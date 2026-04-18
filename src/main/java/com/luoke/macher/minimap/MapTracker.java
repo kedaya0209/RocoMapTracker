@@ -1,6 +1,7 @@
 package com.luoke.macher.minimap;
 
 import com.luoke.capture.CaptureFrameRecord;
+import lombok.extern.slf4j.Slf4j;
 import org.bytedeco.javacpp.BytePointer;
 import org.bytedeco.opencv.opencv_core.Mat;
 import org.bytedeco.opencv.opencv_core.Point;
@@ -13,6 +14,7 @@ import java.nio.FloatBuffer;
 import static org.bytedeco.opencv.global.opencv_core.CV_8UC4;
 import static org.bytedeco.opencv.global.opencv_imgproc.*;
 
+@Slf4j
 public class MapTracker {
 
     private static volatile MapTracker instance;
@@ -45,7 +47,7 @@ public class MapTracker {
         if (record.width() == lastScreenWidth && record.height() == lastScreenHeight && activeROI != null) {
             return true;
         }
-
+        long start = System.currentTimeMillis();
         // 内部转换并执行检测
         try (Mat screenMat = recordToMat(record)) {
             boolean success = runCircleDetection(screenMat);
@@ -53,6 +55,7 @@ public class MapTracker {
                 this.lastScreenWidth = record.width();
                 this.lastScreenHeight = record.height();
             }
+            log.info("识别小地图位置，耗时：{}ms", System.currentTimeMillis() - start);
             return success;
         }
     }

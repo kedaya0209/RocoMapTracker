@@ -64,6 +64,7 @@ public class SiftMapMatcher implements MapMatcher {
         try (Mat img2 = imread(largeMapPath, IMREAD_GRAYSCALE)) {
             if (img2.empty()) throw new RuntimeException("加载失败: " + largeMapPath);
             sift.detectAndCompute(img2, new Mat(), cachedKp2, cachedDes2);
+            log.info("从缓存加载大图特征完成，特征点数: {}", cachedKp2.size());
             saveCache(cachePath);
             buildMatcher();
             this.isInitialized = true;
