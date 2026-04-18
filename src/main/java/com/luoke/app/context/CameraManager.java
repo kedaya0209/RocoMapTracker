@@ -6,7 +6,7 @@ import lombok.Setter;
 @Getter
 @Setter
 public class CameraManager {
-    private boolean followMode = false;
+    private boolean followMode = true;
     // 调低默认跟随缩放倍率（例如 1.0 甚至 0.8），数值越小视野越广
     private double followScale = 1.0;
 

@@ -104,7 +104,7 @@ public class MapTracker {
 
     public void resetToFullRange() {
         if (componentRadius <= 0) return;
-        int r = (int) componentRadius;
+        int r = (int) componentRadius - 10;
         this.activeROI = new Rect(
                 Math.max(0, componentCenter.x() - r),
                 Math.max(0, componentCenter.y() - r),

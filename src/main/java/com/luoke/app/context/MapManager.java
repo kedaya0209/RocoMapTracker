@@ -8,6 +8,8 @@ import lombok.Setter;
 @Setter
 public class MapManager {
     private Image mapImage;
+    private double mapWidth;
+    private double mapHeight;
     private double scale = 1.0, offsetX = 0, offsetY = 0;
     private double viewWidth, viewHeight;
     private double playerX = 0, playerY = 0;
@@ -24,6 +26,8 @@ public class MapManager {
 
     public void init(Image image, double w, double h, double tX, double tY) {
         this.mapImage = image;
+        this.mapWidth = image.getWidth();
+        this.mapHeight = image.getWidth();
         this.viewWidth = w;
         this.viewHeight = h;
         this.trimOffsetX = tX;

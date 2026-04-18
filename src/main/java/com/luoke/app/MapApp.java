@@ -153,7 +153,7 @@ public class MapApp extends Application {
         windowsMonitor = new WindowsMonitor("洛克王国：世界");
         MapTracker tracker = MapTracker.getInstance();
 
-        windowsMonitor.startMonitor0(16, frame -> {
+        windowsMonitor.startMonitor0(10, frame -> {
             if (frame == null) {
                 updateStatusText("状态: ⚠️ 找不到窗口", Color.ORANGE, null);
                 return;
@@ -174,7 +174,7 @@ public class MapApp extends Application {
 
                     if (corners != null && corners.length >= 3) {
                         double[] center = MapMathUtil.getCentroid(corners);
-                        CoordinateTransformer.updatePositionSmoothly(center[0], center[1], 0.6);
+                        CoordinateTransformer.updatePositionSmoothly(center[0], center[1], .8);
 
                         String debugInfo = String.format("窗口: %dx%d | 耗时: %dms", frame.width(), frame.height(), cost);
                         updateStatusText("状态: 🛰️ 正在同步", Color.LIGHTGREEN, debugInfo);

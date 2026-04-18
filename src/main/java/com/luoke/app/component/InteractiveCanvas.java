@@ -46,7 +46,7 @@ public class InteractiveCanvas extends Canvas {
             if (cam.isFollowMode()) {
                 // 跟随模式下：调整视野广度 (Scale越小视野越广)
                 double newFollowScale = cam.getFollowScale() * factor;
-                cam.setFollowScale(Math.max(0.4, Math.min(newFollowScale, 5.0)));
+                cam.setFollowScale(Math.max(0.3, Math.min(newFollowScale, 5.0)));
             } else {
                 // 手动模式下：正常地图缩放
                 MapManager.getInstance().zoom(factor, e.getX(), e.getY());
