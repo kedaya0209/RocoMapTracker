@@ -1,17 +1,17 @@
 package com.luoke.app;
 
 import com.luoke.app.component.InteractiveCanvas;
+import com.luoke.app.component.PlayerRenderer;
 import com.luoke.app.context.CameraManager;
 import com.luoke.app.context.MapManager;
-import com.luoke.app.utils.CoordinateTransformer;
-import com.luoke.app.utils.ImageUtil;
-import com.luoke.app.utils.MapMathUtil;
+import com.luoke.app.utils.*;
 import com.luoke.capture.CaptureFrameRecord;
 import com.luoke.capture.WGCCapture;
 import com.luoke.capture.WindowsMonitor;
 import com.luoke.macher.map.MapMatcher;
 import com.luoke.macher.map.MapMatcherFactory;
-import com.luoke.macher.minimap.MapTracker;
+import com.luoke.macher.player.Player;
+import com.luoke.macher.player.RocoTrackerUtils;
 import com.luoke.processor.MiniMapProcessor;
 import javafx.application.Application;
 import javafx.application.Platform;
@@ -19,41 +19,55 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.geometry.Rectangle2D;
 import javafx.scene.Scene;
+import javafx.scene.canvas.Canvas;
+import javafx.scene.canvas.GraphicsContext;
+import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
-import javafx.scene.image.Image;
+import javafx.scene.image.*;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.stage.Stage;
 import lombok.extern.slf4j.Slf4j;
+import org.bytedeco.opencv.opencv_core.Mat;
 import org.bytedeco.opencv.opencv_core.Rect;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
 import java.io.File;
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 @Slf4j
 public class MapApp extends Application {
 
     private static final String MAP_RESOURCE_PATH = "/source/big_map.png";
+    private static final String PLAYER_SOURCE_PATH = "/source/player.png";
+    private static final String SAVE_FOLDER = "C:\\Users\\tangh\\Desktop\\test";
 
-    private final AtomicBoolean isMatcherReady = new AtomicBoolean(false);
-    private final MapTracker tracker = MapTracker.getInstance();
+    private final com.luoke.macher.minimap.MapTracker tracker = com.luoke.macher.minimap.MapTracker.getInstance();
     private WindowsMonitor windowsMonitor;
     private MapMatcher matcher;
+    private final AtomicBoolean isMatcherReady = new AtomicBoolean(false);
 
-    // UI 组件
-    private Label combinedStatusLabel; // 合并后的信息显示
-    private CheckBox followCb;
-    private CheckBox showInfoCb;
-    private HBox toolBar;
-
+    private Label combinedStatusLabel;
+    private CheckBox followCb, showInfoCb;
     private long lastUiUpdateTime = 0;
 
-    public static void main(String[] args) {
-        launch(args);
-    }
+    private Stage debugStage;
+    private Canvas debugCanvas;
+    private Button debugSaveBtn;
+    private final double DEBUG_SIZE = 250;
+
+    private volatile CaptureFrameRecord lastMiniMapFrame;
+
+    public static void main(String[] args) { launch(args); }
 
     @Override
     public void start(Stage primaryStage) {
@@ -64,18 +78,15 @@ public class MapApp extends Application {
             double ratio = trimmed.getWidth() / trimmed.getHeight();
 
             MapManager.getInstance().init(trimmed, 800, 800 / ratio, trimRect.getMinX(), trimRect.getMinY());
+            PlayerRenderer.getInstance().initIcon(PLAYER_SOURCE_PATH);
 
             Pane root = initUI();
-
             primaryStage.setScene(new Scene(root, 800, 800 / ratio));
-            primaryStage.setTitle("实时辅助地图工具 - 同步稳定版");
+            primaryStage.setTitle("洛克实时导航");
             primaryStage.setOnCloseRequest(e -> stop());
             primaryStage.show();
 
             preloadMatcherAsync();
-
-            Platform.runLater(() -> CameraManager.getInstance().resetToFullView());
-
         } catch (Exception e) {
             log.error("启动失败", e);
         }
@@ -91,128 +102,114 @@ public class MapApp extends Application {
         controlPanel.setPadding(new Insets(15));
         controlPanel.setPickOnBounds(false);
 
-        // 1. 工具栏
-        toolBar = new HBox(12);
-        toolBar.setAlignment(Pos.CENTER_LEFT);
-        toolBar.setStyle("-fx-background-color: rgba(0,0,0,0.6); -fx-padding: 8 12; -fx-background-radius: 4;");
-
-        followCb = new CheckBox("正在加载...");
-        followCb.setDisable(true);
-        followCb.setSelected(CameraManager.getInstance().isFollowMode());
-        followCb.setTextFill(Color.WHITE);
+        HBox toolBar = new HBox(12);
+        toolBar.setStyle("-fx-background-color: rgba(0,0,0,0.6); -fx-padding: 8;");
+        followCb = new CheckBox("跟随"); followCb.setTextFill(Color.WHITE);
         followCb.setOnAction(e -> CameraManager.getInstance().setFollowMode(followCb.isSelected()));
-
-        showInfoCb = new CheckBox("显示详细信息");
-        showInfoCb.setSelected(true);
-        showInfoCb.setTextFill(Color.WHITE);
-
+        showInfoCb = new CheckBox("详细信息"); showInfoCb.setSelected(true); showInfoCb.setTextFill(Color.WHITE);
         toolBar.getChildren().addAll(followCb, showInfoCb);
 
-        // 2. 合并后的信息 Label
-        combinedStatusLabel = new Label("状态: ⏳ 初始化中...");
+        combinedStatusLabel = new Label("系统就绪中...");
         combinedStatusLabel.setTextFill(Color.WHITE);
-        combinedStatusLabel.setStyle("-fx-background-color: rgba(0,0,0,0.6); -fx-padding: 8 12; -fx-background-radius: 4;");
-        combinedStatusLabel.visibleProperty().bind(showInfoCb.selectedProperty());
+        combinedStatusLabel.setStyle("-fx-background-color: rgba(0,0,0,0.7); -fx-padding: 10;");
 
         controlPanel.getChildren().addAll(toolBar, combinedStatusLabel);
         root.getChildren().add(controlPanel);
-
         return root;
+    }
+
+    private void processImage(WGCCapture.Frame frame) {
+        if (frame == null || !isMatcherReady.get()) return;
+        long totalStart = System.nanoTime(); // 总耗时起点
+
+        try {
+            if (tracker.ensureInitialized(frame)) {
+                Rect roi = tracker.getActiveROI();
+                CaptureFrameRecord miniMapFrame = MiniMapProcessor.extractCircleMaskMiniMapBytes(
+                        frame.getPixels(), frame.getWidth(), frame.getHeight(),
+                        roi.x(), roi.y(), roi.width(), roi.height());
+
+                if (miniMapFrame != null && miniMapFrame.bytes() != null) {
+                    this.lastMiniMapFrame = miniMapFrame;
+
+                    // 1. 地图匹配耗时测量
+                    long matchStart = System.nanoTime();
+                    double[][] corners = matcher.run(miniMapFrame.bytes(), roi.width(), roi.height());
+                    double matchMs = (System.nanoTime() - matchStart) / 1_000_000.0;
+
+                    if (corners != null && corners.length >= 3) {
+                        double[] center = MapMathUtil.getCentroid(corners);
+
+                        try (Mat m = ImageUtil.convertToMat(miniMapFrame)) {
+                            // 2. 角色方向识别耗时测量
+                            long playerStart = System.nanoTime();
+                            Player p = RocoTrackerUtils.updatePlayerInfo(m);
+                            double playerMs = (System.nanoTime() - playerStart) / 1_000_000.0;
+
+                            double totalMs = (System.nanoTime() - totalStart) / 1_000_000.0;
+
+                            if (!p.isFound()) {
+                                updateStatusText("未识别到玩家", Color.BROWN,
+                                        String.format("匹配: %.1fms | 方向: %.1fms | 总计: %.1fms", matchMs, playerMs, totalMs));
+                                return;
+                            }
+
+                            // 正常更新状态
+                            double angle = p.getAngle();
+                            MapManager.getInstance().updatePlayerState(center[0], center[1], angle);
+                            CoordinateTransformer.updatePositionSmoothly(center[0], center[1], 0.8);
+
+                            updateStatusText("🛰️ 同步中", Color.LIGHTGREEN,
+                                    String.format("角度: %.1f°\n匹配: %.1fms | 方向: %.1fms | 总计: %.1fms",
+                                            angle, matchMs, playerMs, totalMs));
+                        }
+                    } else {
+                        updateStatusText("❌ 匹配失败", Color.RED, "无法定位坐标");
+                    }
+                }
+            }
+        } catch (Exception e) { log.error("处理异常", e); }
+    }
+
+
+    private void updateStatusText(String status, Color color, String debugInfo) {
+        if (System.currentTimeMillis() - lastUiUpdateTime < 150) return;
+        lastUiUpdateTime = System.currentTimeMillis();
+        Platform.runLater(() -> {
+            combinedStatusLabel.setText(status + "\n" + debugInfo);
+            combinedStatusLabel.setTextFill(color);
+        });
     }
 
     private void preloadMatcherAsync() {
         Thread.ofVirtual().start(() -> {
             try {
                 matcher = MapMatcherFactory.createMatcher(0, false);
-                URL resource = this.getClass().getResource(MAP_RESOURCE_PATH);
-                if (resource != null) {
-                    matcher.init(new File(resource.toURI()).getAbsolutePath());
-                }
+                URL res = getClass().getResource(MAP_RESOURCE_PATH);
+                if (res != null) matcher.init(new File(res.toURI()).getAbsolutePath());
                 isMatcherReady.set(true);
-                Platform.runLater(() -> {
-                    followCb.setDisable(false);
-                    followCb.setText("跟随玩家");
-                    updateStatusText("✅ 已就绪", Color.LIGHTGREEN, "等待进入游戏...");
-                    startLiveMonitor();
-                });
-            } catch (Exception e) {
-                log.error("特征库加载失败", e);
-                Platform.runLater(() -> updateStatusText("❌ 加载失败", Color.RED, e.getMessage()));
-            }
+                Platform.runLater(this::startLiveMonitor);
+            } catch (Exception e) { log.error("加载失败", e); }
         });
     }
 
     private void startLiveMonitor() {
-        if (!isMatcherReady.get()) return;
         windowsMonitor = new WindowsMonitor("洛克王国：世界");
         windowsMonitor.startMonitorPoll(10, this::processImage);
     }
 
-    private void processImage(WGCCapture.Frame frame) {
-        if (frame == null) {
-            updateStatusText("⚠️ 找不到窗口", Color.ORANGE, "请确认游戏已运行");
-            return;
-        }
-
-        try {
-            if (tracker.ensureInitialized(frame)) {
-                Rect roi = tracker.getActiveROI();
-                long startMatch = System.currentTimeMillis();
-
-                CaptureFrameRecord miniMapFrame = MiniMapProcessor.extractCircleMaskMiniMapBytes(
-                        frame.getPixels(), frame.getWidth(), frame.getHeight(),
-                        roi.x(), roi.y(), roi.width(), roi.height());
-
-                if (miniMapFrame != null && miniMapFrame.bytes() != null) {
-                    double[][] corners = matcher.run(miniMapFrame.bytes(), roi.width(), roi.height());
-                    long cost = System.currentTimeMillis() - startMatch;
-
-                    if (corners != null && corners.length >= 3) {
-                        double[] center = MapMathUtil.getCentroid(corners);
-                        CoordinateTransformer.updatePositionSmoothly(center[0], center[1], .8);
-
-                        String debug = String.format("%dx%d | 延迟: %dms", frame.getWidth(), frame.getHeight(), cost);
-                        updateStatusText("🛰️ 正在同步", Color.LIGHTGREEN, debug);
-                    } else {
-                        updateStatusText("🔍 匹配丢失", Color.RED, "特征点不足");
-                    }
-                }
-            } else {
-                updateStatusText("🔎 定位UI...", Color.WHITE, "正在寻找小地图边界");
-            }
-        } catch (Exception e) {
-            log.error("处理异常", e);
-        } finally {
-            frame = null;
-        }
-    }
-
-    /**
-     * 合并显示的更新方法
-     */
-    private void updateStatusText(String status, Color color, String debug) {
-        if (!combinedStatusLabel.isVisible()) return;
-
-        long now = System.currentTimeMillis();
-        // 频率限制在 500ms 左右即可，兼顾实时性与性能
-        if (now - lastUiUpdateTime < 500) return;
-
-        lastUiUpdateTime = now;
-        Platform.runLater(() -> {
-            StringBuilder sb = new StringBuilder("状态: ").append(status);
-            if (debug != null && !debug.isEmpty()) {
-                sb.append("  |  ").append(debug);
-            }
-            combinedStatusLabel.setText(sb.toString());
-            combinedStatusLabel.setTextFill(color);
-        });
+    private void saveToLocal(Image img, String name) throws IOException {
+        int w = (int) img.getWidth(), h = (int) img.getHeight();
+        BufferedImage bi = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        int[] buf = new int[w * h];
+        img.getPixelReader().getPixels(0, 0, w, h, PixelFormat.getIntArgbInstance(), buf, 0, w);
+        bi.setRGB(0, 0, w, h, buf, 0, w);
+        ImageIO.write(bi, "png", new File(SAVE_FOLDER, name));
     }
 
     @Override
     public void stop() {
-        if (windowsMonitor != null) {
-            windowsMonitor.stopMonitor();
-        }
-        log.info("应用退出");
+        if (windowsMonitor != null) windowsMonitor.stopMonitor();
+        if (debugStage != null) debugStage.close();
     }
 }

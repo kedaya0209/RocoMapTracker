@@ -24,13 +24,13 @@ public class TestCapture {
         AtomicInteger count = new AtomicInteger(0);
         int sum = 10;
         CountDownLatch latch = new CountDownLatch(sum);
-        monitor.startMonitorImage(10, bufferedImage -> {
-            ImageIO.write(bufferedImage, "png", new File(String.format("%s\\%d-test.png", dir, count.incrementAndGet())));
-            latch.countDown();
-            if (count.get() >= sum) {
-                monitor.stopMonitor();
-            }
-        });
+//        monitor.startMonitorImage(10, bufferedImage -> {
+//            ImageIO.write(bufferedImage, "png", new File(String.format("%s\\%d-test.png", dir, count.incrementAndGet())));
+//            latch.countDown();
+//            if (count.get() >= sum) {
+//                monitor.stopMonitor();
+//            }
+//        });
         latch.await();
     }
 }

@@ -32,8 +32,8 @@ public class TestMacher {
         MapMatcher matcher = MapMatcherFactory.createMatcher(0, false);
         matcher.init(bigMap);
         monitor.startMonitorPoll(10, frameRecord -> {
-            int h = (int) (frameRecord.height() * 0.148);
-            byte[] bytes = MiniMapProcessor.extractFinalMiniMap(frameRecord, 0.897, 0.0785, 0.148).bytes();
+            int h = 0;
+            byte[] bytes = MiniMapProcessor.extractFinalMiniMap(null, 0.897, 0.0785, 0.148).bytes();
             MatchingResultUtil.saveRawPixelsToFile(bytes, h, h, String.format("%s\\%d-test-miniMap.png", dir, count.get()));
             //获取小地图与大地图匹配的区域
             long start = System.currentTimeMillis();

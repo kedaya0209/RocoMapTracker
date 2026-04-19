@@ -31,6 +31,31 @@ public class ImageUtil {
         return wimg;
     }
 
+    /**
+     * 将 JavaFX Image 转换为 OpenCV Mat (BGRA 格式)
+     * 用于初始化玩家图标时识别其初始朝向
+     */
+    public static Mat imageToMat(Image img) {
+        if (img == null) return null;
+
+        int w = (int) img.getWidth();
+        int h = (int) img.getHeight();
+
+        // 1. 准备一个字节数组来接收像素数据
+        // JavaFX 默认读取格式为 ByteBgraPre (BGRA 顺序，每个像素 4 字节)
+        byte[] buffer = new byte[w * h * 4];
+        PixelReader pr = img.getPixelReader();
+
+        // 2. 将像素数据读入 buffer
+        pr.getPixels(0, 0, w, h, PixelFormat.getByteBgraInstance(), buffer, 0, w * 4);
+
+        // 3. 创建 Mat。注意：CV_8UC4 对应 4 通道 (BGRA)
+        Mat mat = new Mat(h, w, CV_8UC4);
+        mat.data().put(buffer);
+
+        return mat;
+    }
+
     public static InputStream readImageAsStream(String path) {
         return ImageUtil.class.getResourceAsStream(path);
     }

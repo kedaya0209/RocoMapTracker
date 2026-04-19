@@ -242,7 +242,7 @@ public class SiftMapMatcher implements MapMatcher {
             }
 
             // 执行单应性矩阵计算 (RANSAC)
-            try (Mat H = opencv_calib3d.findHomography(objPoints, scenePoints, opencv_calib3d.RANSAC, 10.0, inliers, 1000, 0.995)) {
+            try (Mat H = opencv_calib3d.findHomography(objPoints, scenePoints, opencv_calib3d.RANSAC, 10.0, inliers, 200, 0.95)) {
                 if (H == null || H.empty()) return null;
 
                 try (Mat objCorners = new Mat(4, 1, CV_32FC2);
