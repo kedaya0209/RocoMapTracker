@@ -24,7 +24,7 @@ public class TestCapture {
         AtomicInteger count = new AtomicInteger(0);
         int sum = 10;
         CountDownLatch latch = new CountDownLatch(sum);
-        monitor.startMonitor1(10, bufferedImage -> {
+        monitor.startMonitorImage(10, bufferedImage -> {
             ImageIO.write(bufferedImage, "png", new File(String.format("%s\\%d-test.png", dir, count.incrementAndGet())));
             latch.countDown();
             if (count.get() >= sum) {

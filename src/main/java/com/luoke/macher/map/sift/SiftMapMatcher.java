@@ -22,25 +22,28 @@ import static org.bytedeco.opencv.global.opencv_imgproc.COLOR_BGRA2GRAY;
 import static org.bytedeco.opencv.global.opencv_imgproc.cvtColor;
 
 /**
- * CPU版本
+ * CPU版本 - 深度内存优化版
+ * 解决了在高频采集下 OpenCV Native 对象堆积导致的 6GB OOM 问题
  */
 @Slf4j
 public class SiftMapMatcher implements MapMatcher {
-    private static final float RATIO_THRESHOLD = 0.75f;
+    private static final float RATIO_THRESHOLD = 0.6f;
     private static final int MIN_MATCH_COUNT = 10;
 
-    private Mat cachedDes2; // 注意：由于 mat() 返回新对象，这里不加 final 方便赋值
+    private Mat cachedDes2;
     private final KeyPointVector cachedKp2;
     private final SIFT sift;
     private final FlannBasedMatcher matcher;
+
+    // 预分配空掩码，避免 detectAndCompute 每次产生匿名的 Native Mat
+    private final Mat mask = new Mat();
 
     private final Java2DFrameConverter j2dConverter = new Java2DFrameConverter();
     private final OpenCVFrameConverter.ToMat matConverter = new OpenCVFrameConverter.ToMat();
     private boolean isInitialized = false;
 
     public SiftMapMatcher(int maxFeatures) {
-        // maxFeatures 建议设为 500-1000 以平衡速度和精度
-        this.sift = SIFT.create(maxFeatures, 3, 0.01, 12.0, .8, false);
+        this.sift = SIFT.create(maxFeatures, 3, 0.001, 50.0, 1.6, false);
         this.matcher = new FlannBasedMatcher();
         this.cachedDes2 = new Mat();
         this.cachedKp2 = new KeyPointVector();
@@ -60,11 +63,11 @@ public class SiftMapMatcher implements MapMatcher {
             }
         }
 
-        log.info("提取大图特征...");
+        log.info("提取大图特征 (耗时操作)...");
         try (Mat img2 = imread(largeMapPath, IMREAD_GRAYSCALE)) {
             if (img2.empty()) throw new RuntimeException("加载失败: " + largeMapPath);
-            sift.detectAndCompute(img2, new Mat(), cachedKp2, cachedDes2);
-            log.info("从缓存加载大图特征完成，特征点数: {}", cachedKp2.size());
+            sift.detectAndCompute(img2, mask, cachedKp2, cachedDes2);
+            log.info("特征提取完成，特征点数: {}", cachedKp2.size());
             saveCache(cachePath);
             buildMatcher();
             this.isInitialized = true;
@@ -81,10 +84,7 @@ public class SiftMapMatcher implements MapMatcher {
 
     private void saveCache(String path) {
         try (FileStorage fs = new FileStorage(path, FileStorage.WRITE)) {
-            // 根据 FileStorage 源码，直接 write(String, Mat)
             fs.write("descriptors", cachedDes2);
-
-            // 手动将 KeyPointVector 转为 Mat 保存
             int kpCount = (int) cachedKp2.size();
             try (Mat kpMat = new Mat(kpCount, 7, CV_32FC1)) {
                 FloatIndexer idx = kpMat.createIndexer();
@@ -110,11 +110,9 @@ public class SiftMapMatcher implements MapMatcher {
         try (FileStorage fs = new FileStorage(path, FileStorage.READ)) {
             if (!fs.isOpened()) return false;
 
-            // 核心修复点 1：根据 FileNode 源码使用 .mat() 方法
             if (this.cachedDes2 != null) this.cachedDes2.release();
             this.cachedDes2 = fs.get("descriptors").mat();
 
-            // 核心修复点 2：读取关键点矩阵
             try (Mat kpMat = fs.get("keypoints").mat()) {
                 if (cachedDes2.empty() || kpMat.empty()) return false;
 
@@ -150,42 +148,67 @@ public class SiftMapMatcher implements MapMatcher {
     @Override
     public double[][] run(byte[] imageBytes, int width, int height) {
         if (imageBytes == null) return null;
-        try (BytePointer ptr = new BytePointer(imageBytes);
-             Mat bgraMat = new Mat(height, width, CV_8UC4, ptr);
-             Mat grayMat = new Mat()) {
+
+        // 显式手动管理 Native 内存，防止 6GB OOM
+        BytePointer ptr = null;
+        Mat bgraMat = null;
+        Mat grayMat = null;
+        try {
+            ptr = new BytePointer(imageBytes);
+            bgraMat = new Mat(height, width, CV_8UC4, ptr);
+            grayMat = new Mat();
+
             cvtColor(bgraMat, grayMat, COLOR_BGRA2GRAY);
             return processMat(grayMat);
+        } finally {
+            // 必须在回调结束后立即释放，不可等待 GC
+            if (grayMat != null) grayMat.release();
+            if (bgraMat != null) bgraMat.release();
+            if (ptr != null) ptr.deallocate();
         }
     }
 
     @Override
     public double[][] run(BufferedImage image) {
         if (image == null) return null;
-        Mat colorMat = matConverter.convert(j2dConverter.convert(image));
-        try (Mat grayMat = new Mat()) {
+        Mat colorMat = null;
+        Mat grayMat = null;
+        try {
+            colorMat = matConverter.convert(j2dConverter.convert(image));
+            if (colorMat == null) return null;
+            grayMat = new Mat();
             cvtColor(colorMat, grayMat, COLOR_BGRA2GRAY);
             return processMat(grayMat);
+        } finally {
+            if (grayMat != null) grayMat.release();
+            if (colorMat != null) colorMat.release();
         }
     }
 
     private double[][] processMat(Mat img1) {
         if (img1 == null || img1.empty() || !isInitialized) return null;
 
+        // 使用 try-with-resources 管理这些实现了 AutoCloseable 的特征点和向量对象
         try (KeyPointVector kp1 = new KeyPointVector();
              Mat des1 = new Mat();
              DMatchVectorVector knnMatches = new DMatchVectorVector();
              DMatchVector goodMatches = new DMatchVector()) {
 
-            sift.detectAndCompute(img1, new Mat(), kp1, des1);
+            // 使用预分配的 mask 避免内存泄露
+            sift.detectAndCompute(img1, mask, kp1, des1);
+            if (des1.empty()) return null;
+
             matcher.knnMatch(des1, knnMatches, 2);
 
             for (long i = 0; i < knnMatches.size(); i++) {
-                DMatchVector m = knnMatches.get(i);
-                if (m.size() >= 2) {
-                    DMatch m1 = m.get(0);
-                    DMatch m2 = m.get(1);
-                    if (m1.distance() < RATIO_THRESHOLD * m2.distance()) {
-                        goodMatches.push_back(m1);
+                // knnMatches.get(i) 会产生临时的 DMatchVector，必须显式释放
+                try (DMatchVector m = knnMatches.get(i)) {
+                    if (m.size() >= 2) {
+                        DMatch m1 = m.get(0);
+                        DMatch m2 = m.get(1);
+                        if (m1.distance() < RATIO_THRESHOLD * m2.distance()) {
+                            goodMatches.push_back(m1);
+                        }
                     }
                 }
             }
@@ -199,24 +222,29 @@ public class SiftMapMatcher implements MapMatcher {
 
     private double[][] calculateCoordinates(Mat img1, KeyPointVector kp1, DMatchVector goodMatches) {
         int rows = (int) goodMatches.size();
+        // findHomography 过程涉及临时矩阵，使用 try 块包装
         try (Mat objPoints = new Mat(rows, 1, CV_32FC2);
-             Mat scenePoints = new Mat(rows, 1, CV_32FC2)) {
+             Mat scenePoints = new Mat(rows, 1, CV_32FC2);
+             Mat inliers = new Mat()) {
 
             FloatIndexer objIdx = objPoints.createIndexer();
             FloatIndexer sceneIdx = scenePoints.createIndexer();
 
             for (long i = 0; i < rows; i++) {
-                DMatch m = goodMatches.get(i);
-                Point2f p1 = kp1.get(m.queryIdx()).pt();
-                Point2f p2 = cachedKp2.get(m.trainIdx()).pt();
-                objIdx.put(i, 0, 0, p1.x());
-                objIdx.put(i, 0, 1, p1.y());
-                sceneIdx.put(i, 0, 0, p2.x());
-                sceneIdx.put(i, 0, 1, p2.y());
+                // goodMatches.get(i) 同样会产生临时的 Native 对象引用
+                try (DMatch m = goodMatches.get(i)) {
+                    Point2f p1 = kp1.get(m.queryIdx()).pt();
+                    Point2f p2 = cachedKp2.get(m.trainIdx()).pt();
+                    objIdx.put(i, 0, 0, p1.x());
+                    objIdx.put(i, 0, 1, p1.y());
+                    sceneIdx.put(i, 0, 0, p2.x());
+                    sceneIdx.put(i, 0, 1, p2.y());
+                }
             }
 
-            try (Mat H = opencv_calib3d.findHomography(objPoints, scenePoints, opencv_calib3d.RANSAC, 3.0, new Mat(), 300, 0.995)) {
-                if (H.empty()) return null;
+            // 执行单应性矩阵计算 (RANSAC)
+            try (Mat H = opencv_calib3d.findHomography(objPoints, scenePoints, opencv_calib3d.RANSAC, 10.0, inliers, 1000, 0.995)) {
+                if (H == null || H.empty()) return null;
 
                 try (Mat objCorners = new Mat(4, 1, CV_32FC2);
                      Mat sceneCorners = new Mat(4, 1, CV_32FC2)) {
@@ -247,12 +275,19 @@ public class SiftMapMatcher implements MapMatcher {
 
     @Override
     public void destroy() {
-        log.info("释放资源...");
-        if (cachedDes2 != null) cachedDes2.release();
+        log.info("释放 SiftMapMatcher 关键资源...");
+        if (cachedDes2 != null) {
+            cachedDes2.release();
+            cachedDes2 = null;
+        }
+        if (mask != null) {
+            mask.release();
+        }
         cachedKp2.close();
         sift.close();
         matcher.close();
         j2dConverter.close();
         matConverter.close();
+        log.info("资源释放完毕");
     }
 }

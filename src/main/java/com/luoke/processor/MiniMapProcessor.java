@@ -2,6 +2,7 @@ package com.luoke.processor;
 
 import com.luoke.capture.CaptureFrameRecord;
 import com.luoke.capture.ImageConverter;
+import com.luoke.capture.WGCCapture;
 
 import java.awt.image.BufferedImage;
 
@@ -119,8 +120,8 @@ public final class MiniMapProcessor {
     }
 
     // 辅助方法：快速将 Record 转换为图片
-    public static BufferedImage toImage(CaptureFrameRecord record) {
-        if (record == null) return null;
-        return ImageConverter.convertBgraToImage(record.bytes(), record.width(), record.height());
+    public static BufferedImage toImage(WGCCapture.Frame frame) {
+        if (frame == null) return null;
+        return ImageConverter.convertBgraToImage(frame.getPixels(), frame.getWidth(), frame.getHeight());
     }
 }

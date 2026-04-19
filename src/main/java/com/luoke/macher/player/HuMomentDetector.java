@@ -8,6 +8,9 @@ import static org.bytedeco.opencv.global.opencv_core.*;
 import static org.bytedeco.opencv.global.opencv_imgcodecs.*;
 import static org.bytedeco.opencv.global.opencv_imgproc.*;
 
+/**
+ * 结果很差，考虑使用KLT优化
+ */
 public class HuMomentDetector {
 
     public static void main(String[] args) {

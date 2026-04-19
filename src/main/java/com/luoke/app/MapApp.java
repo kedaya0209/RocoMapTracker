@@ -7,6 +7,7 @@ import com.luoke.app.utils.CoordinateTransformer;
 import com.luoke.app.utils.ImageUtil;
 import com.luoke.app.utils.MapMathUtil;
 import com.luoke.capture.CaptureFrameRecord;
+import com.luoke.capture.WGCCapture;
 import com.luoke.capture.WindowsMonitor;
 import com.luoke.macher.map.MapMatcher;
 import com.luoke.macher.map.MapMatcherFactory;
@@ -20,11 +21,8 @@ import javafx.geometry.Rectangle2D;
 import javafx.scene.Scene;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
-import javafx.scene.control.ToggleButton;
 import javafx.scene.image.Image;
-import javafx.scene.layout.HBox;
-import javafx.scene.layout.Pane;
-import javafx.scene.layout.VBox;
+import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.stage.Stage;
 import lombok.extern.slf4j.Slf4j;
@@ -41,6 +39,7 @@ public class MapApp extends Application {
     private static final String MAP_RESOURCE_PATH = "/source/big_map.png";
     private final AtomicBoolean isProcessing = new AtomicBoolean(false);
     private final AtomicBoolean isMatcherReady = new AtomicBoolean(false);
+    private final MapTracker tracker = MapTracker.getInstance();
     private WindowsMonitor windowsMonitor;
     private MapMatcher matcher;
     private Label statusLabel;
@@ -48,6 +47,9 @@ public class MapApp extends Application {
     private VBox infoContainer; // 用于控制状态栏整体显示/隐藏
 
     private long lastUiUpdateTime = 0;
+
+    //配置项,主动拉去或者消费推流  枚举项 HIGH_PERFORMANCE , POWER_SAVING
+    private String performanceMode = "HIGH_PERFORMANCE";
 
     public static void main(String[] args) {
         launch(args);
@@ -76,16 +78,16 @@ public class MapApp extends Application {
             // 1. 水平排列的控制按钮
             HBox toolBar = new HBox(12);
             toolBar.setAlignment(Pos.CENTER_LEFT);
-
-            ToggleButton followBtn = new ToggleButton("正在加载...");
-            followBtn.setDisable(true);
-            followBtn.setPrefWidth(120);
+            CheckBox followCb = new CheckBox("正在加载...");
+            followCb.setDisable(true);
+            followCb.setPrefWidth(120);
+            followCb.setText("跟随玩家");
 
             CheckBox showInfoCb = new CheckBox("显示状态信息");
             showInfoCb.setSelected(true);
             showInfoCb.setTextFill(Color.WHITE);
 
-            toolBar.getChildren().addAll(followBtn, showInfoCb);
+            toolBar.getChildren().addAll(followCb, showInfoCb);
 
             // 2. 状态信息容器
             infoContainer = new VBox(5);
@@ -101,14 +103,16 @@ public class MapApp extends Application {
             // 绑定显示开关
             infoContainer.visibleProperty().bind(showInfoCb.selectedProperty());
 
+            //现在是透明背景，需要填充一个颜色，要与infoContainer颜色一致
+            toolBar.setBackground(infoContainer.getBackground());
+
             controlPanel.getChildren().addAll(toolBar, infoContainer);
             root.getChildren().add(controlPanel);
 
             // 事件监听
-            followBtn.setOnAction(e -> {
-                boolean active = followBtn.isSelected();
+            followCb.setOnAction(e -> {
+                boolean active = followCb.isSelected();
                 CameraManager.getInstance().setFollowMode(active);
-                followBtn.setText(active ? "📍 正在跟随" : "📍 停止跟随");
             });
 
             primaryStage.setScene(new Scene(root, 800, 800 / ratio));
@@ -116,7 +120,7 @@ public class MapApp extends Application {
             primaryStage.setOnCloseRequest(e -> stop());
             primaryStage.show();
 
-            preloadMatcherAsync(primaryStage, followBtn);
+            preloadMatcherAsync(followCb);
             Platform.runLater(() -> CameraManager.getInstance().resetToFullView());
 
         } catch (Exception e) {
@@ -124,8 +128,7 @@ public class MapApp extends Application {
         }
     }
 
-    // ... preloadMatcherAsync 保持不变 ...
-    private void preloadMatcherAsync(Stage stage, ToggleButton btn) {
+    private void preloadMatcherAsync(CheckBox btn) {
         Thread.ofVirtual().start(() -> {
             try {
                 matcher = MapMatcherFactory.createMatcher(0, false);
@@ -136,7 +139,6 @@ public class MapApp extends Application {
                 isMatcherReady.set(true);
                 Platform.runLater(() -> {
                     btn.setDisable(false);
-                    btn.setText("📍 停止跟随");
                     statusLabel.setText("状态: ✅ 已就绪");
                     startLiveMonitor();
                 });
@@ -151,46 +153,51 @@ public class MapApp extends Application {
         if (!isMatcherReady.get()) return;
 
         windowsMonitor = new WindowsMonitor("洛克王国：世界");
-        MapTracker tracker = MapTracker.getInstance();
+        if ("HIGH_PERFORMANCE".equals(performanceMode)) {
+            windowsMonitor.startMonitorPush(10, this::processImage);
+            return;
+        }
+        windowsMonitor.startMonitorPoll(10, this::processImage);
 
-        windowsMonitor.startMonitor0(10, frame -> {
-            if (frame == null) {
-                updateStatusText("状态: ⚠️ 找不到窗口", Color.ORANGE, null);
-                return;
-            }
-            if (!isProcessing.compareAndSet(false, true)) return;
+    }
 
-            try {
-                if (tracker.ensureInitialized(frame)) {
-                    Rect roi = tracker.getActiveROI();
-                    long startMatch = System.currentTimeMillis();
+    private void processImage(WGCCapture.Frame frame) {
+        if (frame == null) {
+            updateStatusText("状态: ⚠️ 找不到窗口", Color.ORANGE, null);
+            return;
+        }
+        if (!isProcessing.compareAndSet(false, true)) return;
 
-                    CaptureFrameRecord miniMapFrame = MiniMapProcessor.extractCircleMaskMiniMapBytes(
-                            frame.bytes(), frame.width(), frame.height(),
-                            roi.x(), roi.y(), roi.width(), roi.height());
+        try {
+            if (tracker.ensureInitialized(frame)) {
+                Rect roi = tracker.getActiveROI();
+                long startMatch = System.currentTimeMillis();
 
-                    double[][] corners = matcher.run(miniMapFrame.bytes(), roi.width(), roi.height());
-                    long cost = System.currentTimeMillis() - startMatch;
+                CaptureFrameRecord miniMapFrame = MiniMapProcessor.extractCircleMaskMiniMapBytes(
+                        frame.getPixels(), frame.getWidth(), frame.getHeight(),
+                        roi.x(), roi.y(), roi.width(), roi.height());
 
-                    if (corners != null && corners.length >= 3) {
-                        double[] center = MapMathUtil.getCentroid(corners);
-                        CoordinateTransformer.updatePositionSmoothly(center[0], center[1], .8);
+                double[][] corners = matcher.run(miniMapFrame.bytes(), roi.width(), roi.height());
+                long cost = System.currentTimeMillis() - startMatch;
 
-                        String debugInfo = String.format("窗口: %dx%d | 耗时: %dms", frame.width(), frame.height(), cost);
-                        updateStatusText("状态: 🛰️ 正在同步", Color.LIGHTGREEN, debugInfo);
-                    } else {
-                        updateStatusText("状态: 🔍 匹配丢失", Color.RED, null);
-                    }
+                if (corners != null && corners.length >= 3) {
+                    double[] center = MapMathUtil.getCentroid(corners);
+                    CoordinateTransformer.updatePositionSmoothly(center[0], center[1], .8);
+
+                    String debugInfo = String.format("窗口: %dx%d | 耗时: %dms", frame.getWidth(), frame.getHeight(), cost);
+                    updateStatusText("状态: 🛰️ 正在同步", Color.LIGHTGREEN, debugInfo);
                 } else {
-                    String debugInfo = String.format("窗口: %dx%d | 正在寻找 UI...", frame.width(), frame.height());
-                    updateStatusText("状态: 🔎 正在定位 UI...", Color.WHITE, debugInfo);
+                    updateStatusText("状态: 🔍 匹配丢失", Color.RED, null);
                 }
-            } catch (Exception e) {
-                log.error("处理异常", e);
-            } finally {
-                isProcessing.set(false);
+            } else {
+                String debugInfo = String.format("窗口: %dx%d | 正在寻找 UI...", frame.getWidth(), frame.getHeight());
+                updateStatusText("状态: 🔎 正在定位 UI...", Color.WHITE, debugInfo);
             }
-        });
+        } catch (Exception e) {
+            log.error("处理异常", e);
+        } finally {
+            isProcessing.set(false);
+        }
     }
 
     private void updateStatusText(String status, Color color, String debug) {
