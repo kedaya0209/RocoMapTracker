@@ -23,7 +23,6 @@ import static org.bytedeco.opencv.global.opencv_imgproc.cvtColor;
 
 /**
  * CPU版本 - 深度内存优化版
- * 解决了在高频采集下 OpenCV Native 对象堆积导致的 6GB OOM 问题
  */
 @Slf4j
 public class SiftMapMatcher implements MapMatcher {

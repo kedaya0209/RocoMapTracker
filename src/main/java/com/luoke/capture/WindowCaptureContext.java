@@ -39,29 +39,8 @@ public class WindowCaptureContext implements AutoCloseable {
     public WGCCapture.Frame captureFrameBytes() {
         if (capture == null && !init()) return null;
 
-        int[] wh = new int[2];
-        // 这里的 1000ms 是等待下一帧的超时时间
-        WGCCapture.Frame frame = capture.captureSingleFrame();
-
-        if (frame == null) {
-            log.warn("Grab timeout or no data.");
-            return null;
-        }
-        return frame;
-    }
-
-    /**
-     * 异步模式：开启监听
-     * 注意：一旦调用此方法，采集流就会一直运行并触发 listener
-     */
-    public void startAsyncCapture(WGCCapture.FrameListener listener) {
-        if (capture == null && !init()) return;
-        if (isStarted) {
-            log.warn("采集已经开启，无法重新设置监听器。如需切换请重新创建 Context。");
-            return;
-        }
-        capture.startPushThread(33, listener);
-        isStarted = true;
+        // 这里的逻辑保持不变，用于单次截图
+        return capture.captureSingleFrame();
     }
 
     /**
@@ -96,7 +75,6 @@ public class WindowCaptureContext implements AutoCloseable {
         if (capture != null) {
             capture.release();
             capture = null;
-            isStarted = false;
             log.info("WindowCaptureContext closed.");
         }
     }
