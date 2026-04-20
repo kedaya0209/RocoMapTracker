@@ -3,9 +3,11 @@ package com.luoke.capture;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 
-import java.io.*;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
-import java.nio.file.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 
 @Slf4j
 public class WGCCapture {
@@ -46,9 +48,12 @@ public class WGCCapture {
         void onFrame(Frame frame);
     }
 
-    private long nativePtr;
+    private final long hwnd;
+    // ===================== 修复：使用 volatile 保证多线程可见性 =====================
+    private volatile long nativePtr;
 
     public WGCCapture(long hwnd) {
+        this.hwnd = hwnd;
         this.nativePtr = nativeInit(hwnd);
         if (this.nativePtr == 0) throw new RuntimeException("Init Failed");
     }
@@ -67,6 +72,12 @@ public class WGCCapture {
             nativeRelease(nativePtr);
             nativePtr = 0;
         }
+    }
+
+    // ===================== 核心修复：Rust 重建后会调用此方法更新指针 =====================
+    private void setNativePtr(long newPtr) {
+        this.nativePtr = newPtr;
+        log.debug("捕获器已重建，新native指针: {}", newPtr);
     }
 
     private native long nativeInit(long hwnd);

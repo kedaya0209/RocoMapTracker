@@ -2,10 +2,11 @@ package com.luoke.capture;
 
 import com.luoke.processor.MiniMapProcessor;
 import lombok.extern.slf4j.Slf4j;
+
+import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
-import javax.imageio.ImageIO;
 import java.nio.file.Files;
 
 @Slf4j
@@ -77,5 +78,13 @@ public class WindowCaptureContext implements AutoCloseable {
             capture = null;
             log.info("WindowCaptureContext closed.");
         }
+    }
+
+    public boolean isStarted() {
+        return isStarted;
+    }
+
+    public void setStarted(boolean started) {
+        isStarted = started;
     }
 }

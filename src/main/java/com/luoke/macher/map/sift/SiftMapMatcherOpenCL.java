@@ -1,5 +1,6 @@
 package com.luoke.macher.map.sift;
 
+import com.luoke.app.utils.ImageUtil;
 import com.luoke.macher.map.MapMatcher;
 import lombok.extern.slf4j.Slf4j;
 import org.bytedeco.javacpp.BytePointer;
@@ -17,7 +18,6 @@ import java.io.File;
 
 import static org.bytedeco.opencv.global.opencv_core.*;
 import static org.bytedeco.opencv.global.opencv_imgcodecs.IMREAD_GRAYSCALE;
-import static org.bytedeco.opencv.global.opencv_imgcodecs.imread;
 import static org.bytedeco.opencv.global.opencv_imgproc.*;
 
 /**
@@ -63,7 +63,7 @@ public class SiftMapMatcherOpenCL implements MapMatcher {
         }
 
         log.info("GPU(OpenCL) 提取大图特征并建立索引...");
-        try (Mat img2 = imread(largeMapPath, IMREAD_GRAYSCALE);
+        try (Mat img2 = ImageUtil.loadResourceToMat(largeMapPath, IMREAD_GRAYSCALE);
              UMat uImg2 = img2.getUMat(ACCESS_READ);
              UMat uDes2Temp = new UMat()) {
 
@@ -78,6 +78,8 @@ public class SiftMapMatcherOpenCL implements MapMatcher {
             }
             this.isInitialized = true;
             log.info("大图初始化完成，提取特征点数: {}", cachedKp2.size());
+        } catch (Exception e) {
+            log.error("运行发生错误, e:", e);
         }
     }
 
@@ -196,7 +198,7 @@ public class SiftMapMatcherOpenCL implements MapMatcher {
 
     @Override
     public double[][] run(String path) {
-        try (Mat img = imread(path, IMREAD_GRAYSCALE);
+        try (Mat img = ImageUtil.loadResourceToMat(path, IMREAD_GRAYSCALE);
              UMat uImg = img.getUMat(ACCESS_READ)) {
             return processUMat(uImg);
         }

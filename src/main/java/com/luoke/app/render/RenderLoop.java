@@ -1,0 +1,75 @@
+package com.luoke.app.render;
+
+import com.luoke.app.context.CameraManager;
+import com.luoke.app.context.MapManager;
+import com.luoke.app.context.StatsManager;
+import javafx.animation.AnimationTimer;
+import javafx.scene.canvas.GraphicsContext;
+import javafx.scene.text.Font;
+import javafx.scene.text.Text;
+
+public class RenderLoop extends AnimationTimer {
+
+    // 和MainApp中topBar的padding保持一致
+    private static final int TOP_BAR_HEIGHT = 40;
+    private final GraphicsContext gc;
+    private final Font font = Font.font("Microsoft YaHei", 14);
+    private final Text textMeasurer = new Text();
+
+    public RenderLoop(GraphicsContext gc) {
+        this.gc = gc;
+        textMeasurer.setFont(font);
+    }
+
+    @Override
+    public void handle(long now) {
+        CameraManager.getInstance().updateViewport();
+        double canvasWidth = gc.getCanvas().getWidth();
+        double canvasHeight = gc.getCanvas().getHeight();
+
+        gc.clearRect(0, 0, canvasWidth, canvasHeight);
+        renderMap();
+        renderPlayer();
+        renderStatsUI(canvasWidth);
+    }
+
+    private void renderMap() {
+        MapManager mm = MapManager.getInstance();
+        if (mm.getMapImage() == null) return;
+
+        gc.save();
+        gc.translate(mm.getOffsetX(), mm.getOffsetY());
+        gc.scale(mm.getScale(), mm.getScale());
+        gc.drawImage(mm.getMapImage(), 0, 0);
+        gc.restore();
+    }
+
+    private void renderPlayer() {
+        PlayerRenderer.getInstance().draw(gc);
+    }
+
+    private void renderStatsUI(double canvasWidth) {
+        StatsManager stats = StatsManager.getInstance();
+        gc.setFont(font);
+
+        String text = String.format(
+                "小地图：%dms | 匹配：%dms | 朝向：%dms | 频率：%d",
+                stats.getLastMapDetectMs(),
+                stats.getLastMatchMs(),
+                stats.getLastDirectionMs(),
+                stats.getFrequency()
+        );
+
+        textMeasurer.setText(text);
+        double textWidth = textMeasurer.getLayoutBounds().getWidth();
+        double margin = 15;
+        double textHeight = textMeasurer.getLayoutBounds().getHeight();
+
+        // 核心修复：和顶部栏的Y坐标保持一致
+        double bgY = (TOP_BAR_HEIGHT - textHeight) / 2; // 垂直居中于topBar
+        double textX = canvasWidth - textWidth - margin;
+        double textY = bgY + textHeight / 2 + 4; // 修正文字基线
+
+        gc.fillText(text, textX, textY);
+    }
+}

@@ -1,5 +1,7 @@
 package com.luoke.macher.map.sift;
 
+import com.luoke.app.utils.FileUtil;
+import com.luoke.app.utils.ImageUtil;
 import com.luoke.macher.map.MapMatcher;
 import lombok.extern.slf4j.Slf4j;
 import org.bytedeco.javacpp.BytePointer;
@@ -17,7 +19,6 @@ import java.io.File;
 
 import static org.bytedeco.opencv.global.opencv_core.*;
 import static org.bytedeco.opencv.global.opencv_imgcodecs.IMREAD_GRAYSCALE;
-import static org.bytedeco.opencv.global.opencv_imgcodecs.imread;
 import static org.bytedeco.opencv.global.opencv_imgproc.COLOR_BGRA2GRAY;
 import static org.bytedeco.opencv.global.opencv_imgproc.cvtColor;
 
@@ -50,12 +51,12 @@ public class SiftMapMatcher implements MapMatcher {
 
     @Override
     public void init(String largeMapPath) {
-        String cachePath = largeMapPath + ".sift.xml";
-        File cacheFile = new File(cachePath);
-
+        String cacheFileName = largeMapPath + ".sift.xml";
+        File cacheFile = FileUtil.getRelativeFile(cacheFileName);
+        String absolutePath = cacheFile.getAbsolutePath();
         if (cacheFile.exists()) {
-            log.info("从缓存加载特征: {}", cachePath);
-            if (loadCache(cachePath)) {
+            log.info("从缓存加载特征: {}", absolutePath);
+            if (loadCache(absolutePath)) {
                 buildMatcher();
                 this.isInitialized = true;
                 return;
@@ -63,11 +64,11 @@ public class SiftMapMatcher implements MapMatcher {
         }
 
         log.info("提取大图特征 (耗时操作)...");
-        try (Mat img2 = imread(largeMapPath, IMREAD_GRAYSCALE)) {
+        try (Mat img2 = ImageUtil.loadResourceToMat(largeMapPath, IMREAD_GRAYSCALE)) {
             if (img2.empty()) throw new RuntimeException("加载失败: " + largeMapPath);
             sift.detectAndCompute(img2, mask, cachedKp2, cachedDes2);
             log.info("特征提取完成，特征点数: {}", cachedKp2.size());
-            saveCache(cachePath);
+            saveCache(absolutePath);
             buildMatcher();
             this.isInitialized = true;
         }
@@ -139,7 +140,7 @@ public class SiftMapMatcher implements MapMatcher {
 
     @Override
     public double[][] run(String smallImgPath) {
-        try (Mat img = imread(smallImgPath, IMREAD_GRAYSCALE)) {
+        try (Mat img = ImageUtil.loadResourceToMat(smallImgPath, IMREAD_GRAYSCALE)) {
             return processMat(img);
         }
     }

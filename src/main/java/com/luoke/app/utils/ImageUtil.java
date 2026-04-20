@@ -8,11 +8,17 @@ import javafx.scene.image.PixelReader;
 import javafx.scene.image.WritableImage;
 import lombok.extern.slf4j.Slf4j;
 import org.bytedeco.javacpp.BytePointer;
+import org.bytedeco.opencv.global.opencv_imgcodecs;
 import org.bytedeco.opencv.opencv_core.Mat;
 
+import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 import static org.bytedeco.opencv.global.opencv_core.CV_8UC4;
+import static org.bytedeco.opencv.global.opencv_imgcodecs.IMREAD_UNCHANGED;
+import static org.opencv.core.CvType.CV_8UC1;
 
 @Slf4j
 public class ImageUtil {
@@ -104,20 +110,82 @@ public class ImageUtil {
      */
     public static byte[] matToBytes(Mat mat) {
         if (mat == null || mat.empty()) return null;
-
-        // 如果你的 Matcher 接受的是编码后的图片（如 PNG/JPG）
-        /*
-        BytePointer buf = new BytePointer();
-        imencode(".png", mat, buf);
-        byte[] bytes = new byte[(int)buf.limit()];
-        buf.get(bytes);
-        return bytes;
-        */
-
-        // 如果你的 Matcher 接受的是原始 BGR 像素流（通常性能更高）
         int size = (int) (mat.total() * mat.elemSize());
         byte[] bytes = new byte[size];
         mat.data().get(bytes);
         return bytes;
+    }
+
+    /**
+     * 核心方法：从 ClassPath 读取图片并直接转为 OpenCV Mat
+     * 无论在 IDE 还是打包成 EXE，此方法都有效
+     *
+     * @param resourcePath 资源路径，例如 "/assets/maps/large_map.png"
+     * @param flags        读取模式，例如 opencv_imgcodecs.IMREAD_GRAYSCALE
+     */
+    public static Mat loadResourceToMat(String resourcePath, int flags) {
+        // 1. 使用流读取，规避 "URI is not hierarchical" 报错
+        try (InputStream is = ImageUtil.class.getResourceAsStream(resourcePath)) {
+            if (is == null) {
+                throw new RuntimeException("找不到资源文件: " + resourcePath);
+            }
+
+            // 2. 将流读入内存字节数组
+            byte[] bytes = is.readAllBytes();
+
+            // 3. 将字节数组解码为 Mat 像素矩阵
+            try (BytePointer bp = new BytePointer(bytes)) {
+                try (Mat encodedMat = new Mat(1, bytes.length, CV_8UC1, bp)) {
+                    Mat decodedMat = opencv_imgcodecs.imdecode(encodedMat, flags);
+                    if (decodedMat.empty()) {
+                        throw new RuntimeException("解码失败: " + resourcePath);
+                    }
+                    return decodedMat;
+                }
+            }
+        } catch (IOException e) {
+            log.error("读取资源异常: {}", resourcePath, e);
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * 将文件路径读取并转为 Mat 对象
+     * 适用于本地文件系统路径
+     */
+    public static Mat readFileToMat(Path path) throws IOException {
+        // 1. 使用 Files.readAllBytes 读取原始字节 (编码后的数据)
+        byte[] bytes = Files.readAllBytes(path);
+
+        // 2. 将字节数组转为 Mat 并解码
+        return bytesToMat(bytes, IMREAD_UNCHANGED);
+    }
+
+    /**
+     * 核心转换逻辑：将字节数组解码为 Mat
+     */
+    public static Mat bytesToMat(byte[] bytes, int flags) {
+        if (bytes == null || bytes.length == 0) {
+            throw new IllegalArgumentException("字节数组为空，无法转换 Mat");
+        }
+
+        // 1. 将 byte[] 包装进 BytePointer
+        // 注意：这里使用 BytePointer 是因为 JavaCPP 的 Mat 构造函数需要它来映射内存
+        try (BytePointer bp = new BytePointer(bytes)) {
+
+            // 2. 创建一个一维的“容器” Mat，存放原始编码数据
+            // 参数说明：行数1, 列数bytes.length, 类型CV_8UC1
+            try (Mat encodedMat = new Mat(1, bytes.length, org.bytedeco.opencv.global.opencv_core.CV_8UC1, bp)) {
+
+                // 3. 使用 imdecode 进行解码（将 PNG/JPG 解压为像素矩阵）
+                Mat decodedMat = opencv_imgcodecs.imdecode(encodedMat, flags);
+
+                if (decodedMat.empty()) {
+                    throw new RuntimeException("Mat 解码失败，请检查数据格式是否为有效的图像编码");
+                }
+
+                return decodedMat;
+            }
+        }
     }
 }

@@ -1,4 +1,4 @@
-package com.luoke.app.component;
+package com.luoke.app.render;
 
 import com.luoke.app.context.MapManager;
 import com.luoke.app.utils.ImageUtil;
