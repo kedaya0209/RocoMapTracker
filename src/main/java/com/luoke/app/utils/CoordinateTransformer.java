@@ -10,8 +10,8 @@ public class CoordinateTransformer {
     public static double[] transform(double rawX, double rawY) {
         MapManager mm = MapManager.getInstance();
         return new double[]{
-                rawX - mm.getTrimOffsetX(),
-                rawY - mm.getTrimOffsetY()
+                rawX,
+                rawY
         };
     }
 

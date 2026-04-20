@@ -15,27 +15,20 @@ public class MapManager {
     private double playerX = -1, playerY = -1;
     private double playerAngle = 0;
 
-    private double trimOffsetX = 0, trimOffsetY = 0;
-
     private MapManager() {}
     public static MapManager getInstance() { return Holder.INSTANCE; }
 
-    public void init(Image image, double w, double h, double tX, double tY) {
+    public void init(Image image, double w, double h) {
         this.mapImage = image;
         this.mapWidth = image.getWidth();
         this.mapHeight = image.getHeight();
         this.viewWidth = w;
         this.viewHeight = h;
-        this.trimOffsetX = tX;
-        this.trimOffsetY = tY;
     }
 
-    // ==============================================
-    // ✅【修复】玩家坐标必须加上 trim 偏移！！！
-    // ==============================================
     public void updatePlayerState(double x, double y, double visualAngle) {
-        this.playerX = x + trimOffsetX;   // 这里！！！
-        this.playerY = y + trimOffsetY;   // 这里！！！
+        this.playerX = x;
+        this.playerY = y;
         this.playerAngle = visualAngle;
     }
 

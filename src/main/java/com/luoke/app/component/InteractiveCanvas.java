@@ -66,7 +66,7 @@ public class InteractiveCanvas extends Canvas {
             double factor = e.getDeltaY() > 0 ? 1.1 : 0.9;
             CameraManager cam = CameraManager.getInstance();
             if (cam.isFollowMode()) {
-                cam.setFollowScale(Math.max(0.3, Math.min(cam.getFollowScale() * factor, 5)));
+                cam.setFollowScale(Math.clamp(cam.getFollowScale() * factor, 0.3, 5));
             } else {
                 MapManager.getInstance().zoom(factor, e.getX(), e.getY());
             }

@@ -109,8 +109,7 @@ public class MainApp extends Application {
     private void initBigMapResource() throws Exception {
         try (InputStream is = ImageUtil.readImageAsStream(MAP_RESOURCE_PATH)) {
             Image rawImage = new Image(is);
-            Image trimmed = ImageUtil.trimEmptyPixels(rawImage);
-            MapManager.getInstance().init(trimmed, trimmed.getWidth(), trimmed.getHeight(), 0, 0);
+            MapManager.getInstance().init(rawImage, rawImage.getWidth(), rawImage.getHeight());
             PlayerRenderer.getInstance().initIcon(PLAYER_SOURCE_PATH);
         }
     }
