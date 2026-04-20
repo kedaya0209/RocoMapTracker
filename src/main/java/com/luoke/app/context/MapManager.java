@@ -4,8 +4,6 @@ import javafx.scene.image.Image;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.util.LinkedList;
-
 @Getter
 @Setter
 public class MapManager {
@@ -43,6 +41,7 @@ public class MapManager {
         // 1. 全局坐标正常更新（用于大地图渲染位置）
         this.playerX = x;
         this.playerY = y;
+        this.playerAngle = visualAngle;
     }
 
     // 关键：这里计算的是玩家在 Canvas 上的绝对像素位置

@@ -4,44 +4,39 @@ import com.luoke.app.component.InteractiveCanvas;
 import com.luoke.app.component.PlayerRenderer;
 import com.luoke.app.context.CameraManager;
 import com.luoke.app.context.MapManager;
-import com.luoke.app.utils.*;
+import com.luoke.app.utils.CoordinateTransformer;
+import com.luoke.app.utils.ImageUtil;
+import com.luoke.app.utils.MapMathUtil;
 import com.luoke.capture.CaptureFrameRecord;
 import com.luoke.capture.WGCCapture;
 import com.luoke.capture.WindowsMonitor;
 import com.luoke.macher.map.MapMatcher;
 import com.luoke.macher.map.MapMatcherFactory;
+import com.luoke.macher.player.ArrowDetector;
 import com.luoke.macher.player.Player;
-import com.luoke.macher.player.RocoTrackerUtils;
 import com.luoke.processor.MiniMapProcessor;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
-import javafx.geometry.Pos;
 import javafx.geometry.Rectangle2D;
 import javafx.scene.Scene;
 import javafx.scene.canvas.Canvas;
-import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
-import javafx.scene.image.*;
-import javafx.scene.layout.*;
+import javafx.scene.image.Image;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Pane;
+import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.stage.Stage;
 import lombok.extern.slf4j.Slf4j;
 import org.bytedeco.opencv.opencv_core.Mat;
 import org.bytedeco.opencv.opencv_core.Rect;
 
-import javax.imageio.ImageIO;
-import java.awt.image.BufferedImage;
 import java.io.File;
-import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 @Slf4j
@@ -143,7 +138,8 @@ public class MapApp extends Application {
                         try (Mat m = ImageUtil.convertToMat(miniMapFrame)) {
                             // 2. 角色方向识别耗时测量
                             long playerStart = System.nanoTime();
-                            Player p = RocoTrackerUtils.updatePlayerInfo(m);
+//                            Player p = RocoTrackerUtils.updatePlayerInfo(m);
+                            Player p = ArrowDetector.detectPlayer(m);
                             double playerMs = (System.nanoTime() - playerStart) / 1_000_000.0;
 
                             double totalMs = (System.nanoTime() - totalStart) / 1_000_000.0;
@@ -153,7 +149,6 @@ public class MapApp extends Application {
                                         String.format("匹配: %.1fms | 方向: %.1fms | 总计: %.1fms", matchMs, playerMs, totalMs));
                                 return;
                             }
-
                             // 正常更新状态
                             double angle = p.getAngle();
                             MapManager.getInstance().updatePlayerState(center[0], center[1], angle);
@@ -196,15 +191,6 @@ public class MapApp extends Application {
     private void startLiveMonitor() {
         windowsMonitor = new WindowsMonitor("洛克王国：世界");
         windowsMonitor.startMonitorPoll(10, this::processImage);
-    }
-
-    private void saveToLocal(Image img, String name) throws IOException {
-        int w = (int) img.getWidth(), h = (int) img.getHeight();
-        BufferedImage bi = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
-        int[] buf = new int[w * h];
-        img.getPixelReader().getPixels(0, 0, w, h, PixelFormat.getIntArgbInstance(), buf, 0, w);
-        bi.setRGB(0, 0, w, h, buf, 0, w);
-        ImageIO.write(bi, "png", new File(SAVE_FOLDER, name));
     }
 
     @Override
