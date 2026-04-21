@@ -1,13 +1,14 @@
 package com.luoke.app.context;
 
+import com.luoke.app.config.AppConfig;
 import lombok.Getter;
 import lombok.Setter;
 
 @Getter
 @Setter
 public class CameraManager {
-    private boolean followMode = false;
-    private double followScale = 1.5;
+    private boolean followMode = AppConfig.DEFAULT_FOLLOW_MODE;
+    private double followScale = AppConfig.DEFAULT_FOLLOW_SCALE;
 
     private CameraManager() {
     }

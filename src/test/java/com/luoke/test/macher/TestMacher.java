@@ -2,8 +2,8 @@ package com.luoke.test.macher;
 
 import com.luoke.capture.WindowsMonitor;
 import com.luoke.macher.map.MapMatcher;
-import com.luoke.macher.map.MapMatcherFactory;
 import com.luoke.macher.map.MatchingResultUtil;
+import com.luoke.macher.map.SiftMapMatcher;
 import com.luoke.processor.MiniMapProcessor;
 import com.luoke.test.capture.TestCapture;
 import lombok.extern.slf4j.Slf4j;
@@ -29,15 +29,15 @@ public class TestMacher {
         AtomicInteger count = new AtomicInteger(0);
         int sum = 1;
         CountDownLatch latch = new CountDownLatch(sum);
-        MapMatcher matcher = MapMatcherFactory.createMatcher(0, false);
+        MapMatcher matcher = new SiftMapMatcher();
         matcher.init(bigMap);
-        monitor.startMonitorPoll(10, frameRecord -> {
+        monitor.startMonitorPoll( frameRecord -> {
             int h = 0;
             byte[] bytes = MiniMapProcessor.extractFinalMiniMap(null, 0.897, 0.0785, 0.148).bytes();
             MatchingResultUtil.saveRawPixelsToFile(bytes, h, h, String.format("%s\\%d-test-miniMap.png", dir, count.get()));
             //获取小地图与大地图匹配的区域
             long start = System.currentTimeMillis();
-            double[][] corners = matcher.run(bytes, h, h);
+            double[][] corners = matcher.match(bytes, h, h);
             log.info("匹配耗时: {}", System.currentTimeMillis() - start);
             //打印日志
             MatchingResultUtil.logCorners(corners);

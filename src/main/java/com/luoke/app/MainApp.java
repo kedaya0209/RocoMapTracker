@@ -1,6 +1,7 @@
 package com.luoke.app;
 
 import com.luoke.app.component.InteractiveCanvas;
+import com.luoke.app.config.AppConfig;
 import com.luoke.app.context.CameraManager;
 import com.luoke.app.context.MapManager;
 import com.luoke.app.context.StatsManager;
@@ -13,7 +14,7 @@ import com.luoke.capture.CaptureFrameRecord;
 import com.luoke.capture.WGCCapture;
 import com.luoke.capture.WindowsMonitor;
 import com.luoke.macher.map.MapMatcher;
-import com.luoke.macher.map.MapMatcherFactory;
+import com.luoke.macher.map.SiftMapMatcher;
 import com.luoke.macher.minimap.MapTracker;
 import com.luoke.macher.player.ArrowDetector;
 import com.luoke.macher.player.Player;
@@ -37,20 +38,19 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @Slf4j
 public class MainApp extends Application {
 
-    private static final String MAP_RESOURCE_PATH = "/source/big_map.png";
-    private static final String PLAYER_SOURCE_PATH = "/source/player.png";
-    private static final String TARGET_WINDOW = "洛克王国：世界";
+    private static final String MAP_RESOURCE_PATH = AppConfig.MAP_RESOURCE_PATH;
+    private static final String PLAYER_SOURCE_PATH = AppConfig.PLAYER_ICON_PATH;
+    private static final String TARGET_WINDOW = AppConfig.TARGET_WINDOW_NAME;
 
     private final MapTracker mapTracker = MapTracker.getInstance();
     private final StatsManager stats = StatsManager.getInstance();
     private final AtomicBoolean isMatcherReady = new AtomicBoolean(false);
     private MapMatcher mapMatcher;
     private WindowsMonitor windowsMonitor;
-    private InteractiveCanvas canvas;
     private RenderLoop renderLoop;
 
     private Label statusLabel;
-    private CheckBox followPlayerCb;
+    private CheckBox followPlayerCb; // 提升为成员变量
 
     static void main(String[] args) {
         launch(args);
@@ -64,28 +64,34 @@ public class MainApp extends Application {
             StackPane root = new StackPane();
 
             // 画布
-            canvas = new InteractiveCanvas();
+            InteractiveCanvas canvas = new InteractiveCanvas();
             canvas.widthProperty().bind(root.widthProperty());
             canvas.heightProperty().bind(root.heightProperty());
 
-            // 顶层悬浮栏（HBox 水平排列，不重叠）
-            HBox topBar = new HBox(12);
-            topBar.setPadding(new Insets(10, 15, 10, 15));
+            // 顶层悬浮栏
+            HBox topBar = new HBox(AppConfig.TOP_BAR_SPACING);
+            topBar.setPadding(new Insets(
+                    AppConfig.TOP_BAR_PADDING_VERTICAL,
+                    AppConfig.TOP_BAR_PADDING_HORIZONTAL,
+                    AppConfig.TOP_BAR_PADDING_VERTICAL,
+                    AppConfig.TOP_BAR_PADDING_HORIZONTAL
+            ));
             topBar.setMouseTransparent(false);
             topBar.setPickOnBounds(false);
             StackPane.setAlignment(topBar, javafx.geometry.Pos.TOP_LEFT);
 
-            // 锁定玩家（黑色文字）
-            followPlayerCb = new CheckBox("锁定玩家");
-            followPlayerCb.setStyle("-fx-text-fill: black; -fx-font-size: 14px;");
+            // ====================== 锁定玩家（默认隐藏） ======================
+            followPlayerCb = new CheckBox(AppConfig.FOLLOW_PLAYER);
+            followPlayerCb.setStyle("-fx-text-fill: black; -fx-font-size: " + AppConfig.UI_FONT_SIZE + "px;");
             followPlayerCb.selectedProperty().addListener((o, ov, nv) ->
                     CameraManager.getInstance().setFollowMode(nv)
             );
+            followPlayerCb.setVisible(false); // 默认隐藏
 
-            // 状态文字（白色）
-            statusLabel = new Label("启动中...");
+            // 状态文字
+            statusLabel = new Label(AppConfig.STATUS_STARTING);
             statusLabel.setTextFill(Color.BLACK);
-            statusLabel.setStyle("-fx-font-size: 14px;");
+            statusLabel.setStyle("-fx-font-size: " + AppConfig.UI_FONT_SIZE + "px;");
 
             topBar.getChildren().addAll(followPlayerCb, statusLabel);
             root.getChildren().addAll(canvas, topBar);
@@ -94,8 +100,8 @@ public class MainApp extends Application {
             renderLoop = new RenderLoop(canvas.getGraphicsContext2D());
             renderLoop.start();
 
-            Scene scene = new Scene(root, 1000, 700);
-            primaryStage.setTitle("洛克导航");
+            primaryStage.setTitle(AppConfig.APP_MAIN_TITLE);
+            Scene scene = new Scene(root, AppConfig.MAIN_WINDOW_DEFAULT_WIDTH, AppConfig.MAIN_WINDOW_DEFAULT_HEIGHT);
             primaryStage.setScene(scene);
             primaryStage.setOnCloseRequest(e -> stop());
             primaryStage.show();
@@ -123,15 +129,15 @@ public class MainApp extends Application {
             CaptureFrameRecord miniMap = mapTracker.getMiniMapImage(frame);
             stats.recordMapDetect(System.currentTimeMillis() - t0);
             if (miniMap == null) {
-                updateStatus("❌ 小地图未找到", Color.RED);
+                updateStatus(AppConfig.STATUS_MINIMAP_NOT_FOUND, Color.RED);
                 return;
             }
 
             long t1 = System.currentTimeMillis();
-            double[][] corners = mapMatcher.run(miniMap.bytes(), miniMap.width(), miniMap.height());
+            double[][] corners = mapMatcher.match(miniMap.bytes(), miniMap.width(), miniMap.height());
             stats.recordMatch(System.currentTimeMillis() - t1);
             if (corners == null || corners.length < 3) {
-                updateStatus("❌ 匹配失败", Color.RED);
+                updateStatus(AppConfig.STATUS_MATCH_FAILED, Color.RED);
                 return;
             }
 
@@ -142,14 +148,20 @@ public class MainApp extends Application {
                 player = ArrowDetector.detectPlayer(mat);
             }
             stats.recordDirection(System.currentTimeMillis() - t2);
+
+            // ====================== 核心：找到玩家 → 显示锁定复选框 ======================
+            if (player.isFound()) {
+                Platform.runLater(() -> followPlayerCb.setVisible(true));
+            }
+
             if (!player.isFound()) {
-                updateStatus("⚠️ 未找到玩家", Color.ORANGE);
+                updateStatus(AppConfig.STATUS_PLAYER_NOT_FOUND, Color.ORANGE);
                 return;
             }
 
             MapManager.getInstance().updatePlayerState(center[0], center[1], player.getAngle());
-            CoordinateTransformer.updatePositionSmoothly(center[0], center[1], 0.8);
-            updateStatus("✅ 同步中", Color.LIGHTGREEN);
+            CoordinateTransformer.updatePositionSmoothly(center[0], center[1], AppConfig.COORDINATE_SMOOTH_FACTOR);
+            updateStatus(AppConfig.STATUS_RUNNING, Color.LIGHTGREEN);
 
         } catch (Exception e) {
             log.error("帧异常", e);
@@ -166,7 +178,7 @@ public class MainApp extends Application {
     private void preloadMatcherAsync() {
         Thread.ofVirtual().start(() -> {
             try {
-                mapMatcher = MapMatcherFactory.createMatcher(0, false);
+                mapMatcher = new SiftMapMatcher();
                 mapMatcher.init(MAP_RESOURCE_PATH);
                 isMatcherReady.set(true);
                 Platform.runLater(this::startCapture);
@@ -178,7 +190,7 @@ public class MainApp extends Application {
 
     private void startCapture() {
         windowsMonitor = new WindowsMonitor(TARGET_WINDOW);
-        windowsMonitor.startMonitorPoll(10, this::processFrame);
+        windowsMonitor.startMonitorPoll(this::processFrame);
     }
 
     @Override

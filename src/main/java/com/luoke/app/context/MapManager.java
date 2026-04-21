@@ -15,6 +15,9 @@ public class MapManager {
     private double playerX = -1, playerY = -1;
     private double playerAngle = 0;
 
+    // ====================== 新增：标记玩家是否已初始化 ======================
+    private boolean playerInitialized = false;
+
     private MapManager() {}
     public static MapManager getInstance() { return Holder.INSTANCE; }
 
@@ -30,6 +33,9 @@ public class MapManager {
         this.playerX = x;
         this.playerY = y;
         this.playerAngle = visualAngle;
+
+        // 只要更新过一次，就标记为已初始化
+        this.playerInitialized = true;
     }
 
     public double getPlayerCanvasX() {

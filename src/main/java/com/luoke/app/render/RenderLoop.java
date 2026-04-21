@@ -1,5 +1,6 @@
 package com.luoke.app.render;
 
+import com.luoke.app.config.AppConfig;
 import com.luoke.app.context.CameraManager;
 import com.luoke.app.context.MapManager;
 import com.luoke.app.context.StatsManager;
@@ -52,23 +53,34 @@ public class RenderLoop extends AnimationTimer {
         StatsManager stats = StatsManager.getInstance();
         gc.setFont(font);
 
-        String text = String.format(
-                "小地图：%dms | 匹配：%dms | 朝向：%dms | 频率：%d",
-                stats.getLastMapDetectMs(),
-                stats.getLastMatchMs(),
-                stats.getLastDirectionMs(),
-                stats.getFrequency()
-        );
+        StringBuilder sb = new StringBuilder();
+
+        // ====================== 根据配置动态拼接文本 ======================
+        if (AppConfig.SHOW_STATS_MAP_TIME) {
+            sb.append(String.format("小地图：%dms ", stats.getLastMapDetectMs()));
+        }
+        if (AppConfig.SHOW_STATS_MATCH_TIME) {
+            sb.append(String.format("匹配：%dms ", stats.getLastMatchMs()));
+        }
+        if (AppConfig.SHOW_STATS_DIR_TIME) {
+            sb.append(String.format("朝向：%dms ", stats.getLastDirectionMs()));
+        }
+        if (AppConfig.SHOW_STATS_FPS) {
+            sb.append(String.format("频率：%d", stats.getFrequency()));
+        }
+
+        String text = sb.toString().trim();
+        if (text.isBlank()) return;
 
         textMeasurer.setText(text);
         double textWidth = textMeasurer.getLayoutBounds().getWidth();
         double margin = 15;
         double textHeight = textMeasurer.getLayoutBounds().getHeight();
 
-        // 核心修复：和顶部栏的Y坐标保持一致
-        double bgY = (TOP_BAR_HEIGHT - textHeight) / 2; // 垂直居中于topBar
+        // 垂直居中于顶部栏
+        double bgY = (TOP_BAR_HEIGHT - textHeight) / 2;
         double textX = canvasWidth - textWidth - margin;
-        double textY = bgY + textHeight / 2 + 4; // 修正文字基线
+        double textY = bgY + textHeight / 2 + 4;
 
         gc.fillText(text, textX, textY);
     }
