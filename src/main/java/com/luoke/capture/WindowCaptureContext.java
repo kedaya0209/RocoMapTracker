@@ -34,18 +34,32 @@ public class WindowCaptureContext implements AutoCloseable {
         }
     }
 
+
     /**
-     * 同步模式：获取原始字节
+     * 启动 Rust 主动推送帧（等Java处理完再推下一帧）
+     */
+    public void startCaptureListener(WindowCaptureEventCallBack<WGCCapture.Frame> callback) {
+        if (capture == null) return;
+        capture.startLoop(frame -> {
+            try {
+                callback.call(frame);
+            } catch (Exception e) {
+                log.error("Capture callback error", e);
+            }
+        });
+    }
+
+    /**
+     * ；单次调用模式：获取原始字节
      */
     public WGCCapture.Frame captureFrameBytes() {
         if (capture == null && !init()) return null;
-
         // 这里的逻辑保持不变，用于单次截图
         return capture.captureSingleFrame();
     }
 
     /**
-     * 同步模式：直接获取 BufferedImage
+     * ；单次调用模式：直接获取 BufferedImage
      */
     public BufferedImage captureFrame() {
         WGCCapture.Frame record = captureFrameBytes();
@@ -54,7 +68,7 @@ public class WindowCaptureContext implements AutoCloseable {
     }
 
     /**
-     * 同步模式：截图并保存
+     * ；单次调用模式：截图并保存
      */
     public boolean captureAndSave(String savePath) {
         BufferedImage image = captureFrame();

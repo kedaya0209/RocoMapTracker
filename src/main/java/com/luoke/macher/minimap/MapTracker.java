@@ -59,10 +59,10 @@ public class MapTracker {
         int sw = frame.getWidth();
         int sh = frame.getHeight();
 
-        int roiX = (int) (sw * 0.62);
-        int roiY = 0;
-        int roiW = sw - roiX;
-        int roiH = (int) (sh * 0.35);
+        int roiX = (int) (sw * 0.89);
+        int roiY = (int) (sh * 0.08);
+        int roiW = sw - roiX - ((int) (sw * 0.01));
+        int roiH = (int) (sh * 0.15);
 
         try (Mat screenMat = new Mat(sh, sw, CV_8UC4, new BytePointer(frame.getPixels()));
              Mat roiMat = new Mat(screenMat, new org.bytedeco.opencv.opencv_core.Rect(roiX, roiY, roiW, roiH));

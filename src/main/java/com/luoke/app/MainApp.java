@@ -180,8 +180,8 @@ public class MainApp extends Application {
             try {
                 mapMatcher = new SiftMapMatcher();
                 mapMatcher.init(MAP_RESOURCE_PATH);
+                startCapture();
                 isMatcherReady.set(true);
-                Platform.runLater(this::startCapture);
             } catch (Exception e) {
                 log.error("匹配器加载失败", e);
             }
@@ -190,7 +190,7 @@ public class MainApp extends Application {
 
     private void startCapture() {
         windowsMonitor = new WindowsMonitor(TARGET_WINDOW);
-        windowsMonitor.startMonitorPoll(this::processFrame);
+        windowsMonitor.startMonitor(this::processFrame);
     }
 
     @Override

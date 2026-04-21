@@ -20,6 +20,10 @@ public final class AppConfig {
 
     public static final String FOLLOW_PLAYER = "视奸玩家";
 
+    // ====================== 窗口捕获模式 ======================
+    // 可选值：push = Rust推送模式（高性能），poll = Java轮询模式
+    public static String CAPTURE_MODE = "poll";
+
     // ====================== 配置文件名称 ======================
     private static final String CONFIG_FILE_NAME = "app-config.properties";
 
@@ -166,6 +170,7 @@ public final class AppConfig {
             Properties prop = new Properties();
 
             if (configFile.exists()) {
+                // 【强制 UTF-8 读取】
                 try (InputStreamReader reader = new InputStreamReader(new FileInputStream(configFile), StandardCharsets.UTF_8)) {
                     prop.load(reader);
                     log.info("✅ 配置文件加载成功：{}", configFile.getAbsolutePath());
@@ -182,7 +187,7 @@ public final class AppConfig {
     }
 
     /**
-     * 生成带完整中文注释的配置文件（无乱码版本）
+     * 生成带完整中文注释的配置文件（UTF-8 BOM 彻底解决乱码）
      */
     private static void generateDefaultConfigWithComments(File configFile) throws Exception {
         String configContent = """
@@ -243,6 +248,17 @@ public final class AppConfig {
                 # 目标捕获帧率（越高越流畅，越占CPU）
                 target.capture.fps=30
                 
+                # ---------------- 窗口捕获模式 ----------------
+                # 可选值：
+                # push  = Rust 内部推送模式（高性能、低延迟、等Java处理完再推下一帧）【推荐】
+                # poll  = Java 主动轮询模式（定时拉取，兼容性更好）
+                capture.mode=push
+                
+                # ---------------- 窗口模糊匹配关键词 ----------------
+                # 作用：自动查找标题包含该关键词的窗口，实现模糊匹配
+                # 示例：洛克王国 | 微信 | Chrome
+                monitor.pattern=洛克王国
+                
                 # ---------------- 统计面板显示开关 ----------------
                 show.stats.map.time=true
                 show.stats.match.time=true
@@ -296,8 +312,15 @@ public final class AppConfig {
                 ransac.confidence=0.95
                 """;
 
-        try (BufferedWriter writer = new BufferedWriter(
-                new OutputStreamWriter(new FileOutputStream(configFile), StandardCharsets.UTF_8))) {
+        try (FileOutputStream fos = new FileOutputStream(configFile);
+             OutputStreamWriter osw = new OutputStreamWriter(fos, StandardCharsets.UTF_8);
+             BufferedWriter writer = new BufferedWriter(osw)) {
+
+            // 写入 UTF-8 BOM，Windows 记事本必认
+            fos.write(0xEF);
+            fos.write(0xBB);
+            fos.write(0xBF);
+
             writer.write(configContent);
         }
     }
@@ -329,6 +352,9 @@ public final class AppConfig {
 
         COORDINATE_SMOOTH_FACTOR = getPropDouble(prop, "coordinate.smooth.factor", COORDINATE_SMOOTH_FACTOR);
         TARGET_CAPTURE_FPS = getPropInt(prop, "target.capture.fps", TARGET_CAPTURE_FPS);
+
+        // 读取捕获模式 push / poll
+        CAPTURE_MODE = getProp(prop, "capture.mode", CAPTURE_MODE);
 
         SHOW_STATS_MAP_TIME = getPropBool(prop, "show.stats.map.time", SHOW_STATS_MAP_TIME);
         SHOW_STATS_MATCH_TIME = getPropBool(prop, "show.stats.match.time", SHOW_STATS_MATCH_TIME);

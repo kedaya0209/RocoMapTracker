@@ -48,15 +48,37 @@ public class WGCCapture {
         void onFrame(Frame frame);
     }
 
-    private final long hwnd;
-    // ===================== 修复：使用 volatile 保证多线程可见性 =====================
     private volatile long nativePtr;
+    private volatile boolean isRunning;
 
     public WGCCapture(long hwnd) {
-        this.hwnd = hwnd;
-        this.nativePtr = nativeInit(hwnd);
+        this.nativePtr = nativeInitWithGPU(hwnd, true);
         if (this.nativePtr == 0) throw new RuntimeException("Init Failed");
     }
+
+    // ===================== 【关键】启动循环推送（等Java处理完再下一帧） =====================
+    public void startLoop(FrameListener listener) {
+        if (nativePtr == 0 || isRunning) return;
+
+        // Rust 会阻塞等待 onFrame 执行完再继续
+        nativeStartLoop(nativePtr, new Object() {
+            // 这个方法会被 Rust 自动调用
+            @SuppressWarnings("unused")
+            long onRawFrame(byte[] data) {
+                try {
+                    if (data != null && data.length > 0) {
+                        listener.onFrame(new Frame(data));
+                    }
+                } catch (Exception e) {
+                    log.error("帧处理异常", e);
+                }
+                return 0;
+            }
+        });
+
+        isRunning = true;
+    }
+
 
     public Frame captureSingleFrame() {
         byte[] data = nativeCaptureFrame(nativePtr);
@@ -69,19 +91,23 @@ public class WGCCapture {
 
     public void release() {
         if (nativePtr != 0) {
+            nativeStopLoop(nativePtr);
             nativeRelease(nativePtr);
             nativePtr = 0;
         }
     }
 
-    // ===================== 核心修复：Rust 重建后会调用此方法更新指针 =====================
-    private void setNativePtr(long newPtr) {
-        this.nativePtr = newPtr;
-        log.debug("捕获器已重建，新native指针: {}", newPtr);
-    }
+    // ===================== Native 方法 =====================
+    public native long nativeInit(long hwnd);
 
-    private native long nativeInit(long hwnd);
-    private native byte[] nativeCaptureFrame(long ptr);
-    private native void nativeStartLoop(long ptr, int delayMs, Object callback);
-    private native void nativeRelease(long ptr);
+    // 🔥 新方法：Java 传入是否强制高性能显卡
+    public native long nativeInitWithGPU(long hwnd, boolean preferHighPerformanceGPU);
+
+    public native byte[] nativeCaptureFrame(long ptr);
+
+    public native void nativeStartLoop(long ptr, Object callback);
+
+    public native void nativeRelease(long ptr);
+
+    public native void nativeStopLoop(long ptr);
 }
