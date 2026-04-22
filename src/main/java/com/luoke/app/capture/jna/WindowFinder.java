@@ -1,4 +1,4 @@
-package com.luoke.app.capture;
+package com.luoke.app.capture.jna;
 
 import com.sun.jna.Native;
 import com.sun.jna.Pointer;

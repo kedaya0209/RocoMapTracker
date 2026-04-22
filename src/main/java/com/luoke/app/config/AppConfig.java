@@ -11,10 +11,12 @@ import java.util.Properties;
 @Slf4j
 public final class AppConfig {
 
-    public static final String FOLLOW_PLAYER = "视奸玩家";
+    public static final String FOLLOW_PLAYER = "跟随玩家";
 
     // ====================== 配置文件名称 ======================
     private static final String CONFIG_FILE_NAME = "app-config.properties";
+
+    public static boolean SHOW_MONITOR_BORDER = false;
 
     // ====================== 【内置默认配置】 ======================
     // 资源文件路径（本地资源，不动）
@@ -134,7 +136,10 @@ public final class AppConfig {
                 # 洛克导航 - 配置文件
                 # 自动生成，修改后重启程序生效
                 # ==============================================
-                
+                #
+                #是否在被监视的窗口显示边框
+                show.monitor.border=false
+                #
                 # ---------------- 资源路径 ----------------
                 # 本地大地图图片路径
                 map.resource.path=/source/map/map_0.png
@@ -280,6 +285,8 @@ public final class AppConfig {
     private static void overrideFromProperties(Properties prop) {
         MAP_RESOURCE_PATH = getStr(prop, "map.resource.path", MAP_RESOURCE_PATH);
         PLAYER_ICON_PATH = getStr(prop, "player.icon.path", PLAYER_ICON_PATH);
+
+        SHOW_MONITOR_BORDER = getBool(prop, "show.monitor.border", SHOW_MONITOR_BORDER);
 
         MAP_REMOTE_URLS = getStrArray(prop, "map.remote.urls");
         MAP_REMOTE_URL_SORT = getIntArray(prop, "map.remote.url.sort");

@@ -1,8 +1,8 @@
 package com.luoke.app;
 
-import com.luoke.app.capture.CaptureFrameRecord;
-import com.luoke.app.capture.WGCCapture;
 import com.luoke.app.capture.WindowsMonitor;
+import com.luoke.app.capture.common.CaptureFrameRecord;
+import com.luoke.app.capture.jna.Frame;
 import com.luoke.app.component.InteractiveCanvas;
 import com.luoke.app.config.AppConfig;
 import com.luoke.app.context.CameraManager;
@@ -119,7 +119,7 @@ public class MainApp extends Application {
         }
     }
 
-    private void processFrame(WGCCapture.Frame frame) {
+    private void processFrame(Frame frame) {
         if (frame == null || !isMatcherReady.get()) return;
         stats.onFrameProcessed();
 

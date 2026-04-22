@@ -1,4 +1,4 @@
-package com.luoke.app.capture;
+package com.luoke.app.capture.common;
 
 import lombok.Builder;
 

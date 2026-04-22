@@ -1,4 +1,4 @@
-package com.luoke.app.capture;
+package com.luoke.app.capture.callback;
 
 @FunctionalInterface
 public interface WindowCaptureEventCallBack<T> {
