@@ -23,7 +23,6 @@ public class MapStitcher {
 
             log.info("开始拼接地图 [{}]，有效瓦片数量：{}", tag, tiles.size());
 
-            // 计算瓦片范围
             int minX = Integer.MAX_VALUE, maxX = Integer.MIN_VALUE;
             int minY = Integer.MAX_VALUE, maxY = Integer.MIN_VALUE;
 
@@ -39,30 +38,35 @@ public class MapStitcher {
             log.info("地图 [{}] 瓦片范围 X:[{}~{}] Y:[{}~{}]，单瓦片大小：{}x{}",
                     tag, minX, maxX, minY, maxY, tw, th);
 
-            // 计算最终图片尺寸
             int width = (maxX - minX + 1) * tw;
             int height = (maxY - minY + 1) * th;
             log.info("地图 [{}] 最终生成图片尺寸：{}x{}", tag, width, height);
 
-            // 创建画布
             BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
             Graphics2D g2d = image.createGraphics();
 
-            // 绘制所有瓦片
+            // ========== 优化：高质量绘图 ==========
+            g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+            g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+
             for (Tile t : tiles) {
                 int dx = (t.getX() - minX) * tw;
                 int dy = (t.getY() - minY) * th;
-                BufferedImage tileImg = javax.imageio.ImageIO.read(new ByteArrayInputStream(t.getData()));
-                if (tileImg != null) {
-                    g2d.drawImage(tileImg, dx, dy, null);
+
+                try (ByteArrayInputStream bais = new ByteArrayInputStream(t.getData())) {
+                    BufferedImage tileImg = javax.imageio.ImageIO.read(bais);
+                    if (tileImg != null) {
+                        g2d.drawImage(tileImg, dx, dy, null);
+                        tileImg.flush(); // 释放瓦片图片
+                    }
                 }
             }
 
             g2d.dispose();
 
-            // 输出文件
             File outFile = FileUtil.getRelativeFile(String.format(MapResourceUpdater.OUTPUT_FILE, tag));
             javax.imageio.ImageIO.write(image, "png", outFile);
+            image.flush(); // 释放主图
 
             log.info("✅ 地图 [{}] 拼接完成，文件路径：{}", tag, outFile.getAbsolutePath());
 

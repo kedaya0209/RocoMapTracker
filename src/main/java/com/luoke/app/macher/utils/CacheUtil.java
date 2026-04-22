@@ -29,7 +29,6 @@ public class CacheUtil {
                  ZstdOutputStream zos = new ZstdOutputStream(bos);
                  DataOutputStream dos = new DataOutputStream(zos)) {
 
-                // 1. 保存类型：0=CV_8U(ORB), 1=CV_32F(SIFT)
                 int type = descriptors.type() == CV_8U ? 0 : 1;
                 dos.writeInt(type);
                 dos.writeInt(descriptors.rows());
@@ -37,7 +36,6 @@ public class CacheUtil {
 
                 if (!descriptors.empty()) {
                     if (type == 1) {
-                        // SIFT
                         FloatIndexer idx = descriptors.createIndexer();
                         for (int r = 0; r < descriptors.rows(); r++) {
                             for (int c = 0; c < descriptors.cols(); c++) {
@@ -45,7 +43,6 @@ public class CacheUtil {
                             }
                         }
                     } else {
-                        // ORB
                         UByteIndexer idx = descriptors.createIndexer();
                         for (int r = 0; r < descriptors.rows(); r++) {
                             for (int c = 0; c < descriptors.cols(); c++) {
@@ -55,7 +52,6 @@ public class CacheUtil {
                     }
                 }
 
-                // 保存特征点
                 int kpCount = (int) keypoints.size();
                 dos.writeInt(kpCount);
                 for (int i = 0; i < kpCount; i++) {
@@ -76,12 +72,14 @@ public class CacheUtil {
     }
 
     public static boolean loadFeatures(String path, Mat descriptors, KeyPointVector keypoints) {
-        try (InputStream fis = Files.newInputStream(new File(path).toPath());
+        File file = new File(path);
+        if (!file.exists()) return false;
+
+        try (InputStream fis = Files.newInputStream(file.toPath());
              BufferedInputStream bis = new BufferedInputStream(fis);
              ZstdInputStream zis = new ZstdInputStream(bis);
              DataInputStream dis = new DataInputStream(zis)) {
 
-            // 读取类型
             int type = dis.readInt();
             int dRows = dis.readInt();
             int dCols = dis.readInt();
@@ -111,7 +109,6 @@ public class CacheUtil {
                 }
             }
 
-            // 加载特征点
             int kpCount = dis.readInt();
             keypoints.resize(kpCount);
             for (int i = 0; i < kpCount; i++) {

@@ -6,9 +6,6 @@ import lombok.Data;
 public class LayerOption {
     private String tileUrl;
 
-    public LayerOption() {
-    }
-
     public LayerOption(String tileUrl) {
         this.tileUrl = tileUrl;
     }

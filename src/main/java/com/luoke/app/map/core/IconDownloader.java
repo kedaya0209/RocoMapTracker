@@ -43,7 +43,7 @@ public class IconDownloader {
 
                 HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
                 conn.setRequestMethod("GET");
-                conn.setRequestProperty("User-Agent", "Mozilla/5.0");
+                conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
                 conn.setRequestProperty("Referer", "https://wiki.biligame.com/");
                 conn.setConnectTimeout(MapResourceUpdater.CONNECT_TIMEOUT);
                 conn.setReadTimeout(MapResourceUpdater.READ_TIMEOUT);
@@ -56,8 +56,10 @@ public class IconDownloader {
                     while ((len = in.read(buf)) != -1) {
                         out.write(buf, 0, len);
                     }
+                } finally {
+                    conn.disconnect(); // 放进 finally 保证一定关闭
                 }
-                conn.disconnect();
+
                 success++;
                 log.info("⬇️  {}", name);
 

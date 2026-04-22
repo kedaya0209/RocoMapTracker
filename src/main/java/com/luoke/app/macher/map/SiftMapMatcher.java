@@ -4,6 +4,7 @@ import com.luoke.app.config.AppConfig;
 import com.luoke.app.macher.utils.CacheUtil;
 import com.luoke.app.utils.FileUtil;
 import com.luoke.app.utils.ImageUtil;
+import com.luoke.app.utils.ResourceUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.bytedeco.javacpp.BytePointer;
 import org.bytedeco.javacpp.indexer.FloatIndexer;
@@ -17,6 +18,7 @@ import org.bytedeco.opencv.opencv_features2d.SIFT;
 
 import java.awt.image.BufferedImage;
 import java.io.File;
+import java.io.InputStream;
 
 import static org.bytedeco.opencv.global.opencv_core.CV_32FC2;
 import static org.bytedeco.opencv.global.opencv_core.CV_8UC4;
@@ -27,15 +29,14 @@ import static org.bytedeco.opencv.global.opencv_imgproc.cvtColor;
 @Slf4j
 public class SiftMapMatcher implements MapMatcher {
 
-    // 从配置读取
     private static final float RATIO_THRESHOLD = AppConfig.MATCH_RATIO_THRESHOLD;
     private static final int MIN_MATCH_COUNT = AppConfig.MATCH_MIN_COUNT;
+
     private final KeyPointVector cachedKp2;
     private final SIFT sift;
     private final FlannBasedMatcher matcher;
-    // 预分配掩码（复用）
     private final Mat mask = new Mat();
-    // ====================== 全局预分配对象，避免每次match都new ======================
+
     private final KeyPointVector kp1 = new KeyPointVector();
     private final Mat des1 = new Mat();
     private final DMatchVectorVector knnMatches = new DMatchVectorVector();
@@ -46,14 +47,12 @@ public class SiftMapMatcher implements MapMatcher {
     private final Mat objCorners = new Mat(4, 1, CV_32FC2);
     private final Mat sceneCorners = new Mat(4, 1, CV_32FC2);
     private final Java2DFrameConverter j2dConverter = new Java2DFrameConverter();
-
-    // ==============================================================================
     private final OpenCVFrameConverter.ToMat matConverter = new OpenCVFrameConverter.ToMat();
+
     private Mat cachedDes2;
     private boolean isInitialized = false;
 
     public SiftMapMatcher() {
-        // ====================== 从配置创建 SIFT ======================
         this.sift = SIFT.create(
                 AppConfig.SIFT_N_FEATURES,
                 AppConfig.SIFT_N_OCTAVE_LAYERS,
@@ -84,13 +83,20 @@ public class SiftMapMatcher implements MapMatcher {
         }
 
         log.info("提取大图特征 (耗时操作)...");
-        try (Mat img2 = ImageUtil.loadResourceToMat(largeMapPath, IMREAD_GRAYSCALE)) {
+
+        // ====================== 【关键改动】优先读外部资源 ======================
+        try (InputStream is = ResourceUtils.getResourceStream(largeMapPath)) {
+            Mat img2 = ImageUtil.loadToMat(is, IMREAD_GRAYSCALE);
             if (img2.empty()) throw new RuntimeException("加载失败: " + largeMapPath);
+
             sift.detectAndCompute(img2, mask, cachedKp2, cachedDes2);
             log.info("特征提取完成，特征点数: {}", cachedKp2.size());
+
             CacheUtil.saveFeatures(absolutePath, cachedDes2, cachedKp2);
             buildMatcher();
             this.isInitialized = true;
+
+            img2.release();
         } catch (Exception e) {
             log.error("初始化失败", e);
         }
@@ -106,8 +112,13 @@ public class SiftMapMatcher implements MapMatcher {
 
     @Override
     public double[][] match(String smallImgPath) {
-        try (Mat img = ImageUtil.loadResourceToMat(smallImgPath, IMREAD_GRAYSCALE)) {
-            return processMat(img);
+        try (InputStream is = ResourceUtils.getResourceStream(smallImgPath)) {
+            Mat img = ImageUtil.loadToMat(is, IMREAD_GRAYSCALE);
+            double[][] result = processMat(img);
+            img.release();
+            return result;
+        } catch (Exception e) {
+            return null;
         }
     }
 
@@ -152,7 +163,6 @@ public class SiftMapMatcher implements MapMatcher {
         if (img1 == null || img1.empty() || !isInitialized)
             return null;
 
-        // 清空复用对象，不释放native内存
         kp1.resize(0);
         des1.release();
         knnMatches.resize(0);
@@ -185,7 +195,6 @@ public class SiftMapMatcher implements MapMatcher {
     private double[][] calculateCoordinates(Mat img1, KeyPointVector kp1, DMatchVector goodMatches) {
         int n = (int) goodMatches.size();
 
-        // 复用Mat，只重新创建尺寸，不重复new
         objPoints.create(n, 1, CV_32FC2);
         scenePoints.create(n, 1, CV_32FC2);
 
@@ -203,7 +212,6 @@ public class SiftMapMatcher implements MapMatcher {
             }
         }
 
-        // ====================== 从配置读取 RANSAC 参数 ======================
         try (Mat H = opencv_calib3d.findHomography(
                 objPoints,
                 scenePoints,
@@ -242,7 +250,6 @@ public class SiftMapMatcher implements MapMatcher {
     public void destroy() {
         log.info("释放 SiftMapMatcher 关键资源...");
 
-        // 统一释放所有预分配Mat
         if (cachedDes2 != null) {
             cachedDes2.release();
             cachedDes2 = null;
@@ -255,7 +262,6 @@ public class SiftMapMatcher implements MapMatcher {
         objCorners.release();
         sceneCorners.release();
 
-        // 关闭所有vector
         kp1.close();
         knnMatches.close();
         goodMatches.close();

@@ -18,6 +18,7 @@ import com.luoke.app.render.RenderLoop;
 import com.luoke.app.utils.CoordinateTransformer;
 import com.luoke.app.utils.ImageUtil;
 import com.luoke.app.utils.MapMathUtil;
+import com.luoke.app.utils.ResourceUtils;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
@@ -38,10 +39,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @Slf4j
 public class MainApp extends Application {
 
-    private static final String MAP_RESOURCE_PATH = AppConfig.MAP_RESOURCE_PATH;
-    private static final String PLAYER_SOURCE_PATH = AppConfig.PLAYER_ICON_PATH;
-    private static final String TARGET_WINDOW = AppConfig.TARGET_WINDOW_NAME;
-
     private final MapTracker mapTracker = MapTracker.getInstance();
     private final StatsManager stats = StatsManager.getInstance();
     private final AtomicBoolean isMatcherReady = new AtomicBoolean(false);
@@ -50,9 +47,11 @@ public class MainApp extends Application {
     private RenderLoop renderLoop;
 
     private Label statusLabel;
-    private CheckBox followPlayerCb; // 提升为成员变量
+    private CheckBox followPlayerCb;
 
     static void main(String[] args) {
+        // ====================== 【关键】启动先释放所有资源 ======================
+        ResourceUtils.extractAll();
         launch(args);
     }
 
@@ -62,13 +61,10 @@ public class MainApp extends Application {
             initBigMapResource();
 
             StackPane root = new StackPane();
-
-            // 画布
             InteractiveCanvas canvas = new InteractiveCanvas();
             canvas.widthProperty().bind(root.widthProperty());
             canvas.heightProperty().bind(root.heightProperty());
 
-            // 顶层悬浮栏
             HBox topBar = new HBox(AppConfig.TOP_BAR_SPACING);
             topBar.setPadding(new Insets(
                     AppConfig.TOP_BAR_PADDING_VERTICAL,
@@ -80,15 +76,13 @@ public class MainApp extends Application {
             topBar.setPickOnBounds(false);
             StackPane.setAlignment(topBar, javafx.geometry.Pos.TOP_LEFT);
 
-            // ====================== 锁定玩家（默认隐藏） ======================
             followPlayerCb = new CheckBox(AppConfig.FOLLOW_PLAYER);
             followPlayerCb.setStyle("-fx-text-fill: black; -fx-font-size: " + AppConfig.UI_FONT_SIZE + "px;");
             followPlayerCb.selectedProperty().addListener((o, ov, nv) ->
                     CameraManager.getInstance().setFollowMode(nv)
             );
-            followPlayerCb.setVisible(false); // 默认隐藏
+            followPlayerCb.setVisible(false);
 
-            // 状态文字
             statusLabel = new Label(AppConfig.STATUS_STARTING);
             statusLabel.setTextFill(Color.BLACK);
             statusLabel.setStyle("-fx-font-size: " + AppConfig.UI_FONT_SIZE + "px;");
@@ -96,7 +90,6 @@ public class MainApp extends Application {
             topBar.getChildren().addAll(followPlayerCb, statusLabel);
             root.getChildren().addAll(canvas, topBar);
 
-            // 渲染循环
             renderLoop = new RenderLoop(canvas.getGraphicsContext2D());
             renderLoop.start();
 
@@ -107,16 +100,22 @@ public class MainApp extends Application {
             primaryStage.show();
 
             preloadMatcherAsync();
+
         } catch (Exception e) {
             log.error("启动失败", e);
         }
     }
 
     private void initBigMapResource() throws Exception {
-        try (InputStream is = ImageUtil.readImageAsStream(MAP_RESOURCE_PATH)) {
+        // ====================== 自动优先读外部资源 ======================
+        try (InputStream is = ResourceUtils.getResourceStream(AppConfig.MAP_RESOURCE_PATH)) {
             Image rawImage = new Image(is);
             MapManager.getInstance().init(rawImage, rawImage.getWidth(), rawImage.getHeight());
-            PlayerRenderer.getInstance().initIcon(PLAYER_SOURCE_PATH);
+        }
+
+        // ====================== 自动优先读外部资源 ======================
+        try (InputStream iconStream = ResourceUtils.getResourceStream(AppConfig.PLAYER_ICON_PATH)) {
+            PlayerRenderer.getInstance().initIcon(iconStream);
         }
     }
 
@@ -149,7 +148,6 @@ public class MainApp extends Application {
             }
             stats.recordDirection(System.currentTimeMillis() - t2);
 
-            // ====================== 核心：找到玩家 → 显示锁定复选框 ======================
             if (player.isFound()) {
                 Platform.runLater(() -> followPlayerCb.setVisible(true));
             }
@@ -179,9 +177,13 @@ public class MainApp extends Application {
         Thread.ofVirtual().start(() -> {
             try {
                 mapMatcher = new SiftMapMatcher();
-                mapMatcher.init(MAP_RESOURCE_PATH);
-                startCapture();
+                // ====================== 自动优先读外部资源 ======================
+                mapMatcher.init(AppConfig.MAP_RESOURCE_PATH);
                 isMatcherReady.set(true);
+                try {
+                    startCapture();
+                } catch (Exception ignore) {
+                }
             } catch (Exception e) {
                 log.error("匹配器加载失败", e);
             }
@@ -189,7 +191,7 @@ public class MainApp extends Application {
     }
 
     private void startCapture() {
-        windowsMonitor = new WindowsMonitor(TARGET_WINDOW);
+        windowsMonitor = new WindowsMonitor(AppConfig.TARGET_WINDOW_NAME);
         windowsMonitor.startMonitor(this::processFrame);
     }
 

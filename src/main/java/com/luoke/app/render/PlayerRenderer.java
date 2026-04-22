@@ -5,6 +5,7 @@ import com.luoke.app.context.MapManager;
 import com.luoke.app.macher.player.ArrowDetector;
 import com.luoke.app.macher.player.Player;
 import com.luoke.app.utils.ImageUtil;
+import com.luoke.app.utils.ResourceUtils;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.image.Image;
 import lombok.extern.slf4j.Slf4j;
@@ -28,11 +29,26 @@ public class PlayerRenderer {
     private PlayerRenderer() {}
     public static PlayerRenderer getInstance() { return Holder.INSTANCE; }
 
+    // -------------------------------------------------------------------------
+    // 【旧方法保留兼容】
+    // -------------------------------------------------------------------------
     public void initIcon(String resourcePath) {
-        try (InputStream is = ImageUtil.readImageAsStream(resourcePath)) {
+        try (InputStream is = ResourceUtils.getResourceStream(resourcePath)) {
+            initIcon(is);
+        } catch (Exception e) {
+            log.error("加载玩家图标失败: {}", resourcePath, e);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // 【新方法：直接传入 InputStream，给 MainApp 调用】
+    // -------------------------------------------------------------------------
+    public void initIcon(InputStream is) {
+        try {
             Image rawIcon = new Image(is);
             this.processedIcon = ImageUtil.trimEmptyPixels(rawIcon);
             iconDrawSize = processedIcon.getWidth();
+
             try (Mat iconMat = ImageUtil.imageToMat(this.processedIcon)) {
                 Player result = ArrowDetector.detectPlayer(iconMat);
                 if (result != null && result.isFound()) {
@@ -42,7 +58,7 @@ public class PlayerRenderer {
                 }
             }
         } catch (Exception e) {
-            log.error("加载玩家图标失败: {}", resourcePath, e);
+            log.error("加载玩家图标失败", e);
         }
     }
 
@@ -51,12 +67,10 @@ public class PlayerRenderer {
 
         MapManager mm = MapManager.getInstance();
 
-        // ====================== 核心逻辑 ======================
         // 从未找到过玩家 → 不渲染
         if (!mm.isPlayerInitialized()) {
             return;
         }
-        // =======================================================
 
         double canvasX = mm.getPlayerCanvasX();
         double canvasY = mm.getPlayerCanvasY();
@@ -81,5 +95,7 @@ public class PlayerRenderer {
         gc.restore();
     }
 
-    private static class Holder { private static final PlayerRenderer INSTANCE = new PlayerRenderer(); }
+    private static class Holder {
+        private static final PlayerRenderer INSTANCE = new PlayerRenderer();
+    }
 }

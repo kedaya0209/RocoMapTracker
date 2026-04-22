@@ -36,11 +36,6 @@ public final class MapResourceUpdater {
     private MapResourceUpdater() {
     }
 
-
-    public static void main(String[] args) {
-        updateAllResources();
-    }
-
     /**
      * 触发全量资源更新
      */

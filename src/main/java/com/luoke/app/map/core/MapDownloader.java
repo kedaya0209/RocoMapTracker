@@ -124,29 +124,18 @@ public class MapDownloader {
         }
     }
 
-    /**
-     * 清理所有临时文件：chunk目录、元数据、失败记录
-     */
     private static void cleanTempFiles() {
         try {
-            // 1. 删除 chunk 目录（递归删除所有内容）
             File chunkDir = FileUtil.getRelativeFile(MapResourceUpdater.CHUNK_DIR);
             deleteDirectory(chunkDir);
             log.info("✅ 已清理临时分片目录：{}", chunkDir.getAbsolutePath());
 
-            // 2. 删除所有元数据文件
             for (String name : AppConfig.MAP_REMOTE_URL_NAME) {
                 File meta = FileUtil.getRelativeFile(String.format(MapResourceUpdater.METADATA_FILE, name));
-                if (meta.exists()) {
-                    meta.delete();
-                    log.debug("已删除元数据：{}", meta.getName());
-                }
+                if (meta.exists()) meta.delete();
 
                 File failed = FileUtil.getRelativeFile(String.format(MapResourceUpdater.FAILED_FILE, name));
-                if (failed.exists()) {
-                    failed.delete();
-                    log.debug("已删除失败记录：{}", failed.getName());
-                }
+                if (failed.exists()) failed.delete();
             }
             log.info("✅ 已清理所有元数据与失败记录");
 
@@ -155,9 +144,6 @@ public class MapDownloader {
         }
     }
 
-    /**
-     * 递归删除目录及内容
-     */
     private static void deleteDirectory(File dir) {
         if (dir == null || !dir.exists()) return;
         File[] files = dir.listFiles();
@@ -167,7 +153,6 @@ public class MapDownloader {
             }
         }
         dir.delete();
-        log.debug("已删除文件/目录：{}", dir.getPath());
     }
 
     private static void worker(String url, String tag) {
@@ -209,33 +194,33 @@ public class MapDownloader {
 
     private static DownloadResult download(int x, int y, String tpl) {
         for (int i = 0; i < MapResourceUpdater.MAX_RETRY; i++) {
+            HttpURLConnection conn = null;
             try {
                 String url = tpl.replace("{x}", x + "").replace("{y}", y + "");
-                HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
+                conn = (HttpURLConnection) new URL(url).openConnection();
                 conn.setRequestMethod("GET");
-                conn.setRequestProperty("User-Agent", "Mozilla/5.0");
+                conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
                 conn.setConnectTimeout(MapResourceUpdater.CONNECT_TIMEOUT);
                 conn.setReadTimeout(MapResourceUpdater.READ_TIMEOUT);
 
                 int code = conn.getResponseCode();
                 if (code == 404) {
-                    conn.disconnect();
                     return DownloadResult.notFound();
                 }
                 if (code != 200) {
                     log.warn("瓦片请求异常，响应码：{}，坐标({}, {})", code, x, y);
-                    conn.disconnect();
                     continue;
                 }
 
                 try (InputStream in = conn.getInputStream()) {
                     byte[] data = in.readAllBytes();
-                    conn.disconnect();
                     return DownloadResult.success(data);
                 }
             } catch (Exception e) {
                 log.warn("瓦片下载异常，重试 {}/{}，坐标({}, {})", i + 1, MapResourceUpdater.MAX_RETRY, x, y);
                 sleep(MapResourceUpdater.TILE_DELAY_MS * 2);
+            } finally {
+                if (conn != null) conn.disconnect();
             }
         }
         return DownloadResult.failed();
@@ -244,7 +229,6 @@ public class MapDownloader {
     private static synchronized void add(int x, int y) {
         if (!visited.contains(x + "," + y)) {
             taskQueue.offer(new int[]{x, y});
-            log.debug("添加待下载瓦片：({}, {})", x, y);
         }
     }
 
@@ -333,7 +317,6 @@ public class MapDownloader {
         chunkBuffer.clear();
         chunkIndex = 0;
         tileW = tileH = -1;
-        log.debug("下载状态已重置");
     }
 
     private static void sleep(long ms) {

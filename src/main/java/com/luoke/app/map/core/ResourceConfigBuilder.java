@@ -39,7 +39,6 @@ public class ResourceConfigBuilder {
                 if (cat == null) continue;
 
                 ResourceConfig cfg = getResourceConfig(point, cat);
-
                 list.add(cfg);
             }
 

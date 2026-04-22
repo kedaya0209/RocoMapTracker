@@ -8,106 +8,86 @@ import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @Slf4j
 public class WGCCapture {
+
     static {
         try {
             String libName = "capture.dll";
             InputStream in = WGCCapture.class.getResourceAsStream("/dll/" + libName);
-            if (in == null) {
-                System.loadLibrary("capture");
-            } else {
-                Path temp = Files.createTempDirectory("wgc_").resolve(libName);
-                Files.copy(in, temp, StandardCopyOption.REPLACE_EXISTING);
-                System.load(temp.toString());
-            }
+            Path temp = Files.createTempDirectory("wgc").resolve(libName);
+            Files.copy(in, temp, StandardCopyOption.REPLACE_EXISTING);
+            System.load(temp.toString());
+            log.info("DLL 加载成功");
         } catch (Exception e) {
-            log.error("动态链接库加载失败,e", e);
+            log.error("DLL 加载失败", e);
             System.exit(1);
         }
     }
 
-    @Data
-    public static class Frame {
-        public final int width;
-        public final int height;
-        public final long timestamp;
-        public final byte[] pixels;
+    private final AtomicBoolean isRunning = new AtomicBoolean(false);
 
-        public Frame(byte[] fullPacket) {
-            this.pixels = fullPacket;
-            ByteBuffer buffer = ByteBuffer.wrap(fullPacket);
-            this.width = buffer.getInt();
-            this.height = buffer.getInt();
-            this.timestamp = buffer.getLong();
+    public WGCCapture(long hwnd) {
+        this.nativePtr = nativeInit(hwnd, true);
+        if (nativePtr == 0) {
+            throw new IllegalStateException("WGC 初始化失败");
         }
-    }
-
-    public interface FrameListener {
-        void onFrame(Frame frame);
+        log.info("WGC 初始化成功，hwnd={}", hwnd);
     }
 
     private volatile long nativePtr;
-    private volatile boolean isRunning;
 
-    public WGCCapture(long hwnd) {
-        this.nativePtr = nativeInitWithGPU(hwnd, true);
-        if (this.nativePtr == 0) throw new RuntimeException("Init Failed");
-    }
-
-    // ===================== 【关键】启动循环推送（等Java处理完再下一帧） =====================
+    // 🔥 核心：只启动，不自动释放
     public void startLoop(FrameListener listener) {
-        if (nativePtr == 0 || isRunning) return;
-
-        // Rust 会阻塞等待 onFrame 执行完再继续
-        nativeStartLoop(nativePtr, new Object() {
-            // 这个方法会被 Rust 自动调用
-            @SuppressWarnings("unused")
-            long onRawFrame(byte[] data) {
-                try {
-                    if (data != null && data.length > 0) {
-                        listener.onFrame(new Frame(data));
-                    }
-                } catch (Exception e) {
-                    log.error("帧处理异常", e);
-                }
-                return 0;
-            }
-        });
-
-        isRunning = true;
+        if (!isRunning.compareAndSet(false, true)) return;
+        new Thread(() -> {
+            nativeStartLoop(nativePtr, listener);
+            isRunning.set(false);
+            log.info("Rust 采集线程已退出");
+        }).start();
     }
 
-
-    public Frame captureSingleFrame() {
-        byte[] data = nativeCaptureFrame(nativePtr);
-        if (data == null || data.length == 0) {
-            try { Thread.sleep(20); } catch (InterruptedException ignored) {}
-            data = nativeCaptureFrame(nativePtr);
-        }
-        return (data != null && data.length > 0) ? new Frame(data) : null;
-    }
-
-    public void release() {
-        if (nativePtr != 0) {
+    public void close() {
+        if (nativePtr == 0) return;
+        isRunning.set(false);
+        try {
             nativeStopLoop(nativePtr);
             nativeRelease(nativePtr);
-            nativePtr = 0;
+        } catch (Exception ignored) {
         }
+        nativePtr = 0;
+        log.info("WGC 已释放");
     }
 
-    // ===================== Native 方法 =====================
-    public native long nativeInit(long hwnd);
+    // ===================== JNI 1:1 对应你的 Rust =====================
+    private native long nativeInit(long hwnd, boolean preferHighPerf);
 
-    // 🔥 新方法：Java 传入是否强制高性能显卡
-    public native long nativeInitWithGPU(long hwnd, boolean preferHighPerformanceGPU);
+    private native void nativeStartLoop(long ptr, Object callback);
 
-    public native byte[] nativeCaptureFrame(long ptr);
+    private native void nativeStopLoop(long ptr);
 
-    public native void nativeStartLoop(long ptr, Object callback);
+    private native void nativeRelease(long ptr);
 
-    public native void nativeRelease(long ptr);
+    // 完全匹配你的Rust：long onRawFrame(byte[])
+    public interface FrameListener {
+        long onRawFrame(byte[] data);
+    }
 
-    public native void nativeStopLoop(long ptr);
+    @Data
+    public static class Frame {
+        public int width;
+        public int height;
+        public long timestamp;
+        public byte[] pixels;
+
+        public Frame(byte[] data) {
+            ByteBuffer bb = ByteBuffer.wrap(data).asReadOnlyBuffer();
+            this.width = bb.getInt();
+            this.height = bb.getInt();
+            this.timestamp = bb.getLong();
+            this.pixels = data;
+        }
+    }
 }
