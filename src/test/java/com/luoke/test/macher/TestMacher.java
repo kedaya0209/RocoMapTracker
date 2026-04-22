@@ -1,10 +1,10 @@
 package com.luoke.test.macher;
 
-import com.luoke.capture.WindowsMonitor;
-import com.luoke.macher.map.MapMatcher;
-import com.luoke.macher.map.MatchingResultUtil;
-import com.luoke.macher.map.SiftMapMatcher;
-import com.luoke.processor.MiniMapProcessor;
+import com.luoke.app.capture.WindowsMonitor;
+import com.luoke.app.macher.map.MapMatcher;
+import com.luoke.app.macher.map.MatchingResultUtil;
+import com.luoke.app.macher.map.SiftMapMatcher;
+import com.luoke.app.processor.MiniMapProcessor;
 import com.luoke.test.capture.TestCapture;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Test;

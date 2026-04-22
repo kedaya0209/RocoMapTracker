@@ -1,9 +1,8 @@
 package com.luoke.test.capture;
 
-import com.luoke.capture.WindowsMonitor;
+import com.luoke.app.capture.WindowsMonitor;
 import org.junit.jupiter.api.Test;
 
-import javax.imageio.ImageIO;
 import java.io.File;
 import java.io.IOException;
 import java.net.URISyntaxException;

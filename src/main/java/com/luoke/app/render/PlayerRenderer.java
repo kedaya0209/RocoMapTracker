@@ -2,9 +2,9 @@ package com.luoke.app.render;
 
 import com.luoke.app.config.AppConfig;
 import com.luoke.app.context.MapManager;
+import com.luoke.app.macher.player.ArrowDetector;
+import com.luoke.app.macher.player.Player;
 import com.luoke.app.utils.ImageUtil;
-import com.luoke.macher.player.ArrowDetector;
-import com.luoke.macher.player.Player;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.image.Image;
 import lombok.extern.slf4j.Slf4j;

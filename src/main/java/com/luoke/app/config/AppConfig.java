@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.Properties;
 
 /**
@@ -28,9 +29,21 @@ public final class AppConfig {
     private static final String CONFIG_FILE_NAME = "app-config.properties";
 
     // ====================== 【内置默认配置】 ======================
-    // 资源文件路径
-    public static String MAP_RESOURCE_PATH = "/source/big_map.png";
-    public static String PLAYER_ICON_PATH = "/source/player.png";
+    // 资源文件路径（本地资源，不动）
+    public static String MAP_RESOURCE_PATH = "/source/map/map_0.png";
+    public static String PLAYER_ICON_PATH = "/source/icon/player.png";
+    public static String RESOURCE_ICON_PATH = "/source/icon/categories.json";
+    public static String RESOURCE_POINT_PATH = "/source/point/points.json";
+
+    // ====================== 【新加：网络爬虫地图 URL 数组】 ======================
+    public static String[] MAP_REMOTE_URLS;
+    public static String[] MAP_REMOTE_URL_NAME;
+    public static int[] MAP_REMOTE_URL_SORT;
+    public static int MAP_ZOOM = 7;
+    public static int MAP_MIN_ZOOM;
+    public static int MAP_MAX_ZOOM;
+    public static String MAP_RESOURCE_INFO_URL = "https://wiki.biligame.com/rocom/大地图";
+    public static String MAP_RESOURCE_POINT_URL = "https://wiki.biligame.com/rocom/Data:Mapnew/point.json";
 
     // 目标游戏窗口 & 主程序窗口
     public static String TARGET_WINDOW_NAME = "洛克王国：世界";
@@ -170,20 +183,25 @@ public final class AppConfig {
             Properties prop = new Properties();
 
             if (configFile.exists()) {
-                // 【强制 UTF-8 读取】
-                try (InputStreamReader reader = new InputStreamReader(new FileInputStream(configFile), StandardCharsets.UTF_8)) {
-                    prop.load(reader);
-                    log.info("✅ 配置文件加载成功：{}", configFile.getAbsolutePath());
-                }
-                overrideFromProperties(prop);
+                readConfig(configFile, prop);
             } else {
                 generateDefaultConfigWithComments(configFile);
                 log.info("✅ 已自动生成默认配置文件：{}", configFile.getAbsolutePath());
+                readConfig(configFile, prop);
             }
 
         } catch (Exception e) {
             log.error("❌ 配置加载失败，使用内置默认值", e);
         }
+    }
+
+    private static void readConfig(File configFile, Properties prop) throws IOException {
+        // 【强制 UTF-8 读取】
+        try (InputStreamReader reader = new InputStreamReader(new FileInputStream(configFile), StandardCharsets.UTF_8)) {
+            prop.load(reader);
+            log.info("✅ 配置文件加载成功：{}", configFile.getAbsolutePath());
+        }
+        overrideFromProperties(prop);
     }
 
     /**
@@ -197,11 +215,31 @@ public final class AppConfig {
                 # ==============================================
                 
                 # ---------------- 资源路径 ----------------
-                # 大地图图片路径
-                map.resource.path=/source/big_map.png
+                # 本地大地图图片路径
+                map.resource.path=/source/map/map_0.png
+                
+                # ---------------- 【新加：远程地图 URL 数组，逗号分隔】 ----------------
+                # 目前有大陆、地下第一层、地下第二层，
+                # 没有配置的话自动从 map.resource.info.url 解析
+                # https://wiki-dev-patch-oss.oss-cn-hangzhou.aliyuncs.com/res/lkwg/map-3.0/7/tile-{x}_{y}.png
+                # https://wiki-dev-patch-oss.oss-cn-hangzhou.aliyuncs.com/res/lkwg/map-1.0/tiles-B1/7/tile-{x}_{y}.png
+                # https://wiki-dev-patch-oss.oss-cn-hangzhou.aliyuncs.com/res/lkwg/map-1.0/tiles-B2/7/tile-{x}_{y}.png
+                # map.remote.urls=https://wiki-dev-patch-oss.oss-cn-hangzhou.aliyuncs.com/res/lkwg/map-3.0/7/tile-{x}_{y}.png,https://wiki-dev-patch-oss.oss-cn-hangzhou.aliyuncs.com/res/lkwg/map-1.0/tiles-B1/7/tile-{x}_{y}.png,https://wiki-dev-patch-oss.oss-cn-hangzhou.aliyuncs.com/res/lkwg/map-1.0/tiles-B2/7/tile-{x}_{y}.png
+                
+                # url图层顺序，默认 大陆表层，-1，-2
+                map.remote.url.sort=0,-1,-2
+                
+                # url图层顺序，默认 大陆表层，-1，-2
+                map.remote.url.name=G,B1,B2
+                
+                # wikiUrl
+                map.resource.info.url = "https://wiki.biligame.com/rocom/大地图";
+                
+                # 资源点位
+                map.resource.point.url = "https://wiki.biligame.com/rocom/Data:Mapnew/point.json";
                 
                 # 玩家箭头图标路径
-                player.icon.path=/source/player.png
+                player.icon.path=/source/icon/player.png
                 
                 # ---------------- 窗口配置 ----------------
                 # 捕获的游戏窗口名称
@@ -332,6 +370,30 @@ public final class AppConfig {
         MAP_RESOURCE_PATH = getProp(prop, "map.resource.path", MAP_RESOURCE_PATH);
         PLAYER_ICON_PATH = getProp(prop, "player.icon.path", PLAYER_ICON_PATH);
 
+        // ====================== 【加载远程地图数组】 ======================
+        MAP_REMOTE_URLS = Arrays.stream(
+                        getProp(prop, "map.remote.urls", "")
+                                .split(","))
+                .map(AppConfig::format)
+                .filter(s -> !s.isBlank())
+                .toArray(String[]::new);
+
+        MAP_REMOTE_URL_SORT = Arrays.stream(
+                        getProp(prop, "map.remote.url.sort", "")
+                                .split(","))
+                .mapToInt(Integer::parseInt)
+                .toArray();
+
+        MAP_REMOTE_URL_NAME = Arrays.stream(
+                        getProp(prop, "map.remote.urls", "")
+                                .split(","))
+                .map(AppConfig::format)
+                .filter(s -> !s.isBlank())
+                .toArray(String[]::new);
+
+        MAP_RESOURCE_INFO_URL = format(getProp(prop, "map.resource.info.url", MAP_RESOURCE_INFO_URL));
+        MAP_RESOURCE_POINT_URL = format(getProp(prop, "map.resource.point.url", MAP_RESOURCE_POINT_URL));
+
         TARGET_WINDOW_NAME = getProp(prop, "target.window.name", TARGET_WINDOW_NAME);
         APP_MAIN_TITLE = getProp(prop, "app.title", APP_MAIN_TITLE);
         MAIN_WINDOW_DEFAULT_WIDTH = getPropInt(prop, "main.window.width", MAIN_WINDOW_DEFAULT_WIDTH);
@@ -353,7 +415,6 @@ public final class AppConfig {
         COORDINATE_SMOOTH_FACTOR = getPropDouble(prop, "coordinate.smooth.factor", COORDINATE_SMOOTH_FACTOR);
         TARGET_CAPTURE_FPS = getPropInt(prop, "target.capture.fps", TARGET_CAPTURE_FPS);
 
-        // 读取捕获模式 push / poll
         CAPTURE_MODE = getProp(prop, "capture.mode", CAPTURE_MODE);
 
         SHOW_STATS_MAP_TIME = getPropBool(prop, "show.stats.map.time", SHOW_STATS_MAP_TIME);
@@ -410,5 +471,14 @@ public final class AppConfig {
         } catch (Exception e) {
             return def;
         }
+    }
+
+    private static String format(String url) {
+        if (url == null) return null;
+        return url.trim()
+                .replace("\"", "")
+                .replace("'", "")
+                .replace(";", "")
+                .strip();
     }
 }

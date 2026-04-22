@@ -1,6 +1,6 @@
 package com.luoke.app.utils;
 
-import com.luoke.capture.CaptureFrameRecord;
+import com.luoke.app.capture.CaptureFrameRecord;
 import javafx.geometry.Rectangle2D;
 import javafx.scene.image.Image;
 import javafx.scene.image.PixelFormat;
