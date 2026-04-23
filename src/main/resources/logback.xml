@@ -25,7 +25,7 @@
     </appender>
 
     <!-- 日志级别配置 -->
-    <logger name="com.luoke" level="DEBUG"/>
+    <logger name="com.luoke" level="INFO"/>
     <logger name="org.bytedeco" level="INFO"/>
 
     <!-- 根日志配置 -->

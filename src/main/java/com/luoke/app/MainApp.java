@@ -14,7 +14,8 @@ import com.luoke.app.macher.map.SiftMapMatcher;
 import com.luoke.app.macher.minimap.MapTracker;
 import com.luoke.app.macher.player.ArrowDetector;
 import com.luoke.app.macher.player.Player;
-import com.luoke.app.render.PlayerRenderer;
+import com.luoke.app.map.MapResourceUpdater;
+import com.luoke.app.render.CutterPlayerRenderer;
 import com.luoke.app.render.RenderLoop;
 import com.luoke.app.utils.CoordinateTransformer;
 import com.luoke.app.utils.ImageUtil;
@@ -24,6 +25,8 @@ import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.scene.Scene;
+import javafx.scene.control.Alert;
+import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
 import javafx.scene.image.Image;
@@ -34,7 +37,9 @@ import javafx.stage.Stage;
 import lombok.extern.slf4j.Slf4j;
 import org.bytedeco.opencv.opencv_core.Mat;
 
+import java.io.File;
 import java.io.InputStream;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 @Slf4j
@@ -50,13 +55,15 @@ public class MainApp extends Application {
     private static Label statusLabel;
     private static CheckBox followPlayerCb;
 
-    static void main(String[] args) {
-        // ====================== 【关键】启动先释放所有资源 ======================
-        preloadMatcherAsync();
-        ResourceUtils.extractAll();
+    // ====================== 【关键】用来阻塞 start() ======================
+    private final CountDownLatch initLatch = new CountDownLatch(1);
+    private volatile boolean initSuccess = false;
+
+    public static void main(String[] args) {
         launch(args);
     }
 
+    // ==================== 下面的代码你不用动 ====================
     private static void processFrame(Frame frame) {
         if (frame == null || !isMatcherReady.get()) return;
         stats.onFrameProcessed();
@@ -69,7 +76,7 @@ public class MainApp extends Application {
                 updateStatus(AppConfig.STATUS_MINIMAP_NOT_FOUND, Color.RED);
                 return;
             }
-
+            CutterPlayerRenderer.getInstance().updateArrow(miniMap);
             long t1 = System.currentTimeMillis();
             double[][] corners = mapMatcher.match(miniMap.bytes(), miniMap.width(), miniMap.height());
             stats.recordMatch(System.currentTimeMillis() - t1);
@@ -98,44 +105,88 @@ public class MainApp extends Application {
             MapManager.getInstance().updatePlayerState(center[0], center[1], player.getAngle());
             CoordinateTransformer.updatePositionSmoothly(center[0], center[1], AppConfig.COORDINATE_SMOOTH_FACTOR);
             updateStatus(AppConfig.STATUS_RUNNING, Color.LIGHTGREEN);
-
         } catch (Exception e) {
             log.error("帧异常", e);
         }
     }
 
-    private static void updateStatus(String msg, Color color) {
-        Platform.runLater(() -> {
-            statusLabel.setText(msg);
-            statusLabel.setTextFill(color);
-        });
-    }
+    // ====================== 【阻塞式初始化】 ======================
+    @Override
+    public void init() throws Exception {
+        super.init();
+        log.info("init() 开始初始化（子线程）");
 
-    private static void preloadMatcherAsync() {
-        Thread.ofVirtual().start(() -> {
-            try {
-                mapMatcher = new SiftMapMatcher();
-                // ====================== 自动优先读外部资源 ======================
-                mapMatcher.init(AppConfig.MAP_RESOURCE_PATH);
-                isMatcherReady.set(true);
-                try {
-                    startCapture();
-                } catch (Exception ignore) {
-                }
-            } catch (Exception e) {
-                log.error("匹配器加载失败", e);
+        try {
+            // 1. 释放基础资源
+            ResourceUtils.extractAll();
+
+            File rootDir = ResourceUtils.getExternalFile(AppConfig.SOURCE_ROOT_DIR);
+            if (!rootDir.exists()) {
+                rootDir.mkdirs();
             }
-        });
+
+            File initFile = ResourceUtils.getExternalFile(AppConfig.SOURCE_INIT);
+            if (initFile.exists()) {
+                log.info("资源已初始化，直接启动");
+                initSuccess = true;
+                return;
+            }
+
+            Platform.runLater(() -> {
+                Alert alert = new Alert(Alert.AlertType.INFORMATION);
+                alert.setTitle("首次启动");
+                alert.setHeaderText("首次运行需要下载资源文件");
+                alert.setContentText("点击确定后开始下载，请不要关闭程序...");
+                alert.showAndWait(); // 这里会阻塞 JavaFX 线程
+            });
+
+            // ======================
+            // 开始下载（后台执行）
+            // ======================
+            log.info("开始下载资源...");
+            MapResourceUpdater.updateAllResources();
+
+            // 标记已初始化
+            initFile.createNewFile();
+            initSuccess = true;
+            log.info("初始化完成！");
+
+        } catch (Exception e) {
+            log.error("初始化失败", e);
+            initSuccess = false;
+
+            // 失败弹窗
+            Platform.runLater(() -> {
+                Alert alert = new Alert(Alert.AlertType.ERROR);
+                alert.setTitle("初始化失败");
+                alert.setHeaderText("资源下载失败，程序无法启动");
+                alert.showAndWait();
+                Platform.exit();
+            });
+        } finally {
+            // 放开 start() 的阻塞
+            initLatch.countDown();
+        }
     }
 
-    private static void startCapture() {
-        windowsMonitor = new WindowsMonitor(AppConfig.TARGET_WINDOW_NAME);
-        windowsMonitor.startMonitor(MainApp::processFrame);
-    }
-
+    // ====================== 【被阻塞，直到 init() 完成】 ======================
     @Override
     public void start(Stage primaryStage) {
         try {
+            // ======================
+            // 【阻塞】等 init() 完成
+            // ======================
+            log.info("等待初始化完成...");
+            initLatch.await();
+
+            if (!initSuccess) {
+                Platform.exit();
+                return;
+            }
+
+            log.info("初始化完成，启动主窗口");
+
+            // ---------- 下面是你原来的逻辑 ----------
             initBigMapResource();
             ResourcePointContext.getInstance().loadAndInit();
 
@@ -162,11 +213,41 @@ public class MainApp extends Application {
             );
             followPlayerCb.setVisible(false);
 
+            Button updateBtn = new Button("更新资源文件");
+            updateBtn.setStyle("-fx-text-fill: black; -fx-font-size: " + AppConfig.UI_FONT_SIZE + "px;");
+            updateBtn.setOnAction(e -> {
+                Thread.ofVirtual().start(() -> {
+                    try {
+                        Platform.runLater(() -> {
+                            updateBtn.setText("正在更新...");
+                            updateBtn.setDisable(true);
+                        });
+
+                        MapResourceUpdater.updateAllResources();
+                        ResourcePointContext.getInstance().loadAndInit();
+
+                        Platform.runLater(() -> {
+                            updateBtn.setText("更新完成");
+                        });
+
+                    } catch (Exception ex) {
+                        log.error("更新失败", ex);
+                        Platform.runLater(() -> {
+                            updateBtn.setText("更新失败，重试");
+                        });
+                    } finally {
+                        Platform.runLater(() -> {
+                            updateBtn.setDisable(false);
+                        });
+                    }
+                });
+            });
+
             statusLabel = new Label(AppConfig.STATUS_STARTING);
             statusLabel.setTextFill(Color.BLACK);
             statusLabel.setStyle("-fx-font-size: " + AppConfig.UI_FONT_SIZE + "px;");
 
-            topBar.getChildren().addAll(followPlayerCb, statusLabel);
+            topBar.getChildren().addAll(updateBtn, followPlayerCb, statusLabel);
             root.getChildren().addAll(canvas, topBar);
 
             renderLoop = new RenderLoop(canvas.getGraphicsContext2D());
@@ -178,23 +259,46 @@ public class MainApp extends Application {
             primaryStage.setOnCloseRequest(e -> stop());
             primaryStage.show();
 
+            preloadMatcherAsync();
 
         } catch (Exception e) {
             log.error("启动失败", e);
+            Platform.exit();
         }
     }
 
-    private void initBigMapResource() throws Exception {
-        // ====================== 自动优先读外部资源 ======================
-        try (InputStream is = ResourceUtils.getResourceStream(AppConfig.MAP_RESOURCE_PATH)) {
+    private static void updateStatus(String msg, Color color) {
+        Platform.runLater(() -> {
+            statusLabel.setText(msg);
+            statusLabel.setTextFill(color);
+        });
+    }
 
+    private static void preloadMatcherAsync() {
+        Thread.ofVirtual().start(() -> {
+            try {
+                mapMatcher = new SiftMapMatcher();
+                mapMatcher.init(AppConfig.MAP_RESOURCE_PATH);
+                isMatcherReady.set(true);
+                try {
+                    startCapture();
+                } catch (Exception ignore) {
+                }
+            } catch (Exception e) {
+                log.error("匹配器加载失败", e);
+            }
+        });
+    }
+
+    private static void startCapture() {
+        windowsMonitor = new WindowsMonitor(AppConfig.TARGET_WINDOW_NAME);
+        windowsMonitor.startMonitor(MainApp::processFrame);
+    }
+
+    private void initBigMapResource() throws Exception {
+        try (InputStream is = ResourceUtils.getResourceStream(AppConfig.MAP_RESOURCE_PATH)) {
             Image rawImage = new Image(is);
             MapManager.getInstance().initWithKey(rawImage, rawImage.getWidth(), rawImage.getHeight(), "G");
-        }
-
-        // ====================== 自动优先读外部资源 ======================
-        try (InputStream iconStream = ResourceUtils.getResourceStream(AppConfig.PLAYER_ICON_PATH)) {
-            PlayerRenderer.getInstance().initIcon(iconStream);
         }
     }
 

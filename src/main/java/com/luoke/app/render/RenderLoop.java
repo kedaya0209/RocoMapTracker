@@ -32,9 +32,6 @@ public class RenderLoop extends AnimationTimer {
         gc.clearRect(0, 0, canvasWidth, canvasHeight);
         renderMap();
 
-        // ==========================
-        // ✅ 【关键：绘制资源图标】
-        // ==========================
         renderResourceIcons();
         renderStatsUI(canvasWidth);
         renderPlayer();
@@ -52,7 +49,9 @@ public class RenderLoop extends AnimationTimer {
     }
 
     private void renderPlayer() {
-        PlayerRenderer.getInstance().draw(gc);
+//        PlayerRenderer.getInstance().draw(gc);
+        CutterPlayerRenderer.getInstance().draw(gc);
+
     }
 
     // ==========================

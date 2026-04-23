@@ -1,6 +1,9 @@
 package com.luoke.app.context;
 
 import com.luoke.app.config.AppConfig;
+import com.luoke.app.event.PlayerPositionEvent;
+import com.luoke.app.hook.HookEventType;
+import com.luoke.app.hook.HookRegistry;
 import javafx.scene.image.Image;
 import lombok.Getter;
 import lombok.Setter;
@@ -43,6 +46,9 @@ public class MapManager {
         this.playerY = y;
         this.playerAngle = visualAngle;
         this.playerInitialized = true;
+        // 发布事件 → 自动分发给所有监听玩家的钩子
+        HookRegistry.INSTANCE.publish(HookEventType.PLAYER_UPDATE,
+                new PlayerPositionEvent(x, y));
     }
 
     public double getPlayerCanvasX() {

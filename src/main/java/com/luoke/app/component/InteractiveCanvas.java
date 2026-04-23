@@ -5,6 +5,7 @@ import com.luoke.app.context.CameraManager;
 import com.luoke.app.context.MapManager;
 import com.luoke.app.context.ResourcePointContext;
 import com.luoke.app.map.loader.ImageLoader;
+import com.luoke.app.map.model.ResourcePoint;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.image.Image;
@@ -82,27 +83,11 @@ public class InteractiveCanvas extends Canvas {
         gc.translate(mapManager.getOffsetX(), mapManager.getOffsetY());
         gc.scale(mapManager.getScale(), mapManager.getScale());
 
-        for (ResourcePointContext.ResourcePoint point : pointContext.getAllPoints()) {
+        for (ResourcePoint point : pointContext.getAllPoints()) {
             String iconPath = point.getConfig().getIcon();
             if (iconPath == null || iconPath.isBlank()) continue;
-
             Image icon = imageLoader.loadScaledIcon(AppConfig.ICON_DIR + iconPath);
-            if (icon == null || icon.isError()) continue;
-
-            // 坐标
-            double x = point.getScreenPosition().getX();
-            double y = point.getScreenPosition().getY();
-
-            double w = icon.getWidth();
-            double h = icon.getHeight();
-
-            // ===========================
-            // ✅ 底部对齐（不居中）
-            // ===========================
-            double drawX = x - w / 2;   // 水平居中（保持）
-            double drawY = y - h;       // 垂直 → 底部对齐坐标点
-
-            gc.drawImage(icon, drawX, drawY);
+            point.render(gc, icon);
         }
 
         gc.restore();

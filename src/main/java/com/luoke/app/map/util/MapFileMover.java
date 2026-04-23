@@ -23,7 +23,7 @@ public class MapFileMover {
         // 下载来源
         File src = FileUtil.getRelativeFile(MapResourceUpdater.DOWNLOAD_ICON_DIR);
         // 目标：从 AppConfig 读取图标目录
-        File dst = ResourceUtils.getExternalFile(AppConfig.RESOURCE_ICON_PATH);
+        File dst = ResourceUtils.getExternalFile(AppConfig.ICON_DIR);
         if (!dst.exists()) dst.mkdirs();
         move(src, dst);
     }
@@ -33,7 +33,7 @@ public class MapFileMover {
         // 下载来源
         File src = FileUtil.getRelativeFile(MapResourceUpdater.DOWNLOAD_POINT_DIR);
         // 目标：从 AppConfig 读取点位目录
-        File dst = ResourceUtils.getExternalFile(AppConfig.RESOURCE_POINT_CONFIG_PATH);
+        File dst = ResourceUtils.getExternalFile(AppConfig.RESOURCE_ICON_DIR);
         if (!dst.exists()) dst.mkdirs();
         move(src, dst);
     }
@@ -43,7 +43,7 @@ public class MapFileMover {
         // 下载来源
         File src = FileUtil.getRelativeFile(MapResourceUpdater.DOWNLOAD_MAP_DIR);
         // 目标：从 AppConfig 读取地图资源路径
-        File dst = ResourceUtils.getExternalFile(AppConfig.MAP_RESOURCE_PATH);
+        File dst = ResourceUtils.getExternalFile(AppConfig.MAP_RESOURCE_DIR);
         if (!dst.exists()) dst.mkdirs();
         move(src, dst);
     }
