@@ -1,91 +1,117 @@
 package com.luoke.app.component;
 
+import com.luoke.app.config.AppConfig;
 import com.luoke.app.context.CameraManager;
 import com.luoke.app.context.MapManager;
-import javafx.geometry.Point2D;
+import com.luoke.app.context.ResourcePointContext;
+import com.luoke.app.map.loader.ImageLoader;
 import javafx.scene.canvas.Canvas;
+import javafx.scene.canvas.GraphicsContext;
+import javafx.scene.image.Image;
 
 public class InteractiveCanvas extends Canvas {
 
-    private Point2D lastMousePos;
+    private final MapManager mapManager = MapManager.getInstance();
     private boolean firstResize = true;
+    private final CameraManager cameraManager = CameraManager.getInstance();
+    private final ResourcePointContext pointContext = ResourcePointContext.getInstance();
+    private final ImageLoader imageLoader = ImageLoader.getInstance();
+    private double lastMouseX, lastMouseY;
 
     public InteractiveCanvas() {
         setFocusTraversable(true);
         setPickOnBounds(true);
         setMouseTransparent(false);
 
-        // 窗口大小监听 + 首次自动适配全图
         widthProperty().addListener(e -> {
-            MapManager mm = MapManager.getInstance();
-            mm.setViewWidth(getWidth());
+            mapManager.setViewWidth(getWidth());
             if (firstResize && getWidth() > 0 && getHeight() > 0) {
                 autoFitMap();
                 firstResize = false;
             } else {
-                mm.ensureBounds();
+                mapManager.ensureBounds();
             }
         });
 
         heightProperty().addListener(e -> {
-            MapManager mm = MapManager.getInstance();
-            mm.setViewHeight(getHeight());
+            mapManager.setViewHeight(getHeight());
             if (firstResize && getWidth() > 0 && getHeight() > 0) {
                 autoFitMap();
                 firstResize = false;
             } else {
-                mm.ensureBounds();
+                mapManager.ensureBounds();
             }
         });
 
-        // 鼠标按下
         setOnMousePressed(e -> {
-            lastMousePos = new Point2D(e.getX(), e.getY());
+            lastMouseX = e.getX();
+            lastMouseY = e.getY();
             e.consume();
         });
 
-        // 鼠标拖动
         setOnMouseDragged(e -> {
-            if (CameraManager.getInstance().isFollowMode()) return;
-            if (lastMousePos == null) return;
+            if (cameraManager.isFollowMode()) return;
 
-            MapManager mm = MapManager.getInstance();
-            double dx = e.getX() - lastMousePos.getX();
-            double dy = e.getY() - lastMousePos.getY();
+            double dx = e.getX() - lastMouseX;
+            double dy = e.getY() - lastMouseY;
 
-            mm.setOffsetX(mm.getOffsetX() + dx);
-            mm.setOffsetY(mm.getOffsetY() + dy);
-            mm.ensureBounds(); // 自动限制边界
+            mapManager.setOffsetX(mapManager.getOffsetX() + dx);
+            mapManager.setOffsetY(mapManager.getOffsetY() + dy);
+            mapManager.ensureBounds();
 
-            lastMousePos = new Point2D(e.getX(), e.getY());
+            lastMouseX = e.getX();
+            lastMouseY = e.getY();
             e.consume();
         });
 
-        // 滚轮缩放
         setOnScroll(e -> {
             double factor = e.getDeltaY() > 0 ? 1.1 : 0.9;
-            CameraManager cam = CameraManager.getInstance();
-            if (cam.isFollowMode()) {
-                cam.setFollowScale(Math.clamp(cam.getFollowScale() * factor, 0.3, 5));
+            if (cameraManager.isFollowMode()) {
+                cameraManager.setFollowScale(Math.clamp(cameraManager.getFollowScale() * factor, 0.3, 5));
             } else {
-                MapManager.getInstance().zoom(factor, e.getX(), e.getY());
+                mapManager.zoom(factor, e.getX(), e.getY());
             }
             e.consume();
         });
     }
 
-    // 自动适配：显示整张地图
+    public void drawAllResourceIcons(GraphicsContext gc) {
+        if (pointContext.getAllPoints().isEmpty()) return;
+
+        gc.save();
+        gc.translate(mapManager.getOffsetX(), mapManager.getOffsetY());
+        gc.scale(mapManager.getScale(), mapManager.getScale());
+
+        for (ResourcePointContext.ResourcePoint point : pointContext.getAllPoints()) {
+            String iconPath = point.getConfig().getIcon();
+            if (iconPath == null || iconPath.isBlank()) continue;
+
+            Image icon = imageLoader.loadScaledIcon(AppConfig.ICON_DIR + iconPath);
+            if (icon == null || icon.isError()) continue;
+
+            // 坐标
+            double x = point.getScreenPosition().getX();
+            double y = point.getScreenPosition().getY();
+
+            double w = icon.getWidth();
+            double h = icon.getHeight();
+
+            // ===========================
+            // ✅ 底部对齐（不居中）
+            // ===========================
+            double drawX = x - w / 2;   // 水平居中（保持）
+            double drawY = y - h;       // 垂直 → 底部对齐坐标点
+
+            gc.drawImage(icon, drawX, drawY);
+        }
+
+        gc.restore();
+    }
+
     private void autoFitMap() {
-        MapManager mm = MapManager.getInstance();
-        if (mm.getMapWidth() <= 0 || mm.getMapHeight() <= 0) return;
-
-        double canvasW = getWidth();
-        double canvasH = getHeight();
-        double scaleW = canvasW / mm.getMapWidth();
-        double scaleH = canvasH / mm.getMapHeight();
-        double fitScale = Math.min(scaleW, scaleH);
-
-        mm.setScale(fitScale);
-        mm.ensureBounds(); // 自动居中+边界
+        if (mapManager.getMapWidth() <= 0 || mapManager.getMapHeight() <= 0) return;
+        double scale = Math.min(getWidth() / mapManager.getMapWidth(), getHeight() / mapManager.getMapHeight());
+        mapManager.setScale(scale);
+        mapManager.ensureBounds();
     }
 }

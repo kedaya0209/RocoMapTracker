@@ -3,6 +3,7 @@ package com.luoke.app.map.loader;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.luoke.app.config.AppConfig;
 import com.luoke.app.map.dto.MapCategoryItem;
+import com.luoke.app.utils.JsonUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -14,7 +15,7 @@ import java.util.List;
 @Slf4j
 public class MapCategoryLoader {
 
-    private static final ObjectMapper om = new ObjectMapper();
+    private static final ObjectMapper om = JsonUtils.getMapper();
 
     public static List<MapCategoryItem> load() {
         try {

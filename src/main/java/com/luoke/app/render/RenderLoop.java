@@ -1,5 +1,6 @@
 package com.luoke.app.render;
 
+import com.luoke.app.component.InteractiveCanvas;
 import com.luoke.app.config.AppConfig;
 import com.luoke.app.context.CameraManager;
 import com.luoke.app.context.MapManager;
@@ -30,8 +31,13 @@ public class RenderLoop extends AnimationTimer {
 
         gc.clearRect(0, 0, canvasWidth, canvasHeight);
         renderMap();
-        renderPlayer();
+
+        // ==========================
+        // ✅ 【关键：绘制资源图标】
+        // ==========================
+        renderResourceIcons();
         renderStatsUI(canvasWidth);
+        renderPlayer();
     }
 
     private void renderMap() {
@@ -47,6 +53,17 @@ public class RenderLoop extends AnimationTimer {
 
     private void renderPlayer() {
         PlayerRenderer.getInstance().draw(gc);
+    }
+
+    // ==========================
+    // ✅ 绘制所有资源点位图标
+    // ==========================
+    private void renderResourceIcons() {
+        if (!(gc.getCanvas() instanceof InteractiveCanvas canvas)) {
+            return;
+        }
+        // 调用 InteractiveCanvas 里的绘制方法
+        canvas.drawAllResourceIcons(gc);
     }
 
     private void renderStatsUI(double canvasWidth) {
@@ -82,6 +99,7 @@ public class RenderLoop extends AnimationTimer {
         double textX = canvasWidth - textWidth - margin;
         double textY = bgY + textHeight / 2 + 4;
 
+        gc.setFill(javafx.scene.paint.Color.BLACK);
         gc.fillText(text, textX, textY);
     }
 }

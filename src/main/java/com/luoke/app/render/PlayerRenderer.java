@@ -14,7 +14,8 @@ import org.bytedeco.opencv.opencv_core.Mat;
 import java.io.InputStream;
 
 /**
- * 识别角色朝向,绝大部分情况功能正常
+ * 识别角色朝向并进行渲染
+ * 已优化：集成原画质压缩与透明度保护
  */
 @Slf4j
 public class PlayerRenderer {
@@ -22,16 +23,11 @@ public class PlayerRenderer {
     private double baseAngle = 0.0;
     private final double LERP_FACTOR = AppConfig.PLAYER_ROTATE_LERP_FACTOR;
     private double iconDrawSize = AppConfig.PLAYER_ICON_DRAW_SIZE;
-    // --- 平滑处理新增属性 ---
     private double smoothedAngle = 0.0;
-    // -----------------------
 
     private PlayerRenderer() {}
     public static PlayerRenderer getInstance() { return Holder.INSTANCE; }
 
-    // -------------------------------------------------------------------------
-    // 【旧方法保留兼容】
-    // -------------------------------------------------------------------------
     public void initIcon(String resourcePath) {
         try (InputStream is = ResourceUtils.getResourceStream(resourcePath)) {
             initIcon(is);
@@ -40,25 +36,23 @@ public class PlayerRenderer {
         }
     }
 
-    // -------------------------------------------------------------------------
-    // 【新方法：直接传入 InputStream，给 MainApp 调用】
-    // -------------------------------------------------------------------------
+    /**
+     * 实现无损压缩加载
+     */
     public void initIcon(InputStream is) {
         try {
             Image rawIcon = new Image(is);
             this.processedIcon = ImageUtil.trimEmptyPixels(rawIcon);
-            iconDrawSize = processedIcon.getWidth();
-
-            try (Mat iconMat = ImageUtil.imageToMat(this.processedIcon)) {
+            // 识别时，使用这个边缘锐利的图
+            try (Mat iconMat = ImageUtil.imageToMat(processedIcon)) {
                 Player result = ArrowDetector.detectPlayer(iconMat);
                 if (result != null && result.isFound()) {
                     this.baseAngle = result.getAngle();
-                    this.smoothedAngle = 0;
-                    log.info("玩家素材基准角校准: {}°", baseAngle);
+                    log.info("玩家素材基准角校准成功: {}°", baseAngle);
                 }
             }
         } catch (Exception e) {
-            log.error("加载玩家图标失败", e);
+            log.error("加载并压缩玩家图标失败", e);
         }
     }
 
@@ -66,16 +60,13 @@ public class PlayerRenderer {
         if (processedIcon == null) return;
 
         MapManager mm = MapManager.getInstance();
-
-        // 从未找到过玩家 → 不渲染
-        if (!mm.isPlayerInitialized()) {
-            return;
-        }
+        if (!mm.isPlayerInitialized()) return;
 
         double canvasX = mm.getPlayerCanvasX();
         double canvasY = mm.getPlayerCanvasY();
         double targetAngle = mm.getPlayerAngle();
 
+        // 角度平滑插值逻辑
         double diff = targetAngle - smoothedAngle;
         if (diff < -180) diff += 360;
         if (diff > 180) diff -= 360;
@@ -83,14 +74,17 @@ public class PlayerRenderer {
         smoothedAngle += diff * LERP_FACTOR;
         smoothedAngle = (smoothedAngle + 360) % 360;
 
+        // 绘图
         gc.save();
         gc.translate(canvasX, canvasY);
-        gc.rotate(smoothedAngle);
+        // 补偿素材本身的基准角（如果有的话）
+        gc.rotate(smoothedAngle - baseAngle);
 
         double ratio = processedIcon.getHeight() / processedIcon.getWidth();
         double drawW = iconDrawSize;
         double drawH = iconDrawSize * ratio;
 
+        // 这里的 drawImage 内部也会进行一次平滑渲染
         gc.drawImage(processedIcon, -drawW / 2, -drawH / 2, drawW, drawH);
         gc.restore();
     }

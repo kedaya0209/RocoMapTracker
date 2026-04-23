@@ -33,7 +33,7 @@ public class MapFileMover {
         // 下载来源
         File src = FileUtil.getRelativeFile(MapResourceUpdater.DOWNLOAD_POINT_DIR);
         // 目标：从 AppConfig 读取点位目录
-        File dst = ResourceUtils.getExternalFile(AppConfig.RESOURCE_POINT_PATH);
+        File dst = ResourceUtils.getExternalFile(AppConfig.RESOURCE_POINT_CONFIG_PATH);
         if (!dst.exists()) dst.mkdirs();
         move(src, dst);
     }

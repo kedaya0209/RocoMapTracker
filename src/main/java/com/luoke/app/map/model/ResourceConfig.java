@@ -1,4 +1,4 @@
-package com.luoke.app.config;
+package com.luoke.app.map.model;
 
 import lombok.Data;
 

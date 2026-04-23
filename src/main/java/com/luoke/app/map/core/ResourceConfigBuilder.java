@@ -1,12 +1,13 @@
 package com.luoke.app.map.core;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.luoke.app.config.ResourceConfig;
 import com.luoke.app.map.LoadInfo;
 import com.luoke.app.map.MapResourceUpdater;
 import com.luoke.app.map.dto.MapCategoryItem;
 import com.luoke.app.map.dto.MapPointItem;
+import com.luoke.app.map.model.ResourceConfig;
 import com.luoke.app.utils.FileUtil;
+import com.luoke.app.utils.JsonUtils;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.File;
@@ -18,7 +19,7 @@ import java.util.Map;
 @Slf4j
 public class ResourceConfigBuilder {
 
-    private static final ObjectMapper om = new ObjectMapper();
+    private static final ObjectMapper om = JsonUtils.getMapper();
 
     public static void buildAndSaveConfig() {
         try {

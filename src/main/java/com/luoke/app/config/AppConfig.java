@@ -21,9 +21,10 @@ public final class AppConfig {
     // ====================== 【内置默认配置】 ======================
     // 资源文件路径（本地资源，不动）
     public static String MAP_RESOURCE_PATH = "/source/map/map_0.png";
+    public static String ICON_DIR = "/source/icon/";
     public static String PLAYER_ICON_PATH = "/source/icon/player.png";
     public static String RESOURCE_ICON_PATH = "/source/icon/categories.json";
-    public static String RESOURCE_POINT_PATH = "/source/point/points.json";
+    public static String RESOURCE_POINT_CONFIG_PATH = "/source/point/resource_config.json";
 
     // ====================== 【新加：网络爬虫地图 URL 数组】 ======================
     public static String[] MAP_REMOTE_URLS = new String[0];
@@ -32,6 +33,7 @@ public final class AppConfig {
     public static int MAP_ZOOM = 7;
     public static int MAP_MIN_ZOOM = 4;
     public static int MAP_MAX_ZOOM = 8;
+    public static int JSON_ZOOM = 7;
     public static String MAP_RESOURCE_INFO_URL = "https://wiki.biligame.com/rocom/大地图";
     public static String MAP_RESOURCE_POINT_URL = "https://wiki.biligame.com/rocom/Data:Mapnew/point.json";
 
@@ -78,6 +80,7 @@ public final class AppConfig {
     public static boolean SHOW_STATS_FPS = true;
 
     // ====================== SIFT 特征匹配配置 ======================
+    public static double SCALE_FACTOR = 1.0;
     public static int SIFT_N_FEATURES = 0;
     public static int SIFT_N_OCTAVE_LAYERS = 3;
     public static double SIFT_CONTRAST_THRESHOLD = 0.001;
@@ -233,6 +236,8 @@ public final class AppConfig {
                 # ==============================================
                 # SIFT 特征匹配参数（图像识别核心）
                 # ==============================================
+                # 图片处理倍率，推荐>0.8 值越小，匹配越快，画面越抖
+                scale.factor=0
                 # SIFT 特征点数量：0=自动提取全部
                 # 调大=更准更慢 | 调小=更快易失败
                 sift.n.features=0
@@ -326,6 +331,7 @@ public final class AppConfig {
         STATUS_PLAYER_NOT_FOUND = getStr(prop, "status.player.not.found", STATUS_PLAYER_NOT_FOUND);
         STATUS_RUNNING = getStr(prop, "status.running", STATUS_RUNNING);
 
+        SCALE_FACTOR = getDouble(prop, "scale.factor", SCALE_FACTOR);
         SIFT_N_FEATURES = getInt(prop, "sift.n.features", SIFT_N_FEATURES);
         SIFT_N_OCTAVE_LAYERS = getInt(prop, "sift.n.octave.layers", SIFT_N_OCTAVE_LAYERS);
         SIFT_CONTRAST_THRESHOLD = getDouble(prop, "sift.contrast.threshold", SIFT_CONTRAST_THRESHOLD);

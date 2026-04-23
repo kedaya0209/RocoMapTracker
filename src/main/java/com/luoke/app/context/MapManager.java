@@ -1,5 +1,6 @@
 package com.luoke.app.context;
 
+import com.luoke.app.config.AppConfig;
 import javafx.scene.image.Image;
 import lombok.Getter;
 import lombok.Setter;
@@ -14,9 +15,10 @@ public class MapManager {
 
     private double playerX = -1, playerY = -1;
     private double playerAngle = 0;
-
-    // ====================== 新增：标记玩家是否已初始化 ======================
     private boolean playerInitialized = false;
+
+    // ====================== 我加的：当前地图唯一 KEY ======================
+    private String currentMapKey;
 
     private MapManager() {}
     public static MapManager getInstance() { return Holder.INSTANCE; }
@@ -29,12 +31,17 @@ public class MapManager {
         this.viewHeight = h;
     }
 
+    // 初始化时 同时设置地图key（你加载图片时调用这个）
+    public void initWithKey(Image image, double w, double h, String mapKey) {
+        init(image, w, h);
+        this.currentMapKey = mapKey;
+        MapCoordinateManager.getInstance().registerMap(mapKey, (int) w, (int) h, AppConfig.JSON_ZOOM, AppConfig.MAP_ZOOM);
+    }
+
     public void updatePlayerState(double x, double y, double visualAngle) {
         this.playerX = x;
         this.playerY = y;
         this.playerAngle = visualAngle;
-
-        // 只要更新过一次，就标记为已初始化
         this.playerInitialized = true;
     }
 

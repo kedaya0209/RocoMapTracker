@@ -7,6 +7,7 @@ import com.luoke.app.component.InteractiveCanvas;
 import com.luoke.app.config.AppConfig;
 import com.luoke.app.context.CameraManager;
 import com.luoke.app.context.MapManager;
+import com.luoke.app.context.ResourcePointContext;
 import com.luoke.app.context.StatsManager;
 import com.luoke.app.macher.map.MapMatcher;
 import com.luoke.app.macher.map.SiftMapMatcher;
@@ -39,87 +40,24 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @Slf4j
 public class MainApp extends Application {
 
-    private final MapTracker mapTracker = MapTracker.getInstance();
-    private final StatsManager stats = StatsManager.getInstance();
-    private final AtomicBoolean isMatcherReady = new AtomicBoolean(false);
-    private MapMatcher mapMatcher;
-    private WindowsMonitor windowsMonitor;
+    private static final MapTracker mapTracker = MapTracker.getInstance();
+    private static final StatsManager stats = StatsManager.getInstance();
+    private static final AtomicBoolean isMatcherReady = new AtomicBoolean(false);
+    private static MapMatcher mapMatcher;
+    private static WindowsMonitor windowsMonitor;
     private RenderLoop renderLoop;
 
-    private Label statusLabel;
-    private CheckBox followPlayerCb;
+    private static Label statusLabel;
+    private static CheckBox followPlayerCb;
 
     static void main(String[] args) {
         // ====================== 【关键】启动先释放所有资源 ======================
+        preloadMatcherAsync();
         ResourceUtils.extractAll();
         launch(args);
     }
 
-    @Override
-    public void start(Stage primaryStage) {
-        try {
-            initBigMapResource();
-
-            StackPane root = new StackPane();
-            InteractiveCanvas canvas = new InteractiveCanvas();
-            canvas.widthProperty().bind(root.widthProperty());
-            canvas.heightProperty().bind(root.heightProperty());
-
-            HBox topBar = new HBox(AppConfig.TOP_BAR_SPACING);
-            topBar.setPadding(new Insets(
-                    AppConfig.TOP_BAR_PADDING_VERTICAL,
-                    AppConfig.TOP_BAR_PADDING_HORIZONTAL,
-                    AppConfig.TOP_BAR_PADDING_VERTICAL,
-                    AppConfig.TOP_BAR_PADDING_HORIZONTAL
-            ));
-            topBar.setMouseTransparent(false);
-            topBar.setPickOnBounds(false);
-            StackPane.setAlignment(topBar, javafx.geometry.Pos.TOP_LEFT);
-
-            followPlayerCb = new CheckBox(AppConfig.FOLLOW_PLAYER);
-            followPlayerCb.setStyle("-fx-text-fill: black; -fx-font-size: " + AppConfig.UI_FONT_SIZE + "px;");
-            followPlayerCb.selectedProperty().addListener((o, ov, nv) ->
-                    CameraManager.getInstance().setFollowMode(nv)
-            );
-            followPlayerCb.setVisible(false);
-
-            statusLabel = new Label(AppConfig.STATUS_STARTING);
-            statusLabel.setTextFill(Color.BLACK);
-            statusLabel.setStyle("-fx-font-size: " + AppConfig.UI_FONT_SIZE + "px;");
-
-            topBar.getChildren().addAll(followPlayerCb, statusLabel);
-            root.getChildren().addAll(canvas, topBar);
-
-            renderLoop = new RenderLoop(canvas.getGraphicsContext2D());
-            renderLoop.start();
-
-            primaryStage.setTitle(AppConfig.APP_MAIN_TITLE);
-            Scene scene = new Scene(root, AppConfig.MAIN_WINDOW_DEFAULT_WIDTH, AppConfig.MAIN_WINDOW_DEFAULT_HEIGHT);
-            primaryStage.setScene(scene);
-            primaryStage.setOnCloseRequest(e -> stop());
-            primaryStage.show();
-
-            preloadMatcherAsync();
-
-        } catch (Exception e) {
-            log.error("启动失败", e);
-        }
-    }
-
-    private void initBigMapResource() throws Exception {
-        // ====================== 自动优先读外部资源 ======================
-        try (InputStream is = ResourceUtils.getResourceStream(AppConfig.MAP_RESOURCE_PATH)) {
-            Image rawImage = new Image(is);
-            MapManager.getInstance().init(rawImage, rawImage.getWidth(), rawImage.getHeight());
-        }
-
-        // ====================== 自动优先读外部资源 ======================
-        try (InputStream iconStream = ResourceUtils.getResourceStream(AppConfig.PLAYER_ICON_PATH)) {
-            PlayerRenderer.getInstance().initIcon(iconStream);
-        }
-    }
-
-    private void processFrame(Frame frame) {
+    private static void processFrame(Frame frame) {
         if (frame == null || !isMatcherReady.get()) return;
         stats.onFrameProcessed();
 
@@ -166,14 +104,14 @@ public class MainApp extends Application {
         }
     }
 
-    private void updateStatus(String msg, Color color) {
+    private static void updateStatus(String msg, Color color) {
         Platform.runLater(() -> {
             statusLabel.setText(msg);
             statusLabel.setTextFill(color);
         });
     }
 
-    private void preloadMatcherAsync() {
+    private static void preloadMatcherAsync() {
         Thread.ofVirtual().start(() -> {
             try {
                 mapMatcher = new SiftMapMatcher();
@@ -190,9 +128,74 @@ public class MainApp extends Application {
         });
     }
 
-    private void startCapture() {
+    private static void startCapture() {
         windowsMonitor = new WindowsMonitor(AppConfig.TARGET_WINDOW_NAME);
-        windowsMonitor.startMonitor(this::processFrame);
+        windowsMonitor.startMonitor(MainApp::processFrame);
+    }
+
+    @Override
+    public void start(Stage primaryStage) {
+        try {
+            initBigMapResource();
+            ResourcePointContext.getInstance().loadAndInit();
+
+            StackPane root = new StackPane();
+            InteractiveCanvas canvas = new InteractiveCanvas();
+            canvas.widthProperty().bind(root.widthProperty());
+            canvas.heightProperty().bind(root.heightProperty());
+
+            HBox topBar = new HBox(AppConfig.TOP_BAR_SPACING);
+            topBar.setPadding(new Insets(
+                    AppConfig.TOP_BAR_PADDING_VERTICAL,
+                    AppConfig.TOP_BAR_PADDING_HORIZONTAL,
+                    AppConfig.TOP_BAR_PADDING_VERTICAL,
+                    AppConfig.TOP_BAR_PADDING_HORIZONTAL
+            ));
+            topBar.setMouseTransparent(false);
+            topBar.setPickOnBounds(false);
+            StackPane.setAlignment(topBar, javafx.geometry.Pos.TOP_LEFT);
+
+            followPlayerCb = new CheckBox(AppConfig.FOLLOW_PLAYER);
+            followPlayerCb.setStyle("-fx-text-fill: black; -fx-font-size: " + AppConfig.UI_FONT_SIZE + "px;");
+            followPlayerCb.selectedProperty().addListener((o, ov, nv) ->
+                    CameraManager.getInstance().setFollowMode(nv)
+            );
+            followPlayerCb.setVisible(false);
+
+            statusLabel = new Label(AppConfig.STATUS_STARTING);
+            statusLabel.setTextFill(Color.BLACK);
+            statusLabel.setStyle("-fx-font-size: " + AppConfig.UI_FONT_SIZE + "px;");
+
+            topBar.getChildren().addAll(followPlayerCb, statusLabel);
+            root.getChildren().addAll(canvas, topBar);
+
+            renderLoop = new RenderLoop(canvas.getGraphicsContext2D());
+            renderLoop.start();
+
+            primaryStage.setTitle(AppConfig.APP_MAIN_TITLE);
+            Scene scene = new Scene(root, AppConfig.MAIN_WINDOW_DEFAULT_WIDTH, AppConfig.MAIN_WINDOW_DEFAULT_HEIGHT);
+            primaryStage.setScene(scene);
+            primaryStage.setOnCloseRequest(e -> stop());
+            primaryStage.show();
+
+
+        } catch (Exception e) {
+            log.error("启动失败", e);
+        }
+    }
+
+    private void initBigMapResource() throws Exception {
+        // ====================== 自动优先读外部资源 ======================
+        try (InputStream is = ResourceUtils.getResourceStream(AppConfig.MAP_RESOURCE_PATH)) {
+
+            Image rawImage = new Image(is);
+            MapManager.getInstance().initWithKey(rawImage, rawImage.getWidth(), rawImage.getHeight(), "G");
+        }
+
+        // ====================== 自动优先读外部资源 ======================
+        try (InputStream iconStream = ResourceUtils.getResourceStream(AppConfig.PLAYER_ICON_PATH)) {
+            PlayerRenderer.getInstance().initIcon(iconStream);
+        }
     }
 
     @Override

@@ -23,11 +23,12 @@ import java.io.InputStream;
 import static org.bytedeco.opencv.global.opencv_core.CV_32FC2;
 import static org.bytedeco.opencv.global.opencv_core.CV_8UC4;
 import static org.bytedeco.opencv.global.opencv_imgcodecs.IMREAD_GRAYSCALE;
-import static org.bytedeco.opencv.global.opencv_imgproc.COLOR_BGRA2GRAY;
-import static org.bytedeco.opencv.global.opencv_imgproc.cvtColor;
+import static org.bytedeco.opencv.global.opencv_imgproc.*;
 
 @Slf4j
 public class SiftMapMatcher implements MapMatcher {
+
+    private static final double SCALE_FACTOR = AppConfig.SCALE_FACTOR;
 
     private static final float RATIO_THRESHOLD = AppConfig.MATCH_RATIO_THRESHOLD;
     private static final int MIN_MATCH_COUNT = AppConfig.MATCH_MIN_COUNT;
@@ -68,46 +69,94 @@ public class SiftMapMatcher implements MapMatcher {
 
     @Override
     public void init(String largeMapPath) {
-        String cacheFileName = largeMapPath + ".sift.zst";
-        File cacheFile = FileUtil.getRelativeFile(cacheFileName);
-        String absolutePath = cacheFile.getAbsolutePath();
+        long start = System.currentTimeMillis();
+        try {
+            // 注意：因为缩放倍率变了，建议删除旧缓存
+            String cacheFileName = largeMapPath + ".sift.zst";
+            File cacheFile = FileUtil.getRelativeFile(cacheFileName);
+            String absolutePath = cacheFile.getAbsolutePath();
 
-        if (cacheFile.exists()) {
-            log.info("从压缩缓存加载特征: {}", absolutePath);
-            if (CacheUtil.loadFeatures(absolutePath, cachedDes2, cachedKp2)) {
+            if (cacheFile.exists()) {
+                log.info("从缓存加载特征: {}", absolutePath);
+                if (CacheUtil.loadFeatures(absolutePath, cachedDes2, cachedKp2)) {
+                    buildMatcher();
+                    this.isInitialized = true;
+                    return;
+                }
+                cacheFile.delete();
+            }
+
+            log.info("提取大图特征 (缩放倍率: {})...", SCALE_FACTOR);
+            try (InputStream is = ResourceUtils.getResourceStream(largeMapPath)) {
+                Mat img2 = ImageUtil.loadToMat(is, IMREAD_GRAYSCALE);
+                if (img2.empty()) throw new RuntimeException("加载失败: " + largeMapPath);
+
+                // 【步骤1】大图强制缩放
+                Mat resizedImg = new Mat();
+                resize(img2, resizedImg, new Size((int) (img2.cols() * SCALE_FACTOR), (int) (img2.rows() * SCALE_FACTOR)));
+                img2.release();
+
+                // 【步骤2】在缩放后的图上提取特征
+                sift.detectAndCompute(resizedImg, mask, cachedKp2, cachedDes2);
+
+                CacheUtil.saveFeatures(absolutePath, cachedDes2, cachedKp2);
                 buildMatcher();
                 this.isInitialized = true;
-                return;
+
+                resizedImg.release();
+            } catch (Exception e) {
+                log.error("初始化失败", e);
             }
-            cacheFile.delete();
-        }
-
-        log.info("提取大图特征 (耗时操作)...");
-
-        // ====================== 【关键改动】优先读外部资源 ======================
-        try (InputStream is = ResourceUtils.getResourceStream(largeMapPath)) {
-            Mat img2 = ImageUtil.loadToMat(is, IMREAD_GRAYSCALE);
-            if (img2.empty()) throw new RuntimeException("加载失败: " + largeMapPath);
-
-            sift.detectAndCompute(img2, mask, cachedKp2, cachedDes2);
-            log.info("特征提取完成，特征点数: {}", cachedKp2.size());
-
-            CacheUtil.saveFeatures(absolutePath, cachedDes2, cachedKp2);
-            buildMatcher();
-            this.isInitialized = true;
-
-            img2.release();
-        } catch (Exception e) {
-            log.error("初始化失败", e);
+        } finally {
+            log.info("Sift初始化耗时：{}ms", System.currentTimeMillis() - start);
         }
     }
 
     private void buildMatcher() {
+        if (cachedDes2 == null || cachedDes2.empty()) return;
         matcher.clear();
         try (MatVector desVector = new MatVector(cachedDes2)) {
             matcher.add(desVector);
+            matcher.train();
         }
-        matcher.train();
+    }
+
+    private double[][] processMat(Mat img1) {
+        if (img1 == null || img1.empty() || !isInitialized) return null;
+
+        // 【步骤3】实时抓取的小图也必须按相同倍率缩放，否则特征描述符无法对齐
+        Mat processedSmall = new Mat();
+        resize(img1, processedSmall, new Size((int) (img1.cols() * SCALE_FACTOR), (int) (img1.rows() * SCALE_FACTOR)));
+
+        kp1.resize(0);
+        des1.release();
+        knnMatches.resize(0);
+        goodMatches.resize(0);
+
+        sift.detectAndCompute(processedSmall, mask, kp1, des1);
+
+        double[][] result = null;
+        if (!des1.empty()) {
+            matcher.knnMatch(des1, knnMatches, 2);
+            for (long i = 0; i < knnMatches.size(); i++) {
+                try (DMatchVector m = knnMatches.get(i)) {
+                    if (m.size() >= 2) {
+                        DMatch m1 = m.get(0);
+                        DMatch m2 = m.get(1);
+                        if (m1.distance() < RATIO_THRESHOLD * m2.distance()) {
+                            goodMatches.push_back(m1);
+                        }
+                    }
+                }
+            }
+
+            if (goodMatches.size() >= MIN_MATCH_COUNT) {
+                result = calculateCoordinates(processedSmall, kp1, goodMatches);
+            }
+        }
+
+        processedSmall.release();
+        return result;
     }
 
     @Override
@@ -125,7 +174,6 @@ public class SiftMapMatcher implements MapMatcher {
     @Override
     public double[][] match(byte[] imageBytes, int width, int height) {
         if (imageBytes == null) return null;
-
         BytePointer ptr = null;
         Mat bgraMat = null;
         Mat grayMat = null;
@@ -159,45 +207,10 @@ public class SiftMapMatcher implements MapMatcher {
         }
     }
 
-    private double[][] processMat(Mat img1) {
-        if (img1 == null || img1.empty() || !isInitialized)
-            return null;
-
-        kp1.resize(0);
-        des1.release();
-        knnMatches.resize(0);
-        goodMatches.resize(0);
-
-        sift.detectAndCompute(img1, mask, kp1, des1);
-        if (des1.empty())
-            return null;
-
-        matcher.knnMatch(des1, knnMatches, 2);
-
-        for (long i = 0; i < knnMatches.size(); i++) {
-            try (DMatchVector m = knnMatches.get(i)) {
-                if (m.size() >= 2) {
-                    DMatch m1 = m.get(0);
-                    DMatch m2 = m.get(1);
-                    if (m1.distance() < RATIO_THRESHOLD * m2.distance()) {
-                        goodMatches.push_back(m1);
-                    }
-                }
-            }
-        }
-
-        if (goodMatches.size() >= MIN_MATCH_COUNT) {
-            return calculateCoordinates(img1, kp1, goodMatches);
-        }
-        return null;
-    }
-
     private double[][] calculateCoordinates(Mat img1, KeyPointVector kp1, DMatchVector goodMatches) {
         int n = (int) goodMatches.size();
-
         objPoints.create(n, 1, CV_32FC2);
         scenePoints.create(n, 1, CV_32FC2);
-
         FloatIndexer objIdx = objPoints.createIndexer();
         FloatIndexer sceneIdx = scenePoints.createIndexer();
 
@@ -212,17 +225,9 @@ public class SiftMapMatcher implements MapMatcher {
             }
         }
 
-        try (Mat H = opencv_calib3d.findHomography(
-                objPoints,
-                scenePoints,
-                opencv_calib3d.RANSAC,
-                AppConfig.RANSAC_REPROJ_THRESHOLD,
-                inliers,
-                AppConfig.RANSAC_MAX_ITERS,
-                AppConfig.RANSAC_CONFIDENCE
-        )) {
-            if (H == null || H.empty())
-                return null;
+        try (Mat H = opencv_calib3d.findHomography(objPoints, scenePoints, opencv_calib3d.RANSAC,
+                AppConfig.RANSAC_REPROJ_THRESHOLD, inliers, AppConfig.RANSAC_MAX_ITERS, AppConfig.RANSAC_CONFIDENCE)) {
+            if (H == null || H.empty()) return null;
 
             FloatIndexer cIdx = objCorners.createIndexer();
             cIdx.put(0, 0, 0, 0);
@@ -239,8 +244,9 @@ public class SiftMapMatcher implements MapMatcher {
             double[][] result = new double[4][2];
             FloatIndexer sIdx = sceneCorners.createIndexer();
             for (int i = 0; i < 4; i++) {
-                result[i][0] = sIdx.get(i, 0, 0);
-                result[i][1] = sIdx.get(i, 0, 1);
+                // 【步骤4】坐标还原：计算结果除以倍率，回到原始大图空间
+                result[i][0] = sIdx.get(i, 0, 0) / SCALE_FACTOR;
+                result[i][1] = sIdx.get(i, 0, 1) / SCALE_FACTOR;
             }
             return result;
         }
@@ -248,8 +254,6 @@ public class SiftMapMatcher implements MapMatcher {
 
     @Override
     public void destroy() {
-        log.info("释放 SiftMapMatcher 关键资源...");
-
         if (cachedDes2 != null) {
             cachedDes2.release();
             cachedDes2 = null;
@@ -261,17 +265,13 @@ public class SiftMapMatcher implements MapMatcher {
         inliers.release();
         objCorners.release();
         sceneCorners.release();
-
         kp1.close();
         knnMatches.close();
         goodMatches.close();
         cachedKp2.close();
-
         sift.close();
         matcher.close();
         j2dConverter.close();
         matConverter.close();
-
-        log.info("资源释放完毕");
     }
 }
