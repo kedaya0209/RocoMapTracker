@@ -96,3 +96,4 @@ coverage/
 *.png
 !resource/source/**/*.png
 /.claude/
+/resources/model/

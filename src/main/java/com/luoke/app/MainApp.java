@@ -9,6 +9,7 @@ import com.luoke.app.context.CameraManager;
 import com.luoke.app.context.MapManager;
 import com.luoke.app.context.ResourcePointContext;
 import com.luoke.app.context.StatsManager;
+import com.luoke.app.hook.multicast.HookMulticaster;
 import com.luoke.app.macher.map.MapMatcher;
 import com.luoke.app.macher.map.SiftMapMatcher;
 import com.luoke.app.macher.minimap.MapTracker;
@@ -16,6 +17,7 @@ import com.luoke.app.macher.player.ArrowDetector;
 import com.luoke.app.macher.player.Player;
 import com.luoke.app.map.MapResourceUpdater;
 import com.luoke.app.render.CutterPlayerRenderer;
+import com.luoke.app.render.PlayerRenderer;
 import com.luoke.app.render.RenderLoop;
 import com.luoke.app.utils.CoordinateTransformer;
 import com.luoke.app.utils.ImageUtil;
@@ -300,12 +302,18 @@ public class MainApp extends Application {
             Image rawImage = new Image(is);
             MapManager.getInstance().initWithKey(rawImage, rawImage.getWidth(), rawImage.getHeight(), "G");
         }
+        try (InputStream is = ResourceUtils.getResourceStream(AppConfig.PLAYER_ICON_PATH)) {
+            PlayerRenderer.getInstance().initIcon(is);
+        }
     }
 
     @Override
     public void stop() {
         if (renderLoop != null) renderLoop.stop();
         if (windowsMonitor != null) windowsMonitor.stopMonitor();
+        HookMulticaster multicaster = HookMulticaster.getInstance();
+        if (multicaster != null) multicaster.shutdown();
         Platform.exit();
+        System.exit(0);
     }
 }

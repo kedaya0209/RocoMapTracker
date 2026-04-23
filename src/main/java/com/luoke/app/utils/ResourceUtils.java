@@ -4,6 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.io.*;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
@@ -110,5 +111,10 @@ public class ResourceUtils {
     public static File getExternalFile(String internalPath) {
         String safePath = internalPath.replaceFirst("^[/\\\\]+", "");
         return FileUtil.getRelativeFile(RESOURCE_BASE_DIR, safePath);
+    }
+
+    public static String getExternalPath(String internalPath) {
+        String safePath = internalPath.replaceFirst("^[/\\\\]+", "");
+        return FileUtil.getAppRootDir().resolve(Path.of(RESOURCE_BASE_DIR, safePath)).toAbsolutePath().toString();
     }
 }

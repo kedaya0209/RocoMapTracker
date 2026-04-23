@@ -31,7 +31,7 @@ public class TestMacher {
         CountDownLatch latch = new CountDownLatch(sum);
         MapMatcher matcher = new SiftMapMatcher();
         matcher.init(bigMap);
-        monitor.startMonitorPoll( frameRecord -> {
+        monitor.startMonitor( frameRecord -> {
             int h = 0;
             byte[] bytes = MiniMapProcessor.extractFinalMiniMap(null, 0.897, 0.0785, 0.148).bytes();
             MatchingResultUtil.saveRawPixelsToFile(bytes, h, h, String.format("%s\\%d-test-miniMap.png", dir, count.get()));

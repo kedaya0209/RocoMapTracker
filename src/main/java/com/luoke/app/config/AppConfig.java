@@ -1,6 +1,6 @@
 package com.luoke.app.config;
 
-import com.luoke.app.utils.FileUtil;
+import com.luoke.app.utils.ResourceUtils;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.*;
@@ -12,11 +12,17 @@ import java.util.Properties;
 public final class AppConfig {
 
     public static final String FOLLOW_PLAYER = "跟随玩家";
+    public static final String MODEL_DIR = "/model/";
+    public static final String OCR_REC_MODEL = "ch_PP-OCRv5_rec_mobile.onnx";
+    public static final String OCR_DET_MODEL = "ch_PP-OCRv5_det_mobile.onnx";
+    public static final String PPOCR_KEYS = "ppocr_keys_v1.txt";
 
     // ====================== 配置文件名称 ======================
     private static final String CONFIG_FILE_NAME = "app-config.properties";
 
     public static boolean SHOW_MONITOR_BORDER = false;
+
+    public static String PLAYER_ICON_MODEL = "cutter";
 
     // ====================== 【内置默认配置】 ======================
     // 资源文件路径（本地资源，不动）
@@ -114,7 +120,7 @@ public final class AppConfig {
 
     private static void loadConfig() {
         try {
-            File configFile = FileUtil.getRelativeFile(CONFIG_FILE_NAME);
+            File configFile = ResourceUtils.getExternalFile(CONFIG_FILE_NAME);
             Properties prop = new Properties();
 
             if (configFile.exists()) {
@@ -164,6 +170,8 @@ public final class AppConfig {
                 map.resource.dir=/source/map/
                 # 图标目录
                 icon.dir=/source/icon/
+                # 玩家图标模式 cutter(从小地图抠图，稳定), simulation(算法模拟，大部分时间稳定)  
+                player.icon.model=cutter
                 # 玩家箭头图标
                 player.icon.path=/source/icon/player.png
                 # 资源点图标目录
@@ -294,6 +302,8 @@ public final class AppConfig {
         RESOURCE_POINT_CONFIG_PATH = getStr(prop, "resource.point.config.path", RESOURCE_POINT_CONFIG_PATH);
 
         SHOW_MONITOR_BORDER = getBool(prop, "show.monitor.border", SHOW_MONITOR_BORDER);
+
+        PLAYER_ICON_MODEL = getStr(prop, "player.icon.model", PLAYER_ICON_MODEL);
 
         MAP_REMOTE_URLS = getStrArray(prop, "map.remote.urls");
         MAP_REMOTE_URL_SORT = getIntArray(prop, "map.remote.url.sort");

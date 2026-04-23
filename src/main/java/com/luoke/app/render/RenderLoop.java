@@ -49,9 +49,11 @@ public class RenderLoop extends AnimationTimer {
     }
 
     private void renderPlayer() {
-//        PlayerRenderer.getInstance().draw(gc);
+        if ("simulation".equalsIgnoreCase(AppConfig.PLAYER_ICON_MODEL)) {
+            PlayerRenderer.getInstance().draw(gc);
+            return;
+        }
         CutterPlayerRenderer.getInstance().draw(gc);
-
     }
 
     // ==========================

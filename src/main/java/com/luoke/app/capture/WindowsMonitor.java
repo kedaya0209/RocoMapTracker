@@ -23,7 +23,7 @@ public class WindowsMonitor {
         if (isMonitoring) return;
         isMonitoring = true;
 
-        Thread.ofVirtual().start(() -> {
+        Thread vThread = Thread.ofVirtual().start(() -> {
             while (isMonitoring) {
                 try {
                     long hwnd = WindowFinder.findWindowByKeyword(windowKeyword);

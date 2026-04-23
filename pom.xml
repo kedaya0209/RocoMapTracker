@@ -10,9 +10,9 @@
     <packaging>jar</packaging>
 
     <properties>
-        <maven.compiler.source>25</maven.compiler.source>
-        <maven.compiler.target>25</maven.compiler.target>
-        <maven.compiler.release>25</maven.compiler.release>
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
+        <maven.compiler.release>21</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
         <javafx.version>25</javafx.version>
@@ -27,14 +27,22 @@
         <junit.version>5.9.2</junit.version>
         <javacv.opencv.version>4.9.0-1.5.10</javacv.opencv.version>
         <javacv.openblas.version>0.3.26-1.5.10</javacv.openblas.version>
+        <graalvm.version>21.0.2</graalvm.version>
+        <onnxruntime.version>1.25.0</onnxruntime.version>
     </properties>
-
     <dependencies>
+        <dependency>
+            <groupId>com.microsoft.onnxruntime</groupId>
+            <artifactId>onnxruntime</artifactId>
+            <version>${onnxruntime.version}</version>
+        </dependency>
+
         <dependency>
             <groupId>com.github.luben</groupId>
             <artifactId>zstd-jni</artifactId>
             <version>${zstd.version}</version>
         </dependency>
+
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-controls</artifactId>
@@ -56,7 +64,7 @@
             <version>${javafx.version}</version>
         </dependency>
 
-        <!-- OpenCV -->
+        <!-- OpenCV + JavaCV -->
         <dependency>
             <groupId>org.bytedeco</groupId>
             <artifactId>javacv</artifactId>
@@ -93,7 +101,7 @@
             <version>${jna.version}</version>
         </dependency>
 
-        <!-- Log -->
+        <!-- Logging -->
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
@@ -113,21 +121,22 @@
         </dependency>
 
         <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter-api</artifactId>
-            <version>${junit.version}</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
             <groupId>org.jsoup</groupId>
             <artifactId>jsoup</artifactId>
-            <version>${jsoup.version}</version> <!-- 建议 ≥1.15.3 -->
-        </dependency><!-- Jsoup 爬网页 -->
-        <!-- Jackson 解析 JSON（必须） -->
+            <version>${jsoup.version}</version>
+        </dependency>
+
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
             <version>${jackson.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-api</artifactId>
+            <version>${junit.version}</version>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
@@ -144,15 +153,15 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.15.0</version>
                 <configuration>
-                    <source>25</source>
-                    <target>25</target>
-                    <release>25</release>
+                    <source>22</source>
+                    <target>22</target>
+                    <release>21</release>
                     <encoding>UTF-8</encoding>
                     <annotationProcessorPaths>
                         <path>
                             <groupId>org.projectlombok</groupId>
                             <artifactId>lombok</artifactId>
-                            <version>1.18.44</version>
+                            <version>${lombok.version}</version>
                         </path>
                     </annotationProcessorPaths>
                 </configuration>
@@ -215,26 +224,46 @@
                     <plugin>
                         <groupId>org.graalvm.buildtools</groupId>
                         <artifactId>native-maven-plugin</artifactId>
-                        <version>1.0.0</version>
+                        <version>0.10.0</version>
                         <extensions>true</extensions>
+                        <executions>
+                            <execution>
+                                <id>build-native</id>
+                                <goals>
+                                    <goal>compile</goal>
+                                </goals>
+                                <phase>package</phase>
+                            </execution>
+                        </executions>
                         <configuration>
                             <mainClass>com.luoke.app.Main</mainClass>
                             <imageName>RocoMapTracker</imageName>
                             <useArgFile>true</useArgFile>
-                            <!-- ✅ 自动启用 Agent 收集元数据-->
+
                             <agent>
-                                <enabled>true</enabled>
-                                <options>experimental-class-loader-support</options>
+                                <enabled>false</enabled>
+                                <options>
+                                    <option>experimental-class-loader-support</option>
+                                    <option>allow-incomplete-classpath</option>
+                                </options>
                             </agent>
 
                             <buildArgs>
+                                <buildArg>-Dfile.encoding=UTF-8</buildArg>
+                                <buildArg>-Dstdout.encoding=UTF-8</buildArg>
+                                <buildArg>-Dstderr.encoding=UTF-8</buildArg>
                                 <buildArg>--no-fallback</buildArg>
                                 <buildArg>-H:+UnlockExperimentalVMOptions</buildArg>
+                                <buildArg>--windows-subsystem=gui</buildArg>
                                 <buildArg>-H:+StripDebugInfo</buildArg>
-                                <buildArg>-H:IncludeResources=.*\.(png|jpg|properties|fxml)</buildArg>
+                                <buildArg>-H:IncludeResources=.*\\.(png|properties|json|fxml)</buildArg>
+                                <buildArg>-H:IncludeResourceBundles=ch.qos.logback.*</buildArg>
                                 <buildArg>-Djava.awt.headless=false</buildArg>
+                                <buildArg>-H:ReachabilityMetadataResources=META-INF/native-image/reachability-metadata.json</buildArg>
                                 <buildArg>-Djna.nosys=true</buildArg>
                                 <buildArg>-Dorg.bytedeco.javacpp.loadlibraries=true</buildArg>
+                                <buildArg>--enable-http</buildArg>
+                                <buildArg>--enable-https</buildArg>
                             </buildArgs>
                         </configuration>
                     </plugin>
