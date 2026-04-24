@@ -10,9 +10,9 @@
     <packaging>jar</packaging>
 
     <properties>
-        <maven.compiler.source>21</maven.compiler.source>
-        <maven.compiler.target>21</maven.compiler.target>
-        <maven.compiler.release>21</maven.compiler.release>
+        <maven.compiler.source>25</maven.compiler.source>
+        <maven.compiler.target>25</maven.compiler.target>
+        <maven.compiler.release>25</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
         <javafx.version>25</javafx.version>
@@ -27,8 +27,8 @@
         <junit.version>5.9.2</junit.version>
         <javacv.opencv.version>4.9.0-1.5.10</javacv.opencv.version>
         <javacv.openblas.version>0.3.26-1.5.10</javacv.openblas.version>
-        <graalvm.version>21.0.2</graalvm.version>
         <onnxruntime.version>1.25.0</onnxruntime.version>
+        <flatlaf.version>3.4.1</flatlaf.version>
     </properties>
     <dependencies>
         <dependency>
@@ -43,6 +43,7 @@
             <version>${zstd.version}</version>
         </dependency>
 
+        <!-- JavaFX -->
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-controls</artifactId>
@@ -62,6 +63,13 @@
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-fxml</artifactId>
             <version>${javafx.version}</version>
+        </dependency>
+
+        <!-- FlatLaf 现代化界面 -->
+        <dependency>
+            <groupId>com.formdev</groupId>
+            <artifactId>flatlaf</artifactId>
+            <version>${flatlaf.version}</version>
         </dependency>
 
         <!-- OpenCV + JavaCV -->
@@ -147,15 +155,25 @@
     </dependencies>
 
     <build>
+        <!-- 资源文件配置（确保 model 被打包）-->
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <includes>
+                    <include>**/*</include>
+                </includes>
+            </resource>
+        </resources>
+
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.15.0</version>
                 <configuration>
-                    <source>22</source>
-                    <target>22</target>
-                    <release>21</release>
+                    <source>25</source>
+                    <target>25</target>
+                    <release>25</release>
                     <encoding>UTF-8</encoding>
                     <annotationProcessorPaths>
                         <path>
@@ -247,7 +265,6 @@
                                     <option>allow-incomplete-classpath</option>
                                 </options>
                             </agent>
-
                             <buildArgs>
                                 <buildArg>-Dfile.encoding=UTF-8</buildArg>
                                 <buildArg>-Dstdout.encoding=UTF-8</buildArg>
@@ -256,7 +273,9 @@
                                 <buildArg>-H:+UnlockExperimentalVMOptions</buildArg>
                                 <buildArg>--windows-subsystem=gui</buildArg>
                                 <buildArg>-H:+StripDebugInfo</buildArg>
-                                <buildArg>-H:IncludeResources=.*\\.(png|properties|json|fxml)</buildArg>
+                                <buildArg>--initialize-at-run-time=ai.onnxruntime.OnnxRuntime</buildArg>
+                                <buildArg>--initialize-at-run-time=ai.onnxruntime.OrtEnvironment</buildArg>
+                                <buildArg>-H:IncludeResources=.*\\.(onnx|bin|json|model|txt|png|fxml|properties)</buildArg>
                                 <buildArg>-H:IncludeResourceBundles=ch.qos.logback.*</buildArg>
                                 <buildArg>-Djava.awt.headless=false</buildArg>
                                 <buildArg>-H:ReachabilityMetadataResources=META-INF/native-image/reachability-metadata.json</buildArg>

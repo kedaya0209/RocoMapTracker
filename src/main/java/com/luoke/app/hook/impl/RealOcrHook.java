@@ -1,9 +1,12 @@
 package com.luoke.app.hook.impl;
 
 import com.luoke.app.capture.jna.Frame;
+import com.luoke.app.context.MaterialCollectionContext;
 import com.luoke.app.context.OcrAsyncManager;
 import com.luoke.app.hook.AbstractGenericHook;
 import com.luoke.app.hook.HookEventType;
+import com.luoke.app.model.ItemResult;
+import com.luoke.app.utils.OcrResultValidator;
 import lombok.extern.slf4j.Slf4j;
 import org.bytedeco.javacpp.BytePointer;
 import org.bytedeco.opencv.global.opencv_core;
@@ -11,79 +14,101 @@ import org.bytedeco.opencv.global.opencv_imgcodecs;
 import org.bytedeco.opencv.opencv_core.Mat;
 import org.bytedeco.opencv.opencv_core.Rect;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
 
 @Slf4j
 public class RealOcrHook extends AbstractGenericHook<Frame> {
-    // 裁剪比例配置
-    private static final double SCALE_X = 0.875;
-    private static final double SCALE_Y = 0.287;
-    private static final double SCALE_W = 0.11;
-    private static final double SCALE_H = 0.17;
+    private static final double SCALE_X = 0.875, SCALE_Y = 0.287, SCALE_W = 0.11, SCALE_H = 0.17;
+    private static final long SCAN_INTERVAL = 200; // 300ms 采样
 
-    private long lastTime = 0;
+    private long lastScanTime = 0;
 
-    @Override
-    public Set<HookEventType> supportedEvents() {
-        return Set.of(HookEventType.FRAME_CAPTURED);
-    }
+    // --- 状态追踪 ---
+    private List<ItemResult> lastConfirmedList = new ArrayList<>(); // 已确认计入的列表
+    private List<ItemResult> pendingList = new ArrayList<>();       // 待校验的列表
+    private int stabilityCount = 0;                                 // 稳定计数
 
     @Override
     public void onEvent(HookEventType eventType, Frame frame) {
         long now = System.currentTimeMillis();
-        if ((now - lastTime) < 1000) return;
-
-        // ====================== 【修复点1】无论成功失败，先锁1秒 ======================
-        lastTime = now;
+        if ((now - lastScanTime) < SCAN_INTERVAL) return;
+        lastScanTime = now;
 
         try {
             byte[] pixels = frame.getPixels();
-            int w = frame.width();
-            int h = frame.height();
+            int w = frame.width(), h = frame.height();
 
             try (BytePointer ptr = new BytePointer(pixels);
                  Mat fullMat = new Mat(h, w, opencv_core.CV_8UC4, ptr)) {
 
-                int tx = (int) (w * SCALE_X);
-                int ty = (int) (h * SCALE_Y);
-                int tw = (int) (w * SCALE_W);
-                int th = (int) (h * SCALE_H);
-
-                tx = Math.max(0, Math.min(tx, w - 1));
-                ty = Math.max(0, Math.min(ty, h - 1));
-                tw = Math.min(tw, w - tx);
-                th = Math.min(th, h - ty);
-
-                Rect roi = new Rect(tx, ty, tw, th);
-
+                Rect roi = new Rect((int) (w * SCALE_X), (int) (h * SCALE_Y), (int) (w * SCALE_W), (int) (h * SCALE_H));
                 try (Mat cropped = fullMat.apply(roi)) {
                     BytePointer buf = new BytePointer();
-                    try {
-                        opencv_imgcodecs.imencode(".png", cropped, buf);
-                        byte[] croppedBytes = new byte[(int) buf.limit()];
-                        buf.get(croppedBytes);
+                    opencv_imgcodecs.imencode(".png", cropped, buf);
+                    byte[] croppedBytes = new byte[(int) buf.limit()];
+                    buf.get(croppedBytes);
 
-                        CompletableFuture<List<String>> future = OcrAsyncManager.getInstance().submitTask(croppedBytes);
-                        List<String> lines = future.get();
+                    OcrAsyncManager.getInstance().submitTask(croppedBytes, lines -> {
+                        // 1. 解析为结构化列表
+                        List<ItemResult> currentList = lines.stream()
+                                .map(OcrResultValidator::parse)
+                                .filter(Objects::nonNull)
+                                .toList();
 
-                        if (lines.isEmpty()) {
-                            return;
+                        synchronized (this) {
+                            // 2. 稳定器逻辑：当前帧需与待定帧完全一致
+                            if (!currentList.isEmpty() && currentList.equals(pendingList)) {
+                                stabilityCount++;
+                            } else {
+                                pendingList = new ArrayList<>(currentList);
+                                stabilityCount = 1;
+                                // 关键：如果区域空了，重置所有快照（应对翻页和下一次拾取）
+                                if (currentList.isEmpty()) {
+                                    lastConfirmedList.clear();
+                                }
+                                return;
+                            }
+
+                            // 3. 连续 2 帧稳定，开始增量比对
+                            if (stabilityCount == 2) {
+                                handleIncrementalLogic(currentList);
+                            }
                         }
-
-                        long end = System.currentTimeMillis();
-                        log.info("图像识别耗时：{}，结果：{}", end - now, lines);
-
-                        // ====================== 【修复点2】这里删掉，不要在这里更新 ======================
-                        // lastTime = now;
-                    } finally {
-                        buf.deallocate();
-                    }
+                    });
+                    buf.deallocate();
                 }
             }
         } catch (Exception e) {
-            log.error("RealTimeOCRHook 裁剪/提交异常", e);
+            log.error("Hook 异常", e);
         }
+    }
+
+    private void handleIncrementalLogic(List<ItemResult> stableList) {
+        // 场景 A: 列表行数增加了（新物资跳出来，包括一次出5个的情况）
+        if (stableList.size() > lastConfirmedList.size()) {
+            for (int i = lastConfirmedList.size(); i < stableList.size(); i++) {
+                ItemResult res = stableList.get(i);
+                log.info("🎯 确认为新增拾取: {} x{}", res.name(), res.count());
+                MaterialCollectionContext.getInstance().addMaterial(res.name(), res.count());
+            }
+        }
+        // 场景 B: 行数没变但内容全变了（极速翻页中，刚好两页行数相同但文字不同）
+        else if (stableList.size() == lastConfirmedList.size() && !stableList.equals(lastConfirmedList)) {
+            for (ItemResult res : stableList) {
+                log.info("🎯 翻页增量确认: {} x{}", res.name(), res.count());
+                MaterialCollectionContext.getInstance().addMaterial(res.name(), res.count());
+            }
+        }
+
+        // 更新最后确认快照
+        lastConfirmedList = new ArrayList<>(stableList);
+    }
+
+    @Override
+    public Set<HookEventType> supportedEvents() {
+        return Set.of(HookEventType.FRAME_CAPTURED);
     }
 }

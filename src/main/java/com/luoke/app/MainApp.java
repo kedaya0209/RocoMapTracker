@@ -177,7 +177,7 @@ public class MainApp extends Application {
             try {
                 mapMatcher = new SiftMapMatcher();
                 mapMatcher.init(AppConfig.MAP_RESOURCE_PATH);
-                OcrAsyncManager.initialize(AppConfig.OCR_CORE_SIZE, AppConfig.OCR_PARALLEL + 1);
+                OcrAsyncManager.initialize(AppConfig.OCR_CORE_SIZE);
                 isMatcherReady.set(true);
                 try {
                     startCapture();

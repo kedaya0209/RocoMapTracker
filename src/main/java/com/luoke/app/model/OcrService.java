@@ -17,10 +17,12 @@ import java.util.List;
 
 @Slf4j
 public class OcrService implements AutoCloseable {
-    // --- 核心模型参数 ---
-    // 删除了固定的 DET_SIZE，改为动态计算
-    private static final int REC_STD_HEIGHT = 48;
-    private static final float TEXT_HEAT_THRESHOLD = 0.5f;
+
+    // ====================== 【优化后精度参数】 ======================
+    private static final int REC_STD_HEIGHT = 52;           // 48 → 52 小字更清晰
+    private static final float TEXT_HEAT_THRESHOLD = 0.35f; // 0.5 → 0.35 抓半透明文字
+    private static final int EXPAND_X = 6;
+    private static final int EXPAND_Y = 4;
 
     private OnnxDetManager detManager;
     private OnnxRecManager recManager;
@@ -34,7 +36,7 @@ public class OcrService implements AutoCloseable {
 
         this.detManager = new OnnxDetManager(detBytes);
         this.recManager = new OnnxRecManager(recBytes, dict);
-        log.info("✅ OCR 服务初始化完成（动态输入尺寸版）");
+        log.info("✅ OCR 服务初始化完成（优化精度版）");
     }
 
     public List<String> recognizeAll(byte[] imageBytes) {
@@ -43,37 +45,31 @@ public class OcrService implements AutoCloseable {
             int srcW = fullImg.getWidth();
             int srcH = fullImg.getHeight();
 
-            // --- 【核心修改：动态计算检测尺寸】 ---
-            // 按照 32 倍数对齐。例如 210 -> 224
             int dynamicDetW = align32(srcW);
             int dynamicDetH = align32(srcH);
 
-            // 【检测模型】传入动态计算的宽和高
             float[] detTensor = buildDetTensor(fullImg, dynamicDetW, dynamicDetH);
-            // 推理时同样传入动态的高和宽（注意参数顺序：通常是 det(tensor, h, w)）
             float[][] heatMap = detManager.detect(detTensor, dynamicDetH, dynamicDetW);
 
-            // extractTextLineBox 已经支持比例缩放，无需修改
             List<Rectangle> lineBoxes = extractTextLineBox(heatMap, srcW, srcH);
             if (lineBoxes.isEmpty()) return Collections.emptyList();
 
             List<String> resultList = new ArrayList<>();
             for (Rectangle box : lineBoxes) {
-                int expandY = 2;
-                int expandX = 4;
-                int y = Math.max(0, box.y - expandY);
-                int h = Math.min(srcH - y, box.height + expandY * 2);
-                int x = Math.max(0, box.x - expandX);
-                int w = Math.min(srcW - x, box.width + expandX * 2);
+                int y = Math.max(0, box.y - EXPAND_Y);
+                int h = Math.min(srcH - y, box.height + EXPAND_Y * 2);
+                int x = Math.max(0, box.x - EXPAND_X);
+                int w = Math.min(srcW - x, box.width + EXPAND_X * 2);
 
                 BufferedImage lineCrop = fullImg.getSubimage(x, y, w, h);
 
-                // 识别模型（CRNN）本身就是动态宽度的，保持不变
                 int recW = (int) (lineCrop.getWidth() * REC_STD_HEIGHT / (double) lineCrop.getHeight());
                 float[] recTensor = buildRecTensor(lineCrop, recW, REC_STD_HEIGHT);
 
                 String text = recManager.recognize(recTensor, REC_STD_HEIGHT, recW);
-                text = text.replaceAll("(?<=[xX×*]\\d).*$", "").trim();
+
+                // 只保留中文、数字、×
+                text = text.replaceAll("[^\\u4e00-\\u9fa5xX×*0-9]", "").trim();
                 if (!text.isEmpty()) resultList.add(text);
             }
             return resultList;
@@ -83,14 +79,9 @@ public class OcrService implements AutoCloseable {
         }
     }
 
-    /**
-     * 将尺寸向上对齐到 32 的倍数
-     */
     private int align32(int size) {
         return (int) Math.ceil(size / 32.0) * 32;
     }
-
-    // --- 剩下的辅助方法根据动态参数微调 ---
 
     private float[] buildDetTensor(BufferedImage src, int targetW, int targetH) {
         return buildTensorCommon(src, targetW, targetH, 0.485f, 0.229f, 0.456f, 0.224f, 0.406f, 0.225f);
@@ -101,20 +92,31 @@ public class OcrService implements AutoCloseable {
     }
 
     private float[] buildTensorCommon(BufferedImage src, int tw, int th, float mr, float sr, float mg, float sg, float mb, float sb) {
-        // 创建动态大小的中间图片
         BufferedImage res = new BufferedImage(tw, th, BufferedImage.TYPE_INT_RGB);
         Graphics2D g = res.createGraphics();
-        // 小图拉伸到 32 倍数建议用 BILINEAR，如果是为了清晰度可以尝试 BICUBIC
-        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
         g.drawImage(src, 0, 0, tw, th, null);
         g.dispose();
 
         int[] pixels = ((DataBufferInt) res.getRaster().getDataBuffer()).getData();
         float[] data = new float[3 * tw * th];
+
         for (int i = 0; i < pixels.length; i++) {
-            data[i] = (((pixels[i] >> 16) & 0xFF) / 255.0f - mr) / sr;
-            data[tw * th + i] = (((pixels[i] >> 8) & 0xFF) / 255.0f - mg) / sg;
-            data[2 * tw * th + i] = ((pixels[i] & 0xFF) / 255.0f - mb) / sb;
+            int rgb = pixels[i];
+            int r = (rgb >> 16) & 0xFF;
+            int g_val = (rgb >> 8) & 0xFF;
+            int b = rgb & 0xFF;
+
+            // 灰度化
+            float gray = (r * 0.299f + g_val * 0.587f + b * 0.114f);
+
+            // 【核心增强】：如果亮度低于 115，认为是背景噪声，设为 0（黑色）
+            // 亮色文字将被显著突出，边缘笔画更清晰，减少错别字
+            float finalVal = (gray > 115) ? gray / 255.0f : 0.0f;
+
+            data[i] = (finalVal - mr) / sr;
+            data[tw * th + i] = (finalVal - mg) / sg;
+            data[2 * tw * th + i] = (finalVal - mb) / sb;
         }
         return data;
     }
@@ -128,8 +130,7 @@ public class OcrService implements AutoCloseable {
         int mapH = heatMap.length;
         int mapW = heatMap[0].length;
         float scaleY = (float) srcH / mapH;
-        // 注意：如果宽度不是 1:1，scaleX 也可以根据需要计算，
-        // 但你目前的逻辑是取整行，所以 srcW 保持不变是正确的。
+
         Integer startY = null;
         for (int y = 0; y < mapH; y++) {
             boolean hasText = false;
