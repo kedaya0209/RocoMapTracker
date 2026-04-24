@@ -3,8 +3,8 @@ package com.luoke.app.utils;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
@@ -113,8 +113,68 @@ public class ResourceUtils {
         return FileUtil.getRelativeFile(RESOURCE_BASE_DIR, safePath);
     }
 
-    public static String getExternalPath(String internalPath) {
-        String safePath = internalPath.replaceFirst("^[/\\\\]+", "");
-        return FileUtil.getAppRootDir().resolve(Path.of(RESOURCE_BASE_DIR, safePath)).toAbsolutePath().toString();
+    /**
+     * 获取资源路径（优先物理路径）
+     * 逻辑：
+     * 1. 检查外部 resources 目录下是否存在该文件。
+     * 2. 若存在，直接返回外部绝对路径。
+     * 3. 若不存在，尝试从内置资源中“实时释放”到外部，再返回路径。
+     * * 修改影响：确保了 OCR 模型加载等需要物理 File Path 的场景在 Native 模式下依然可用。
+     */
+    public static String getExternalPath(String internalPath, boolean isExtract) {
+        // 1. 获取外部对应的 File 对象
+        File externalFile = getExternalFile(internalPath);
+
+        // 2. 如果外部物理文件不存在，则尝试释放它
+        if (!externalFile.exists() && isExtract) {
+            log.info("外部路径不存在，尝试从内置资源释放：{}", internalPath);
+            extractSingleFile(internalPath);
+        }
+
+        // 3. 再次检查是否释放成功
+        if (externalFile.exists()) {
+            return externalFile.getAbsolutePath();
+        }
+
+        // 4. 如果内置也没有（extractSingleFile 失败），抛出异常或返回原始路径
+        // 在 Native 模式下，此处如果不报错，后续加载模型时会因为找不到文件直接 Crash
+        log.error("无法获取有效的物理资源路径：{}", internalPath);
+        return externalFile.getAbsolutePath();
     }
+
+
+    public static String getExternalPath(String internalPath) {
+        return getExternalPath(internalPath, false);
+    }
+
+    // 在 ResourceUtils 中增加
+    public static byte[] readResourceBytes(String internalPath) throws IOException {
+        try (InputStream in = getResourceStream(internalPath)) {
+            return in.readAllBytes();
+        }
+    }
+
+    /**
+     * 读取资源文件的每一行（优先外部物理文件）
+     * 修改影响：
+     * 1. 显式指定 UTF-8，防止在不同系统（如 Windows 中文版）下读取字典文件出现乱码。
+     * 2. 使用 BufferedReader 替代 Scanner，在大文件（如几千行的识别字典）下效率更高。
+     */
+    public static List<String> readResourceLines(String internalPath) throws IOException {
+        List<String> result = new ArrayList<>();
+        // getResourceStream 内部已经处理了“外部优先”逻辑
+        try (InputStream in = getResourceStream(internalPath);
+             BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
+
+            String line;
+            while ((line = reader.readLine()) != null) {
+                // 过滤掉空行，OCR 字典通常不包含空行
+                if (!line.isBlank()) {
+                    result.add(line);
+                }
+            }
+        }
+        return result;
+    }
+
 }

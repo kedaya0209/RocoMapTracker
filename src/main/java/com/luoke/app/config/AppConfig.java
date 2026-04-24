@@ -13,8 +13,8 @@ public final class AppConfig {
 
     public static final String FOLLOW_PLAYER = "跟随玩家";
     public static final String MODEL_DIR = "/model/";
-    public static final String OCR_REC_MODEL = "ch_PP-OCRv5_rec_mobile.onnx";
-    public static final String OCR_DET_MODEL = "ch_PP-OCRv5_det_mobile.onnx";
+    public static final String OCR_REC_MODEL = "ch_PP-OCRv4_rec_mobile.onnx";
+    public static final String OCR_DET_MODEL = "ch_PP-OCRv4_det_mobile.onnx";
     public static final String PPOCR_KEYS = "ppocr_keys_v1.txt";
 
     // ====================== 配置文件名称 ======================
