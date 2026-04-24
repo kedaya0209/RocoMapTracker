@@ -10,7 +10,7 @@ import lombok.Setter;
 
 @Getter
 @Setter
-public class MapManager {
+public class MapContext {
     private Image mapImage;
     private double mapWidth, mapHeight;
     private double scale = 1.0, offsetX = 0, offsetY = 0;
@@ -23,8 +23,12 @@ public class MapManager {
     // ====================== 我加的：当前地图唯一 KEY ======================
     private String currentMapKey;
 
-    private MapManager() {}
-    public static MapManager getInstance() { return Holder.INSTANCE; }
+    private MapContext() {
+    }
+
+    public static MapContext getInstance() {
+        return Holder.INSTANCE;
+    }
 
     public void init(Image image, double w, double h) {
         this.mapImage = image;
@@ -77,6 +81,6 @@ public class MapManager {
     }
 
     private static class Holder {
-        private static final MapManager INSTANCE = new MapManager();
+        private static final MapContext INSTANCE = new MapContext();
     }
 }

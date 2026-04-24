@@ -17,6 +17,14 @@ public enum HookRegistry {
         }
     }
 
+    public void registers(AbstractGenericHook<?>... hooks) {
+        for (AbstractGenericHook<?> hook : hooks) {
+            for (HookEventType eventType : hook.supportedEvents()) {
+                container.registerHook(eventType, hook);
+            }
+        }
+    }
+
     /**
      * 发布事件 入队
      */

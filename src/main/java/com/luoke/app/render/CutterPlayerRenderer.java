@@ -1,7 +1,7 @@
 package com.luoke.app.render;
 
 import com.luoke.app.capture.common.CaptureFrameRecord;
-import com.luoke.app.context.MapManager;
+import com.luoke.app.context.MapContext;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.image.Image;
 import javafx.scene.image.PixelWriter;
@@ -124,7 +124,7 @@ public class CutterPlayerRenderer {
         Image img = currentArrowImage;
         if (img == null) return;
 
-        MapManager mm = MapManager.getInstance();
+        MapContext mm = MapContext.getInstance();
         if (!mm.isPlayerInitialized()) return;
 
         double centerX = mm.getPlayerCanvasX();

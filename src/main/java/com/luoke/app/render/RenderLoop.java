@@ -2,9 +2,9 @@ package com.luoke.app.render;
 
 import com.luoke.app.component.InteractiveCanvas;
 import com.luoke.app.config.AppConfig;
-import com.luoke.app.context.CameraManager;
-import com.luoke.app.context.MapManager;
-import com.luoke.app.context.StatsManager;
+import com.luoke.app.context.CameraContext;
+import com.luoke.app.context.MapContext;
+import com.luoke.app.context.StatsContext;
 import javafx.animation.AnimationTimer;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.text.Font;
@@ -25,7 +25,7 @@ public class RenderLoop extends AnimationTimer {
 
     @Override
     public void handle(long now) {
-        CameraManager.getInstance().updateViewport();
+        CameraContext.getInstance().updateViewport();
         double canvasWidth = gc.getCanvas().getWidth();
         double canvasHeight = gc.getCanvas().getHeight();
 
@@ -38,7 +38,7 @@ public class RenderLoop extends AnimationTimer {
     }
 
     private void renderMap() {
-        MapManager mm = MapManager.getInstance();
+        MapContext mm = MapContext.getInstance();
         if (mm.getMapImage() == null) return;
 
         gc.save();
@@ -68,7 +68,7 @@ public class RenderLoop extends AnimationTimer {
     }
 
     private void renderStatsUI(double canvasWidth) {
-        StatsManager stats = StatsManager.getInstance();
+        StatsContext stats = StatsContext.getInstance();
         gc.setFont(font);
 
         StringBuilder sb = new StringBuilder();

@@ -3,8 +3,6 @@ package com.luoke.app.context;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.luoke.app.config.AppConfig;
-import com.luoke.app.hook.HookRegistry;
-import com.luoke.app.hook.impl.ResourceGrayHook;
 import com.luoke.app.map.model.ResourceConfig;
 import com.luoke.app.map.model.ResourcePoint;
 import com.luoke.app.utils.JsonUtils;
@@ -90,7 +88,6 @@ public class ResourcePointContext {
 
         // ====================== 构建 GEO 空间索引 ======================
         gridIndex.buildIndex(pointList);
-        HookRegistry.INSTANCE.register(new ResourceGrayHook());
     }
 
     // =========================

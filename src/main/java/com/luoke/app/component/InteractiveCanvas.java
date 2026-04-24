@@ -1,8 +1,8 @@
 package com.luoke.app.component;
 
 import com.luoke.app.config.AppConfig;
-import com.luoke.app.context.CameraManager;
-import com.luoke.app.context.MapManager;
+import com.luoke.app.context.CameraContext;
+import com.luoke.app.context.MapContext;
 import com.luoke.app.context.ResourcePointContext;
 import com.luoke.app.map.loader.ImageLoader;
 import com.luoke.app.map.model.ResourcePoint;
@@ -12,9 +12,9 @@ import javafx.scene.image.Image;
 
 public class InteractiveCanvas extends Canvas {
 
-    private final MapManager mapManager = MapManager.getInstance();
+    private final MapContext mapManager = MapContext.getInstance();
     private boolean firstResize = true;
-    private final CameraManager cameraManager = CameraManager.getInstance();
+    private final CameraContext cameraManager = CameraContext.getInstance();
     private final ResourcePointContext pointContext = ResourcePointContext.getInstance();
     private final ImageLoader imageLoader = ImageLoader.getInstance();
     private double lastMouseX, lastMouseY;

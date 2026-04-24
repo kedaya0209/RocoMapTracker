@@ -6,19 +6,19 @@ import lombok.Setter;
 
 @Getter
 @Setter
-public class CameraManager {
+public class CameraContext {
     private boolean followMode = AppConfig.DEFAULT_FOLLOW_MODE;
     private double followScale = AppConfig.DEFAULT_FOLLOW_SCALE;
 
-    private CameraManager() {
+    private CameraContext() {
     }
 
-    public static CameraManager getInstance() {
+    public static CameraContext getInstance() {
         return Holder.INSTANCE;
     }
 
     public void updateViewport() {
-        MapManager mm = MapManager.getInstance();
+        MapContext mm = MapContext.getInstance();
         if (mm.getMapImage() == null || !followMode) return;
 
         mm.setScale(followScale);
@@ -32,6 +32,6 @@ public class CameraManager {
     }
 
     private static class Holder {
-        private static final CameraManager INSTANCE = new CameraManager();
+        private static final CameraContext INSTANCE = new CameraContext();
     }
 }

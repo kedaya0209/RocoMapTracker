@@ -1,6 +1,6 @@
 package com.luoke.app.utils;
 
-import com.luoke.app.context.MapManager;
+import com.luoke.app.context.MapContext;
 
 public class CoordinateTransformer {
 
@@ -8,7 +8,7 @@ public class CoordinateTransformer {
      * 将全图原始坐标转换为裁剪后的本地地图坐标
      */
     public static double[] transform(double rawX, double rawY) {
-        MapManager mm = MapManager.getInstance();
+        MapContext mm = MapContext.getInstance();
         return new double[]{
                 rawX,
                 rawY
@@ -22,7 +22,7 @@ public class CoordinateTransformer {
      */
     public static void updatePositionSmoothly(double rawX, double rawY, double lerp) {
         double[] local = transform(rawX, rawY);
-        MapManager mm = MapManager.getInstance();
+        MapContext mm = MapContext.getInstance();
 
         double currentX = mm.getPlayerX();
         double currentY = mm.getPlayerY();

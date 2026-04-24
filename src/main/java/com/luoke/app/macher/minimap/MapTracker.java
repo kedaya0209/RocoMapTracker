@@ -100,7 +100,7 @@ public class MapTracker {
                 }
             }
         }
-        log.warn("❌ 小地图检测失败");
+//        log.warn("❌ 小地图检测失败");
         return false;
     }
 

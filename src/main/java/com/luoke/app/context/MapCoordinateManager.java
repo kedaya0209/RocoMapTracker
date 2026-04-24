@@ -22,7 +22,7 @@ public class MapCoordinateManager {
 
     // 只做坐标计算！！！
     public Point2D toScreen(double x, double y) {
-        MapManager mm = MapManager.getInstance();
+        MapContext mm = MapContext.getInstance();
         MapConfig cfg = mapConfigMap.get(mm.getCurrentMapKey());
 
         double scale = Math.pow(2, cfg.imageZoom - cfg.jsonZoom);

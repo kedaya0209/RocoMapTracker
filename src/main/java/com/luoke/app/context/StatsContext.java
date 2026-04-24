@@ -3,9 +3,9 @@ package com.luoke.app.context;
 import lombok.Getter;
 
 @Getter
-public final class StatsManager {
+public final class StatsContext {
 
-    private static final StatsManager INSTANCE = new StatsManager();
+    private static final StatsContext INSTANCE = new StatsContext();
     private long lastMapDetectMs;
     private long lastMatchMs;
     private long lastDirectionMs;
@@ -13,7 +13,7 @@ public final class StatsManager {
     private int frameCounter;
     private long lastSecondTime = System.currentTimeMillis();
 
-    public static StatsManager getInstance() {
+    public static StatsContext getInstance() {
         return INSTANCE;
     }
 

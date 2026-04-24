@@ -3,7 +3,6 @@ package com.luoke.app.hook.multicast;
 import com.luoke.app.hook.AbstractGenericHook;
 import com.luoke.app.hook.HookEventType;
 import com.luoke.app.hook.container.HookContainer;
-import javafx.application.Platform;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
@@ -71,28 +70,13 @@ public class HookMulticaster {
             return;
         }
 
-        boolean uiNeed = isUiEvent(eventType);
-
         for (AbstractGenericHook<?> hook : hookList) {
             try {
-                if (uiNeed) {
-                    Platform.runLater(() -> {
-                        ((AbstractGenericHook) hook).onEvent(eventType, data);
-                    });
-                } else {
-                    ((AbstractGenericHook) hook).onEvent(eventType, data);
-                }
+                ((AbstractGenericHook) hook).onEvent(eventType, data);
             } catch (Throwable t) {
                 log.error("钩子执行异常，event:{}", eventType, t);
             }
         }
-    }
-
-    private boolean isUiEvent(HookEventType type) {
-        return switch (type) {
-            case PLAYER_UPDATE, MAP_CHANGED -> true;
-            default -> false;
-        };
     }
 
     /**

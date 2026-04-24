@@ -5,10 +5,11 @@ import com.luoke.app.capture.common.CaptureFrameRecord;
 import com.luoke.app.capture.jna.Frame;
 import com.luoke.app.component.InteractiveCanvas;
 import com.luoke.app.config.AppConfig;
-import com.luoke.app.context.CameraManager;
-import com.luoke.app.context.MapManager;
-import com.luoke.app.context.ResourcePointContext;
-import com.luoke.app.context.StatsManager;
+import com.luoke.app.context.*;
+import com.luoke.app.hook.HookEventType;
+import com.luoke.app.hook.HookRegistry;
+import com.luoke.app.hook.impl.RealOcrHook;
+import com.luoke.app.hook.impl.ResourceGrayHook;
 import com.luoke.app.hook.multicast.HookMulticaster;
 import com.luoke.app.macher.map.MapMatcher;
 import com.luoke.app.macher.map.SiftMapMatcher;
@@ -48,7 +49,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class MainApp extends Application {
 
     private static final MapTracker mapTracker = MapTracker.getInstance();
-    private static final StatsManager stats = StatsManager.getInstance();
+    private static final StatsContext stats = StatsContext.getInstance();
     private static final AtomicBoolean isMatcherReady = new AtomicBoolean(false);
     private static MapMatcher mapMatcher;
     private static WindowsMonitor windowsMonitor;
@@ -69,8 +70,8 @@ public class MainApp extends Application {
     private static void processFrame(Frame frame) {
         if (frame == null || !isMatcherReady.get()) return;
         stats.onFrameProcessed();
-
         try {
+            HookMulticaster.getInstance().enqueue(HookEventType.FRAME_CAPTURED, frame);
             long t0 = System.currentTimeMillis();
             CaptureFrameRecord miniMap = mapTracker.getMiniMapImage(frame);
             stats.recordMapDetect(System.currentTimeMillis() - t0);
@@ -104,7 +105,7 @@ public class MainApp extends Application {
                 return;
             }
 
-            MapManager.getInstance().updatePlayerState(center[0], center[1], player.getAngle());
+            MapContext.getInstance().updatePlayerState(center[0], center[1], player.getAngle());
             CoordinateTransformer.updatePositionSmoothly(center[0], center[1], AppConfig.COORDINATE_SMOOTH_FACTOR);
             updateStatus(AppConfig.STATUS_RUNNING, Color.LIGHTGREEN);
         } catch (Exception e) {
@@ -171,9 +172,34 @@ public class MainApp extends Application {
         }
     }
 
+    private static void preloadMatcherAsync() {
+        Thread.ofVirtual().start(() -> {
+            try {
+                mapMatcher = new SiftMapMatcher();
+                mapMatcher.init(AppConfig.MAP_RESOURCE_PATH);
+                OcrAsyncManager.initialize(AppConfig.OCR_CORE_SIZE, AppConfig.OCR_PARALLEL + 1);
+                isMatcherReady.set(true);
+                try {
+                    startCapture();
+                } catch (Exception ignore) {
+                }
+            } catch (Exception e) {
+                log.error("匹配器加载失败", e);
+            }
+        });
+    }
+
+    private static void updateStatus(String msg, Color color) {
+        Platform.runLater(() -> {
+            statusLabel.setText(msg);
+            statusLabel.setTextFill(color);
+        });
+    }
+
     // ====================== 【被阻塞，直到 init() 完成】 ======================
     @Override
     public void start(Stage primaryStage) {
+        registerHook();
         try {
             // ======================
             // 【阻塞】等 init() 完成
@@ -211,7 +237,7 @@ public class MainApp extends Application {
             followPlayerCb = new CheckBox(AppConfig.FOLLOW_PLAYER);
             followPlayerCb.setStyle("-fx-text-fill: black; -fx-font-size: " + AppConfig.UI_FONT_SIZE + "px;");
             followPlayerCb.selectedProperty().addListener((o, ov, nv) ->
-                    CameraManager.getInstance().setFollowMode(nv)
+                    CameraContext.getInstance().setFollowMode(nv)
             );
             followPlayerCb.setVisible(false);
 
@@ -269,29 +295,6 @@ public class MainApp extends Application {
         }
     }
 
-    private static void updateStatus(String msg, Color color) {
-        Platform.runLater(() -> {
-            statusLabel.setText(msg);
-            statusLabel.setTextFill(color);
-        });
-    }
-
-    private static void preloadMatcherAsync() {
-        Thread.ofVirtual().start(() -> {
-            try {
-                mapMatcher = new SiftMapMatcher();
-                mapMatcher.init(AppConfig.MAP_RESOURCE_PATH);
-                isMatcherReady.set(true);
-                try {
-                    startCapture();
-                } catch (Exception ignore) {
-                }
-            } catch (Exception e) {
-                log.error("匹配器加载失败", e);
-            }
-        });
-    }
-
     private static void startCapture() {
         windowsMonitor = new WindowsMonitor(AppConfig.TARGET_WINDOW_NAME);
         windowsMonitor.startMonitor(MainApp::processFrame);
@@ -300,11 +303,17 @@ public class MainApp extends Application {
     private void initBigMapResource() throws Exception {
         try (InputStream is = ResourceUtils.getResourceStream(AppConfig.MAP_RESOURCE_PATH)) {
             Image rawImage = new Image(is);
-            MapManager.getInstance().initWithKey(rawImage, rawImage.getWidth(), rawImage.getHeight(), "G");
+            MapContext.getInstance().initWithKey(rawImage, rawImage.getWidth(), rawImage.getHeight(), "G");
         }
         try (InputStream is = ResourceUtils.getResourceStream(AppConfig.PLAYER_ICON_PATH)) {
             PlayerRenderer.getInstance().initIcon(is);
         }
+    }
+
+    private void registerHook() {
+        ResourceGrayHook resourceGrayHook = new ResourceGrayHook();
+        RealOcrHook realTimeOCRHook = new RealOcrHook();
+        HookRegistry.INSTANCE.registers(resourceGrayHook, realTimeOCRHook);
     }
 
     @Override

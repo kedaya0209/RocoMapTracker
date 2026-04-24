@@ -1,6 +1,5 @@
 package com.luoke.app.capture;
 
-import com.luoke.app.capture.callback.WindowCaptureEventCallBack;
 import com.luoke.app.capture.jna.Frame;
 import com.luoke.app.capture.jna.FrameCallback;
 import com.luoke.app.capture.jna.WgcLibrary;
@@ -11,6 +10,7 @@ import lombok.Setter;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.util.function.Consumer;
 
 public class WgcCapture {
 
@@ -48,7 +48,7 @@ public class WgcCapture {
         }
     }
 
-    public void startLoop(WindowCaptureEventCallBack<Frame> callback, boolean showBorder) {
+    public void startLoop(Consumer<Frame> callback, boolean showBorder) {
         if (running) return;
         running = true;
         frameCallback.setCallback(callback);
@@ -58,12 +58,12 @@ public class WgcCapture {
     @Setter
     public class WindowCaptureHook implements FrameCallback {
 
-        private WindowCaptureEventCallBack<Frame> callback;
+        private Consumer<Frame> callback;
 
         @Override
         public void onFrame(Pointer data, long len, int w, int h, int pitch, int code) {
             if (!running || code != 0 || data == null) return;
-            callback.call(new Frame(data, w, h, pitch));
+            callback.accept(new Frame(data, w, h, pitch));
         }
     }
 

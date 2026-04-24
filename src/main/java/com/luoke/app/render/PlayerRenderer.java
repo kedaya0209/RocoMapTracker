@@ -1,7 +1,7 @@
 package com.luoke.app.render;
 
 import com.luoke.app.config.AppConfig;
-import com.luoke.app.context.MapManager;
+import com.luoke.app.context.MapContext;
 import com.luoke.app.macher.player.ArrowDetector;
 import com.luoke.app.macher.player.Player;
 import com.luoke.app.utils.ImageUtil;
@@ -59,7 +59,7 @@ public class PlayerRenderer {
     public void draw(GraphicsContext gc) {
         if (processedIcon == null) return;
 
-        MapManager mm = MapManager.getInstance();
+        MapContext mm = MapContext.getInstance();
         if (!mm.isPlayerInitialized()) return;
 
         double canvasX = mm.getPlayerCanvasX();
