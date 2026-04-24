@@ -18,7 +18,7 @@ public final class AppConfig {
     public static final String PPOCR_KEYS = "ppocr_keys_v1.txt";
 
     // ====================== 配置文件名称 ======================
-    private static final String CONFIG_FILE_NAME = "app-config.properties";
+    private static final String CONFIG_FILE_NAME = "app_config.properties";
 
     public static boolean SHOW_MONITOR_BORDER = false;
 
