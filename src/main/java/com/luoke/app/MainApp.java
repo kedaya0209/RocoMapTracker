@@ -241,35 +241,15 @@ public class MainApp extends Application {
             );
             followPlayerCb.setVisible(false);
 
+            // 拦截默认关闭行为，手动强制走销毁流程
+            primaryStage.setOnCloseRequest(event -> {
+                event.consume(); // 吃掉默认关闭
+                stop();          // 主动调用你的完整释放逻辑
+            });
+
             Button updateBtn = new Button("更新资源文件");
             updateBtn.setStyle("-fx-text-fill: black; -fx-font-size: " + AppConfig.UI_FONT_SIZE + "px;");
-            updateBtn.setOnAction(e -> {
-                Thread.ofVirtual().start(() -> {
-                    try {
-                        Platform.runLater(() -> {
-                            updateBtn.setText("正在更新...");
-                            updateBtn.setDisable(true);
-                        });
-
-                        MapResourceUpdater.updateAllResources();
-                        ResourcePointContext.getInstance().loadAndInit();
-
-                        Platform.runLater(() -> {
-                            updateBtn.setText("更新完成");
-                        });
-
-                    } catch (Exception ex) {
-                        log.error("更新失败", ex);
-                        Platform.runLater(() -> {
-                            updateBtn.setText("更新失败，重试");
-                        });
-                    } finally {
-                        Platform.runLater(() -> {
-                            updateBtn.setDisable(false);
-                        });
-                    }
-                });
-            });
+            updateBtn.setOnAction(e -> updateResource(updateBtn));
 
             statusLabel = new Label(AppConfig.STATUS_STARTING);
             statusLabel.setTextFill(Color.BLACK);
@@ -295,6 +275,28 @@ public class MainApp extends Application {
         }
     }
 
+    private static void updateResource(Button updateBtn) {
+        Thread.ofVirtual().start(() -> {
+            try {
+                Platform.runLater(() -> {
+                    updateBtn.setText("正在更新...");
+                    updateBtn.setDisable(true);
+                });
+
+                MapResourceUpdater.updateAllResources();
+                ResourcePointContext.getInstance().loadAndInit();
+
+                Platform.runLater(() -> updateBtn.setText("更新完成"));
+
+            } catch (Exception ex) {
+                log.error("更新失败", ex);
+                Platform.runLater(() -> updateBtn.setText("更新失败，重试"));
+            } finally {
+                Platform.runLater(() -> updateBtn.setDisable(false));
+            }
+        });
+    }
+
     private static void startCapture() {
         windowsMonitor = new WindowsMonitor(AppConfig.TARGET_WINDOW_NAME);
         windowsMonitor.startMonitor(MainApp::processFrame);
@@ -318,11 +320,46 @@ public class MainApp extends Application {
 
     @Override
     public void stop() {
-        if (renderLoop != null) renderLoop.stop();
-        if (windowsMonitor != null) windowsMonitor.stopMonitor();
-        HookMulticaster multicaster = HookMulticaster.getInstance();
-        if (multicaster != null) multicaster.shutdown();
-        Platform.exit();
-        System.exit(0);
+        System.out.println(">>> 正在启动紧急退出程序...");
+
+        // 1. 立即开启一个“自杀计数器”线程（防止 stop 方法本身卡死）
+        Thread watchdog = new Thread(() -> {
+            try {
+                Thread.sleep(300); // 给 3 秒时间优雅退出
+                System.err.println(">>> 优雅退出超时，执行强制毁灭 (halt)...");
+                Runtime.getRuntime().halt(0); // halt 不会等待 ShutdownHook，直接杀掉 JVM
+            } catch (InterruptedException ignored) {}
+        });
+        watchdog.setDaemon(true);
+        watchdog.start();
+
+        try {
+            HookMulticaster multicaster = HookMulticaster.getInstance();
+            // 2. 先切断信号源：让所有新产生的事件直接丢弃
+            if (multicaster != null) {
+                multicaster.shutdown();
+            }
+
+            // 3. 释放资源（带中断）
+            if (windowsMonitor != null) windowsMonitor.stopMonitor();
+            if (renderLoop != null) renderLoop.stop();
+
+            // 4. 注意：如果这些 destroy 耗时极长，考虑放进子线程异步关，或者直接跳过
+            if (mapMatcher != null) mapMatcher.destroy();
+            OcrAsyncManager ocrAsyncManager = OcrAsyncManager.getInstance();
+            if (ocrAsyncManager != null) {
+                // 在 close 内部，务必调用 executorService.shutdownNow() 强制中断虚拟线程
+                ocrAsyncManager.close();
+            }
+
+            Platform.exit();
+
+            // 5. 最后的挣扎
+            Runtime.getRuntime().exit(0);
+
+        } catch (Exception e) {
+            System.err.println("退出过程中发生异常: " + e.getMessage());
+            Runtime.getRuntime().halt(1);
+        }
     }
 }
