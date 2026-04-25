@@ -10,15 +10,12 @@
     <packaging>jar</packaging>
 
     <properties>
-        <!-- 🔥 降级到 JDK 21 -->
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
         <maven.compiler.release>21</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
-        <!-- 降级到 JavaFX 21 -->
-        <javafx.version>21.0.4</javafx.version>
-
+        <javafx.version>25</javafx.version>
         <javacv.version>1.5.10</javacv.version>
         <jna.version>5.13.0</jna.version>
         <zstd.version>1.5.6-2</zstd.version>
@@ -30,15 +27,20 @@
         <junit.version>5.9.2</junit.version>
         <javacv.opencv.version>4.9.0-1.5.10</javacv.opencv.version>
         <javacv.openblas.version>0.3.26-1.5.10</javacv.openblas.version>
+        <graalvm.version>21.0.2</graalvm.version>
         <onnxruntime.version>1.25.0</onnxruntime.version>
-        <flatlaf.version>3.4.1</flatlaf.version>
     </properties>
-
     <dependencies>
         <dependency>
-            <groupId>com.microsoft.onnxruntime</groupId>
-            <artifactId>onnxruntime</artifactId>
-            <version>${onnxruntime.version}</version>
+            <groupId>ai.djl</groupId>
+            <artifactId>api</artifactId>
+            <version>0.36.0</version>
+        </dependency>
+        <dependency>
+            <groupId>ai.djl.onnxruntime</groupId>
+            <artifactId>onnxruntime-engine</artifactId>
+            <version>0.36.0</version>
+            <scope>runtime</scope>
         </dependency>
 
         <dependency>
@@ -47,7 +49,6 @@
             <version>${zstd.version}</version>
         </dependency>
 
-        <!-- JavaFX -->
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-controls</artifactId>
@@ -58,21 +59,17 @@
             <artifactId>javafx-graphics</artifactId>
             <version>${javafx.version}</version>
         </dependency>
+
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-base</artifactId>
             <version>${javafx.version}</version>
         </dependency>
+
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-fxml</artifactId>
             <version>${javafx.version}</version>
-        </dependency>
-
-        <dependency>
-            <groupId>com.formdev</groupId>
-            <artifactId>flatlaf</artifactId>
-            <version>${flatlaf.version}</version>
         </dependency>
 
         <!-- OpenCV + JavaCV -->
@@ -87,6 +84,7 @@
                 </exclusion>
             </exclusions>
         </dependency>
+
         <dependency>
             <groupId>org.bytedeco</groupId>
             <artifactId>opencv</artifactId>
@@ -106,6 +104,7 @@
             <artifactId>jna</artifactId>
             <version>${jna.version}</version>
         </dependency>
+
         <dependency>
             <groupId>net.java.dev.jna</groupId>
             <artifactId>jna-platform</artifactId>
@@ -118,6 +117,7 @@
             <artifactId>slf4j-api</artifactId>
             <version>${sl4j.version}</version>
         </dependency>
+
         <dependency>
             <groupId>ch.qos.logback</groupId>
             <artifactId>logback-classic</artifactId>
@@ -149,6 +149,7 @@
             <version>${junit.version}</version>
             <scope>test</scope>
         </dependency>
+
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-engine</artifactId>
@@ -158,23 +159,14 @@
     </dependencies>
 
     <build>
-        <resources>
-            <resource>
-                <directory>src/main/resources</directory>
-                <includes>
-                    <include>**/*</include>
-                </includes>
-            </resource>
-        </resources>
-
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.13.0</version>
+                <version>3.15.0</version>
                 <configuration>
-                    <source>21</source>
-                    <target>21</target>
+                    <source>22</source>
+                    <target>22</target>
                     <release>21</release>
                     <encoding>UTF-8</encoding>
                     <annotationProcessorPaths>
@@ -212,7 +204,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-assembly-plugin</artifactId>
-                <version>3.6.0</version>
+                <version>3.8.0</version>
                 <configuration>
                     <archive>
                         <manifest>
@@ -244,51 +236,47 @@
                     <plugin>
                         <groupId>org.graalvm.buildtools</groupId>
                         <artifactId>native-maven-plugin</artifactId>
-                        <version>0.9.28</version>
+                        <version>0.10.0</version>
                         <extensions>true</extensions>
+                        <executions>
+                            <execution>
+                                <id>build-native</id>
+                                <goals>
+                                    <goal>compile</goal>
+                                </goals>
+                                <phase>package</phase>
+                            </execution>
+                        </executions>
                         <configuration>
                             <mainClass>com.luoke.app.Main</mainClass>
                             <imageName>RocoMapTracker</imageName>
                             <useArgFile>true</useArgFile>
 
+                            <agent>
+                                <enabled>false</enabled>
+                                <options>
+                                    <option>experimental-class-loader-support</option>
+                                    <option>allow-incomplete-classpath</option>
+                                </options>
+                            </agent>
+
                             <buildArgs>
-                                <!-- 基础（绝对安全，不报错） -->
-                                <buildArg>--no-fallback</buildArg>
-                                <buildArg>-O2</buildArg>
-                                <buildArg>-H:+StripDebugInfo</buildArg>
-
-                                <!-- JavaFX 必须（修复渲染报错） -->
-                                <buildArg>-Djavafx.platform=win</buildArg>
-                                <buildArg>-Djava.awt.headless=false</buildArg>
                                 <buildArg>-Dfile.encoding=UTF-8</buildArg>
-                                <buildArg>-Dprism.forceGPU=true</buildArg>
-
-                                <!-- 系统 -->
+                                <buildArg>--no-fallback</buildArg>
+                                <buildArg>-Djava.awt.headless=false</buildArg>
+                                <buildArg>-R:MaxHeapSize=512m</buildArg>
+                                <buildArg>-H:IncludeResources=model/.*</buildArg>
+                                <buildArg>-H:IncludeResources=.*\.(png|properties|json|fxml|xml|dll|txt|onnx)$</buildArg>
+                                <buildArg>-H:IncludeResourceBundles=ch.qos.logback.*</buildArg>
+                                <buildArg>-H:ReachabilityMetadataResources=META-INF/native-image/reachability-metadata.json</buildArg>
+                                <buildArg>-H:+UnlockExperimentalVMOptions</buildArg>
+                                <buildArg>-H:+JNI</buildArg>
+                                <buildArg>-H:+StripDebugInfo</buildArg>
                                 <buildArg>-Djna.nosys=true</buildArg>
                                 <buildArg>-Dorg.bytedeco.javacpp.loadlibraries=true</buildArg>
-
-                                <!-- 延迟初始化（保证不崩溃） -->
-                                <buildArg>--initialize-at-run-time=ai.onnxruntime</buildArg>
-                                <buildArg>--initialize-at-run-time=org.bytedeco</buildArg>
-                                <buildArg>--initialize-at-run-time=com.sun.javafx</buildArg>
-                                <buildArg>--initialize-at-run-time=org.openjfx</buildArg>
-                                <buildArg>--initialize-at-run-time=com.sun.glass</buildArg>
-                                <buildArg>--initialize-at-run-time=com.sun.prism</buildArg>
-
-                                <!-- 资源包含（全部正确语法，不崩溃） -->
-                                <buildArg>-H:IncludeResources=model/.*</buildArg>
-                                <buildArg>-H:IncludeResources=dll/.*</buildArg>
-                                <buildArg>-H:IncludeResources=.*[.]onnx</buildArg>
-                                <buildArg>-H:IncludeResources=.*[.]fxml</buildArg>
-                                <buildArg>-H:IncludeResources=.*[.]png</buildArg>
-                                <buildArg>-H:IncludeResources=.*[.]jpg</buildArg>
-                                <buildArg>-H:IncludeResources=.*[.]jpeg</buildArg>
-                                <buildArg>-H:IncludeResources=.*[.]gif</buildArg>
-                                <buildArg>-H:IncludeResources=.*[.]bmp</buildArg>
-                                <buildArg>-H:IncludeResources=.*[.]properties</buildArg>
-                                <buildArg>-H:IncludeResources=.*[.]json</buildArg>
-                                <buildArg>-H:IncludeResources=.*[.]ttf</buildArg>
-                                <buildArg>-H:IncludeResources=.*[.]otf</buildArg>
+                                <buildArg>-J-Xmx8g</buildArg>
+                                <buildArg>--enable-http</buildArg>
+                                <buildArg>--enable-https</buildArg>
                             </buildArgs>
                         </configuration>
                     </plugin>

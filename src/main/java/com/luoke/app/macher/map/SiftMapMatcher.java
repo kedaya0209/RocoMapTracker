@@ -7,6 +7,7 @@ import com.luoke.app.utils.ResourceUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.bytedeco.javacpp.BytePointer;
 import org.bytedeco.javacpp.indexer.FloatIndexer;
+import org.bytedeco.javacv.Frame;
 import org.bytedeco.javacv.Java2DFrameConverter;
 import org.bytedeco.javacv.OpenCVFrameConverter;
 import org.bytedeco.opencv.global.opencv_calib3d;
@@ -31,25 +32,16 @@ public class SiftMapMatcher implements MapMatcher {
     private static final float RATIO_THRESHOLD = AppConfig.MATCH_RATIO_THRESHOLD;
     private static final int MIN_MATCH_COUNT = AppConfig.MATCH_MIN_COUNT;
 
+    // --- 算法核心（全程复用） ---
     private final SIFT sift;
     private final FlannBasedMatcher matcher;
 
-    // 缓存的大图数据
+    // --- 静态大图缓存（全程复用） ---
     private final KeyPointVector cachedKp2 = new KeyPointVector();
     private final Mat cachedDes2 = new Mat();
-    private final Mat mask = new Mat();
+    private final Mat mask = new Mat(); // 空掩码，无需特殊释放，跟随类消亡
 
-    // 实时计算复用对象（避免频繁 GC）
-    private final KeyPointVector kp1 = new KeyPointVector();
-    private final Mat des1 = new Mat();
-    private final DMatchVectorVector knnMatches = new DMatchVectorVector();
-    private final DMatchVector goodMatches = new DMatchVector();
-    private final Mat objPoints = new Mat();
-    private final Mat scenePoints = new Mat();
-    private final Mat inliers = new Mat();
-    private final Mat objCorners = new Mat(4, 1, CV_32FC2);
-    private final Mat sceneCorners = new Mat(4, 1, CV_32FC2);
-
+    // --- 转换器（轻量级无状态，可复用） ---
     private final Java2DFrameConverter j2dConverter = new Java2DFrameConverter();
     private final OpenCVFrameConverter.ToMat matConverter = new OpenCVFrameConverter.ToMat();
 
@@ -73,9 +65,8 @@ public class SiftMapMatcher implements MapMatcher {
         try {
             File cacheFile = ResourceUtils.getExternalFile(largeMapPath + ".sift.zst");
             String cachePath = cacheFile.getAbsolutePath();
-            String indexPath = cachePath + ".idx"; // FLANN 树索引缓存
+            String indexPath = cachePath + ".idx";
 
-            // 优先从缓存加载
             if (cacheFile.exists()) {
                 log.info("检测到特征缓存，正在并发加载...");
                 if (CacheUtil.loadFeatures(cachePath, cachedDes2, cachedKp2)) {
@@ -86,24 +77,20 @@ public class SiftMapMatcher implements MapMatcher {
                 log.warn("缓存损坏，重新提取特征...");
             }
 
-            // 提取新特征
             log.info("提取大图特征 (Scale: {})...", SCALE_FACTOR);
-            try (InputStream is = ResourceUtils.getResourceStream(largeMapPath)) {
-                Mat img2 = ImageUtil.loadToMat(is, IMREAD_GRAYSCALE);
+            // 优化点：使用 try-with-resources 严格管理大图内存
+            try (InputStream is = ResourceUtils.getResourceStream(largeMapPath);
+                 Mat img2 = ImageUtil.loadToMat(is, IMREAD_GRAYSCALE);
+                 Mat resizedImg = new Mat()) {
+
                 if (img2.empty()) throw new RuntimeException("无法读取大图: " + largeMapPath);
 
-                Mat resizedImg = new Mat();
                 resize(img2, resizedImg, new Size((int) (img2.cols() * SCALE_FACTOR), (int) (img2.rows() * SCALE_FACTOR)));
-
                 sift.detectAndCompute(resizedImg, mask, cachedKp2, cachedDes2);
 
-                // 保存特征点到 Zstd
                 CacheUtil.saveFeatures(cachePath, cachedDes2, cachedKp2);
-                // 构建并保存 FLANN 索引
                 loadOrBuildMatcher(indexPath);
 
-                img2.release();
-                resizedImg.release();
                 this.isInitialized = true;
             }
         } catch (Exception e) {
@@ -115,7 +102,6 @@ public class SiftMapMatcher implements MapMatcher {
 
     private void loadOrBuildMatcher(String indexPath) {
         matcher.clear();
-        // 必须先 add 再进行读取或训练
         try (MatVector desVector = new MatVector(cachedDes2)) {
             matcher.add(desVector);
             File idxFile = new File(indexPath);
@@ -132,11 +118,9 @@ public class SiftMapMatcher implements MapMatcher {
 
     @Override
     public double[][] match(String smallImgPath) {
-        try (InputStream is = ResourceUtils.getResourceStream(smallImgPath)) {
-            Mat img = ImageUtil.loadToMat(is, IMREAD_GRAYSCALE);
-            double[][] result = processMat(img);
-            if (img != null) img.release();
-            return result;
+        try (InputStream is = ResourceUtils.getResourceStream(smallImgPath);
+             Mat img = ImageUtil.loadToMat(is, IMREAD_GRAYSCALE)) {
+            return processMat(img);
         } catch (Exception e) {
             return null;
         }
@@ -156,9 +140,11 @@ public class SiftMapMatcher implements MapMatcher {
     @Override
     public double[][] match(BufferedImage image) {
         if (image == null) return null;
-        try (Mat colorMat = matConverter.convert(j2dConverter.convert(image));
+        // 优化点：修复 Frame 转换时可能引发的隐性泄漏
+        try (Frame cvFrame = j2dConverter.convert(image);
+             Mat colorMat = matConverter.convert(cvFrame);
              Mat grayMat = new Mat()) {
-            if (colorMat == null) return null;
+            if (colorMat == null || colorMat.empty()) return null;
             cvtColor(colorMat, grayMat, COLOR_BGRA2GRAY);
             return processMat(grayMat);
         }
@@ -167,74 +153,83 @@ public class SiftMapMatcher implements MapMatcher {
     private double[][] processMat(Mat img1) {
         if (img1 == null || img1.empty() || !isInitialized) return null;
 
-        // 1. 缩放小图
-        Mat processedSmall = new Mat();
-        resize(img1, processedSmall, new Size((int) (img1.cols() * SCALE_FACTOR), (int) (img1.rows() * SCALE_FACTOR)));
+        // 优化点：所有的中间变量全改为局部变量，配合 try-with-resources 实现帧级释放
+        try (Mat processedSmall = new Mat();
+             KeyPointVector localKp1 = new KeyPointVector();
+             Mat localDes1 = new Mat();
+             DMatchVectorVector localKnnMatches = new DMatchVectorVector();
+             DMatchVector localGoodMatches = new DMatchVector()) {
 
-        // 2. 清理上一轮的数据
-        kp1.resize(0);
-        des1.release();
-        knnMatches.clear();
-        goodMatches.clear();
+            // 1. 缩放小图
+            resize(img1, processedSmall, new Size((int) (img1.cols() * SCALE_FACTOR), (int) (img1.rows() * SCALE_FACTOR)));
 
-        // 3. 特征提取
-        sift.detectAndCompute(processedSmall, mask, kp1, des1);
+            // 2. 特征提取
+            sift.detectAndCompute(processedSmall, mask, localKp1, localDes1);
+            if (localDes1.empty()) return null;
 
-        double[][] result = null;
-        if (!des1.empty()) {
-            // 4. KNN 匹配
-            matcher.knnMatch(des1, knnMatches, 2);
+            // 3. KNN 匹配
+            matcher.knnMatch(localDes1, localKnnMatches, 2);
 
-            // 5. Lowe's Ratio Test 筛选
-            for (long i = 0; i < knnMatches.size(); i++) {
-                DMatchVector m = knnMatches.get(i);
-                if (m.size() >= 2) {
-                    DMatch m1 = m.get(0);
-                    DMatch m2 = m.get(1);
-                    if (m1.distance() < RATIO_THRESHOLD * m2.distance()) {
-                        goodMatches.push_back(m1);
+            // 4. Lowe's Ratio Test 筛选 (注意内层 Vector 和 Match 对象的释放)
+            for (long i = 0; i < localKnnMatches.size(); i++) {
+                try (DMatchVector m = localKnnMatches.get(i)) {
+                    if (m.size() >= 2) {
+                        try (DMatch m1 = m.get(0);
+                             DMatch m2 = m.get(1)) {
+                            if (m1.distance() < RATIO_THRESHOLD * m2.distance()) {
+                                localGoodMatches.push_back(m1);
+                            }
+                        }
                     }
                 }
-                m.close(); // 释放 DMatchVector
             }
 
-            // 6. 坐标计算
-            if (goodMatches.size() >= MIN_MATCH_COUNT) {
-                result = calculateCoordinates(processedSmall, kp1, goodMatches);
+            // 5. 坐标计算
+            if (localGoodMatches.size() >= MIN_MATCH_COUNT) {
+                return calculateCoordinates(processedSmall, localKp1, localGoodMatches);
             }
+        } catch (Exception e) {
+            log.error("SIFT 匹配过程异常", e);
         }
-
-        processedSmall.release();
-        return result;
+        return null;
     }
 
-    private double[][] calculateCoordinates(Mat img1, KeyPointVector kp1, DMatchVector goodMatches) {
-        int n = (int) goodMatches.size();
-        objPoints.create(n, 1, CV_32FC2);
-        scenePoints.create(n, 1, CV_32FC2);
+    private double[][] calculateCoordinates(Mat img1, KeyPointVector localKp1, DMatchVector localGoodMatches) {
+        int n = (int) localGoodMatches.size();
 
-        try (FloatIndexer objIdx = objPoints.createIndexer();
-             FloatIndexer sceneIdx = scenePoints.createIndexer()) {
+        // 优化点：局部申请矩阵，并在闭包内使用 FloatIndexer
+        try (Mat localObjPoints = new Mat(n, 1, CV_32FC2);
+             Mat localScenePoints = new Mat(n, 1, CV_32FC2);
+             FloatIndexer objIdx = localObjPoints.createIndexer();
+             FloatIndexer sceneIdx = localScenePoints.createIndexer()) {
 
             for (long i = 0; i < n; i++) {
-                DMatch m = goodMatches.get(i);
-                Point2f p1 = kp1.get(m.queryIdx()).pt();
-                Point2f p2 = cachedKp2.get(m.trainIdx()).pt();
-                objIdx.put(i, 0, 0, p1.x());
-                objIdx.put(i, 0, 1, p1.y());
-                sceneIdx.put(i, 0, 0, p2.x());
-                sceneIdx.put(i, 0, 1, p2.y());
-                m.close();
+                // 致命漏洞修复：防止循环中产生的 KeyPoint 和 Point2f 指针堆积
+                try (DMatch m = localGoodMatches.get(i);
+                     KeyPoint k1 = localKp1.get(m.queryIdx());
+                     Point2f p1 = k1.pt();
+                     KeyPoint k2 = cachedKp2.get(m.trainIdx());
+                     Point2f p2 = k2.pt()) {
+
+                    objIdx.put(i, 0, 0, p1.x());
+                    objIdx.put(i, 0, 1, p1.y());
+                    sceneIdx.put(i, 0, 0, p2.x());
+                    sceneIdx.put(i, 0, 1, p2.y());
+                }
             }
 
             // 7. 查找单应性矩阵 (RANSAC)
-            try (Mat H = opencv_calib3d.findHomography(objPoints, scenePoints, opencv_calib3d.RANSAC,
-                    AppConfig.RANSAC_REPROJ_THRESHOLD, inliers, AppConfig.RANSAC_MAX_ITERS, AppConfig.RANSAC_CONFIDENCE)) {
+            try (Mat inliers = new Mat(); // Ransac 的中间变量也需释放
+                 Mat H = opencv_calib3d.findHomography(localObjPoints, localScenePoints, opencv_calib3d.RANSAC,
+                         AppConfig.RANSAC_REPROJ_THRESHOLD, inliers, AppConfig.RANSAC_MAX_ITERS, AppConfig.RANSAC_CONFIDENCE)) {
 
                 if (H == null || H.empty()) return null;
 
-                // 定义小图四个角点
-                try (FloatIndexer cIdx = objCorners.createIndexer()) {
+                // 定义小图四个角点并执行透视变换
+                try (Mat localObjCorners = new Mat(4, 1, CV_32FC2);
+                     Mat localSceneCorners = new Mat(4, 1, CV_32FC2);
+                     FloatIndexer cIdx = localObjCorners.createIndexer()) {
+
                     cIdx.put(0, 0, 0, 0);
                     cIdx.put(0, 0, 1, 0);
                     cIdx.put(1, 0, 0, 0);
@@ -243,49 +238,38 @@ public class SiftMapMatcher implements MapMatcher {
                     cIdx.put(2, 0, 1, img1.rows());
                     cIdx.put(3, 0, 0, img1.cols());
                     cIdx.put(3, 0, 1, 0);
-                }
 
-                // 投影到大图坐标系
-                opencv_core.perspectiveTransform(objCorners, sceneCorners, H);
+                    opencv_core.perspectiveTransform(localObjCorners, localSceneCorners, H);
 
-                double[][] result = new double[4][2];
-                try (FloatIndexer sIdx = sceneCorners.createIndexer()) {
-                    for (int i = 0; i < 4; i++) {
-                        // 还原回原始大图尺寸坐标 (除以缩放因子)
-                        result[i][0] = sIdx.get(i, 0, 0) / SCALE_FACTOR;
-                        result[i][1] = sIdx.get(i, 0, 1) / SCALE_FACTOR;
+                    double[][] result = new double[4][2];
+                    try (FloatIndexer sIdx = localSceneCorners.createIndexer()) {
+                        for (int i = 0; i < 4; i++) {
+                            // 还原回原始大图尺寸坐标 (除以缩放因子)
+                            result[i][0] = sIdx.get(i, 0, 0) / SCALE_FACTOR;
+                            result[i][1] = sIdx.get(i, 0, 1) / SCALE_FACTOR;
+                        }
                     }
+                    return result;
                 }
-                return result;
             }
+        } catch (Exception e) {
+            log.error("计算单应性矩阵异常", e);
+            return null;
         }
     }
 
     @Override
     public void destroy() {
-        // 释放成员变量
-        if (cachedDes2 != null) cachedDes2.release();
-        if (mask != null) mask.release();
-        if (des1 != null) des1.release();
-        if (objPoints != null) objPoints.release();
-        if (scenePoints != null) scenePoints.release();
-        if (inliers != null) inliers.release();
-        if (objCorners != null) objCorners.release();
-        if (sceneCorners != null) sceneCorners.release();
-
-        // 释放 Vector 和算法对象
-        kp1.close();
-        knnMatches.close();
-        goodMatches.close();
-        cachedKp2.close();
-        sift.close();
-        matcher.close();
-
-        // 释放转换器
-        j2dConverter.close();
-        matConverter.close();
+        // 只需释放一直存活的静态资源
+        if (cachedDes2 != null) cachedDes2.close();
+        if (cachedKp2 != null) cachedKp2.close();
+        if (mask != null) mask.close();
+        if (sift != null) sift.close();
+        if (matcher != null) matcher.close();
+        if (j2dConverter != null) j2dConverter.close();
+        if (matConverter != null) matConverter.close();
 
         isInitialized = false;
-        log.info("SIFT 资源已释放");
+        log.info("SIFT 静态资源已彻底释放");
     }
 }

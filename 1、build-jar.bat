@@ -2,7 +2,7 @@
 chcp 65001 >nul
 cls
 
-set GRAALVM_HOME=D:\Documents\environment\java\graalvm-win\graalvm-jdk-21.0.11+9.1
+set GRAALVM_HOME=D:\Documents\environment\java\graalvm-win\graalvm-jdk-25.0.2+10.1
 set JAVA_HOME=%GRAALVM_HOME%
 set PATH=%GRAALVM_HOME%\bin;%PATH%
 

@@ -1,6 +1,7 @@
 package com.luoke.app.hook.impl;
 
 import com.luoke.app.capture.jna.Frame;
+import com.luoke.app.config.AppConfig;
 import com.luoke.app.context.MaterialCollectionContext;
 import com.luoke.app.context.OcrAsyncManager;
 import com.luoke.app.hook.AbstractGenericHook;
@@ -18,6 +19,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Slf4j
 public class RealOcrHook extends AbstractGenericHook<Frame> {
@@ -29,29 +31,35 @@ public class RealOcrHook extends AbstractGenericHook<Frame> {
     // --- 状态追踪 ---
     private List<ItemResult> lastConfirmedList = new ArrayList<>(); // 已确认计入的列表
     private List<ItemResult> pendingList = new ArrayList<>();       // 待校验的列表
-    private int stabilityCount = 0;                                 // 稳定计数
+    private final AtomicInteger parallel = new AtomicInteger(AppConfig.OCR_CORE_SIZE);// 稳定计数
+    private int stabilityCount = 0;
 
     @Override
     public void onEvent(HookEventType eventType, Frame frame) {
         long now = System.currentTimeMillis();
         if ((now - lastScanTime) < SCAN_INTERVAL) return;
+        if (parallel.get() <= 0) return;
+        parallel.decrementAndGet();
+        boolean taskSubmitted = false;
         lastScanTime = now;
+
 
         try {
             byte[] pixels = frame.getPixels();
             int w = frame.width(), h = frame.height();
 
             try (BytePointer ptr = new BytePointer(pixels);
-                 Mat fullMat = new Mat(h, w, opencv_core.CV_8UC4, ptr)) {
+                 Mat fullMat = new Mat(h, w, opencv_core.CV_8UC4, ptr);
+                 Rect roi = new Rect((int) (w * SCALE_X), (int) (h * SCALE_Y), (int) (w * SCALE_W), (int) (h * SCALE_H));
+                 Mat cropped = fullMat.apply(roi);
+                 BytePointer buf = new BytePointer()) {
 
-                Rect roi = new Rect((int) (w * SCALE_X), (int) (h * SCALE_Y), (int) (w * SCALE_W), (int) (h * SCALE_H));
-                try (Mat cropped = fullMat.apply(roi)) {
-                    BytePointer buf = new BytePointer();
-                    opencv_imgcodecs.imencode(".png", cropped, buf);
-                    byte[] croppedBytes = new byte[(int) buf.limit()];
-                    buf.get(croppedBytes);
+                opencv_imgcodecs.imencode(".png", cropped, buf);
+                byte[] croppedBytes = new byte[(int) buf.limit()];
+                buf.get(croppedBytes);
 
-                    OcrAsyncManager.getInstance().submitTask(croppedBytes, lines -> {
+                OcrAsyncManager.getInstance().submitTask(croppedBytes, lines -> {
+                    try {
                         // 1. 解析为结构化列表
                         List<ItemResult> currentList = lines.stream()
                                 .map(OcrResultValidator::parse)
@@ -77,12 +85,18 @@ public class RealOcrHook extends AbstractGenericHook<Frame> {
                                 handleIncrementalLogic(currentList);
                             }
                         }
-                    });
-                    buf.deallocate();
-                }
+                    } finally {
+                        parallel.incrementAndGet();
+                    }
+                });
+                taskSubmitted = true; // 提交成功
             }
         } catch (Exception e) {
             log.error("Hook 异常", e);
+        } finally {
+            if (!taskSubmitted) {
+                parallel.incrementAndGet();
+            }
         }
     }
 

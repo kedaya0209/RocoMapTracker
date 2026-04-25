@@ -1,65 +1,58 @@
 package com.luoke.app.model;
 
-import ai.onnxruntime.OnnxTensor;
-import ai.onnxruntime.OrtEnvironment;
-import ai.onnxruntime.OrtException;
-import ai.onnxruntime.OrtSession;
-import lombok.extern.slf4j.Slf4j;
+import ai.djl.inference.Predictor;
+import ai.djl.ndarray.NDArray;
+import ai.djl.ndarray.NDList;
+import ai.djl.ndarray.NDManager;
+import ai.djl.ndarray.types.Shape;
+import ai.djl.repository.zoo.Criteria;
+import ai.djl.repository.zoo.ZooModel;
+import ai.djl.translate.NoopTranslator;
+import com.luoke.app.config.AppConfig;
+import com.luoke.app.utils.ResourceUtils;
 
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
-import java.util.Collections;
+import java.nio.file.Path;
 
-/**
- * 文字检测推理管理类
- */
-@Slf4j
 public class OnnxDetManager implements AutoCloseable {
-    private final OrtEnvironment env;
-    private final OrtSession detSession;
+    private final ZooModel<NDList, NDList> model;
+    private final Predictor<NDList, NDList> predictor;
 
-    public OnnxDetManager(byte[] detModelBytes) throws OrtException {
-        this.env = OrtEnvironment.getEnvironment();
-        OrtSession.SessionOptions options = new OrtSession.SessionOptions();
-        options.setOptimizationLevel(OrtSession.SessionOptions.OptLevel.ALL_OPT);
-
-        /**
-         * setIntraOpNumThreads: 推理线程数。
-         * 修改影响：根据 CPU 核心数调整（建议设为 4）。
-         * - 设大：可以降低单次识别延迟，但核心数过多会导致线程切换开销变大，速度反而变慢。
-         */
-        options.setIntraOpNumThreads(4);
-        this.detSession = env.createSession(detModelBytes, options);
+    public OnnxDetManager(String modelName) throws Exception {
+        String path = ResourceUtils.getExternalPath(AppConfig.MODEL_DIR + modelName, true);
+        Criteria<NDList, NDList> criteria = Criteria.builder()
+                .setTypes(NDList.class, NDList.class)
+                .optEngine("OnnxRuntime")
+                .optModelPath(Path.of(path))
+                .optOption("interOpNumThreads", "1")
+                .optOption("intraOpNumThreads", "2")
+                .optOption("optimizationLevel", "ALL")
+                .optTranslator(new NoopTranslator())
+                .build();
+        this.model = criteria.loadModel();
+        this.predictor = model.newPredictor();
     }
 
-    public float[][] detect(float[] pixels, int h, int w) throws OrtException {
-        long[] shape = {1, 3, h, w};
+    public float[][] detect(FloatBuffer buffer, int h, int w) throws Exception {
+        // 使用 subManager 确保单帧推理后 NDArray 立即释放
+        try (NDManager sub = model.getNDManager().newSubManager()) {
+            NDArray array = sub.create(buffer, new Shape(1, 3, h, w));
+            try (NDList output = predictor.predict(new NDList(array))) {
+                NDArray heatMapArr = output.getFirst();
+                float[] flat = heatMapArr.toFloatArray();
 
-        /**
-         * DirectBuffer 优化 (零拷贝):
-         * 原理：Java 堆内存（float[]）在传递给 C++ 的 ONNX Runtime 时需要一次内存拷贝。
-         * 效果：使用 allocateDirect 申请堆外内存，让推理引擎直接读取，减少垃圾回收压力和内存拷贝耗时。
-         */
-        FloatBuffer directBuffer = ByteBuffer.allocateDirect(pixels.length * 4)
-                .order(ByteOrder.nativeOrder())
-                .asFloatBuffer();
-        directBuffer.put(pixels);
-        directBuffer.rewind();
-
-        OnnxTensor tensor = OnnxTensor.createTensor(env, directBuffer, shape);
-
-        try (OrtSession.Result results = detSession.run(Collections.singletonMap("x", tensor))) {
-            float[][][][] output = (float[][][][]) results.get(0).getValue();
-            return output[0][0];
-        } finally {
-            tensor.close();
+                float[][] res = new float[h][w];
+                for (int i = 0; i < h; i++) {
+                    System.arraycopy(flat, i * w, res[i], 0, w);
+                }
+                return res;
+            }
         }
     }
 
     @Override
-    public void close() throws OrtException {
-        if (detSession != null) detSession.close();
-        if (env != null) env.close();
+    public void close() {
+        predictor.close();
+        model.close();
     }
 }

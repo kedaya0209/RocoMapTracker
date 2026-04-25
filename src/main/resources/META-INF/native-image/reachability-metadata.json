@@ -1,6 +1,46 @@
 {
   "reflection": [
     {
+      "type": "ai.djl.onnxruntime.engine.OrtEngineProvider"
+    },
+    {
+      "type": "ai.djl.onnxruntime.zoo.OrtHfZooProvider"
+    },
+    {
+      "type": "ai.djl.onnxruntime.zoo.OrtZooProvider"
+    },
+    {
+      "type": "ai.onnxruntime.OnnxTensor",
+      "jniAccessible": true,
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": [
+            "long",
+            "long",
+            "ai.onnxruntime.TensorInfo"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "ai.onnxruntime.TensorInfo",
+      "jniAccessible": true,
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": [
+            "long[]",
+            "java.lang.String[]",
+            "int"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "ai.onnxruntime.extensions.OrtxPackage"
+    },
+    {
       "type": "byte[]",
       "serializable": true
     },
@@ -1824,7 +1864,24 @@
     },
     {
       "type": "com.sun.jna.CallbackReference$AttachOptions",
-      "jniAccessible": true
+      "jniAccessible": true,
+      "fields": [
+        {
+          "name": "daemon"
+        },
+        {
+          "name": "detach"
+        },
+        {
+          "name": "name"
+        }
+      ],
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
     },
     {
       "type": "com.sun.jna.FromNativeConverter",
@@ -2213,6 +2270,50 @@
       ]
     },
     {
+      "type": "com.sun.scenario.effect.impl.hw.d3d.D3DShaderSource",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "com.sun.scenario.effect.impl.prism.PrRenderer",
+      "methods": [
+        {
+          "name": "createRenderer",
+          "parameterTypes": [
+            "com.sun.scenario.effect.FilterContext"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "com.sun.scenario.effect.impl.prism.ps.PPSColorAdjustPeer",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": [
+            "com.sun.scenario.effect.FilterContext",
+            "com.sun.scenario.effect.impl.Renderer",
+            "java.lang.String"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "com.sun.scenario.effect.impl.prism.ps.PPSRenderer",
+      "methods": [
+        {
+          "name": "createRenderer",
+          "parameterTypes": [
+            "com.sun.scenario.effect.FilterContext"
+          ]
+        }
+      ]
+    },
+    {
       "type": "java.awt.AWTEvent",
       "jniAccessible": true,
       "fields": [
@@ -2448,6 +2549,26 @@
       ]
     },
     {
+      "type": "java.awt.geom.GeneralPath",
+      "jniAccessible": true,
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        },
+        {
+          "name": "<init>",
+          "parameterTypes": [
+            "int",
+            "byte[]",
+            "int",
+            "float[]",
+            "int"
+          ]
+        }
+      ]
+    },
+    {
       "type": "java.awt.geom.Path2D",
       "jniAccessible": true,
       "fields": [
@@ -2468,6 +2589,60 @@
       "fields": [
         {
           "name": "floatCoords"
+        }
+      ]
+    },
+    {
+      "type": "java.awt.geom.Point2D$Float",
+      "jniAccessible": true,
+      "fields": [
+        {
+          "name": "x"
+        },
+        {
+          "name": "y"
+        }
+      ],
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": [
+            "float",
+            "float"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "java.awt.geom.Rectangle2D$Float",
+      "jniAccessible": true,
+      "fields": [
+        {
+          "name": "height"
+        },
+        {
+          "name": "width"
+        },
+        {
+          "name": "x"
+        },
+        {
+          "name": "y"
+        }
+      ],
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        },
+        {
+          "name": "<init>",
+          "parameterTypes": [
+            "float",
+            "float",
+            "float",
+            "float"
+          ]
         }
       ]
     },
@@ -4642,6 +4817,193 @@
       ]
     },
     {
+      "type": "sun.font.CharToGlyphMapper",
+      "jniAccessible": true,
+      "methods": [
+        {
+          "name": "charToGlyph",
+          "parameterTypes": [
+            "int"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "sun.font.Font2D",
+      "jniAccessible": true,
+      "methods": [
+        {
+          "name": "canDisplay",
+          "parameterTypes": [
+            "char"
+          ]
+        },
+        {
+          "name": "charToGlyphRaw",
+          "parameterTypes": [
+            "int"
+          ]
+        },
+        {
+          "name": "charToVariationGlyphRaw",
+          "parameterTypes": [
+            "int",
+            "int"
+          ]
+        },
+        {
+          "name": "getMapper",
+          "parameterTypes": []
+        },
+        {
+          "name": "getTableBytes",
+          "parameterTypes": [
+            "int"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "sun.font.FontStrike",
+      "jniAccessible": true,
+      "methods": [
+        {
+          "name": "getGlyphMetrics",
+          "parameterTypes": [
+            "int"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "sun.font.FontUtilities",
+      "jniAccessible": true,
+      "methods": [
+        {
+          "name": "debugFonts",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "sun.font.FreetypeFontScaler",
+      "jniAccessible": true,
+      "methods": [
+        {
+          "name": "invalidateScaler",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "sun.font.GlyphList",
+      "jniAccessible": true,
+      "fields": [
+        {
+          "name": "gposx"
+        },
+        {
+          "name": "gposy"
+        },
+        {
+          "name": "images"
+        },
+        {
+          "name": "lcdRGBOrder"
+        },
+        {
+          "name": "lcdSubPixPos"
+        },
+        {
+          "name": "len"
+        },
+        {
+          "name": "positions"
+        },
+        {
+          "name": "usePositions"
+        }
+      ]
+    },
+    {
+      "type": "sun.font.PhysicalStrike",
+      "jniAccessible": true,
+      "fields": [
+        {
+          "name": "pScalerContext"
+        }
+      ],
+      "methods": [
+        {
+          "name": "adjustPoint",
+          "parameterTypes": [
+            "java.awt.geom.Point2D$Float"
+          ]
+        },
+        {
+          "name": "getGlyphPoint",
+          "parameterTypes": [
+            "int",
+            "int"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "sun.font.StrikeMetrics",
+      "jniAccessible": true,
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": [
+            "float",
+            "float",
+            "float",
+            "float",
+            "float",
+            "float",
+            "float",
+            "float",
+            "float",
+            "float"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "sun.font.TrueTypeFont",
+      "jniAccessible": true,
+      "methods": [
+        {
+          "name": "readBlock",
+          "parameterTypes": [
+            "java.nio.ByteBuffer",
+            "int",
+            "int"
+          ]
+        },
+        {
+          "name": "readBytes",
+          "parameterTypes": [
+            "int",
+            "int"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "sun.font.Type1Font",
+      "jniAccessible": true,
+      "methods": [
+        {
+          "name": "readFile",
+          "parameterTypes": [
+            "java.nio.ByteBuffer"
+          ]
+        }
+      ]
+    },
+    {
       "type": "sun.java2d.Disposer",
       "jniAccessible": true,
       "methods": [
@@ -5615,6 +5977,15 @@
       "glob": "META-INF/maven/org.bytedeco/opencv/pom.properties"
     },
     {
+      "glob": "META-INF/services/ai.djl.engine.EngineProvider"
+    },
+    {
+      "glob": "META-INF/services/ai.djl.repository.RepositoryFactory"
+    },
+    {
+      "glob": "META-INF/services/ai.djl.repository.zoo.ZooProvider"
+    },
+    {
       "glob": "META-INF/services/ch.qos.logback.classic.spi.Configurator"
     },
     {
@@ -5649,6 +6020,18 @@
     },
     {
       "glob": "META-INF/services/org.slf4j.spi.SLF4JServiceProvider"
+    },
+    {
+      "glob": "ai/onnxruntime/native/win-x64/onnxruntime.dll"
+    },
+    {
+      "glob": "ai/onnxruntime/native/win-x64/onnxruntime4j_jni.dll"
+    },
+    {
+      "glob": "ai/onnxruntime/native/win-x64/onnxruntime_providers_cuda.dll"
+    },
+    {
+      "glob": "ai/onnxruntime/native/win-x64/onnxruntime_providers_shared.dll"
     },
     {
       "glob": "api-ms-win-core-console-l1-1-0.dll"
@@ -10076,6 +10459,9 @@
       "glob": "com/sun/prism/d3d/hlsl/Texture_LinearGradient_PAD.obj"
     },
     {
+      "glob": "com/sun/scenario/effect/impl/hw/d3d/hlsl/ColorAdjust.obj"
+    },
+    {
       "glob": "dll/capture.dll"
     },
     {
@@ -10095,6 +10481,15 @@
     },
     {
       "glob": "logback.xml"
+    },
+    {
+      "glob": "model/ch_PP-OCRv4_det_mobile.onnx"
+    },
+    {
+      "glob": "model/ch_PP-OCRv4_rec_mobile.onnx"
+    },
+    {
+      "glob": "model/ppocr_keys_v1.txt"
     },
     {
       "glob": "msvcp140.dll"
@@ -11838,6 +12233,9 @@
     },
     {
       "glob": "resource-list.txt"
+    },
+    {
+      "glob": "source/icon/player.png"
     },
     {
       "glob": "ucrtbase.dll"

@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.bytedeco.javacpp.BytePointer;
 import org.bytedeco.opencv.opencv_core.Mat;
 import org.bytedeco.opencv.opencv_core.Size;
+import org.bytedeco.opencv.opencv_imgproc.Vec3fVector;
 
 import static org.bytedeco.opencv.global.opencv_core.CV_8UC4;
 import static org.bytedeco.opencv.global.opencv_core.convertScaleAbs;
@@ -74,7 +75,7 @@ public class MapTracker {
             convertScaleAbs(grayMat, enhancedMat, 2.0, 15);
             medianBlur(enhancedMat, enhancedMat, 3);
 
-            try (org.bytedeco.opencv.opencv_imgproc.Vec3fVector circles = new org.bytedeco.opencv.opencv_imgproc.Vec3fVector()) {
+            try (Vec3fVector circles = new Vec3fVector()) {
                 double minDist = 180 * SCALE;
                 int minR = (int) (70 * SCALE);
                 int maxR = (int) (190 * SCALE);

@@ -18,8 +18,6 @@ public final class AppConfig {
     public static final String PPOCR_KEYS = "ppocr_keys_v1.txt";
     //ORC对象池
     public static int OCR_CORE_SIZE = 2;
-    //OCR同时允许处理多少任务
-    public static int OCR_PARALLEL = 2;
 
     // ====================== 配置文件名称 ======================
     private static final String CONFIG_FILE_NAME = "app_config.properties";
