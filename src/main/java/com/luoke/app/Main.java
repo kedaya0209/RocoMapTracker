@@ -1,5 +1,8 @@
 package com.luoke.app;
 
+import com.luoke.app.ui.ModernCanvasApp;
+import javafx.application.Application;
+
 /**
  * 应用程序入口类
  * <p>
@@ -16,7 +19,6 @@ package com.luoke.app;
  * @version 1.0
  */
 public class Main {
-
     /**
      * 应用程序主入口方法
      * <p>
@@ -31,8 +33,6 @@ public class Main {
      * @param args 命令行参数数组，可以包含配置文件路径或其他运行时参数
      */
     public static void main(String[] args) {
-        // 将命令行参数转发给JavaFX应用程序主类
-        // MainApp继承自javafx.application.Application，由JavaFX框架管理生命周期
-        MainApp.main(args);
+        Application.launch(ModernCanvasApp.class, args);
     }
 }

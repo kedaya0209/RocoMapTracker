@@ -1,4 +1,4 @@
-package com.luoke.app.render;
+package com.luoke.app.ui.render;
 
 import com.luoke.app.capture.common.CaptureFrameRecord;
 import com.luoke.app.context.MapContext;

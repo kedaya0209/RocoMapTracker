@@ -1,0 +1,68 @@
+[
+  {
+    "name": "com.luoke.app.ui.ModernCanvasApp",
+    "allDeclaredConstructors": true,
+    "allPublicConstructors": true,
+    "allDeclaredMethods": true,
+    "allPublicMethods": true,
+    "allDeclaredFields": true,
+    "allPublicFields": true,
+    "unsafeAllocated": true
+  },
+  {
+    "name": "com.sun.prism.shader.FillRoundRect_Color_Loader",
+    "allDeclaredConstructors": true,
+    "allPublicConstructors": true,
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "com.sun.prism.shader.FillPgram_Color_Loader",
+    "allDeclaredConstructors": true,
+    "allPublicConstructors": true,
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "com.sun.prism.shader.Solid_Color_Loader",
+    "allDeclaredConstructors": true,
+    "allPublicConstructors": true,
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "com.sun.prism.shader.DrawRoundRect_Color_Loader",
+    "allDeclaredConstructors": true,
+    "allPublicConstructors": true,
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "com.sun.prism.shader.DrawRect_Color_Loader",
+    "allDeclaredConstructors": true,
+    "allPublicConstructors": true,
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "com.sun.prism.shader.FillRect_Color_Loader",
+    "allDeclaredConstructors": true,
+    "allPublicConstructors": true,
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "com.sun.prism.shader.Texture_Color_Loader",
+    "allDeclaredConstructors": true,
+    "allPublicConstructors": true,
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "com.sun.prism.shader.DrawPgram_Color_Loader",
+    "allDeclaredConstructors": true,
+    "allPublicConstructors": true,
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "com.sun.scenario.effect.impl.prism.ps.PPSLinearConvolveShadowPeer",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "com.sun.scenario.effect.impl.prism.ps.PPSRenderer",
+    "allDeclaredConstructors": true
+  }
+]

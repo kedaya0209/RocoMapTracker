@@ -1,14 +1,21 @@
-package com.luoke.app.render;
+package com.luoke.app.ui.render;
 
-import com.luoke.app.component.InteractiveCanvas;
 import com.luoke.app.config.AppConfig;
 import com.luoke.app.context.CameraContext;
 import com.luoke.app.context.MapContext;
+import com.luoke.app.context.MaterialCollectionContext;
 import com.luoke.app.context.StatsContext;
+import com.luoke.app.ui.component.InteractiveCanvas;
+import com.luoke.app.ui.component.ResourceCounterPanel;
+import com.luoke.app.ui.component.TitleBar;
 import javafx.animation.AnimationTimer;
 import javafx.scene.canvas.GraphicsContext;
+import javafx.scene.control.Label;
+import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.Text;
+
+import java.util.Map;
 
 /**
  * 渲染循环类
@@ -66,7 +73,7 @@ public class RenderLoop extends AnimationTimer {
      * <p>用于预先测量文本的宽度和高度，优化布局计算。
      * 避免在渲染循环中重复创建Text对象，减少GC压力。
      */
-    private final Text textMeasurer = new Text();
+    private final Text textMeasurer;
 
     /**
      * 构造函数
@@ -78,6 +85,7 @@ public class RenderLoop extends AnimationTimer {
     public RenderLoop(GraphicsContext gc) {
         this.gc = gc;
         // 设置文本测量器的字体，确保测量结果与实际渲染一致
+        textMeasurer = new Text();
         textMeasurer.setFont(font);
     }
 
@@ -122,6 +130,9 @@ public class RenderLoop extends AnimationTimer {
 
         // 渲层4：渲染玩家位置和朝向（最顶层）
         renderPlayer();
+
+        //渲染拾取物
+        rendResourceCount();
     }
 
     /**
@@ -275,7 +286,6 @@ public class RenderLoop extends AnimationTimer {
         if (AppConfig.SHOW_STATS_FPS) {
             sb.append(String.format("频率：%d", stats.getFrequency()));
         }
-
         // 提取最终文本
         String text = sb.toString().trim();
         // 如果没有启用任何统计显示，提前返回
@@ -295,12 +305,56 @@ public class RenderLoop extends AnimationTimer {
         double bgY = (TOP_BAR_HEIGHT - textHeight) / 2;
         // 计算右对齐位置：画布宽度 - 文本宽度 - 边距
         double textX = canvasWidth - textWidth - margin;
+
+        TitleBar instance = TitleBar.getInstance();
+        double offsetY = instance.getHeight();
         // 计算文本Y坐标：背景Y + 文本高度/2 + 基线偏移
-        double textY = bgY + textHeight / 2 + 4;
+        double textY = bgY + textHeight / 2 + 4 + offsetY;
 
         // 设置文本颜色为黑色
-        gc.setFill(javafx.scene.paint.Color.BLACK);
+        gc.setFill(Color.BLACK);
         // 绘制统计文本
         gc.fillText(text, textX, textY);
     }
+
+    private void rendResourceCount() {
+        // 1. 获取单例实例
+        ResourceCounterPanel resourcePanel = ResourceCounterPanel.getInstance();
+        MaterialCollectionContext collectionContext = MaterialCollectionContext.getInstance();
+
+        // 2. 获取当前的汇总数据视图
+        Map<String, Integer> summaryMap = collectionContext.getSummaryMap();
+
+        // 3. UI 更新必须在 JavaFX 主线程执行
+        // 4. 清理旧数据行：保留索引 0 的标题 Label，移除之后的所有内容
+        int childCount = resourcePanel.getChildren().size();
+        if (childCount > 1) {
+            resourcePanel.getChildren().remove(1, childCount);
+        }
+
+        // 5. 动态构建物资列表
+        summaryMap.forEach((name, total) -> {
+            // 创建水平对齐的行
+            javafx.scene.layout.HBox row = new javafx.scene.layout.HBox(12);
+            row.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+
+            // 名称 Label：淡灰色
+            Label nameLabel = new Label(name + " :");
+            nameLabel.setTextFill(javafx.scene.paint.Color.web("#CCCCCC"));
+
+            // 数量 Label：统一蓝色，加粗显示
+            Label countLabel = new Label(String.valueOf(total));
+            countLabel.setTextFill(javafx.scene.paint.Color.web("#00BFFF")); // 之前定义的 UNIFIED_BLUE
+            countLabel.getStyleClass().add(atlantafx.base.theme.Styles.TEXT_BOLD);
+
+            row.getChildren().addAll(nameLabel, countLabel);
+            resourcePanel.getChildren().add(row);
+        });
+
+        // 6. 交互逻辑：如果有了第一条数据，自动淡入显示面板
+        if (!summaryMap.isEmpty() && !resourcePanel.isVisible()) {
+            resourcePanel.toggle(true);
+        }
+    }
+
 }

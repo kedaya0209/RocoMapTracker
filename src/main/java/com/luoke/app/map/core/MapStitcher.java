@@ -54,48 +54,6 @@ import java.util.List;
 @Slf4j
 public class MapStitcher {
 
-    /**
-     * 拼接地图瓦片为完整图片
-     * <p>
-     * 该方法执行完整的地图拼接流程：
-     * <ol>
-     *   <li>检查瓦片列表是否为空，空则跳过</li>
-     *   <li>遍历瓦片列表，计算X和Y坐标的最小最大值</li>
-     *   <li>根据坐标范围和瓦片尺寸计算最终图片尺寸</li>
-     *   <li>创建目标BufferedImage画布</li>
-     *   <li>设置高质量渲染提示</li>
-     *   <li>按坐标将每个瓦片绘制到画布对应位置</li>
-     *   <li>保存拼接后的图片为PNG文件</li>
-     *   <li>释放所有图片和图形资源</li>
-     * </ol>
-     * <p>
-     * 坐标计算逻辑：
-     * <ul>
-     *   <li>瓦片绘制位置 = (瓦片坐标 - 最小坐标) * 瓦片尺寸</li>
-     *   <li>最终图片宽度 = (最大X - 最小X + 1) * 瓦片宽度</li>
-     *   <li>最终图片高度 = (最大Y - 最小Y + 1) * 瓦片高度</li>
-     * </ul>
-     * <p>
-     * 内存管理：
-     * <ul>
-     *   <li>瓦片图片绘制后立即flush，释放Native内存</li>
-     *   <li>Graphics2D使用后dispose，释放绘图资源</li>
-     *   <li>主图保存后flush，释放Native内存</li>
-     *   <li>ByteArrayInputStream使用try-with-resources自动关闭</li>
-     * </ul>
-     * <p>
-     * 性能优化：
-     * <ul>
-     *   <li>使用双线性插值提高拼接质量</li>
-     *   <li>设置高质量渲染提示</li>
-     *   <li>及时释放瓦片图片，减少内存占用</li>
-     * </ul>
-     *
-     * @param tiles 瓦片列表，包含所有需要拼接的瓦片数据
-     * @param tag 地图标签，用于日志记录和文件命名
-     * @param tw 单个瓦片的宽度，<= 0时使用默认值256
-     * @param th 单个瓦片的高度，<= 0时使用默认值256
-     */
     public static void stitch(List<Tile> tiles, String tag, int tw, int th) {
         try {
             // 检查瓦片列表是否为空，空则跳过拼接

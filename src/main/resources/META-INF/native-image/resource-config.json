@@ -1,0 +1,9 @@
+{
+  "resources": {
+    "includes": [
+      {"pattern": "com/luoke/app/ui/.*"},
+      {"pattern": "atlantafx/.*"},
+      {"pattern": "native/.*"}
+    ]
+  }
+}

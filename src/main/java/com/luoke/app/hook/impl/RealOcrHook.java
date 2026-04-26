@@ -165,6 +165,8 @@ public class RealOcrHook extends AbstractGenericHook<Frame> {
      */
     @Override
     public void onEvent(HookEventType eventType, Frame frame) {
+        if (!AppConfig.MATERIAL_COLLECTION) return;
+
         long now = System.currentTimeMillis();
 
         // 采样间隔检查：距离上次OCR不足200ms则跳过

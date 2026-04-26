@@ -72,68 +72,8 @@ import java.util.Map;
  */
 @Slf4j
 public class ResourceConfigBuilder {
-
-    /**
-     * Jackson ObjectMapper实例，用于JSON序列化
-     * <p>
-     * 使用静态final变量复用ObjectMapper实例：
-     * <ul>
-     *   <li>避免重复创建，减少开销</li>
-     *   <li>复用缓存和配置，提高性能</li>
-     *   <li>从JsonUtils获取，确保配置一致</li>
-     * </ul>
-     * <p>
-     * ObjectMapper开销：
-     * <ul>
-     *   <li>创建实例需要序列化器注册</li>
-     *   <li>缓存反射信息，后续使用更快</li>
-     *   <li>复用实例可以提高整体性能</li>
-     * </ul>
-     */
     private static final ObjectMapper om = JsonUtils.getMapper();
 
-    /**
-     * 构建并保存资源配置文件
-     * <p>
-     * 该方法执行完整的资源配置构建流程：
-     * <ol>
-     *   <li>加载地图分类数据</li>
-     *   <li>加载地图点位数据</li>
-     *   <li>建立分类索引（按markType）</li>
-     *   <li>遍历所有点位，查找对应分类</li>
-     *   <li>为每个点位构建资源配置</li>
-     *   <li>保存配置为JSON文件</li>
-     * </ol>
-     * <p>
-     * 数据关联逻辑：
-     * <ul>
-     *   <li>点位数据包含markType字段</li>
-     *   <li>分类数据也包含markType字段</li>
-     *   <li>通过markType将点位和分类关联</li>
-     *   <li>分类包含图标等资源信息</li>
-     *   <li>点位包含位置信息</li>
-     * </ul>
-     * <p>
-     * 过滤逻辑：
-     * <ul>
-     *   <li>忽略没有markType的分类</li>
-     *   <li>忽略找不到分类的点位</li>
-     *   <li>只保存有效配置</li>
-     * </ul>
-     * <p>
-     * 性能优化：
-     * <ul>
-     *   <li>使用HashMap建立分类索引，O(1)查找</li>
-     *   <li>遍历点位时快速查找分类</li>
-     *   <li>使用ArrayList收集配置，提高遍历效率</li>
-     * </ul>
-     * <p>
-     * 错误处理：
-     * <ul>
-     *   <li>捕获所有异常，记录错误日志</li>
-     *   <li>单个配置失败不影响其他配置</li>
-     * </ul>
-     */
     public static void buildAndSaveConfig() {
         try {
             // 加载地图分类数据
@@ -196,46 +136,6 @@ public class ResourceConfigBuilder {
         }
     }
 
-    /**
-     * 从点位和分类数据构建资源配置
-     * <p>
-     * 该方法将点位和分类数据合并为资源配置对象：
-     * <ul>
-     *   <li>创建ResourceConfig对象</li>
-     *   <li>设置资源类型（来自分类）</li>
-     *   <li>设置资源类型ID（来自分类）</li>
-     *   <li>设置资源名称（来自分类）</li>
-     *   <li>设置图标文件名（从分类的icon URL提取）</li>
-     *   <li>设置经度（来自点位）</li>
-     *   <li>设置纬度（来自点位）</li>
-     *   <li>设置图层（来自点位）</li>
-     *   <li>设置缩放级别（使用默认值）</li>
-     * </ul>
-     * <p>
-     * 数据来源说明：
-     * <ul>
-     *   <li>分类数据：type, markType, markTypeName, icon</li>
-     *   <li>点位数据：lat, lng, layer</li>
-     *   <li>默认值：zoom = 4</li>
-     * </ul>
-     * <p>
-     * 图标文件名提取：
-     * <ul>
-     *   <li>分类的icon字段是完整URL</li>
-     *   <li>提取最后一个/之后的部分作为文件名</li>
-     *   <li>例如："https://example.com/icon.png" -> "icon.png"</li>
-     * </ul>
-     * <p>
-     * 默认值处理：
-     * <ul>
-     *   <li>zoom使用配置的默认值</li>
-     *   <li>确保配置的完整性</li>
-     * </ul>
-     *
-     * @param point 地图点位数据，包含位置信息
-     * @param cat 地图分类数据，包含资源信息
-     * @return 构建好的资源配置对象
-     */
     private static ResourceConfig getResourceConfig(MapPointItem point, MapCategoryItem cat) {
         // 创建资源配置对象
         ResourceConfig cfg = new ResourceConfig();

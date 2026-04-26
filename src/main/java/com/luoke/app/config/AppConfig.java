@@ -129,6 +129,11 @@ public final class AppConfig {
     public static boolean SHOW_MONITOR_BORDER = false;
 
     /**
+     * 是否启用资源采集
+     */
+    public static boolean MATERIAL_COLLECTION = false;
+
+    /**
      * 玩家图标模式
      * <p>
      * 可选值：

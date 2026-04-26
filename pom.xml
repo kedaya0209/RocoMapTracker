@@ -28,18 +28,26 @@
         <javacv.opencv.version>4.9.0-1.5.10</javacv.opencv.version>
         <javacv.openblas.version>0.3.26-1.5.10</javacv.openblas.version>
         <graalvm.version>21.0.2</graalvm.version>
-        <onnxruntime.version>1.25.0</onnxruntime.version>
+        <djl.version>0.36.0</djl.version>
+        <atlantafx.version>2.1.0</atlantafx.version>
     </properties>
     <dependencies>
+        <!-- Source: https://mvnrepository.com/artifact/io.github.mkpaz/atlantafx-base -->
+        <dependency>
+            <groupId>io.github.mkpaz</groupId>
+            <artifactId>atlantafx-base</artifactId>
+            <version>${atlantafx.version}</version>
+            <scope>compile</scope>
+        </dependency>
         <dependency>
             <groupId>ai.djl</groupId>
             <artifactId>api</artifactId>
-            <version>0.36.0</version>
+            <version>${djl.version}</version>
         </dependency>
         <dependency>
             <groupId>ai.djl.onnxruntime</groupId>
             <artifactId>onnxruntime-engine</artifactId>
-            <version>0.36.0</version>
+            <version>${djl.version}</version>
             <scope>runtime</scope>
         </dependency>
 
@@ -259,22 +267,34 @@
                                     <option>allow-incomplete-classpath</option>
                                 </options>
                             </agent>
-
                             <buildArgs>
                                 <buildArg>-Dfile.encoding=UTF-8</buildArg>
                                 <buildArg>--no-fallback</buildArg>
                                 <buildArg>-Djava.awt.headless=false</buildArg>
-                                <buildArg>-R:MaxHeapSize=512m</buildArg>
-                                <buildArg>-H:IncludeResources=model/.*</buildArg>
-                                <buildArg>-H:IncludeResources=.*\.(png|properties|json|fxml|xml|dll|txt|onnx)$</buildArg>
+                                <buildArg>-R:MaxHeapSize=1g</buildArg>
+                                <buildArg>-J-Xmx16g</buildArg>
+
+                                <!-- ✅ 修复：必须包含 JavaFX 内部 shader / obj / ps / hlsl 渲染文件 -->
+                                <buildArg>-H:IncludeResources=(model/.*|com/sun/prism/.*|com/sun/javafx/.*|com/sun/scenario/effect/.*|.*\.(png|properties|json|fxml|xml|dll|txt|onnx|css|ttf|woff2|sh|ps|hlsl|cso))$</buildArg>
+
                                 <buildArg>-H:IncludeResourceBundles=ch.qos.logback.*</buildArg>
                                 <buildArg>-H:ReachabilityMetadataResources=META-INF/native-image/reachability-metadata.json</buildArg>
+
                                 <buildArg>-H:+UnlockExperimentalVMOptions</buildArg>
+                                <buildArg>--add-exports=javafx.graphics/com.sun.prism.shader=ALL-UNNAMED</buildArg>
+                                <buildArg>--add-exports=javafx.graphics/com.sun.glass.ui=ALL-UNNAMED</buildArg>
+                                <buildArg>--add-exports=javafx.graphics/com.sun.prism.d3d=ALL-UNNAMED</buildArg>
+
+                                <!-- ✅ 修复：必须把 JavaFX 渲染类全部运行时初始化 -->
+                                <buildArg>--initialize-at-run-time=com.sun.prism.**</buildArg>
+                                <buildArg>--initialize-at-run-time=com.sun.glass.ui.**</buildArg>
+                                <buildArg>--initialize-at-run-time=javafx.**</buildArg>
+                                <buildArg>--initialize-at-run-time=atlantafx.**</buildArg>
+                                <buildArg>--initialize-at-run-time=org.kordamp.ikonli.**</buildArg>
+
                                 <buildArg>-H:+JNI</buildArg>
                                 <buildArg>-H:+StripDebugInfo</buildArg>
                                 <buildArg>-Djna.nosys=true</buildArg>
-                                <buildArg>-Dorg.bytedeco.javacpp.loadlibraries=true</buildArg>
-                                <buildArg>-J-Xmx8g</buildArg>
                                 <buildArg>--enable-http</buildArg>
                                 <buildArg>--enable-https</buildArg>
                             </buildArgs>
