@@ -394,14 +394,14 @@ mvn javafx:run
 
 ```bash
 # 打包带依赖的JAR
-mvn clean package
+# 修改1、build-jar.bat 中的环境路径即可
 ```
 
 ### Native Image编译
 
 ```bash
 # 编译原生可执行文件
-mvn clean package -Pnative
+# 将需要安装微软C++桌面开发环境，将4\build-native.bat文件中的环境路径修改后直接运行，等待exe文件即可
 ```
 
 **Native Image优势**：
