@@ -26,12 +26,21 @@ public class LoadingOverlay extends VBox {
         progressBar.setPrefWidth(400);
         progressBar.getStyleClass().add(Styles.MEDIUM);
 
-        cancelBtn.getStyleClass().add(Styles.DANGER);
-        cancelBtn.setOnAction(e -> {
-            cancelBtn.setDisable(true);
-            statusLabel.setText("正在取消并清理中...");
-            if (onCancel != null) onCancel.run();
-        });
+        // --- 核心修改逻辑 ---
+        if (onCancel == null) {
+            // 如果没传回调（初始化场景），彻底隐藏并移除按钮占位
+            cancelBtn.setVisible(false);
+            cancelBtn.setManaged(false);
+        } else {
+            // 如果传了回调（下载场景），显示并配置按钮
+            cancelBtn.getStyleClass().add(Styles.DANGER);
+            cancelBtn.setOnAction(e -> {
+                cancelBtn.setDisable(true);
+                statusLabel.setText("正在取消并清理中...");
+                onCancel.run();
+            });
+        }
+        // ------------------
 
         this.getChildren().addAll(statusLabel, progressBar, cancelBtn);
     }

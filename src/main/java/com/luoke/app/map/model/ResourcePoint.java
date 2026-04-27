@@ -73,4 +73,8 @@ public class ResourcePoint {
 
         gc.restore();
     }
+
+    public boolean isCollectible() {
+        return ("采集".equals(getConfig().getType()) && getConfig().getMarkType() > 704);
+    }
 }

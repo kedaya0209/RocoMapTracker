@@ -27,6 +27,11 @@ public class IconDownloader {
     private static final AtomicBoolean isStopRequested = new AtomicBoolean(false);
     private static final DownloadProgressContext progress = DownloadProgressContext.getInstance();
 
+    public static AtomicBoolean getIsStopRequested() {
+        return isStopRequested;
+    }
+
+
     /**
      * 设置停止标记
      */

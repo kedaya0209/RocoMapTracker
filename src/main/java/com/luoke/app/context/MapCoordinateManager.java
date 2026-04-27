@@ -127,9 +127,33 @@ public class MapCoordinateManager {
         // 应用用户自定义的缩放和平移：最终转换为屏幕显示坐标
         // 这是用户在界面上进行的缩放和拖拽操作的结果
         return new Point2D(
-                mm.getOffsetX() + mx * mm.getScale(),  // X方向：用户平移X + 地图坐标X * 用户缩放
-                mm.getOffsetY() + my * mm.getScale()   // Y方向：用户平移Y + 地图坐标Y * 用户缩放
+                mx,  // X方向：用户平移X + 地图坐标X * 用户缩放
+                my   // Y方向：用户平移Y + 地图坐标Y * 用户缩放
         );
+    }
+
+    public Point2D fromScreen(double screenX, double screenY) {
+        // 获取当前地图上下文
+        MapContext mm = MapContext.getInstance();
+
+        // 获取当前激活地图的配置信息
+        MapConfig cfg = mapConfigMap.get(mm.getCurrentMapKey());
+        if (cfg == null) {
+            throw new NullPointerException("当前地图未注册配置: " + mm.getCurrentMapKey());
+        }
+
+        // 1. 逆向应用用户自定义的缩放和平移
+        // 对应 toScreen 中的：mm.getOffsetX() + mx * mm.getScale()
+
+        // 2. 计算配置缩放因子 (与 toScreen 保持一致)
+        double scale = Math.pow(2, cfg.imageZoom - cfg.jsonZoom);
+
+        // 3. 逆向应用地图尺寸中心对齐和配置缩放
+        // 对应 toScreen 中的：cfg.width / 2 + x * scale
+        double x = (screenX - cfg.width / 2.0) / scale;
+        double y = (screenY - cfg.height / 2.0) / scale;
+
+        return new Point2D(x, y);
     }
 
     /**

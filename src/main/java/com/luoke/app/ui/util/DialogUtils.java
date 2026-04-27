@@ -7,6 +7,8 @@ import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
@@ -17,14 +19,7 @@ import javafx.util.Duration;
 public class DialogUtils {
 
     /**
-     * 显示自定义沉浸式对话框
-     *
-     * @param rootStack  场景的根容器 (StackPane)
-     * @param title      标题
-     * @param message    内容
-     * @param buttonText 按钮文字
-     * @param isError    是否为错误样式 (影响图标颜色和按钮色调)
-     * @param onConfirm  点击确认后的回调
+     * 简易文本弹窗
      */
     public static void showSimpleDialog(StackPane rootStack,
                                         String title,
@@ -32,70 +27,119 @@ public class DialogUtils {
                                         String buttonText,
                                         boolean isError,
                                         Runnable onConfirm) {
+        String styleClass = isError ? Styles.DANGER : Styles.SUCCESS;
+        String iconColor = isError ? "#ff9800" : "#00BFFF";
+        buildBaseDialog(rootStack, title, createMessageLabel(message), buttonText, styleClass, iconColor, onConfirm, null);
+    }
 
-        // 1. 遮罩层
+    /**
+     * 自定义内容弹窗（居中修复版）
+     */
+    public static void showConfirmDialog(StackPane rootStack,
+                                         String title,
+                                         Node content,
+                                         Runnable onConfirm,
+                                         Runnable onCancel) {
+        // 确保 content 本身不会因为宽度问题导致视觉偏移
+        if (content instanceof Region region) {
+            region.setMaxWidth(Double.MAX_VALUE);
+        }
+        buildBaseDialog(rootStack, title, content, "确认添加", Styles.SUCCESS, "#00BFFF", onConfirm, onCancel);
+    }
+
+    /**
+     * 文本确认弹窗
+     */
+    public static void showConfirmDialog(StackPane rootStack,
+                                         String title,
+                                         String message,
+                                         Runnable onConfirm,
+                                         Runnable onCancel) {
+        buildBaseDialog(rootStack, title, createMessageLabel(message), "确认退出", Styles.DANGER, "#ff9800", onConfirm, onCancel);
+    }
+
+    private static void buildBaseDialog(StackPane rootStack,
+                                        String title,
+                                        Node content,
+                                        String confirmBtnText,
+                                        String confirmBtnStyleClass,
+                                        String iconColorHex,
+                                        Runnable onConfirm,
+                                        Runnable onCancel) {
         StackPane mask = new StackPane();
         mask.setStyle("-fx-background-color: rgba(0, 0, 0, 0.8);");
 
-        // 2. 对话框容器
-        VBox dialogBox = new VBox(20);
-        dialogBox.setMaxSize(380, 240);
+        VBox dialogBox = new VBox(25); // 稍微增大间距
+        dialogBox.setMaxSize(420, 320);
         dialogBox.setPadding(new Insets(30));
         dialogBox.setAlignment(Pos.CENTER);
         dialogBox.setStyle(
                 "-fx-background-color: #1e1e1e; " +
-                        "-fx-border-color: " + (isError ? "#f44336" : "rgba(255,255,255,0.1)") + "; " +
+                        "-fx-border-color: rgba(255,255,255,0.1); " +
                         "-fx-border-radius: 12; " +
                         "-fx-background-radius: 12; " +
                         "-fx-border-width: 1.5; " +
                         "-fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.5), 20, 0, 0, 10);"
         );
 
-        // 3. 图标 (SVG)
+        // 图标
         SVGPath icon = new SVGPath();
-        if (isError) {
-            // 错误图标 (感叹号)
-            icon.setContent("M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z");
-            icon.setFill(Color.web("#f44336"));
-        } else {
-            // 信息图标 (圆圈 i)
-            icon.setContent("M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z");
-            icon.setFill(Color.web("#00BFFF")); // 你定义的统一蓝色
-        }
+        icon.setContent("M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z");
+        icon.setFill(Color.web(iconColorHex));
         icon.setScaleX(1.8);
         icon.setScaleY(1.8);
 
-        // 4. 文字
+        // 标题
         Label titleLabel = new Label(title);
         titleLabel.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: white;");
 
-        Label msgLabel = new Label(message);
-        msgLabel.setTextAlignment(TextAlignment.CENTER);
-        msgLabel.setWrapText(true);
-        msgLabel.setStyle("-fx-text-fill: #BBBBBB;");
+        // --- 核心居中处理层 ---
+        StackPane contentContainer = new StackPane();
+        contentContainer.setAlignment(Pos.CENTER);
+        contentContainer.getChildren().add(content);
+        // 让容器自适应宽度，方便垂直堆叠
+        VBox.setVgrow(contentContainer, javafx.scene.layout.Priority.ALWAYS);
 
-        // 5. 按钮
-        Button actionBtn = new Button(buttonText);
-        actionBtn.getStyleClass().addAll(Styles.BUTTON_OUTLINED, isError ? Styles.DANGER : Styles.SUCCESS);
-        actionBtn.setPrefWidth(120);
+        // 按钮组
+        HBox btnBox = new HBox(15);
+        btnBox.setAlignment(Pos.CENTER);
 
-        actionBtn.setOnAction(e -> {
-            fadeOutAndRemove(rootStack, mask, onConfirm);
-        });
+        Button confirmBtn = new Button(confirmBtnText);
+        confirmBtn.getStyleClass().addAll(Styles.BUTTON_OUTLINED, confirmBtnStyleClass);
+        confirmBtn.setPrefWidth(120);
+        confirmBtn.setOnAction(e -> fadeOutAndRemove(rootStack, mask, onConfirm));
 
-        dialogBox.getChildren().addAll(icon, titleLabel, msgLabel, actionBtn);
+        btnBox.getChildren().add(confirmBtn);
+
+        if (onCancel != null) {
+            Button cancelBtn = new Button("取消");
+            cancelBtn.setPrefWidth(120);
+            cancelBtn.getStyleClass().addAll(Styles.BUTTON_OUTLINED); // 使用主题自带的样式减少冗余
+            cancelBtn.setOnAction(e -> fadeOutAndRemove(rootStack, mask, onCancel));
+            btnBox.getChildren().add(cancelBtn);
+        }
+
+        dialogBox.getChildren().addAll(icon, titleLabel, contentContainer, btnBox);
         mask.getChildren().add(dialogBox);
         rootStack.getChildren().add(mask);
 
         // 入场动画
         mask.setOpacity(0);
-        FadeTransition ft = new FadeTransition(Duration.millis(250), mask);
+        FadeTransition ft = new FadeTransition(Duration.millis(200), mask);
         ft.setToValue(1);
         ft.play();
     }
 
+    private static Label createMessageLabel(String message) {
+        Label msgLabel = new Label(message);
+        msgLabel.setTextAlignment(TextAlignment.CENTER);
+        msgLabel.setWrapText(true);
+        msgLabel.setStyle("-fx-text-fill: #BBBBBB;");
+        return msgLabel;
+    }
+
     private static void fadeOutAndRemove(StackPane root, Node node, Runnable callback) {
-        FadeTransition ft = new FadeTransition(Duration.millis(200), node);
+        FadeTransition ft = new FadeTransition(Duration.millis(150), node);
         ft.setToValue(0);
         ft.setOnFinished(e -> {
             root.getChildren().remove(node);

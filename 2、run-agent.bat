@@ -14,10 +14,11 @@ if not exist "%CONFIG_DIR%" mkdir "%CONFIG_DIR%"
 echo ==============================================
 echo  正在启动 RocoMapTracker 并收集反射配置
 echo  [已开启定时刷盘] 每 10 秒自动保存一次
+echo  第一次收集需要改为config-output-dir
 echo ==============================================
 
 :: 使用你发现的正确参数名：config-write-period-secs
-java "-agentlib:native-image-agent=config-output-dir=%CONFIG_DIR%,experimental-class-loader-support,config-write-period-secs=10,config-write-initial-delay-secs=5" -jar "target/RocoMapTracker-1.0.0-jar-with-dependencies.jar"
+java "-agentlib:native-image-agent=config-merge-dir=%CONFIG_DIR%,experimental-class-loader-support,config-write-period-secs=10,config-write-initial-delay-secs=5" -jar "target/RocoMapTracker-1.0.0-jar-with-dependencies.jar"
 
 echo.
 echo ==============================================

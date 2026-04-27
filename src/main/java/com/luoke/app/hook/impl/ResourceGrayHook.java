@@ -95,7 +95,7 @@ public class ResourceGrayHook extends AbstractGenericHook<PlayerPositionEvent> {
             // 过滤条件检查：
             // 1. 仅对"采集"类型的资源生效
             // 2. markType > 704是游戏内特定的采集资源分类规则
-            if (!("采集".equals(res.getConfig().getType()) && res.getConfig().getMarkType() > 704)) {
+            if (res.isCollectible()) {
                 continue;
             }
 

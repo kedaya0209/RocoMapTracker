@@ -40,10 +40,17 @@ public class MapDownloader {
 
     private static final DownloadProgressContext progress = DownloadProgressContext.getInstance();
 
+    public static AtomicBoolean getIsStopRequested() {
+        return isStopRequested;
+    }
+
     public static void updateMap() {
         try {
             log.info("开始地图资源更新流程...");
             downloadAllMaps();
+            if (isStopRequested.get()) {
+                return;
+            }
             MapFileMover.moveMapsToResource();
             log.info("✅ 所有任务已圆满完成！");
         } catch (Exception e) {
@@ -94,7 +101,9 @@ public class MapDownloader {
                     }
                     CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
                 }
-
+                if (isStopRequested.get()) {
+                    return;
+                }
                 // 保存剩余分片并持久化元数据
                 if (!chunkBuffer.isEmpty()) saveChunk(tag);
                 saveMeta(validTiles, tag);

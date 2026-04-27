@@ -273,6 +273,8 @@
                                 <buildArg>-Djava.awt.headless=false</buildArg>
                                 <buildArg>-R:MaxHeapSize=1g</buildArg>
                                 <buildArg>-J-Xmx16g</buildArg>
+                                <buildArg>-H:NativeLinkerOption=/SUBSYSTEM:WINDOWS</buildArg>
+                                <buildArg>-H:NativeLinkerOption=/ENTRY:mainCRTStartup</buildArg>
 
                                 <!-- ✅ 修复：必须包含 JavaFX 内部 shader / obj / ps / hlsl 渲染文件 -->
                                 <buildArg>-H:IncludeResources=(model/.*|com/sun/prism/.*|com/sun/javafx/.*|com/sun/scenario/effect/.*|.*\.(png|properties|json|fxml|xml|dll|txt|onnx|css|ttf|woff2|sh|ps|hlsl|cso))$</buildArg>

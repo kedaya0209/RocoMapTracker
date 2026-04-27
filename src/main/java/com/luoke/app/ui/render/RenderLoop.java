@@ -110,7 +110,11 @@ public class RenderLoop extends AnimationTimer {
     @Override
     public void handle(long now) {
         // 更新摄像机视口，响应用户的缩放和平移操作
-        CameraContext.getInstance().updateViewport();
+        CameraContext camera = CameraContext.getInstance();
+        camera.updateViewport();
+        if (camera.hasValidPlayerPosition()) {
+            camera.updateViewport();
+        }
 
         // 获取画布当前尺寸，用于清空和UI定位
         double canvasWidth = gc.getCanvas().getWidth();

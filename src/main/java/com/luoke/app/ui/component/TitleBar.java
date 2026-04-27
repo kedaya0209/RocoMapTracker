@@ -2,6 +2,7 @@ package com.luoke.app.ui.component;
 
 import atlantafx.base.theme.Styles;
 import com.luoke.app.config.AppConfig;
+import com.luoke.app.ui.util.DialogUtils;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
@@ -11,6 +12,7 @@ import javafx.scene.control.Slider;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.SVGPath;
 import javafx.stage.Stage;
@@ -95,26 +97,26 @@ public class TitleBar extends HBox {
         });
     }
 
-    private static Button getCloseButton(Stage stage) {
+    private Button getCloseButton(Stage stage) {
         Button closeBtn = new Button("✕");
 
         // 初始样式：无边框，白色文字，透明背景
         closeBtn.setStyle(
                 "-fx-background-color: transparent;" +
-                        "-fx-border-color: transparent;" + // 显式去掉边框
-                        "-fx-text-fill: white;" +          // 初始颜色设为白色
+                        "-fx-border-color: transparent;" +
+                        "-fx-text-fill: white;" +
                         "-fx-font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;" +
-                        "-fx-font-size: 16px;" +           // 稍微调大一点点，视觉更清晰
-                        "-fx-font-weight: normal;" +       // 细一点更精致
+                        "-fx-font-size: 16px;" +
+                        "-fx-font-weight: normal;" +
                         "-fx-padding: 6px 12px;" +
-                        "-fx-cursor: hand;"                // 加上手型，增强交互感
+                        "-fx-cursor: hand;"
         );
 
-        // Hover 逻辑：变黑底，文字保持白色或略微变亮
+        // Hover 逻辑
         closeBtn.setOnMouseEntered(e -> closeBtn.setStyle(
                 closeBtn.getStyle()
                         .replace("-fx-text-fill: white;", "-fx-text-fill: red;") +
-                        "-fx-background-color: #1a1a1a;" // 悬停时的黑底效果
+                        "-fx-background-color: #1a1a1a;"
         ));
 
         closeBtn.setOnMouseExited(e -> closeBtn.setStyle(
@@ -122,7 +124,24 @@ public class TitleBar extends HBox {
                         .replace("-fx-text-fill: red;", "-fx-text-fill: white;")
         ));
 
-        closeBtn.setOnAction(e -> stage.close());
+        // ===================== 【核心：添加关闭确认弹窗】 =====================
+        closeBtn.setOnAction(e -> {
+            if (this.getParent() != null && this.getParent().getParent() instanceof StackPane rootStack) {
+                DialogUtils.showConfirmDialog(
+                        rootStack,
+                        "确认退出",
+                        "确定要关闭程序吗？\n所有识别与渲染服务将会停止运行。",
+                        // 确认：关闭窗口
+                        stage::close,
+                        // 取消：什么都不做，直接关闭弹窗
+                        () -> {}
+                );
+            } else {
+                stage.close();
+            }
+        });
+        // ====================================================================
+
         return closeBtn;
     }
 
@@ -146,7 +165,7 @@ public class TitleBar extends HBox {
 
         public static TitleBar getINSTANCE() {
             if (INSTANCE == null) {
-                throw new RuntimeException("实力未初始化");
+                throw new RuntimeException("实例未初始化");
             }
             return INSTANCE;
         }

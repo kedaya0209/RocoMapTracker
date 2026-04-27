@@ -15,7 +15,6 @@ echo ==============================
 echo Step 4: Build Native EXE
 echo ==============================
 
-
 %MAVEN_BIN% clean native:compile -Pnative -DskipTests
 
 

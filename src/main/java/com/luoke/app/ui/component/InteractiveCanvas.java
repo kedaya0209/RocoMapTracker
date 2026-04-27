@@ -6,17 +6,26 @@ import com.luoke.app.context.MapContext;
 import com.luoke.app.context.ResourcePointContext;
 import com.luoke.app.map.loader.ImageLoader;
 import com.luoke.app.map.model.ResourcePoint;
+import com.luoke.app.ui.util.DialogUtils;
+import javafx.application.Platform;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+import javafx.geometry.Point2D;
+import javafx.geometry.Pos;
 import javafx.scene.Cursor;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
-import javafx.scene.control.ContextMenu;
-import javafx.scene.control.MenuItem;
-import javafx.scene.control.SeparatorMenuItem;
-import javafx.scene.control.Tooltip;
+import javafx.scene.control.*;
 import javafx.scene.image.Image;
 import javafx.scene.input.MouseButton;
+import javafx.scene.layout.StackPane;
+import javafx.scene.layout.VBox;
 import javafx.util.Duration;
 import lombok.extern.slf4j.Slf4j;
+
+import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
 
 /**
  * 交互式地图画布组件
@@ -32,17 +41,18 @@ public class InteractiveCanvas extends Canvas {
     private final Tooltip hintTooltip = new Tooltip();
     private double lastMouseX, lastMouseY;
     private boolean firstResize = true;
-    // 交互状态
     private ResourcePoint hoveredPoint = null;
     private ContextMenu mapContextMenu;
     private ContextMenu imageContextMenu;
+
+    private double clickSceneX;
+    private double clickSceneY;
 
     public InteractiveCanvas() {
         setFocusTraversable(true);
         initMenus();
         initTooltip();
 
-        // 监听尺寸变化逻辑
         widthProperty().addListener(e -> {
             mapManager.setViewWidth(getWidth());
             if (firstResize && getWidth() > 0 && getHeight() > 0) {
@@ -58,7 +68,6 @@ public class InteractiveCanvas extends Canvas {
             } else mapManager.ensureBounds();
         });
 
-        // --- 鼠标悬停检测 (Hover & Hint) ---
         setOnMouseMoved(e -> {
             ResourcePoint point = findPointAt(e.getX(), e.getY());
             if (point != hoveredPoint) {
@@ -79,7 +88,25 @@ public class InteractiveCanvas extends Canvas {
             }
         });
 
-        // --- 鼠标右键菜单分流 ---
+        setOnMouseExited(e -> {
+            hintTooltip.hide();
+            if (hoveredPoint != null) {
+                hoveredPoint.setHovered(false);
+                hoveredPoint = null;
+            }
+            setCursor(Cursor.DEFAULT);
+        });
+
+        setOnMousePressed(e -> {
+            if (e.getButton() == MouseButton.SECONDARY) {
+                clickSceneX = e.getX();
+                clickSceneY = e.getY();
+            }
+            hideAllMenus();
+            lastMouseX = e.getX();
+            lastMouseY = e.getY();
+        });
+
         setOnMouseClicked(e -> {
             if (e.getButton() == MouseButton.SECONDARY) {
                 if (hoveredPoint != null) {
@@ -92,12 +119,6 @@ public class InteractiveCanvas extends Canvas {
             }
         });
 
-        // 拖拽与平移
-        setOnMousePressed(e -> {
-            hideAllMenus();
-            lastMouseX = e.getX();
-            lastMouseY = e.getY();
-        });
         setOnMouseDragged(e -> {
             if (cameraManager.isFollowMode()) cameraManager.setFollowMode(false);
             double dx = e.getX() - lastMouseX;
@@ -109,7 +130,6 @@ public class InteractiveCanvas extends Canvas {
             lastMouseY = e.getY();
         });
 
-        // 缩放
         setOnScroll(e -> {
             double factor = e.getDeltaY() > 0 ? 1.1 : 0.9;
             if (cameraManager.isFollowMode()) {
@@ -127,8 +147,77 @@ public class InteractiveCanvas extends Canvas {
         MenuItem resetCam = new MenuItem("重置视角");
         resetCam.setOnAction(e -> autoFitMap());
         mapContextMenu.getItems().addAll(addPoint, new SeparatorMenuItem(), resetCam);
-
         imageContextMenu = new ContextMenu();
+
+        addPoint.setOnAction(e -> openAddPointDialog(clickSceneX, clickSceneY));
+    }
+
+    private void openAddPointDialog(double canvasX, double canvasY) {
+        // ... 坐标计算保持不变 ...
+        double scale = mapManager.getScale();
+        double logicX = (canvasX - mapManager.getOffsetX()) / scale;
+        double logicY = (canvasY - mapManager.getOffsetY()) / scale;
+
+        // 1. 获取去重后的类型列表
+        ObservableList<String> allItems = FXCollections.observableArrayList();
+        Set<String> markTypeSet = new TreeSet<>(); // 使用 TreeSet 自动排序，体验更好
+        for (ResourcePoint point : pointContext.getAllPoints()) {
+            String typeName = point.getConfig().getMarkTypeName();
+            if (typeName != null && !typeName.isBlank()) markTypeSet.add(typeName);
+        }
+        allItems.addAll(markTypeSet);
+
+        // 2. 初始化 ComboBox
+        ComboBox<String> typeCombo = new ComboBox<>(allItems);
+        typeCombo.setEditable(true);
+        typeCombo.setPromptText("搜索/选择标记类型");
+        typeCombo.setPrefWidth(280);
+
+        // ==========================================
+        // 🔥 核心逻辑：实现 AutoComplete 筛选效果
+        // ==========================================
+        typeCombo.getEditor().textProperty().addListener((obs, oldValue, newValue) -> {
+            // 如果是手动选择导致的文字改变，不触发搜索逻辑（防止死循环）
+            if (typeCombo.getSelectionModel().getSelectedItem() != null &&
+                    typeCombo.getSelectionModel().getSelectedItem().equals(newValue)) {
+                return;
+            }
+            Platform.runLater(() -> {
+                if (newValue == null || newValue.isEmpty()) {
+                    typeCombo.setItems(allItems);
+                } else {
+                    // 筛选包含关键字的项目（不区分大小写）
+                    ObservableList<String> filteredList = allItems.filtered(item ->
+                            item.toLowerCase().contains(newValue.toLowerCase())
+                    );
+                    typeCombo.setItems(filteredList);
+                }
+
+                // 只要有内容就展示下拉列表，模拟 AutoComplete
+                if (!typeCombo.getItems().isEmpty()) {
+                    typeCombo.show();
+                } else {
+                    typeCombo.hide();
+                }
+            });
+        });
+
+        // 布局部分
+        VBox content = new VBox(12, typeCombo);
+        content.setAlignment(Pos.CENTER);
+        content.setFillWidth(false);
+        content.setStyle("-fx-padding: 20 0 20 0;");
+
+        if (this.getParent() != null && this.getParent().getParent() instanceof StackPane rootStack) {
+            DialogUtils.showConfirmDialog(rootStack, "新增标记", content, () -> {
+                // 获取方式改为 getEditor().getText()，这样即使没在列表里选，输入的内容也生效
+                String selected = typeCombo.getEditor().getText();
+                if (selected == null || selected.isBlank()) return;
+                pointContext.savePoint(selected, logicX, logicY);
+                log.info("添加标记成功：{} → ({},{})", selected, logicX, logicY);
+            }, () -> {
+            });
+        }
     }
 
     private void initTooltip() {
@@ -142,12 +231,13 @@ public class InteractiveCanvas extends Canvas {
         double logicX = (mouseX - mapManager.getOffsetX()) / scale;
         double logicY = (mouseY - mapManager.getOffsetY()) / scale;
 
-        for (int i = pointContext.getAllPoints().size() - 1; i >= 0; i--) {
-            ResourcePoint p = pointContext.getAllPoints().get(i);
-            // 判定范围：ResourcePoint坐标是底部中心，向上偏移检测
+        List<ResourcePoint> list = pointContext.getAllPoints();
+        for (int i = list.size() - 1; i >= 0; i--) {
+            ResourcePoint p = list.get(i);
             double r = 16.0;
-            if (logicX >= p.getScreenPosition().getX() - r && logicX <= p.getScreenPosition().getX() + r &&
-                    logicY >= p.getScreenPosition().getY() - r * 2 && logicY <= p.getScreenPosition().getY()) {
+            Point2D pos = p.getScreenPosition();
+            if (logicX >= pos.getX() - r && logicX <= pos.getX() + r &&
+                    logicY >= pos.getY() - r * 2 && logicY <= pos.getY()) {
                 return p;
             }
         }
@@ -158,10 +248,25 @@ public class InteractiveCanvas extends Canvas {
         imageContextMenu.getItems().clear();
         MenuItem info = new MenuItem(p.getConfig().getMarkTypeName());
         info.setDisable(true);
-        MenuItem toggle = new MenuItem(p.isGrayed() ? "恢复标记" : "标记已采集");
-        toggle.setOnAction(e -> p.setGrayed(!p.isGrayed()));
+        imageContextMenu.getItems().addAll(info, new SeparatorMenuItem());
+        if (p.isCollectible()) {
+            MenuItem toggle = new MenuItem(p.isGrayed() ? "恢复标记" : "标记已采集");
+            toggle.setOnAction(e -> p.setGrayed(!p.isGrayed()));
+            imageContextMenu.getItems().add(toggle);
+        }
+        // 在 showImageMenu 方法中修改
         MenuItem del = new MenuItem("删除此点位");
-        imageContextMenu.getItems().addAll(info, new SeparatorMenuItem(), toggle, del);
+        del.setOnAction(e -> {
+            if (this.getParent() != null && this.getParent().getParent() instanceof StackPane rootStack) {
+                DialogUtils.showConfirmDialog(rootStack,
+                        String.format("确认移除标记[%s]", p.getConfig().getMarkTypeName()),
+                        "该操作将从本地点位数据库中永久删除此标记",
+                        () -> pointContext.deletePoint(p),
+                        () -> {
+                        });
+            }
+        });
+        imageContextMenu.getItems().add(del);
         imageContextMenu.show(this, sx, sy);
     }
 

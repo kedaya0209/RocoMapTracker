@@ -5,6 +5,7 @@ import com.luoke.app.context.CameraContext;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Cursor;
 import javafx.scene.control.Tooltip;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
@@ -41,7 +42,7 @@ public class FloatToolbox extends VBox {
 
     private StackPane createVectorIconButton(String hint, String svgPath, boolean isFollowLogic, ResourceCounterPanel panel, String unifiedBlueColor) {
         StackPane btn = new StackPane();
-        btn.setCursor(javafx.scene.Cursor.HAND);
+        btn.setCursor(Cursor.HAND);
         btn.setPadding(new Insets(10));
 
         SVGPath icon = new SVGPath();
@@ -63,7 +64,7 @@ public class FloatToolbox extends VBox {
         if (isFollowLogic) {
             btn.setOnMouseClicked(e -> CameraContext.getInstance().setFollowMode(!CameraContext.getInstance().isFollowMode()));
             CameraContext.getInstance().followModeProperty().addListener((obs, old, newVal) -> {
-                Platform.runLater(() -> icon.setFill(newVal ? Color.web(unifiedBlueColor) : Color.web("#C0C0C0")));
+                Platform.runLater(() -> icon.setFill(newVal ? Color.web(unifiedBlueColor) : Color.WHITE));
             });
         } else if (panel != null) {
             // 切换面板显示的逻辑

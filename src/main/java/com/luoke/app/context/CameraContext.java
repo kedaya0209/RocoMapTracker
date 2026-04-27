@@ -150,7 +150,7 @@ public class CameraContext {
         MapContext mm = MapContext.getInstance();
 
         // 前置检查：地图未加载或跟随模式未启用，直接返回
-        if (mm.getMapImage() == null || !isFollowMode()) {
+        if (mm.getMapImage() == null || !isFollowMode() ||!hasValidPlayerPosition()) {
             return;
         }
 
@@ -172,6 +172,11 @@ public class CameraContext {
         // 当地图小于视口时，将地图居中显示
         // 当地图大于视口时，限制偏移量使视口不会超出边界
         mm.ensureBounds();
+    }
+
+    public boolean hasValidPlayerPosition() {
+        MapContext mm = MapContext.getInstance();
+        return mm.getPlayerX() > 0 && mm.getPlayerY() > 0;
     }
 
     /**

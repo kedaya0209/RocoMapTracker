@@ -4,6 +4,16 @@ import com.luoke.app.map.core.IconDownloader;
 import com.luoke.app.map.core.MapDownloader;
 import com.luoke.app.map.core.ResourceConfigBuilder;
 import com.luoke.app.map.util.MapFileMover;
+import com.luoke.app.utils.ResourceUtils;
+import lombok.extern.slf4j.Slf4j;
+
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.FileVisitResult;
+import java.nio.file.FileVisitor;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.attribute.BasicFileAttributes;
 
 /**
  * 地图资源更新触发器
@@ -11,6 +21,7 @@ import com.luoke.app.map.util.MapFileMover;
  * @author 可达鸭
  * @since 1.0.0
  */
+@Slf4j
 public final class MapResourceUpdater {
 
     // ==================== 全局常量配置 ====================
@@ -71,10 +82,43 @@ public final class MapResourceUpdater {
     // ==================== 公共API方法 ====================
 
     public static void updateAllResources() {
+        File downloadDir = ResourceUtils.getExternalFile(DOWNLOAD_DIR);
+        if (downloadDir.exists()) {
+            try {
+                Files.walkFileTree(downloadDir.toPath(), new FileVisitor<Path>() {
+                    @Override
+                    public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+                        return FileVisitResult.CONTINUE;
+                    }
+
+                    @Override
+                    public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                        Files.deleteIfExists(file);
+                        return FileVisitResult.CONTINUE;
+                    }
+
+                    @Override
+                    public FileVisitResult visitFileFailed(Path file, IOException exc) throws IOException {
+                        return FileVisitResult.CONTINUE;
+                    }
+
+                    @Override
+                    public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+                        Files.deleteIfExists(dir);
+                        return FileVisitResult.CONTINUE;
+                    }
+                });
+            } catch (Exception e) {
+                log.error("删除下载文件夹失败, e:", e);
+            }
+        }
+
         // 1. 更新地图瓦片并拼接成大图
         // 这一步会下载指定层级范围内的所有瓦片，并将它们拼接成完整的大图
         MapDownloader.updateMap();
-
+        if (MapDownloader.getIsStopRequested().get()) {
+            return;
+        }
         // 2. 生成合并后的资源配置文件
         // 这一步会整合地图配置、点位信息、分类信息，生成统一的配置文件
         ResourceConfigBuilder.buildAndSaveConfig();
@@ -83,7 +127,9 @@ public final class MapResourceUpdater {
         // 这一步会根据配置文件中的图标URL列表，批量下载图标资源
         // 使用限流机制避免请求过频，使用去重机制避免重复下载
         IconDownloader.downloadIcons();
-
+        if (IconDownloader.getIsStopRequested().get()) {
+            return;
+        }
         // 4. 将下载的资源移动到正式目录（覆盖模式）
         // 这一步会将download目录下的所有资源移动到正式资源目录
         // 使用覆盖模式确保资源始终是最新版本
