@@ -1,6 +1,6 @@
 package com.luoke.app.macher.map;
 
-import java.awt.image.BufferedImage;
+import com.luoke.app.macher.map.sift.SiftPCAMapMatcher;
 
 /**
  * 地图匹配器接口
@@ -42,7 +42,7 @@ import java.awt.image.BufferedImage;
  *
  * @author 可达鸭
  * @version 1.0
- * @see SiftMapMatcher SIFT算法实现
+ * @see SiftPCAMapMatcher SIFT算法实现
  */
 public interface MapMatcher {
 
@@ -76,40 +76,7 @@ public interface MapMatcher {
      * @param largeMapPath 大图的资源路径，支持classpath和外部文件
      *                   例如："/maps/large_map.png" 或 "C:/maps/large_map.png"
      */
-    void init(String largeMapPath);
-
-    /**
-     * 执行匹配（文件路径版本）
-     *
-     * <p>从指定路径加载小图，提取特征后与大图进行匹配，返回小图在大图中的4个角点坐标。</p>
-     *
-     * <h3>匹配流程：</h3>
-     * <ol>
-     *   <li>读取小图文件</li>
-     *   <li>提取小图的特征点和描述符</li>
-     *   <li>与大图特征进行匹配</li>
-     *   <li>计算单应性矩阵</li>
-     *   <li>返回4个角点坐标</li>
-     * </ol>
-     *
-     * <h3>返回值说明：</h3>
-     * <ul>
-     *   <li>成功：返回4个坐标点，格式为 double[4][2]</li>
-     *   <li>失败：返回 null（原因：未初始化、特征点不足、匹配失败等）</li>
-     * </ul>
-     *
-     * <h3>坐标说明：</h3>
-     * <ul>
-     *   <li>坐标顺序通常为：左上、左下、右下、右上</li>
-     *   <li>坐标是基于原始大图尺寸的像素坐标</li>
-     *   <li>坐标值可能存在小的误差（±1-2像素）</li>
-     * </ul>
-     *
-     * @param smallImgPath 待定位的小图路径
-     *                    例如："/maps/small_view.png"
-     * @return 匹配到的4个角点坐标数组，失败返回 null
-     */
-    double[][] match(String smallImgPath);
+    boolean init(String largeMapPath);
 
     /**
      * 执行匹配（字节数组版本）
@@ -139,32 +106,6 @@ public interface MapMatcher {
      * @return 匹配到的4个角点坐标数组，失败返回 null
      */
     double[][] match(byte[] imageBytes, int width, int height);
-
-    /**
-     * 执行匹配（BufferedImage版本）
-     *
-     * <p>从Java AWT的BufferedImage对象进行匹配，适用于AWT/Swing等Java标准库生成的图像。</p>
-     *
-     * <h3>使用场景：</h3>
-     * <ul>
-     *   <li>AWT/Swing应用中的图像组件</li>
-     *   <li>通过ImageIO读取的图像文件</li>
-     *   <li>Java标准库生成的图像</li>
-     * </ul>
-     *
-     * <h3>性能考虑：</h3>
-     * <ul>
-     *   <li>需要经过多次转换：BufferedImage → Frame → Mat</li>
-     *   <li>转换过程可能产生额外的Native对象</li>
-     *   <li>性能可能略低于字节数组版本</li>
-     *   <li>建议优先使用字节数组版本以获得更好的性能</li>
-     * </ul>
-     *
-     * @param image 待匹配的BufferedImage对象
-     *              支持RGB、BGR、BGRA等常见格式
-     * @return {4][2] 匹配到的4个角点坐标数组，失败返回 null
-     */
-    double[][] match(BufferedImage image);
 
     /**
      * 释放持久化资源

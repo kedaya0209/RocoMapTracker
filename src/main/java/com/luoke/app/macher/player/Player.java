@@ -4,7 +4,6 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.bytedeco.opencv.opencv_core.Point;
 
 /**
  * 玩家实体类
@@ -80,18 +79,4 @@ public class Player {
      * <p>0度表示向右，90度表示向下，180度表示向左，270度表示向上</p>
      */
     private double angle;
-
-    /**
-     * 玩家在原始大地图上的像素坐标
-     * <p>Point对象包含x和y两个坐标值</p>
-     * <p>这是Native资源，需要注意内存管理</p>
-     */
-    private Point pos;
-
-    /**
-     * 可视区域朝向（预留字段）
-     * <p>该字段当前未使用，保留用于未来的功能扩展</p>
-     * <p>可能用于表示玩家视野的中心方向</p>
-     */
-    private double viewAngle;
 }

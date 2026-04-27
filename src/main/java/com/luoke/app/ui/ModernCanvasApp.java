@@ -2,19 +2,21 @@ package com.luoke.app.ui;
 
 import atlantafx.base.theme.PrimerDark;
 import atlantafx.base.theme.Styles;
+import com.luoke.app.capture.CaptureService;
+import com.luoke.app.capture.ROIData;
+import com.luoke.app.capture.processor.impl.MapMatcherProcessor;
+import com.luoke.app.capture.processor.impl.OcrProcessor;
 import com.luoke.app.config.AppConfig;
 import com.luoke.app.context.MapContext;
 import com.luoke.app.context.OcrAsyncManager;
 import com.luoke.app.context.ResourcePointContext;
 import com.luoke.app.hook.HookRegistry;
-import com.luoke.app.hook.impl.RealOcrHook;
 import com.luoke.app.hook.impl.ResourceGrayHook;
 import com.luoke.app.hook.multicast.HookMulticaster;
 import com.luoke.app.map.MapResourceUpdater;
 import com.luoke.app.map.core.DownloadProgressContext;
 import com.luoke.app.map.core.IconDownloader;
 import com.luoke.app.map.core.MapDownloader;
-import com.luoke.app.processor.CoreProcessor;
 import com.luoke.app.ui.component.*;
 import com.luoke.app.ui.render.PlayerRenderer;
 import com.luoke.app.ui.render.RenderLoop;
@@ -42,6 +44,8 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.io.File;
 import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.List;
 
 @Slf4j
 @NoArgsConstructor
@@ -55,8 +59,11 @@ public class ModernCanvasApp extends Application {
 
     private RenderLoop renderLoop;
     private final UiAnimator uiAnimator = new UiAnimator();
-    private final CoreProcessor coreProcessor = CoreProcessor.getInstance();
     private LoadingOverlay globalLoading;
+
+    // 🔥 核心服务句柄
+    private CaptureService mainCaptureService;
+    private volatile boolean isAppRunning = true;
 
     public static void main(String[] args) {
         launch(args);
@@ -100,7 +107,7 @@ public class ModernCanvasApp extends Application {
             try {
                 File rootDir = ResourceUtils.getExternalFile(AppConfig.SOURCE_ROOT_DIR);
                 if (!rootDir.exists()) rootDir.mkdirs();
-
+                OcrAsyncManager.initialize(AppConfig.OCR_CORE_SIZE);
                 File initFile = ResourceUtils.getExternalFile(AppConfig.SOURCE_INIT);
                 if (initFile.exists()) {
                     updateLoadingProgress(0.3, "正在初始化钩子组件...");
@@ -120,7 +127,7 @@ public class ModernCanvasApp extends Application {
                 }
             } catch (Exception e) {
                 log.error("资源自检异常", e);
-                showErrorAndExit("环境检查失败，请检查文件权限。");
+                showErrorAndExit("环境检查失败，请检查文件权限。或删除resource目录");
             }
         });
     }
@@ -169,9 +176,6 @@ public class ModernCanvasApp extends Application {
         try {
             rootStack.getChildren().clear();
 
-            // =========================
-            // Canvas (全屏绘制)
-            // =========================
             InteractiveCanvas interactiveCanvas = new InteractiveCanvas();
             interactiveCanvas.setPickOnBounds(true);
 
@@ -187,9 +191,6 @@ public class ModernCanvasApp extends Application {
             interactiveCanvas.widthProperty().bind(canvasContainer.widthProperty());
             interactiveCanvas.heightProperty().bind(canvasContainer.heightProperty());
 
-            // =========================
-            // Sidebar / UI
-            // =========================
             Sidebar sidebar = new Sidebar();
             sidebar.setTranslateX(-220);
             AnchorPane sidebarContainer = new AnchorPane(sidebar);
@@ -197,13 +198,18 @@ public class ModernCanvasApp extends Application {
             AnchorPane.setTopAnchor(sidebar, 45.0);
             AnchorPane.setBottomAnchor(sidebar, 0.0);
 
+            StatsOverlay statsOverlay = StatsOverlay.getInstance();
+            AnchorPane.setTopAnchor(statsOverlay, 40.0);
+            AnchorPane.setRightAnchor(statsOverlay, 20.0);
+
             ResourceCounterPanel resourcePanel = ResourceCounterPanel.getInstance();
-            AnchorPane panelAnchor = new AnchorPane(resourcePanel);
+            AnchorPane panelAnchor = new AnchorPane(statsOverlay, resourcePanel);
             panelAnchor.setPickOnBounds(false);
             AnchorPane.setTopAnchor(resourcePanel, 80.0);
             AnchorPane.setRightAnchor(resourcePanel, 20.0);
-
             FloatToolbox floatToolbox = new FloatToolbox(resourcePanel, UNIFIED_BLUE);
+
+
             AnchorPane floatContainer = new AnchorPane(floatToolbox);
             floatContainer.setPickOnBounds(false);
             AnchorPane.setTopAnchor(floatToolbox, 80.0);
@@ -216,24 +222,18 @@ public class ModernCanvasApp extends Application {
             VBox uiOverlay = new VBox(titleBar);
             uiOverlay.setPickOnBounds(false);
 
-            // =========================
-            // 🔥 关键：透明 Resize 层
-            // =========================
             AnchorPane resizeLayer = new AnchorPane();
             resizeLayer.setPickOnBounds(false);
             resizeLayer.setMouseTransparent(false);
             windowManager.install(primaryStage, resizeLayer);
 
-            // =========================
-            // 层级装载
-            // =========================
             rootStack.getChildren().addAll(
                     canvasContainer,
                     sidebarContainer,
                     panelAnchor,
                     floatContainer,
                     uiOverlay,
-                    resizeLayer // 放在最上层以保证捕获鼠标
+                    resizeLayer
             );
 
             uiAnimator.setupSidebarToggle(menuBtn, sidebar, floatContainer);
@@ -241,16 +241,88 @@ public class ModernCanvasApp extends Application {
                 if (e.getButton() == MouseButton.PRIMARY && uiAnimator.isSidebarVisible()) menuBtn.fire();
             });
 
+            // 🔥 启动自动重连监控守护进程 (替代旧版 WindowsMonitor)
+            startCaptureWatchdog();
+
             renderLoop = new RenderLoop(interactiveCanvas.getGraphicsContext2D());
             renderLoop.start();
-
-            coreProcessor.setStatusUpdateHandler(this::updateStatus);
-            coreProcessor.preloadMatcherAsync();
 
         } catch (Exception e) {
             log.error("UI 构建逻辑失败: ", e);
             showErrorAndExit("界面挂载异常。");
         }
+    }
+
+    /**
+     * 🔥 采集服务守护进程：支持窗口关闭自动重连
+     */
+    private void startCaptureWatchdog() {
+        Thread.ofVirtual().start(() -> {
+            log.info("启动采集监控守护线程...");
+            while (isAppRunning) {
+                try {
+                    // 1. 尝试连接窗口
+                    mainCaptureService = new CaptureService("洛克王国：世界");
+                    mainCaptureService.tryConnect();
+                    if (mainCaptureService.getId() <= 0) {
+                        // 窗口没开，心跳等待
+                        log.info("未找到窗口");
+                        Thread.sleep(5000);
+                        continue;
+                    }
+
+                    // 2. 窗口连接成功，配置处理器
+                    setupCaptureProcessors();
+                    notify("已成功连接游戏窗口 (ID: " + mainCaptureService.getId() + ")", NotificationToast.Type.SUCCESS);
+
+                    // 3. 阻塞观察：直到窗口失效
+                    while (isAppRunning && mainCaptureService.getId() > 0) {
+                        // 此处利用 Rust 内部心跳，若 Rust 侧检测到窗口关闭，id 会失效或 stop 会被触发
+                        // 简单起见，我们每隔 2 秒确认一次服务状态
+                        Thread.sleep(2000);
+                    }
+
+                    log.warn("检测到游戏窗口断开，准备重连...");
+                    notify("游戏窗口已断开，正在等待重新运行...", NotificationToast.Type.ERROR);
+
+                } catch (InterruptedException e) {
+                    break;
+                } catch (Exception e) {
+                    log.error("监控守护线程异常", e);
+                    try {
+                        Thread.sleep(10000);
+                    } catch (InterruptedException ignored) {
+                    }
+                } finally {
+                    if (mainCaptureService != null) {
+                        mainCaptureService.stop();
+                        mainCaptureService = null;
+                    }
+                }
+            }
+        });
+    }
+
+    /**
+     * 配置 SIFT 和 OCR 处理器并同步 ROI
+     */
+    private void setupCaptureProcessors() {
+        if (mainCaptureService == null) return;
+
+        // 初始化处理器
+        MapMatcherProcessor siftProcessor = new MapMatcherProcessor(0, (msg, color) -> {
+        });
+        OcrProcessor ocrProcessor = new OcrProcessor(1);
+//        SaveImageProcessor saveImageProcessor = new SaveImageProcessor(0, "C:\\Users\\tangh\\Desktop\\test\\arrow");
+        // 挂载
+        mainCaptureService.addProcessors(siftProcessor, ocrProcessor);
+
+        // 同步连续内存 ROI 数组 (JNA 核心逻辑)
+        List<ROIData> rois = new ArrayList<>();
+        rois.add(siftProcessor.getRoi());
+        rois.add(ocrProcessor.getRoi());
+
+        mainCaptureService.setRois(ROIData.createContiguousArray(rois));
     }
 
     private void updateStatus(String msg, Color color) {
@@ -267,7 +339,7 @@ public class ModernCanvasApp extends Application {
     }
 
     private void registerHook() {
-        HookRegistry.INSTANCE.registers(new ResourceGrayHook(), new RealOcrHook());
+        HookRegistry.INSTANCE.registers(new ResourceGrayHook());
     }
 
     private void initBigMapResource() throws Exception {
@@ -276,7 +348,8 @@ public class ModernCanvasApp extends Application {
             MapContext.getInstance().initWithKey(rawImage, rawImage.getWidth(), rawImage.getHeight(), "G");
         }
         try (InputStream is = ResourceUtils.getResourceStream(AppConfig.PLAYER_ICON_PATH)) {
-            PlayerRenderer.getInstance().initIcon(is);
+            Image rawImage = new Image(is);
+            PlayerRenderer.getInstance().init(rawImage);
         }
     }
 
@@ -291,19 +364,23 @@ public class ModernCanvasApp extends Application {
 
     @Override
     public void stop() {
+        isAppRunning = false;
         Thread watchdog = new Thread(() -> {
             try {
-                Thread.sleep(500);
+                Thread.sleep(1500);
                 Runtime.getRuntime().halt(0);
             } catch (InterruptedException ignored) {
             }
         });
         watchdog.setDaemon(true);
         watchdog.start();
+
         try {
-            HookMulticaster.getInstance().shutdown();
-            coreProcessor.shutdown();
+            if (mainCaptureService != null) {
+                mainCaptureService.stop();
+            }
             if (renderLoop != null) renderLoop.stop();
+            HookMulticaster.getInstance().shutdown();
             OcrAsyncManager.getInstance().close();
             Platform.exit();
             System.exit(0);

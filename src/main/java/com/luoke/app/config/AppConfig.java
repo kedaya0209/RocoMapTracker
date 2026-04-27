@@ -96,6 +96,14 @@ public final class AppConfig {
      * </p>
      */
     public static final String PPOCR_KEYS = "ppocr_keys_v1.txt";
+    /**
+     * 箭头识别模型名称
+     */
+    public static final String ARROW_MODEL_NAME = "arrow_fp32.onnx";
+    /**
+     * 地图匹配算法设置
+     */
+    public static String MAP_MATCHAER = "SIFT-ULTRA";
 
     /**
      * OCR核心线程池大小
@@ -107,7 +115,7 @@ public final class AppConfig {
      * </p>
      */
     //ORC对象池
-    public static int OCR_CORE_SIZE = 2;
+    public static int OCR_CORE_SIZE = 1;
 
     /**
      * 配置文件名称
@@ -445,9 +453,6 @@ public final class AppConfig {
      * </p>
      */
     public static double COORDINATE_SMOOTH_FACTOR = 0.8;
-
-    // 目标捕获帧率 FPS
-
     /**
      * 目标捕获帧率
      * <p>

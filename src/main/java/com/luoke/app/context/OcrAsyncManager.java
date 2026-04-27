@@ -1,6 +1,6 @@
 package com.luoke.app.context;
 
-import com.luoke.app.model.OcrService;
+import com.luoke.app.model.ocr.OcrService;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
@@ -48,16 +48,18 @@ public class OcrAsyncManager implements AutoCloseable {
     private static volatile OcrAsyncManager INSTANCE;
 
     /**
-     * 虚拟线程执行器
-     *
-     * <p>设计意图：
-     * <ul>
-     *   <li>使用虚拟线程替代传统线程，大幅减少内存占用</li>
-     *   <li>虚拟线程调度开销极低，适合高并发短任务</li>
-     *   <li>每个OCR任务在独立的虚拟线程中执行</li>
-     * </ul>
+     * 线程池
      */
-    private final ExecutorService vtExecutor = Executors.newVirtualThreadPerTaskExecutor();
+    private final ExecutorService executorService = Executors.newFixedThreadPool(2, new ThreadFactory() {
+        private final AtomicInteger index = new AtomicInteger(0);
+
+        @Override
+        public Thread newThread(Runnable r) {
+            Thread thread = new Thread(r, "OCR-" + index.incrementAndGet());
+            thread.setDaemon(true);
+            return thread;
+        }
+    });
 
     /**
      * OCR服务池，使用有界阻塞队列
@@ -70,18 +72,6 @@ public class OcrAsyncManager implements AutoCloseable {
      * </ul>
      */
     private final BlockingQueue<OcrService> servicePool;
-
-    /**
-     * 待处理任务计数器，使用AtomicInteger保证线程安全
-     *
-     * <p>用途：
-     * <ul>
-     *   <li>限制并发任务数量，避免系统过载</li>
-     *   <li>任务提交时递增，任务完成时递减</li>
-     *   <li>通过threshold判断是否接受新任务</li>
-     * </ul>
-     */
-    private final AtomicInteger pendingTasks = new AtomicInteger(0);
 
     /**
      * 私有构造函数，防止外部实例化
@@ -196,21 +186,12 @@ public class OcrAsyncManager implements AutoCloseable {
      * @param bytes 图像字节数组
      * @param callback 回调函数，接收OCR识别结果（文本列表）
      */
-    public void submitTask(byte[] bytes, Consumer<List<String>> callback) {
-        // 1. 稍微放宽到 8，给极速翻页留出缓冲空间
-        // 设计意图：限制并发任务数，避免系统过载
-        if (pendingTasks.get() >= 8) {
-            return; // 拒绝新任务
-        }
-
-        // 任务计数器递增
-        pendingTasks.incrementAndGet();
+    public void submitTask(byte[] bytes, int width, int height, Consumer<List<String>> callback) {
 
         // 记录任务提交时间，用于陈旧帧检测
         long submitTime = System.currentTimeMillis();
 
-        // 在虚拟线程中执行OCR任务
-        vtExecutor.submit(() -> {
+        executorService.submit(() -> {
             OcrService service = null;
             try {
                 // 2. 超时判定：如果这个任务在队列里待了超过 500ms 还没被执行，
@@ -219,12 +200,12 @@ public class OcrAsyncManager implements AutoCloseable {
                     return; // 丢弃陈旧帧
                 }
 
-                // 从服务池获取OcrService实例，超时1秒
-                service = servicePool.poll(1, TimeUnit.SECONDS);
+                // 从服务池获取OcrService实例，没有空闲服务直接丢
+                service = servicePool.poll();
 
                 if (service != null) {
                     // 执行OCR识别
-                    List<String> result = service.recognizeAll(bytes);
+                    List<String> result = service.recognizeAll(bytes, width, height);
 
                     // 调用回调函数传递结果
                     callback.accept(result);
@@ -236,9 +217,6 @@ public class OcrAsyncManager implements AutoCloseable {
                 if (service != null) {
                     servicePool.offer(service);
                 }
-
-                // 任务计数器递减
-                pendingTasks.decrementAndGet();
             }
         });
     }
@@ -264,7 +242,7 @@ public class OcrAsyncManager implements AutoCloseable {
     @Override
     public void close() {
         // 关闭虚拟线程执行器，中断所有正在执行
-        vtExecutor.shutdownNow();
+        executorService.shutdownNow();
 
         // 遍历服务池，关闭每个OcrService实例
         // 这会释放Native资源（OpenCV、ONNX等）
