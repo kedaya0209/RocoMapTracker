@@ -9,6 +9,7 @@ import com.luoke.app.capture.processor.impl.OcrProcessor;
 import com.luoke.app.config.AppConfig;
 import com.luoke.app.context.MapContext;
 import com.luoke.app.context.OcrAsyncManager;
+import com.luoke.app.context.ResourceContext;
 import com.luoke.app.context.ResourcePointContext;
 import com.luoke.app.hook.HookRegistry;
 import com.luoke.app.hook.impl.ResourceGrayHook;
@@ -61,7 +62,6 @@ public class ModernCanvasApp extends Application {
     private final UiAnimator uiAnimator = new UiAnimator();
     private LoadingOverlay globalLoading;
 
-    // 🔥 核心服务句柄
     private CaptureService mainCaptureService;
     private volatile boolean isAppRunning = true;
 
@@ -241,7 +241,6 @@ public class ModernCanvasApp extends Application {
                 if (e.getButton() == MouseButton.PRIMARY && uiAnimator.isSidebarVisible()) menuBtn.fire();
             });
 
-            // 🔥 启动自动重连监控守护进程 (替代旧版 WindowsMonitor)
             startCaptureWatchdog();
 
             renderLoop = new RenderLoop(interactiveCanvas.getGraphicsContext2D());
@@ -253,32 +252,23 @@ public class ModernCanvasApp extends Application {
         }
     }
 
-    /**
-     * 🔥 采集服务守护进程：支持窗口关闭自动重连
-     */
     private void startCaptureWatchdog() {
         Thread.ofVirtual().start(() -> {
             log.info("启动采集监控守护线程...");
             while (isAppRunning) {
                 try {
-                    // 1. 尝试连接窗口
                     mainCaptureService = new CaptureService("洛克王国：世界");
                     mainCaptureService.tryConnect();
                     if (mainCaptureService.getId() <= 0) {
-                        // 窗口没开，心跳等待
                         log.info("未找到窗口");
                         Thread.sleep(5000);
                         continue;
                     }
 
-                    // 2. 窗口连接成功，配置处理器
                     setupCaptureProcessors();
                     notify("已成功连接游戏窗口 (ID: " + mainCaptureService.getId() + ")", NotificationToast.Type.SUCCESS);
 
-                    // 3. 阻塞观察：直到窗口失效
                     while (isAppRunning && mainCaptureService.getId() > 0) {
-                        // 此处利用 Rust 内部心跳，若 Rust 侧检测到窗口关闭，id 会失效或 stop 会被触发
-                        // 简单起见，我们每隔 2 秒确认一次服务状态
                         Thread.sleep(2000);
                     }
 
@@ -303,21 +293,15 @@ public class ModernCanvasApp extends Application {
         });
     }
 
-    /**
-     * 配置 SIFT 和 OCR 处理器并同步 ROI
-     */
     private void setupCaptureProcessors() {
         if (mainCaptureService == null) return;
 
-        // 初始化处理器
         MapMatcherProcessor siftProcessor = new MapMatcherProcessor(0, (msg, color) -> {
         });
         OcrProcessor ocrProcessor = new OcrProcessor(1);
-//        SaveImageProcessor saveImageProcessor = new SaveImageProcessor(0, "C:\\Users\\tangh\\Desktop\\test\\arrow");
-        // 挂载
+
         mainCaptureService.addProcessors(siftProcessor, ocrProcessor);
 
-        // 同步连续内存 ROI 数组 (JNA 核心逻辑)
         List<ROIData> rois = new ArrayList<>();
         rois.add(siftProcessor.getRoi());
         rois.add(ocrProcessor.getRoi());
@@ -343,11 +327,11 @@ public class ModernCanvasApp extends Application {
     }
 
     private void initBigMapResource() throws Exception {
-        try (InputStream is = ResourceUtils.getResourceStream(AppConfig.MAP_RESOURCE_PATH)) {
+        try (InputStream is = ResourceUtils.getResourceStream(ResourceContext.getShowMap())) {
             Image rawImage = new Image(is);
             MapContext.getInstance().initWithKey(rawImage, rawImage.getWidth(), rawImage.getHeight(), "G");
         }
-        try (InputStream is = ResourceUtils.getResourceStream(AppConfig.PLAYER_ICON_PATH)) {
+        try (InputStream is = ResourceUtils.getResourceStream(ResourceContext.getPlayerIcon())) {
             Image rawImage = new Image(is);
             PlayerRenderer.getInstance().init(rawImage);
         }

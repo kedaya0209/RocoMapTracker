@@ -12,17 +12,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Slf4j
 public class CaptureService {
     private final String windowTitle;
-    private static final int MAX_BLACK_FRAMES = 30; // 连续 30 帧全黑则认为失效
-    // 🔥 新增：连续黑帧计数器
+    private static final int MAX_BLACK_FRAMES = 30;
     private final AtomicInteger continuousBlackFrames = new AtomicInteger(0);
 
     private final CopyOnWriteArrayList<RoiProcessor> processors = new CopyOnWriteArrayList<>();
     private volatile int id = -1;
-    /**
-     * JNI 回调：增加黑帧检测
-     */
+
     private final WgcCaptureLib.JniCallback captureCallback = (id, index, data, len, w, h, code) -> {
-        // 1. Rust 侧通知销毁
         if (code == -1 || index < 0 || data == null) {
             log.warn("Rust 侧捕获流已断开: id={}", id);
             this.id = -1;
@@ -31,21 +27,19 @@ public class CaptureService {
 
         byte[] grayData = data.getByteArray(0, (int) len);
 
-        // 2. 🔥 黑帧检测逻辑 (仅对 index 0 主图进行采样)
         if (index == 0) {
             if (isAllBlack(grayData, 100)) {
                 if (continuousBlackFrames.incrementAndGet() > MAX_BLACK_FRAMES) {
                     log.error("检测到持续黑帧，强制重置采集会话...");
-                    this.stop(); // 停止 Rust 侧资源
-                    this.id = -1; // 触发 Java 守护进程重连
+                    this.stop();
+                    this.id = -1;
                     return;
                 }
             } else {
-                continuousBlackFrames.set(0); // 只要有一帧不是黑的，计数重置
+                continuousBlackFrames.set(0);
             }
         }
 
-        // 3. 分发给处理器
         for (RoiProcessor processor : processors) {
             if (processor.targetRoiIndex() == -1 || processor.targetRoiIndex() == index) {
                 processor.onProcess(grayData, w, h);
@@ -53,16 +47,12 @@ public class CaptureService {
         }
     };
     private long lastHwnd = 0;
-    // 🔥 新增：保存当前 ROI，用于重启后自动下发
     private ROIData[] cachedRois;
 
     public CaptureService(String windowTitle) {
         this.windowTitle = windowTitle;
     }
 
-    /**
-     * 🔥 核心改动：尝试连接窗口逻辑
-     */
     public boolean tryConnect() {
         long hwnd = WindowFinder.findWindowByKeyword(windowTitle);
         if (hwnd <= 0) return false;

@@ -22,7 +22,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * 地图瓦片下载器 - 完整逻辑版
+ * 地图瓦片下载器
  * 采用 BFS 自动探测边界 + Java 21 虚拟线程并发 + 进度监控
  */
 @Slf4j

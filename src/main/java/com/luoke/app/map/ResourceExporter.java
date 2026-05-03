@@ -10,16 +10,20 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.*;
 
+/**
+ * 资源导出器：精准导出“材料”类资源，适配 ResourceConfig 模型
+ * 坐标系：图片中心为 (0,0)
+ * 功能：自动去重、自动图标复制、脏数据过滤
+ */
 public class ResourceExporter {
 
     private static final String BASE_DIR = "C:\\Users\\tangh\\Desktop\\map";
     private static final String RESOURCE_DIR = "D:\\Documents\\unpack\\Output\\Exports\\NRC";
     private static final int CANVAS_SIZE = 8192;
-    private static final double HALF_SIZE = 4096.0;
 
-    // 这里填入你需要导出的所有 NPC 名称
     private static final Set<String> TARGET_NPC_NAMES = new HashSet<>();
 
     private final Map<Integer, JsonNode> npcConf = new HashMap<>();
@@ -33,132 +37,121 @@ public class ResourceExporter {
     private final ObjectMapper mapper = new ObjectMapper();
 
     public static void main(String[] args) throws IOException {
-        List<String> keys = Files.readAllLines(Paths.get(BASE_DIR, "keys.txt"));
-        TARGET_NPC_NAMES.addAll(keys);
+        Path keysPath = Paths.get(BASE_DIR, "keys.txt");
+        if (Files.exists(keysPath)) {
+            TARGET_NPC_NAMES.addAll(Files.readAllLines(keysPath));
+        }
         new ResourceExporter().export();
     }
 
     public void export() throws IOException {
         loadData();
 
-        Map<String, ArrayNode> typeMap = new HashMap<>();
+        // --- 1. 建立类型白名单 (只保留“材料”) ---
         Map<Integer, String> typeIntMap = new HashMap<>();
         itemTypeConf.values().forEach(row -> {
-            String typeName = row.get("type_name").asText();
-            if (!"材料".equals(typeName)) return;
-            Integer typeId = row.get("type").asInt();
-            typeIntMap.put(typeId, typeName);
+            if (row.has("type_name") && "材料".equals(row.get("type_name").asText())) {
+                typeIntMap.put(row.get("type").asInt(), row.get("type_name").asText());
+            }
         });
+
+        // --- 2. 映射 NPC 名称到 类型和图标，并复制文件 ---
+        Map<String, String> nameToTypeMap = new HashMap<>();
+        Map<String, String> nameToIconMap = new HashMap<>();
+        File iconDir = new File(BASE_DIR, "icon");
+        if (!iconDir.exists()) iconDir.mkdirs();
 
         itemConf.values().forEach(row -> {
             try {
+                // 忽略字段缺失的脏数据
+                if (!row.has("name") || !row.has("type") || !row.has("big_icon")) return;
+
                 String name = row.get("name").asText();
                 if (!TARGET_NPC_NAMES.contains(name)) return;
-                int typeInt = row.get("type").asInt();
-                String icon = row.get("big_icon").asText();
-                icon = icon.replace("Game", "Content");
-                icon = icon.substring(icon.indexOf("'") + 1, icon.lastIndexOf(".") + 1) + "png";
-                String type = typeIntMap.get(typeInt);
-                ArrayNode values = typeMap.getOrDefault(type, mapper.createArrayNode());
-                ObjectNode node = mapper.createObjectNode();
-                node.put("name", name);
-                node.put("icon", icon);
-                values.add(node);
-                typeMap.put(type, values);
-            } catch (Exception ignore) {
-            }
-        });
-        typeMap.remove(null);
 
-        // 使用 Map 按名称归类点位，最终生成更整齐的 JSON
-        Map<String, ArrayNode> resultMap = new HashMap<>();
-        TARGET_NPC_NAMES.forEach(name -> resultMap.put(name, mapper.createArrayNode()));
+                int typeInt = row.get("type").asInt();
+                String typeName = typeIntMap.get(typeInt);
+                if (typeName == null) return; // 只处理“材料”
+
+                nameToTypeMap.put(name, typeName);
+
+                String iconRaw = row.get("big_icon").asText();
+                if (!iconRaw.contains("'")) return;
+
+                String iconPath = iconRaw.replace("Game", "Content");
+                iconPath = iconPath.substring(iconPath.indexOf("'") + 1, iconPath.lastIndexOf(".") + 1) + "png";
+
+                Path source = Paths.get(RESOURCE_DIR, iconPath);
+                String targetName = name + ".png";
+                if (Files.exists(source)) {
+                    Files.copy(source, Path.of(iconDir.getAbsolutePath(), targetName), StandardCopyOption.REPLACE_EXISTING);
+                    nameToIconMap.put(name, targetName);
+                }
+            } catch (Exception ignore) {}
+        });
+
+        // --- 3. 生成 JSON 并执行坐标去重 ---
+        ArrayNode root = mapper.createArrayNode();
+        Set<String> deduplicationSet = new HashSet<>();
 
         npcConf.values().forEach(row -> {
-            String matchedName = getMatchedName(row);
-            if (matchedName != null) {
-                double[] wPos = getPos(row);
-                String resId = getResId(row);
+            try {
+                String matchedName = getMatchedName(row);
+                // 过滤：必须是 keys.txt 里的 NPC，且在 itemConf 中被识别为“材料”
+                if (matchedName != null && nameToTypeMap.containsKey(matchedName)) {
+                    double[] wPos = getPos(row);
+                    String resId = getResId(row);
 
-                if (wPos != null && sceneCenters.containsKey(resId) && sceneSideLengths.containsKey(resId)) {
-                    double[] center = sceneCenters.get(resId);
-                    double side = sceneSideLengths.get(resId);
+                    if (wPos != null && sceneCenters.containsKey(resId) && sceneSideLengths.containsKey(resId)) {
+                        double[] center = sceneCenters.get(resId);
+                        double side = sceneSideLengths.get(resId);
 
-                    double pixelsPerUnit = CANVAS_SIZE / side;
-                    double dx = wPos[0] - center[0];
-                    double dy = wPos[1] - center[1];
+                        double pixelsPerUnit = CANVAS_SIZE / side;
+                        double dx = wPos[0] - center[0];
+                        double dy = wPos[1] - center[1];
 
-                    // 严格复刻你验证准确的加法逻辑
-                    int px = (int) Math.round(HALF_SIZE + (dx * pixelsPerUnit));
-                    int py = (int) Math.round(HALF_SIZE + (dy * pixelsPerUnit));
+                        // 转换坐标：中心原点 (0,0)
+                        double px = dx * pixelsPerUnit;
+                        double py = dy * pixelsPerUnit;
 
-                    ObjectNode node = mapper.createObjectNode();
-                    node.put("res_id", resId);
-                    ArrayNode wArray = mapper.createArrayNode().add(wPos[0]).add(wPos[1]);
-                    ArrayNode pArray = mapper.createArrayNode().add(px).add(py);
-                    node.set("world_pos", wArray);
-                    node.set("pixel_pos", pArray);
+                        // --- 组合键去重：层级 + 坐标 (保留2位小数) ---
+                        String coordKey = String.format("%s_%.2f_%.2f", resId, px, py);
+                        if (deduplicationSet.contains(coordKey)) {
+                            return;
+                        }
+                        deduplicationSet.add(coordKey);
 
-                    resultMap.get(matchedName).add(node);
+                        // 构建模型节点
+                        ObjectNode node = mapper.createObjectNode();
+                        node.put("type", nameToTypeMap.get(matchedName));
+                        node.put("markType", 1);
+                        node.put("markTypeName", matchedName);
+                        node.put("icon", nameToIconMap.get(matchedName));
+                        node.put("lng", px);
+                        node.put("lat", py);
+                        node.put("layer", resId);
+                        root.add(node);
+                    }
                 }
-            }
+            } catch (Exception ignore) {}
         });
 
-        //copy资源文件
-        File iconDir = new File(BASE_DIR, "icon");
-        String absolutePath = iconDir.getAbsolutePath();
-        if (!iconDir.exists()) {
-            iconDir.mkdirs();
-        }
-
-        Map<String, String> map = new HashMap<>();
-        for (ArrayNode value : typeMap.values()) {
-            for (JsonNode node : value) {
-                ObjectNode n = (ObjectNode) node;
-                String name = n.get("name").asText();
-                String iconPath = n.get("icon").asText();
-                Files.copy(Paths.get(RESOURCE_DIR, iconPath), Path.of(absolutePath, name + ".png"));
-                n.remove("icon");
-                map.put(name, name + ".png");
-            }
-
-        }
-        // 组装最终 JSON
-        ArrayNode root1 = mapper.createArrayNode();
-        typeMap.forEach((name, nodes) -> {
-            if (!nodes.isEmpty()) {
-                ObjectNode node = mapper.createObjectNode();
-                node.put("type", name);
-                node.put("icon", map.get(name));
-                node.put("items", nodes);
-                root1.add(node);
-            }
-        });
-        mapper.writerWithDefaultPrettyPrinter().writeValue(new File(BASE_DIR, "itemType.json"), root1);
-        System.out.println("批量导出完成，保存至：itemType.json");
-        ArrayNode root2 = mapper.createArrayNode();
-        resultMap.forEach((name, nodes) -> {
-            if (nodes.size() > 0) {
-                ObjectNode node = mapper.createObjectNode();
-                node.put("name", name);
-                node.put("points", nodes);
-                root2.add(node);
-            }
-        });
-        mapper.writerWithDefaultPrettyPrinter().writeValue(new File(BASE_DIR, "resourcePoint.json"), root2);
-        System.out.println("批量导出完成，保存至：BatchNpcPoints.json");
+        // 4. 落地保存
+        File outFile = new File(BASE_DIR, "resource_configs.json");
+        mapper.writerWithDefaultPrettyPrinter().writeValue(outFile, root);
+        System.out.println("批量导出并去重完成！");
+        System.out.println("生成总点位数: " + root.size());
+        System.out.println("结果文件: " + outFile.getAbsolutePath());
     }
 
     private String getMatchedName(JsonNode r) {
-        if (!r.has("editor_name") || r.get("editor_name").size() == 0) return null;
+        if (!r.has("editor_name") || r.get("editor_name").isEmpty()) return null;
         String editorName = r.get("editor_name").get(0).asText();
         for (String target : TARGET_NPC_NAMES) {
             if (editorName.contains(target)) return target;
         }
         return null;
     }
-
-    // --- 以下逻辑与你提供的 ResourceExporter 完全一致，确保数据读取不走样 ---
 
     private void loadData() throws IOException {
         File dataDir = new File(BASE_DIR, "pointdata");
@@ -183,11 +176,8 @@ public class ResourceExporter {
         if (f.exists()) {
             mapper.readTree(f).get("RocoDataRows").fields().forEachRemaining(e -> {
                 try {
-                    String key = e.getKey();
-                    int key1 = Integer.parseInt(key);
-                    map.put(key1, e.getValue());
-                } catch (Exception ignore) {
-                }
+                    map.put(Integer.parseInt(e.getKey()), e.getValue());
+                } catch (Exception ignore) {}
             });
         }
     }

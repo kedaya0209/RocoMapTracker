@@ -44,7 +44,6 @@ public class ResourcePointContext {
         config.setMarkType(originConfig.getMarkType());
         config.setType(originConfig.getType());
         config.setLayer(originConfig.getLayer());
-        config.setZoom(originConfig.getZoom());
         config.setLat(rawPoint.getY());
         config.setLng(rawPoint.getX());
         config.setIcon(originConfig.getIcon());
@@ -53,18 +52,10 @@ public class ResourcePointContext {
 
     public void loadAndInit() {
         try {
-            File extFile = ResourceUtils.getExternalFile(AppConfig.RESOURCE_POINT_CONFIG_PATH);
-            if (extFile.exists()) {
-                rawResourceList.clear();
-                List<ResourceConfig> configs = objectMapper.readValue(extFile, new TypeReference<List<ResourceConfig>>() {
-                });
-                rawResourceList.addAll(configs);
-            } else {
-                InputStream inputStream = ResourceUtils.getResourceStream(AppConfig.RESOURCE_POINT_CONFIG_PATH);
-                List<ResourceConfig> configs = objectMapper.readValue(inputStream, new TypeReference<List<ResourceConfig>>() {
-                });
-                rawResourceList.addAll(configs);
-            }
+            InputStream inputStream = ResourceUtils.getResourceStream(ResourceContext.getPointResource());
+            List<ResourceConfig> configs = objectMapper.readValue(inputStream, new TypeReference<List<ResourceConfig>>() {
+            });
+            rawResourceList.addAll(configs);
             preprocessPoints();
             log.info("资源点位加载完成，总数：{}", pointList.size());
         } catch (Exception e) {
@@ -107,9 +98,6 @@ public class ResourcePointContext {
         }
     }
 
-    // ======================
-    // ✅ 新增：删除点位
-    // ======================
     public void deletePoint(ResourcePoint point) {
         try {
             rawResourceList.remove(point.getConfig());

@@ -17,13 +17,13 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * 图标下载器 - 增强版
- * 集成了进度上报与用户中断检测逻辑
+ * 图标下载器
+ * 集成进度上报与用户中断检测逻辑
  */
 @Slf4j
 public class IconDownloader {
 
-    // 共享 MapDownloader 的停止标记，实现全局一键取消
+    // 共享停止标记，实现全局一键取消
     private static final AtomicBoolean isStopRequested = new AtomicBoolean(false);
     private static final DownloadProgressContext progress = DownloadProgressContext.getInstance();
 
@@ -53,16 +53,13 @@ public class IconDownloader {
             }
         }
 
-        // 初始化进度：图标下载是已知总量的，所以直接设置总数
         int total = urls.size();
         progress.reset("图标资源");
-        // 这里的逻辑与 BFS 不同，图标是静态列表，我们手动模拟 addTask
         for (int i = 0; i < total; i++) progress.addTask();
 
         int success = 0, skip = 0, fail = 0;
 
         for (String url : urls) {
-            // --- 中断检测 ---
             if (isStopRequested.get()) {
                 log.warn("图标下载任务被用户取消");
                 break;
@@ -76,7 +73,7 @@ public class IconDownloader {
 
                 if (file.exists()) {
                     skip++;
-                    progress.finishTask(); // 跳过也算完成一个任务
+                    progress.finishTask();
                     continue;
                 }
 

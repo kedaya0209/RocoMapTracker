@@ -4,6 +4,7 @@ import com.luoke.app.capture.ROIData;
 import com.luoke.app.capture.processor.RoiProcessor;
 import com.luoke.app.config.AppConfig;
 import com.luoke.app.context.MapContext;
+import com.luoke.app.context.ResourceContext;
 import com.luoke.app.context.StatsContext;
 import com.luoke.app.macher.map.MapMatcher;
 import com.luoke.app.macher.map.SwitchMapMatcher;
@@ -43,7 +44,7 @@ public class MapMatcherProcessor implements RoiProcessor {
         this.targetRoiIndex = targetRoiIndex;
         this.statusUpdateHandler = statusHandler;
         this.mapMatcher = SwitchMapMatcher.getInstance();
-        this.mapMatcher.init(AppConfig.MAP_RESOURCE_PATH);
+        this.mapMatcher.init(ResourceContext.getSiftMap());
         this.arrowDetector = ArrowDetector.getInstance();
         try {
             arrowDetector.init();

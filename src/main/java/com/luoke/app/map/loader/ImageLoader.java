@@ -28,7 +28,6 @@ public class ImageLoader {
                 if (result.isError()) return null;
                 return result;
             } catch (Exception e) {
-                e.printStackTrace();
                 return null;
             }
         });

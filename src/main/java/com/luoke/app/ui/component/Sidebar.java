@@ -6,6 +6,8 @@ import com.luoke.app.macher.map.SwitchMapMatcher;
 import com.luoke.app.map.MapResourceUpdater;
 import com.luoke.app.map.core.DownloadProgressContext;
 import com.luoke.app.ui.ModernCanvasApp;
+import com.luoke.app.ui.util.DialogUtils;
+import com.luoke.app.ui.util.RestartUtils;
 import javafx.animation.KeyFrame;
 import javafx.animation.KeyValue;
 import javafx.animation.Timeline;
@@ -13,36 +15,34 @@ import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Cursor;
-import javafx.scene.control.Button;
-import javafx.scene.control.Label;
-import javafx.scene.control.ProgressBar;
+import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
 import javafx.scene.shape.SVGPath;
 import javafx.util.Duration;
+import lombok.extern.slf4j.Slf4j;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.function.BiConsumer;
 
+@Slf4j
 public class Sidebar extends VBox {
 
     private StackPane btnContainer;
     private Button updateBtn;
     private ProgressBar progressBar;
     private Label progressLabel;
-    private final List<Button> algoButtons = new ArrayList<>();
+    private Label statusLabel;
+
     private final String SIDEBAR_BG = "#1e1e1e";
     private final String BUTTON_BG = "#2b2b2b";
     private final String BUTTON_TEXT = "#FFFFFF";
     private final String ACCENT_COLOR = "#409EFF";
     private final String SELECTED_GREEN = "#4CAF50";
     private final double ITEM_HEIGHT = 38;
-    private Label statusLabel;
-    private VBox menuContent;
-    private HBox menuHeader;
-    private Button selectedButton = null;
-    // 状态锁
+
+    private Button selectedAlgoBtn = null;
+    private Button selectedResourceBtn = null;
     private boolean isAlgorithmLoading = false;
 
     public Sidebar() {
@@ -51,29 +51,94 @@ public class Sidebar extends VBox {
         setPrefWidth(240);
         setStyle("-fx-background-color: " + SIDEBAR_BG + "; -fx-border-color: rgba(255,255,255,0.05); -fx-border-width: 0 1 0 0;");
 
+        // 1. 标题
         Label title = new Label("系统设置");
         title.getStyleClass().addAll(Styles.TEXT_BOLD, Styles.TEXT_CAPTION);
         title.setTextFill(Color.web("#888888"));
         title.setPadding(new Insets(0, 0, 15, 5));
 
-        VBox controlsGroup = new VBox(8);
+        VBox controlsGroup = new VBox(10);
 
-        createAnimatedMenu();
+        // 2. 匹配算法菜单
+        VBox algoMenu = createExpandableMenu("匹配算法选择",
+                new String[]{"SIFT", "SIFT-PCA", "SIFT-ULTRA", "SIFT-PCA-ULTRA"},
+                AppConfig.MAP_MATCHAER,
+                this::switchAlgorithm,
+                true
+        );
+        // 增加边距解决顶部拥挤问题
+        VBox.setMargin(algoMenu, new Insets(8, 0, 0, 0));
+
+        // 3. 资源模式菜单
+        VBox resourceMenu = createExpandableMenu("资源模式切换",
+                new String[]{"内置资源", "WIKI资源"},
+                AppConfig.INTERNAL_RESOURCE ? "内置资源" : "WIKI资源",
+                this::switchResource,
+                false
+        );
+
+        // 4. 更新按钮区域
         createProgressButton();
 
-        controlsGroup.getChildren().addAll(menuHeader, menuContent, btnContainer);
-        getChildren().addAll(title, controlsGroup);
+        controlsGroup.getChildren().addAll(algoMenu, resourceMenu, btnContainer);
+
+        // 5. 布局：中间撑开空间
+        Region bottomSpacer = new Region();
+        VBox.setVgrow(bottomSpacer, Priority.ALWAYS);
+
+        getChildren().addAll(title, controlsGroup, bottomSpacer);
+
+        // 6. 底部声明：仅在非内置模式显示
+        if (!AppConfig.INTERNAL_RESOURCE) {
+            initWikiFooter();
+        }
     }
 
-    private void createAnimatedMenu() {
-        menuHeader = new HBox(10);
-        menuHeader.setAlignment(Pos.CENTER_LEFT);
-        menuHeader.setPrefHeight(ITEM_HEIGHT);
-        menuHeader.setCursor(Cursor.HAND);
-        menuHeader.setPadding(new Insets(0, 12, 0, 12));
-        menuHeader.setStyle("-fx-background-color: " + BUTTON_BG + "; -fx-background-radius: 6;");
+    /**
+     * 初始化底部 WIKI 链接声明
+     */
+    private void initWikiFooter() {
+        VBox footer = new VBox(2);
+        footer.setAlignment(Pos.CENTER);
+        footer.setPadding(new Insets(10, 0, 0, 0));
 
-        Label label = new Label("匹配算法选择");
+        // 模拟 a 标签样式的 Hyperlink
+        Hyperlink wikiLink = new Hyperlink("数据来源：洛克王国WIKI");
+        String linkStyle = "-fx-text-fill: #444444; -fx-font-size: 10px; -fx-underline: true; -fx-border-color: transparent; -fx-padding: 0;";
+        wikiLink.setStyle(linkStyle);
+
+        wikiLink.setOnMouseEntered(e -> wikiLink.setStyle("-fx-text-fill: #888888; -fx-font-size: 10px; -fx-underline: true; -fx-border-color: transparent; -fx-padding: 0;"));
+        wikiLink.setOnMouseExited(e -> wikiLink.setStyle(linkStyle));
+
+        wikiLink.setOnAction(e -> {
+            openWebpage("https://wiki.biligame.com/rocom/"); // 替换为真实的 WIKI URL
+            wikiLink.setVisited(false);
+        });
+
+        Label copyrightLabel = new Label("仅供学习交流使用");
+        copyrightLabel.setStyle("-fx-text-fill: #444444; -fx-font-size: 9px;");
+
+        footer.getChildren().addAll(wikiLink, copyrightLabel);
+        getChildren().add(footer);
+    }
+
+    private void openWebpage(String url) {
+        try {
+            new ProcessBuilder("cmd", "/c", "start", url).start();
+        } catch (Exception e) {
+            log.error("跳转失败", e);
+        }
+    }
+
+    private VBox createExpandableMenu(String title, String[] items, String defaultValue, BiConsumer<String, Button> onAction, boolean isAlgo) {
+        HBox header = new HBox(10);
+        header.setAlignment(Pos.CENTER_LEFT);
+        header.setPrefHeight(ITEM_HEIGHT);
+        header.setCursor(Cursor.HAND);
+        header.setPadding(new Insets(0, 12, 0, 12));
+        header.setStyle("-fx-background-color: " + BUTTON_BG + "; -fx-background-radius: 6;");
+
+        Label label = new Label(title);
         label.setTextFill(Color.web(BUTTON_TEXT));
         label.setStyle("-fx-font-size: 13px;");
 
@@ -83,131 +148,136 @@ public class Sidebar extends VBox {
         SVGPath arrow = new SVGPath();
         arrow.setContent("M7 10l5 5 5-5z");
         arrow.setFill(Color.WHITE);
+        header.getChildren().addAll(label, spacer, arrow);
 
-        menuHeader.getChildren().addAll(label, spacer, arrow);
-
-        menuContent = new VBox(5);
-        menuContent.setOpacity(0);
-        menuContent.setPrefHeight(0);
-        menuContent.setMinHeight(0);
-        menuContent.setStyle("-fx-background-color: transparent;");
+        VBox content = new VBox(5);
+        content.setOpacity(0);
+        content.setPrefHeight(0);
+        content.setMinHeight(0);
 
         Rectangle clip = new Rectangle();
         clip.widthProperty().bind(this.widthProperty());
-        clip.heightProperty().bind(menuContent.prefHeightProperty());
-        menuContent.setClip(clip);
+        clip.heightProperty().bind(content.prefHeightProperty());
+        content.setClip(clip);
 
-        String[] algos = {
-                "SIFT", "SIFT-PCA", "SIFT-ULTRA", "SIFT-PCA-ULTRA"
-        };
+        for (String itemName : items) {
+            Button btn = new Button(itemName);
+            btn.setMaxWidth(Double.MAX_VALUE);
+            btn.setPrefHeight(34);
+            btn.setAlignment(Pos.CENTER_LEFT);
+            btn.setPadding(new Insets(0, 0, 0, 15));
+            btn.setCursor(Cursor.HAND);
+            btn.setStyle("-fx-background-color: transparent; -fx-text-fill: #888888; -fx-font-size: 12px;");
 
-        for (String algo : algos) {
-            Button item = new Button(algo);
-            item.setMaxWidth(Double.MAX_VALUE);
-            item.setPrefHeight(34);
-            item.setAlignment(Pos.CENTER_LEFT);
-            item.setPadding(new Insets(0, 0, 0, 15));
-            item.setCursor(Cursor.HAND);
-            item.setStyle("-fx-background-color: transparent; -fx-text-fill: #888888; -fx-font-size: 12px;");
-
-            item.setOnMouseEntered(e -> {
-                if (!isAlgorithmLoading && item != selectedButton) {
-                    item.setStyle("-fx-background-color: rgba(255,255,255,0.03); -fx-text-fill: white;");
-                }
-            });
-            item.setOnMouseExited(e -> {
-                if (!isAlgorithmLoading && item != selectedButton) {
-                    item.setStyle("-fx-background-color: transparent; -fx-text-fill: #888888;");
-                }
-            });
-
-            item.setOnAction(e -> switchAlgorithm(algo, item));
-            //默认选中
-            if (AppConfig.MAP_MATCHAER.equalsIgnoreCase(algo)) {
-                selectedButton = item; // 必须赋值给成员变量，否则下次切换时无法清除此按钮样式
-                // 直接应用选中时的绿色样式
-                item.setStyle("-fx-background-color: rgba(76,175,80,0.1); " +
-                        "-fx-text-fill: " + SELECTED_GREEN + "; " +
-                        "-fx-font-size: 12px; " +
-                        "-fx-font-weight: bold;");
+            if (itemName.equalsIgnoreCase(defaultValue)) {
+                applySelectedStyle(btn);
+                if (isAlgo) selectedAlgoBtn = btn; else selectedResourceBtn = btn;
             }
 
-            algoButtons.add(item);
-            menuContent.getChildren().add(item);
+            btn.setOnMouseEntered(e -> {
+                if (!isAlgorithmLoading && !isCurrentlySelected(btn, isAlgo)) {
+                    btn.setStyle("-fx-background-color: rgba(255,255,255,0.03); -fx-text-fill: white;");
+                }
+            });
+            btn.setOnMouseExited(e -> {
+                if (!isAlgorithmLoading && !isCurrentlySelected(btn, isAlgo)) {
+                    btn.setStyle("-fx-background-color: transparent; -fx-text-fill: #888888;");
+                }
+            });
+
+            btn.setOnAction(e -> onAction.accept(itemName, btn));
+            content.getChildren().add(btn);
         }
 
-        double expandedHeight = algos.length * 39;
+        double expandedHeight = items.length * 39;
         Timeline animation = new Timeline();
-
-        menuHeader.setOnMouseClicked(e -> {
-            boolean opening = menuContent.getPrefHeight() == 0;
+        header.setOnMouseClicked(e -> {
+            boolean opening = content.getPrefHeight() == 0;
             animation.stop();
             animation.getKeyFrames().setAll(
                     new KeyFrame(Duration.millis(250),
-                            new KeyValue(menuContent.prefHeightProperty(), opening ? expandedHeight : 0, javafx.animation.Interpolator.EASE_BOTH),
-                            new KeyValue(menuContent.opacityProperty(), opening ? 1 : 0, javafx.animation.Interpolator.EASE_BOTH),
+                            new KeyValue(content.prefHeightProperty(), opening ? expandedHeight : 0, javafx.animation.Interpolator.EASE_BOTH),
+                            new KeyValue(content.opacityProperty(), opening ? 1 : 0, javafx.animation.Interpolator.EASE_BOTH),
                             new KeyValue(arrow.rotateProperty(), opening ? 180 : 0, javafx.animation.Interpolator.EASE_BOTH)
                     )
             );
             animation.play();
         });
+
+        return new VBox(header, content);
+    }
+
+    private void applySelectedStyle(Button btn) {
+        btn.setStyle("-fx-background-color: rgba(76,175,80,0.1); -fx-text-fill: " + SELECTED_GREEN +
+                "; -fx-font-size: 12px; -fx-font-weight: bold;");
+    }
+
+    private boolean isCurrentlySelected(Button btn, boolean isAlgo) {
+        return isAlgo ? (btn == selectedAlgoBtn) : (btn == selectedResourceBtn);
     }
 
     private void switchAlgorithm(String algo, Button clickedBtn) {
         if (isAlgorithmLoading) return;
+        if (isCurrentlySelected(clickedBtn, true)) return;
 
         isAlgorithmLoading = true;
-        // 锁定所有按钮并更改指针
-        algoButtons.forEach(btn -> {
-            btn.setDisable(true);
-            btn.setCursor(Cursor.WAIT);
-        });
-        updateBtn.setDisable(true);
-
-        // UI 表现：选中效果
-        if (selectedButton != null) {
-            selectedButton.setStyle("-fx-background-color: transparent; -fx-text-fill: #888888; -fx-font-size: 12px;");
+        if (selectedAlgoBtn != null) {
+            selectedAlgoBtn.setStyle("-fx-background-color: transparent; -fx-text-fill: #888888; -fx-font-size: 12px;");
         }
-        selectedButton = clickedBtn;
-        selectedButton.setStyle("-fx-background-color: rgba(76,175,80,0.1); -fx-text-fill: " + SELECTED_GREEN + "; -fx-font-size: 12px; -fx-font-weight: bold;");
+        selectedAlgoBtn = clickedBtn;
+        applySelectedStyle(clickedBtn);
 
         Thread.ofVirtual().start(() -> {
             try {
                 SwitchMapMatcher.getInstance().switchMapMatcher(algo);
                 Platform.runLater(() -> ModernCanvasApp.notify("算法已就绪: " + algo, NotificationToast.Type.SUCCESS));
+                AppConfig.MAP_MATCHAER = algo;
+                AppConfig.save();
             } catch (Exception e) {
                 Platform.runLater(() -> ModernCanvasApp.notify("切换失败", NotificationToast.Type.ERROR));
             } finally {
-                Platform.runLater(() -> {
-                    isAlgorithmLoading = false;
-                    algoButtons.forEach(btn -> {
-                        btn.setDisable(false);
-                        btn.setCursor(Cursor.HAND);
-                    });
-                    updateBtn.setDisable(false);
-                });
+                Platform.runLater(() -> isAlgorithmLoading = false);
             }
         });
     }
 
+    private void switchResource(String resource, Button clickedBtn) {
+        boolean isInternal = resource.equals("内置资源");
+        if (isInternal == AppConfig.INTERNAL_RESOURCE) return;
+
+        DialogUtils.showConfirmDialog(
+                (StackPane) getScene().getRoot(),
+                "模式切换",
+                "切换资源模式需要重启程序生效，是否继续？",
+                () -> {
+                    AppConfig.INTERNAL_RESOURCE = isInternal;
+                    AppConfig.save();
+                    RestartUtils.restart();
+                },
+                () -> {} // 取消按钮正常显示
+        );
+    }
+
     private void createProgressButton() {
         btnContainer = new StackPane();
-        btnContainer.setAlignment(Pos.CENTER);
+        btnContainer.setPadding(new Insets(10, 0, 0, 0));
 
-        updateBtn = new Button("更新资源");
+        updateBtn = new Button("更新WIKI资源");
         updateBtn.setMaxWidth(Double.MAX_VALUE);
         updateBtn.setPrefHeight(ITEM_HEIGHT);
         updateBtn.setStyle("-fx-background-color: " + BUTTON_BG + "; -fx-text-fill: " + BUTTON_TEXT + "; -fx-background-radius: 6; -fx-font-size: 13px; -fx-cursor: hand;");
 
-        SVGPath icon = new SVGPath();
-        icon.setContent("M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z");
-        icon.setFill(Color.WHITE);
-        updateBtn.setGraphic(icon);
-
         updateBtn.setOnAction(e -> {
-            if (!isAlgorithmLoading) {
-                showCustomConfirmDialog();
-            }
+            DialogUtils.showConfirmDialog(
+                    (StackPane) getScene().getRoot(),
+                    "确认更新",
+                    "确认同步最新WIKI数据？下载过程中请保持网络畅通。",
+                    () -> {
+                        switchToLoadingState();
+                        startDownloadTask();
+                    },
+                    () -> {}
+            );
         });
 
         progressBar = new ProgressBar(0);
@@ -228,55 +298,15 @@ public class Sidebar extends VBox {
         btnContainer.getChildren().addAll(updateBtn, progressBar, progressLabel, statusLabel);
     }
 
-    private void showCustomConfirmDialog() {
-        StackPane root = (StackPane) getScene().getRoot();
-        StackPane mask = new StackPane();
-        mask.setStyle("-fx-background-color: rgba(0, 0, 0, 0.7);");
-
-        VBox dialog = new VBox(20);
-        dialog.setMaxSize(360, 200);
-        dialog.setPadding(new Insets(25));
-        dialog.setAlignment(Pos.CENTER_LEFT);
-        dialog.setStyle("-fx-background-color: #252525; -fx-background-radius: 12; -fx-border-color: rgba(255,255,255,0.1); -fx-border-width: 1;");
-
-        Label header = new Label("确认更新");
-        header.getStyleClass().add(Styles.TITLE_3);
-        header.setTextFill(Color.WHITE);
-
-        Label body = new Label("确认开始更新任务？\n下载过程中请勿断开网络。");
-        body.setTextFill(Color.web("#BBBBBB"));
-
-        HBox actions = new HBox(12);
-        actions.setAlignment(Pos.CENTER_RIGHT);
-
-        Button cancelBtn = new Button("取消");
-        cancelBtn.getStyleClass().add(Styles.FLAT);
-
-        Button confirmBtn = new Button("确定更新");
-        confirmBtn.getStyleClass().addAll(Styles.BUTTON_OUTLINED, Styles.SUCCESS);
-
-        actions.getChildren().addAll(cancelBtn, confirmBtn);
-        dialog.getChildren().addAll(header, body, actions);
-        mask.getChildren().add(dialog);
-        root.getChildren().add(mask);
-
-        cancelBtn.setOnAction(e -> root.getChildren().remove(mask));
-        confirmBtn.setOnAction(e -> {
-            root.getChildren().remove(mask);
-            switchToLoadingState();
-            startDownloadTask();
-        });
-    }
-
     private void startDownloadTask() {
         Thread.ofVirtual().start(() -> {
             try {
                 MapResourceUpdater.updateAllResources();
-                Platform.runLater(() -> ModernCanvasApp.notify("地图资源更新成功！", NotificationToast.Type.SUCCESS));
+                Platform.runLater(() -> ModernCanvasApp.notify("更新成功！", NotificationToast.Type.SUCCESS));
             } catch (Exception e) {
                 Platform.runLater(() -> {
                     switchToNormalState();
-                    ModernCanvasApp.notify("下载失败：网络连接超时", NotificationToast.Type.ERROR);
+                    ModernCanvasApp.notify("更新失败", NotificationToast.Type.ERROR);
                 });
             }
         });
@@ -286,7 +316,6 @@ public class Sidebar extends VBox {
         updateBtn.setDisable(true);
         updateBtn.setOpacity(0);
         progressBar.setVisible(true);
-        progressBar.setOpacity(1);
         progressLabel.setVisible(true);
         statusLabel.setVisible(true);
 
@@ -297,13 +326,7 @@ public class Sidebar extends VBox {
                 progressLabel.setText(completed + " / " + total);
                 statusLabel.setText(DownloadProgressContext.getInstance().getStatusText());
                 if (completed >= total && total > 0) {
-                    Platform.runLater(() -> {
-                        try {
-                            Thread.sleep(1000);
-                        } catch (InterruptedException ignored) {
-                        }
-                        switchToNormalState();
-                    });
+                    new Timeline(new KeyFrame(Duration.seconds(1), e -> switchToNormalState())).play();
                 }
             });
         });
@@ -315,8 +338,5 @@ public class Sidebar extends VBox {
         statusLabel.setVisible(false);
         updateBtn.setDisable(false);
         updateBtn.setOpacity(1);
-        progressLabel.setText("");
-        statusLabel.setText("");
-        progressBar.setProgress(0);
     }
 }

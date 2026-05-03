@@ -1,6 +1,7 @@
 package com.luoke.app.macher.map;
 
 import com.luoke.app.config.AppConfig;
+import com.luoke.app.context.ResourceContext;
 import com.luoke.app.macher.map.sift.SiftMapMatcher;
 import com.luoke.app.macher.map.sift.SiftPCAMapMatcher;
 import com.luoke.app.macher.map.sift.SiftPCAUltraMapMatcher;
@@ -74,7 +75,7 @@ public class SwitchMapMatcher implements MapMatcher {
         MapMatcher nextMatcher = createMatcher(type);
 
         // 尝试初始化新匹配器
-        if (nextMatcher.init(AppConfig.MAP_RESOURCE_PATH)) {
+        if (nextMatcher.init(ResourceContext.getSiftMap())) {
             AppConfig.MAP_MATCHAER = type;
             this.mapMatcher = nextMatcher; // 引用替换
 
