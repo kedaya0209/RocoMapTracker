@@ -68,6 +68,11 @@ public final class StatsContext {
         this.lastDirectionMs = ms;
     }
 
+    public void reset() {
+        lastMapDetectMs = 0;
+        lastMatchMs = 0;
+        lastDirectionMs = 0;
+    }
 
     public void onFrameProcessed() {
         // 帧计数器累加：统计当前时间窗口内的帧数

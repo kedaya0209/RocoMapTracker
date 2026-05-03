@@ -1,0 +1,48 @@
+package com.luoke.app.map.model;
+
+import javafx.geometry.Point2D;
+import lombok.Data;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
+
+@Data
+public class RoutePath {
+    private String name;
+    private List<Point> nodes = new ArrayList<>();
+    //资源文件标记
+    private String tag;
+    private boolean visible = true;
+
+    public RoutePath() {
+    } // 序列化需要
+
+    public List<Point2D> getNodes() {
+        return nodes.stream().map(Point::toPoint2D).collect(Collectors.toCollection(ArrayList::new));
+    }
+
+    public void remove(int index) {
+        nodes.remove(index);
+    }
+
+    public void addNode(Point2D point2D) {
+        nodes.add(new Point(point2D.getX(), point2D.getY()));
+    }
+
+    public void addNode(Point point) {
+        nodes.add(point);
+    }
+
+    public void addNode(int index, Point point) {
+        nodes.add(index, point);
+    }
+
+    public RoutePath(String name) {
+        this.name = name;
+    }
+
+    public void setNode(int draggedNodeIndex, Point point) {
+        nodes.set(draggedNodeIndex, point);
+    }
+}

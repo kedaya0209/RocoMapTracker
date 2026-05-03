@@ -30,6 +30,7 @@ public final class AppConfig {
     public static final String ICON_DIR = "/source/icon/";
     public static final String PLAYER_ICON_PATH = "/source/icon/player.png";
     public static final String RESOURCE_ICON_DIR = "/source/point/";
+    public static final String RESOURCE_COLLECT_SET = "/source/point/collect_set.txt";
     public static final String RESOURCE_POINT_CONFIG_PATH = "/source/point/resource_config.json";
     public static final String INTERNAL_RESOURCE_POINT_CONFIG_PATH = "/source/point/internal_resource_point.json";
 
@@ -38,6 +39,8 @@ public final class AppConfig {
     public static final String OCR_DET_MODEL = "ch_PP-OCRv4_det_mobile.onnx";
     public static final String PPOCR_KEYS = "ppocr_keys_v1.txt";
     public static final String ARROW_MODEL_NAME = "arrow_fp32.onnx";
+    public static final String PATHS = "/source/map_paths.json";
+    public static final String INTERNAL_PATHS = "/source/internal_map_paths.json";
 
     private static final String CONFIG_FILE_NAME = "app_config.properties";
 
@@ -54,7 +57,7 @@ public final class AppConfig {
 
     // 窗口与捕获
     public static String TARGET_WINDOW_NAME = "洛克王国：世界";
-    public static String APP_MAIN_TITLE = "洛克导航";
+    public static String APP_MAIN_TITLE = "洛克王国地图";
     public static int TARGET_CAPTURE_FPS = 30;
     public static boolean SHOW_MONITOR_BORDER = false;
 
@@ -86,9 +89,6 @@ public final class AppConfig {
     public static int RANSAC_MAX_ITERS = 200;
     public static double RANSAC_CONFIDENCE = 0.95;
 
-    // 统计显示
-    public static String STATUS_MATCH_FAILED = "❌ 匹配失败";
-    public static String STATUS_RUNNING = "监控洛克王国：世界中";
     public static boolean SHOW_STATS_MAP_TIME = true;
     public static boolean SHOW_STATS_MATCH_TIME = true;
     public static boolean SHOW_STATS_DIR_TIME = true;

@@ -1,28 +1,23 @@
 package com.luoke.app.macher.player;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-
 /**
- * 玩家实体类
- * 表示游戏地图中的玩家位置和朝向信息
+ * 玩家实体 — 检测结果容器。
  */
-@Data
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
 public class Player {
 
-    /**
-     * 是否成功检测到玩家
-     */
-    private boolean found;
+    private final boolean found;
+    private final double angle;
 
-    /**
-     * 玩家朝向角度（0-360度）
-     * 0度向右，90度向下，180度向左，270度向上
-     */
-    private double angle;
+    public Player(boolean found, double angle) {
+        this.found = found;
+        this.angle = angle;
+    }
+
+    public boolean isFound() {
+        return found;
+    }
+
+    public double getAngle() {
+        return angle;
+    }
 }

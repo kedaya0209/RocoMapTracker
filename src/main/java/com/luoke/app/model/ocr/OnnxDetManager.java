@@ -1,66 +1,86 @@
 package com.luoke.app.model.ocr;
 
-import ai.djl.inference.Predictor;
 import ai.djl.ndarray.NDArray;
 import ai.djl.ndarray.NDList;
 import ai.djl.ndarray.NDManager;
 import ai.djl.ndarray.types.Shape;
 import ai.djl.repository.zoo.Criteria;
-import ai.djl.repository.zoo.ZooModel;
-import ai.djl.translate.NoopTranslator;
-import com.luoke.app.config.AppConfig;
-import com.luoke.app.utils.ResourceUtils;
+import com.luoke.app.model.BaseOnnxManager;
 import lombok.extern.slf4j.Slf4j;
 
 import java.nio.FloatBuffer;
-import java.nio.file.Path;
 
 /**
- * ONNX文本检测模型管理器 - 零拷贝优化版
+ * ONNX 文本检测模型管理器。
  */
 @Slf4j
-public class OnnxDetManager implements AutoCloseable {
-    private final ZooModel<NDList, NDList> model;
-    private final Predictor<NDList, NDList> predictor;
+public class OnnxDetManager extends BaseOnnxManager {
+
+    private NDManager detManager;
+    private int detectCount;
 
     public OnnxDetManager(String modelName) throws Exception {
-        String path = ResourceUtils.getExternalPath(AppConfig.MODEL_DIR + modelName, true);
-
-        Criteria<NDList, NDList> criteria = Criteria.builder()
-                .setTypes(NDList.class, NDList.class)
-                .optEngine("OnnxRuntime")
-                .optModelPath(Path.of(path))
-                .optOption("interOpNumThreads", "1") // 建议设为 1，减少上下文切换
-                .optOption("intraOpNumThreads", "2")
-                .optOption("optimizationLevel", "ALL")
-                .optTranslator(new NoopTranslator())
-                .build();
-
-        this.model = criteria.loadModel();
-        this.predictor = model.newPredictor();
+        super(modelName);
+        this.detManager = newSubManager();
     }
 
-    /**
-     * 执行检测推理
-     * @return 返回一维展平的概率数组，减少二维数组创建开销
-     */
+    @Override
+    protected void configureCriteria(Criteria.Builder builder) {
+        builder.optOption("interOpNumThreads", "1")
+                .optOption("intraOpNumThreads", "2")
+                .optOption("optimizationLevel", "ALL");
+    }
+
     public float[] detect(FloatBuffer buffer, int h, int w) throws Exception {
-        try (NDManager sub = model.getNDManager().newSubManager()) {
-            NDArray array = sub.create(buffer, new Shape(1, 3, h, w));
+        if (detManager == null) return new float[0];
+        NDArray array = null;
+        NDList inputList = null;
+        NDList output = null;
 
-            try (NDList output = predictor.predict(new NDList(array))) {
-                NDArray heatMapArr = output.getFirst();
+        try {
+            array = detManager.create(buffer, new Shape(1, 3, h, w));
+            inputList = new NDList(array);
+            output = predictor.predict(inputList);
+            return output.getFirst().toFloatArray();
+        } finally {
+            if (output != null) output.close();
+            if (inputList != null) inputList.close();
+            if (array != null) array.close();
 
-                // 💡 优化 1：直接返回一维数组，不构建 float[][]
-                // toFloatArray 会从 Native 拷贝到 Java 堆，这是必须的一次拷贝
-                return heatMapArr.toFloatArray();
-            }
+            if (++detectCount % 200 == 0) resetSubManager();
+            if (detectCount % 300 == 0) rebuildSession();
+        }
+    }
+
+    private void resetSubManager() {
+        try {
+            NDManager old = this.detManager;
+            this.detManager = newSubManager();
+            if (old != null) old.close();
+            log.debug("OnnxDetManager NDManager 已重置 (frame={})", detectCount);
+        } catch (Exception e) {
+            log.error("重置 DetManager NDManager 失败", e);
+        }
+    }
+
+    private void rebuildSession() {
+        try {
+            NDManager oldManager = this.detManager;
+            this.detManager = null;
+            if (oldManager != null) oldManager.close();
+
+            rebuild();
+            this.detManager = newSubManager();
+            System.gc();
+            log.info("OnnxDetManager ONNX Session 已重建 (frame={})", detectCount);
+        } catch (Exception e) {
+            log.error("重建 Det ONNX Session 失败", e);
         }
     }
 
     @Override
     public void close() {
-        if (predictor != null) predictor.close();
-        if (model != null) model.close();
+        if (detManager != null) detManager.close();
+        super.close();
     }
 }

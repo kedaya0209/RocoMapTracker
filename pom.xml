@@ -6,13 +6,13 @@
 
     <groupId>com.luoke</groupId>
     <artifactId>RocoMapTracker</artifactId>
-    <version>1.0.0</version>
+    <version>1.1.0</version>
     <packaging>jar</packaging>
 
     <properties>
-        <maven.compiler.source>21</maven.compiler.source>
-        <maven.compiler.target>21</maven.compiler.target>
-        <maven.compiler.release>21</maven.compiler.release>
+        <maven.compiler.source>25</maven.compiler.source>
+        <maven.compiler.target>25</maven.compiler.target>
+        <maven.compiler.release>25</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
         <javafx.version>25</javafx.version>
@@ -25,7 +25,7 @@
         <logback.version>1.4.11</logback.version>
         <lombok.version>1.18.44</lombok.version>
         <junit.version>5.9.2</junit.version>
-        <graalvm.version>21.0.2</graalvm.version>
+        <graalvm.version>25.0.2</graalvm.version>
         <djl.version>0.36.0</djl.version>
         <atlantafx.version>2.1.0</atlantafx.version>
         <opencv.version>4.9.0-0</opencv.version>
@@ -158,9 +158,9 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.15.0</version>
                 <configuration>
-                    <source>22</source>
-                    <target>22</target>
-                    <release>21</release>
+                    <source>25</source>
+                    <target>25</target>
+                    <release>25</release>
                     <encoding>UTF-8</encoding>
                     <annotationProcessorPaths>
                         <path>
@@ -253,38 +253,169 @@
                                 </options>
                             </agent>
                             <buildArgs>
-                                <!-- 1. 基础环境 -->
+                                <buildArg>-R:MaxHeapSize=1G</buildArg>
+                                <buildArg>-R:MinHeapSize=256M</buildArg>
+                                <buildArg>-R:MaxDirectMemorySize=512M</buildArg>
+
+                                <!-- 企业版特性 -->
+                                <buildArg>-H:+RemoveUnusedSymbols</buildArg>
+
+                                <!-- 基础配置 -->
                                 <buildArg>-H:+AddAllCharsets</buildArg>
                                 <buildArg>-Dfile.encoding=UTF-8</buildArg>
                                 <buildArg>--enable-native-access=ALL-UNNAMED</buildArg>
                                 <buildArg>--no-fallback</buildArg>
                                 <buildArg>-Djava.awt.headless=false</buildArg>
+                                <buildArg>-H:+InstallExitHandlers</buildArg>
 
-                                <!-- 2. 内存优化：编译用 8G，运行用 512M -->
-                                <buildArg>-J-Xmx8g</buildArg>
-                                <buildArg>-R:MaxHeapSize=512M</buildArg>
+                                <!-- I/O & Native 内存 -->
+                                <buildArg>-Djdk.nio.maxCachedBufferSize=262144</buildArg>
+                                <buildArg>-Djna.nosys=true</buildArg>
 
-                                <!-- 3. 初始化逻辑 -->
+                                <!-- 编译优化 -->
+                                <buildArg>-J-Xmx24g</buildArg>
+                                <buildArg>-O3</buildArg>
+                                <buildArg>-march=x86-64-v3</buildArg>
+                                <buildArg>-H:+StripDebugInfo</buildArg>
+
                                 <buildArg>--initialize-at-run-time=com.sun.prism.**</buildArg>
                                 <buildArg>--initialize-at-run-time=com.sun.glass.ui.**</buildArg>
                                 <buildArg>--initialize-at-run-time=javafx.**</buildArg>
-                                <!-- 增加 DJL 和 OpenCV 的运行时初始化 -->
                                 <buildArg>--initialize-at-run-time=org.opencv.**</buildArg>
                                 <buildArg>--initialize-at-run-time=ai.djl.opencv.**</buildArg>
                                 <buildArg>--initialize-at-run-time=com.sun.jna.**</buildArg>
 
-                                <!-- 4. 资源包含：合并了你的自定义路径与 SPI 路径 -->
                                 <buildArg>-H:IncludeResources=(META-INF/services/.*|model/.*|com/sun/prism/.*|com/sun/javafx/.*|.*\.(png|properties|json|fxml|xml|dll|txt|css|ttf|woff2|sh|ps|hlsl|cso))$</buildArg>
-
                                 <buildArg>-H:IncludeResourceBundles=ch.qos.logback.*</buildArg>
                                 <buildArg>-H:ReachabilityMetadataResources=META-INF/native-image/reachability-metadata.json</buildArg>
 
-                                <!-- 5. 导出与调试 -->
                                 <buildArg>--add-exports=javafx.graphics/com.sun.prism.shader=ALL-UNNAMED</buildArg>
                                 <buildArg>--add-exports=javafx.graphics/com.sun.glass.ui=ALL-UNNAMED</buildArg>
                                 <buildArg>--add-exports=javafx.graphics/com.sun.prism.d3d=ALL-UNNAMED</buildArg>
                                 <buildArg>-H:+ReportExceptionStackTraces</buildArg>
+                                <buildArg>--enable-url-protocols=http,https</buildArg>
                                 <buildArg>-H:+JNI</buildArg>
+                                <buildArg>--initialize-at-run-time=com.luoke.app.utils.JNIFrameNative</buildArg>
+                            </buildArgs>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <!--
+          PGO Step 1: 构建插桩二进制
+            mvn -Pnative-instrument clean package
+          然后运行生成的 exe 采集代表性场景数据（自动生成 default.iprof）
+        -->
+        <profile>
+            <id>native-instrument</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.graalvm.buildtools</groupId>
+                        <artifactId>native-maven-plugin</artifactId>
+                        <version>0.10.0</version>
+                        <extensions>true</extensions>
+                        <executions>
+                            <execution>
+                                <id>build-native</id>
+                                <goals><goal>compile</goal></goals>
+                                <phase>package</phase>
+                            </execution>
+                        </executions>
+                        <configuration>
+                            <mainClass>com.luoke.app.Main</mainClass>
+                            <imageName>RocoMapTracker-instrumented</imageName>
+                            <buildArgs>
+                                <buildArg>--gc=Z</buildArg>
+                                <buildArg>-R:MaxHeapSize=1G</buildArg>
+                                <buildArg>-R:MaxDirectMemorySize=512M</buildArg>
+                                <buildArg>--pgo-instrument</buildArg>
+                                <buildArg>-O3</buildArg>
+                                <buildArg>-march=x86-64-v3</buildArg>
+                                <buildArg>-H:+AddAllCharsets</buildArg>
+                                <buildArg>-Dfile.encoding=UTF-8</buildArg>
+                                <buildArg>--enable-native-access=ALL-UNNAMED</buildArg>
+                                <buildArg>--no-fallback</buildArg>
+                                <buildArg>-Djava.awt.headless=false</buildArg>
+                                <buildArg>-H:+JNI</buildArg>
+                                <buildArg>-H:+ReportExceptionStackTraces</buildArg>
+                                <buildArg>--enable-url-protocols=http,https</buildArg>
+                                <buildArg>-J-Xmx8g</buildArg>
+                                <buildArg>--initialize-at-run-time=com.sun.prism.**</buildArg>
+                                <buildArg>--initialize-at-run-time=com.sun.glass.ui.**</buildArg>
+                                <buildArg>--initialize-at-run-time=javafx.**</buildArg>
+                                <buildArg>--initialize-at-run-time=org.opencv.**</buildArg>
+                                <buildArg>--initialize-at-run-time=ai.djl.opencv.**</buildArg>
+                                <buildArg>--initialize-at-run-time=com.sun.jna.**</buildArg>
+                                <buildArg>--initialize-at-run-time=com.luoke.app.utils.JNIFrameNative</buildArg>
+                                <buildArg>-H:IncludeResources=(META-INF/services/.*|model/.*|com/sun/prism/.*|com/sun/javafx/.*|.*\.(png|properties|json|fxml|xml|dll|txt|css|ttf|woff2|sh|ps|hlsl|cso))$</buildArg>
+                                <buildArg>-H:IncludeResourceBundles=ch.qos.logback.*</buildArg>
+                            </buildArgs>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <!--
+          PGO Step 2: 用采集的 iprof 数据构建最终优化二进制
+            mvn -Pnative-pgo clean package
+          前提：default.iprof 存在于项目根目录
+        -->
+        <profile>
+            <id>native-pgo</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.graalvm.buildtools</groupId>
+                        <artifactId>native-maven-plugin</artifactId>
+                        <version>0.10.0</version>
+                        <extensions>true</extensions>
+                        <executions>
+                            <execution>
+                                <id>build-native</id>
+                                <goals><goal>compile</goal></goals>
+                                <phase>package</phase>
+                            </execution>
+                        </executions>
+                        <configuration>
+                            <mainClass>com.luoke.app.Main</mainClass>
+                            <imageName>RocoMapTracker</imageName>
+                            <buildArgs>
+                                <buildArg>--gc=Z</buildArg>
+<!--                                <buildArg>-H:NativeLinkerOption=/SUBSYSTEM:WINDOWS</buildArg>-->
+<!--                                <buildArg>-H:NativeLinkerOption=/ENTRY:mainCRTStartup</buildArg>-->
+                                <buildArg>-R:MaxHeapSize=1G</buildArg>
+                                <buildArg>-R:MinHeapSize=256M</buildArg>
+                                <buildArg>-R:MaxDirectMemorySize=512M</buildArg>
+                                <buildArg>-H:+OmitInlinedMethodStackTrace</buildArg>
+                                <buildArg>-H:+RemoveUnusedSymbols</buildArg>
+                                <buildArg>--pgo=default.iprof</buildArg>
+                                <buildArg>-O3</buildArg>
+                                <buildArg>-march=x86-64-v3</buildArg>
+                                <buildArg>-H:+AddAllCharsets</buildArg>
+                                <buildArg>-Dfile.encoding=UTF-8</buildArg>
+                                <buildArg>--enable-native-access=ALL-UNNAMED</buildArg>
+                                <buildArg>--no-fallback</buildArg>
+                                <buildArg>-Djava.awt.headless=false</buildArg>
+                                <buildArg>-H:+InstallExitHandlers</buildArg>
+                                <buildArg>-Djdk.nio.maxCachedBufferSize=262144</buildArg>
+                                <buildArg>-Djna.nosys=true</buildArg>
+                                <buildArg>-H:+StripDebugInfo</buildArg>
+                                <buildArg>-H:+JNI</buildArg>
+                                <buildArg>--enable-url-protocols=http,https</buildArg>
+                                <buildArg>-J-Xmx8g</buildArg>
+                                <buildArg>--initialize-at-run-time=com.sun.prism.**</buildArg>
+                                <buildArg>--initialize-at-run-time=com.sun.glass.ui.**</buildArg>
+                                <buildArg>--initialize-at-run-time=javafx.**</buildArg>
+                                <buildArg>--initialize-at-run-time=org.opencv.**</buildArg>
+                                <buildArg>--initialize-at-run-time=ai.djl.opencv.**</buildArg>
+                                <buildArg>--initialize-at-run-time=com.sun.jna.**</buildArg>
+                                <buildArg>--initialize-at-run-time=com.luoke.app.utils.JNIFrameNative</buildArg>
+                                <buildArg>-H:IncludeResources=(META-INF/services/.*|model/.*|com/sun/prism/.*|com/sun/javafx/.*|.*\.(png|properties|json|fxml|xml|dll|txt|css|ttf|woff2|sh|ps|hlsl|cso))$</buildArg>
+                                <buildArg>-H:IncludeResourceBundles=ch.qos.logback.*</buildArg>
                             </buildArgs>
                         </configuration>
                     </plugin>

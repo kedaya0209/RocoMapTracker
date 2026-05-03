@@ -8,7 +8,7 @@ import com.luoke.app.macher.map.sift.SiftPCAUltraMapMatcher;
 import com.luoke.app.macher.map.sift.SiftUltraMapMatcher;
 import lombok.extern.slf4j.Slf4j;
 
-import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.Objects;
 import java.util.Set;
 
@@ -23,7 +23,7 @@ public class SwitchMapMatcher implements MapMatcher {
     // 单例实例
     private static volatile SwitchMapMatcher instance;
 
-    private final Set<String> set = new HashSet<>();
+    private static final Set<String> set = new LinkedHashSet<>();
 
     // 使用 volatile 保证在 switchMapMatcher 时，其他线程能立即看到引用的变化
     private volatile MapMatcher mapMatcher;
@@ -37,6 +37,10 @@ public class SwitchMapMatcher implements MapMatcher {
 
         // 初始化默认匹配器
         this.mapMatcher = createMatcher(AppConfig.MAP_MATCHAER);
+    }
+
+    public Set<String> getMatchers() {
+        return set;
     }
 
     // 获取单例的入口

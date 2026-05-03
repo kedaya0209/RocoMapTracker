@@ -20,6 +20,8 @@ public class SaveImageProcessor implements RoiProcessor {
     private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss_SSS");
     private long lastSaveTime = 0;
 
+    private final int count = 0;
+
     public SaveImageProcessor(int roiIndex, String saveDir) {
         this.roiIndex = roiIndex;
         this.saveDir = saveDir;
@@ -34,40 +36,40 @@ public class SaveImageProcessor implements RoiProcessor {
     @Override
     public void onProcess(byte[] data, int width, int height) {
         if (data == null || data.length == 0) return;
+        boolean a = true;
+        if (a) {
+            return;
+        }
 
-        // 优化采样逻辑：每 10 秒保存一张，而不是在整 10 秒的那一秒内疯狂保存
         long currentTime = System.currentTimeMillis();
-        if (currentTime - lastSaveTime < 10000) {
+        if (currentTime - lastSaveTime < 1000) {
             return;
         }
         lastSaveTime = currentTime;
 
-        // 1. 创建灰度图类型的 BufferedImage
-        // Rust 传过来的是 8-bit 灰度，对应 Java 的 TYPE_BYTE_GRAY
+        // 创建灰度图
         BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_BYTE_GRAY);
-
-        // 2. 将紧凑的灰度字节数组拷贝到 BufferedImage 的底层 Buffer
         byte[] targetPixels = ((DataBufferByte) image.getRaster().getDataBuffer()).getData();
         System.arraycopy(data, 0, targetPixels, 0, data.length);
 
-        // 3. 异步保存防止阻塞 Rust 的回调线程
+        // 异步保存完整图和中心裁剪64x64
         saveImageAsync(image, width, height);
     }
 
     private void saveImageAsync(BufferedImage image, int width, int height) {
-        String fileName = String.format("gray_roi_%d_%s_%dx%d.png",
+        String baseName = String.format("gray_roi_%d_%s_%dx%d",
                 roiIndex, LocalDateTime.now().format(formatter), width, height);
-        File outputFile = new File(saveDir, fileName);
+        File fullFile = new File(saveDir, baseName + ".png");
 
-        // 开启新线程写入，保证回调接口的极致性能
-        new Thread(() -> {
+        Thread.ofVirtual().start(() -> {
             try {
-                ImageIO.write(image, "png", outputFile);
-                log.info("灰度ROI已保存: {}", outputFile.getAbsolutePath());
+                // 保存完整图
+                ImageIO.write(image, "png", fullFile);
+//                log.info("灰度ROI已保存: {}", fullFile.getAbsolutePath());
             } catch (IOException e) {
                 log.error("保存灰度图失败: {}", e.getMessage());
             }
-        }).start();
+        });
     }
 
     @Override

@@ -2,12 +2,12 @@ package com.luoke.app.context;
 
 import com.luoke.app.map.model.ResourceConfig;
 import com.luoke.app.map.model.ResourcePoint;
+import com.luoke.app.ui.component.ResourceCounterPanel;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
@@ -15,15 +15,17 @@ import java.util.stream.Collectors;
 @Data
 public class MaterialCollectionContext {
     private static final MaterialCollectionContext INSTANCE = new MaterialCollectionContext();
+
+    // 存储累计结果
     private final Map<String, Integer> summaryMap = new ConcurrentHashMap<>();
+    // 存储历史流水
     private final List<LootRecord> historyLog = Collections.synchronizedList(new ArrayList<>());
     private final AtomicLong firstLootTimestamp = new AtomicLong(0);
 
-    // 💡 新增：版本号，用于 UI 判定是否需要刷新
-    private final AtomicInteger dataVersion = new AtomicInteger(0);
     private final Set<String> filters;
 
     private MaterialCollectionContext() {
+        // 初始加载过滤词（仅统计地图上存在的资源点名）
         List<ResourcePoint> allPoints = ResourcePointContext.getInstance().getAllPoints();
         filters = allPoints.stream()
                 .map(ResourcePoint::getConfig)
@@ -35,36 +37,41 @@ public class MaterialCollectionContext {
         return INSTANCE;
     }
 
+    /**
+     * 添加物资并触发 UI 刷新
+     */
     public void addMaterial(String name, int amount) {
         if (amount <= 0) return;
         if (!filters.contains(name)) return;
+
         long now = System.currentTimeMillis();
         firstLootTimestamp.compareAndSet(0, now);
 
+        // 1. 更新数据模型
         historyLog.add(new LootRecord(now, name, amount));
         summaryMap.merge(name, amount, Integer::sum);
 
-        // 💡 关键点：数据变动，提升版本号
-        dataVersion.incrementAndGet();
-
         log.info("📦 [采集记录] {} +{}, 当前累计: {}", name, amount, summaryMap.get(name));
+
+        // 2. 🔥 【关键优化】主动驱动 UI 更新
+        // 不再依赖 RenderLoop 里的 Version 检查，而是数据变了立刻通知面板
+        ResourceCounterPanel.getInstance().refreshData(new HashMap<>(summaryMap));
     }
 
-    public int getDataVersion() {
-        return dataVersion.get();
-    }
-
+    /**
+     * 重置数据并关闭面板
+     */
     public void reset() {
         summaryMap.clear();
         historyLog.clear();
         firstLootTimestamp.set(0);
-        dataVersion.set(0); // 重置版本
+
+        // 通知 UI 数据已清空（面板内部会处理 hide 逻辑）
+        ResourceCounterPanel.getInstance().refreshData(Collections.emptyMap());
+
         log.info("♻️ 采集上下文已重置");
     }
 
     public record LootRecord(long timestamp, String name, int amount) {
-        public String format() {
-            return String.format("[%d] 拾取: %s x%d", timestamp, name, amount);
-        }
     }
 }

@@ -2,45 +2,43 @@ package com.luoke.app.ui.component;
 
 import atlantafx.base.theme.Styles;
 import javafx.animation.FadeTransition;
+import javafx.application.Platform;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.Node;
 import javafx.scene.control.Label;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.util.Duration;
 
+import java.util.Map;
+
 public class ResourceCounterPanel extends VBox {
 
-    // --- 单例实现开始 ---
     private static volatile ResourceCounterPanel instance;
+    private final Label titleLabel;
 
-    // 将构造函数设为私有
     private ResourceCounterPanel() {
         super(10);
         setPadding(new Insets(15));
-        setPrefWidth(200);
+        setPrefWidth(220); // 稍微加宽一点，防止文字溢出
 
-        // 样式：半透明背景 + 细边框
         setStyle("-fx-background-color: rgba(30, 30, 30, 0.85); " +
                 "-fx-background-radius: 10; " +
                 "-fx-border-color: rgba(255, 255, 255, 0.1); " +
                 "-fx-border-radius: 10;");
 
-        Label title = new Label("采集统计");
-        title.getStyleClass().add(Styles.TEXT_BOLD);
-        title.setTextFill(Color.WHITE);
+        titleLabel = new Label("采集统计");
+        titleLabel.getStyleClass().add(Styles.TEXT_BOLD);
+        titleLabel.setTextFill(Color.WHITE);
 
-        getChildren().add(title);
+        getChildren().add(titleLabel);
 
-        // 默认状态为隐藏且透明
         setVisible(false);
         setOpacity(0);
     }
-    // --- 单例实现结束 ---
 
-    /**
-     * 获取单例实例
-     * 使用双重检查锁定确保线程安全
-     */
     public static ResourceCounterPanel getInstance() {
         if (instance == null) {
             synchronized (ResourceCounterPanel.class) {
@@ -53,17 +51,57 @@ public class ResourceCounterPanel extends VBox {
     }
 
     /**
-     * 切换面板显示状态的动画方法
+     * 【关键改动】响应式刷新方法
+     * 由 MaterialCollectionContext 在数据变动时调用
      */
-    public void toggle(boolean show) {
-        // 防止重复触发相同状态的动画
-        if (show == isVisible() && getOpacity() > 0 == show) return;
+    public void refreshData(Map<String, Integer> summary) {
+        // 必须在 JavaFX UI 线程执行
+        Platform.runLater(() -> {
+            // 1. 保留标题，清理旧数据行
+            Node title = getChildren().get(0);
+            getChildren().clear();
+            getChildren().add(title);
 
-        FadeTransition ft = new FadeTransition(Duration.millis(200), this);
+            // 2. 如果没有数据，直接收起面板
+            if (summary == null || summary.isEmpty()) {
+                toggle(false);
+                return;
+            }
+
+            // 3. 构建新数据行
+            summary.forEach((name, total) -> {
+                HBox row = new HBox(12);
+                row.setAlignment(Pos.CENTER_LEFT);
+
+                Label nameLabel = new Label(name + " :");
+                nameLabel.setTextFill(Color.web("#CCCCCC"));
+
+                Label countLabel = new Label(String.valueOf(total));
+                countLabel.setTextFill(Color.web("#00BFFF"));
+                countLabel.setStyle("-fx-font-weight: bold;");
+
+                row.getChildren().addAll(nameLabel, countLabel);
+                getChildren().add(row);
+            });
+
+            // 4. 如果面板当前是隐藏状态，且有了新数据，则自动滑出
+            if (!isVisible() || getOpacity() < 1.0) {
+                toggle(true);
+            }
+        });
+    }
+
+    public void toggle(boolean show) {
+        // 防止动画冲突：如果目标状态已达到，则跳过
+        if (show == (isVisible() && getOpacity() > 0.5)) return;
+
+        FadeTransition ft = new FadeTransition(Duration.millis(300), this);
         if (show) {
             setVisible(true);
+            ft.setFromValue(getOpacity());
             ft.setToValue(1.0);
         } else {
+            ft.setFromValue(getOpacity());
             ft.setToValue(0.0);
             ft.setOnFinished(e -> setVisible(false));
         }

@@ -1,6 +1,11 @@
 package com.luoke.app.ui.component;
 
 import atlantafx.base.theme.Styles;
+import com.luoke.app.hook.AbstractGenericHook;
+import com.luoke.app.hook.HookEventType;
+import com.luoke.app.hook.HookRegistry;
+import com.luoke.app.hook.event.ProgressEvent;
+import javafx.application.Platform;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
@@ -9,30 +14,32 @@ import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
+import lombok.extern.slf4j.Slf4j;
 
+import java.util.Set;
+
+@Slf4j
 public class LoadingOverlay extends VBox {
     private final ProgressBar progressBar = new ProgressBar(0);
     private final Label statusLabel = new Label("正在初始化资源...");
     private final Button cancelBtn = new Button("取消下载");
+    private final ProgressHook progressHook = new ProgressHook();
 
     public LoadingOverlay(Runnable onCancel) {
         this.setAlignment(Pos.CENTER);
         this.setSpacing(25);
-        this.setStyle("-fx-background-color: #1e1e1e;");
+        this.setStyle("-fx-background-color: #1a1a1a;");
 
         statusLabel.setTextFill(Color.WHITE);
-        statusLabel.setFont(Font.font("System", FontWeight.BOLD, 16));
+        statusLabel.setFont(Font.font("System", FontWeight.BOLD, 18));
 
-        progressBar.setPrefWidth(400);
+        progressBar.setPrefWidth(450);
         progressBar.getStyleClass().add(Styles.MEDIUM);
 
-        // --- 核心修改逻辑 ---
         if (onCancel == null) {
-            // 如果没传回调（初始化场景），彻底隐藏并移除按钮占位
             cancelBtn.setVisible(false);
             cancelBtn.setManaged(false);
         } else {
-            // 如果传了回调（下载场景），显示并配置按钮
             cancelBtn.getStyleClass().add(Styles.DANGER);
             cancelBtn.setOnAction(e -> {
                 cancelBtn.setDisable(true);
@@ -40,13 +47,43 @@ public class LoadingOverlay extends VBox {
                 onCancel.run();
             });
         }
-        // ------------------
 
         this.getChildren().addAll(statusLabel, progressBar, cancelBtn);
+
+        HookRegistry.INSTANCE.register(progressHook);
     }
 
+    /**
+     * 移除自身时必须注销 Hook，防止监听器泄漏
+     */
+    public void dispose() {
+        HookRegistry.INSTANCE.unregister(progressHook);
+    }
+
+    /**
+     * 手动更新接口（保留以备直接调用）
+     */
     public void updateProgress(double progress, String text) {
-        progressBar.setProgress(progress);
+        if (progress < 0) {
+            progressBar.setProgress(ProgressBar.INDETERMINATE_PROGRESS);
+        } else {
+            progressBar.setProgress(progress);
+        }
         statusLabel.setText(text);
+    }
+
+    // 在 LoadingOverlay 内部定义一个具名的 Hook 实现类
+    private class ProgressHook extends AbstractGenericHook<ProgressEvent> {
+        @Override
+        public void onEvent(HookEventType eventType, ProgressEvent data) {
+            if (eventType == HookEventType.INIT_PROGRESS) {
+                Platform.runLater(() -> updateProgress(data.value(), data.text()));
+            }
+        }
+
+        @Override
+        public Set<HookEventType> supportedEvents() {
+            return Set.of(HookEventType.INIT_PROGRESS);
+        }
     }
 }

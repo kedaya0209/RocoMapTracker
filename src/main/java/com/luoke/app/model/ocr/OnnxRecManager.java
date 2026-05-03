@@ -1,91 +1,106 @@
 package com.luoke.app.model.ocr;
 
-import ai.djl.inference.Predictor;
 import ai.djl.ndarray.NDArray;
 import ai.djl.ndarray.NDList;
 import ai.djl.ndarray.NDManager;
 import ai.djl.ndarray.types.Shape;
 import ai.djl.repository.zoo.Criteria;
-import ai.djl.repository.zoo.ZooModel;
-import ai.djl.translate.NoopTranslator;
 import com.luoke.app.config.AppConfig;
+import com.luoke.app.model.BaseOnnxManager;
 import com.luoke.app.utils.ResourceUtils;
 import lombok.extern.slf4j.Slf4j;
 
 import java.nio.FloatBuffer;
-import java.nio.file.Path;
 import java.util.List;
 
 /**
- * ONNX文本识别模型管理器 - 高性能修正版
+ * ONNX 文本识别模型管理器。
  */
 @Slf4j
-public class OnnxRecManager implements AutoCloseable {
-    private final ZooModel<NDList, NDList> model;
-    private final Predictor<NDList, NDList> predictor;
+public class OnnxRecManager extends BaseOnnxManager {
+
     private final List<String> dict;
+    private NDManager recManager;
+    private int recCount;
 
     public OnnxRecManager(String modelName) throws Exception {
+        super(modelName);
         this.dict = ResourceUtils.readResourceLines(AppConfig.MODEL_DIR + AppConfig.PPOCR_KEYS);
-        String path = ResourceUtils.getExternalPath(AppConfig.MODEL_DIR + modelName, true);
-
-        Criteria<NDList, NDList> criteria = Criteria.builder()
-                .setTypes(NDList.class, NDList.class)
-                .optEngine("OnnxRuntime")
-                .optModelPath(Path.of(path))
-                // 💡 针对 24/7 运行，建议限制线程数，防止 CPU 爆表导致界面卡顿
-                .optOption("interOpNumThreads", "1")
-                .optOption("intraOpNumThreads", "2")
-                .optTranslator(new NoopTranslator())
-                .build();
-
-        this.model = criteria.loadModel();
-        this.predictor = model.newPredictor();
+        this.recManager = newSubManager();
     }
 
-    /**
-     * 执行推理
-     */
+    @Override
+    protected void configureCriteria(Criteria.Builder builder) {
+        builder.optOption("interOpNumThreads", "1")
+                .optOption("intraOpNumThreads", "2");
+    }
+
     public String recognize(FloatBuffer buffer, int h, int w) throws Exception {
-        // 使用 subManager 确保推理过程产生的中间变量 NDArray 被立即释放
-        try (NDManager sub = model.getNDManager().newSubManager()) {
-            NDArray array = sub.create(buffer, new Shape(1, 3, h, w));
+        if (recManager == null) return "";
+        NDArray array = null;
+        NDList inputList = null;
+        NDList output = null;
 
-            try (NDList output = predictor.predict(new NDList(array))) {
-                NDArray outTensor = output.getFirst();
+        try {
+            array = recManager.create(buffer, new Shape(1, 3, h, w));
+            inputList = new NDList(array);
+            output = predictor.predict(inputList);
 
-                // 💡 性能优化点：获取形状
-                // PaddleOCR 输出通常是 [steps, num_classes] 或 [1, steps, num_classes]
-                long[] shape = outTensor.getShape().getShape();
-                int steps, charSize;
-
-                if (shape.length == 3) { // [1, steps, charSize]
-                    steps = (int) shape[1];
-                    charSize = (int) shape[2];
-                } else { // [steps, charSize]
-                    steps = (int) shape[0];
-                    charSize = (int) shape[1];
-                }
-
-                // 💡 关键优化：直接获取 FloatBuffer 避免 toFloatArray() 的额外拷贝开销
-                // toFloatBuffer() 返回的是对 Native 内存的直接视图或高效拷贝
-                FloatBuffer outBuffer = outTensor.toByteBuffer().asFloatBuffer();
-
-                return decodeCtc(outBuffer, steps, charSize);
+            NDArray outTensor = output.getFirst();
+            long[] shape = outTensor.getShape().getShape();
+            int steps, charSize;
+            if (shape.length == 3) {
+                steps = (int) shape[1];
+                charSize = (int) shape[2];
+            } else {
+                steps = (int) shape[0];
+                charSize = (int) shape[1];
             }
+
+            FloatBuffer outBuffer = outTensor.toByteBuffer().asFloatBuffer();
+            return decodeCtc(outBuffer, steps, charSize);
+        } finally {
+            if (output != null) output.close();
+            if (inputList != null) inputList.close();
+            if (array != null) array.close();
+
+            if (++recCount % 200 == 0) resetSubManager();
+            if (recCount % 300 == 0) rebuildSession();
         }
     }
 
-    /**
-     * CTC 解码 - 修正了 FloatBuffer 的读取逻辑
-     */
+    private void resetSubManager() {
+        try {
+            NDManager old = this.recManager;
+            this.recManager = newSubManager();
+            if (old != null) old.close();
+            log.debug("OnnxRecManager NDManager 已重置 (frame={})", recCount);
+        } catch (Exception e) {
+            log.error("重置 RecManager NDManager 失败", e);
+        }
+    }
+
+    private void rebuildSession() {
+        try {
+            NDManager oldManager = this.recManager;
+            this.recManager = null;
+            if (oldManager != null) oldManager.close();
+
+            rebuild();
+            this.recManager = newSubManager();
+            System.gc();
+            log.info("OnnxRecManager ONNX Session 已重建 (frame={})", recCount);
+        } catch (Exception e) {
+            log.error("重建 Rec ONNX Session 失败", e);
+        }
+    }
+
     private String decodeCtc(FloatBuffer outBuffer, int steps, int charSize) {
         StringBuilder sb = new StringBuilder();
         int lastIdx = -1;
 
         for (int i = 0; i < steps; i++) {
             int maxIdx = 0;
-            // 获取当前 step 的偏移
             int offset = i * charSize;
             float maxVal = outBuffer.get(offset);
 
@@ -97,22 +112,19 @@ public class OnnxRecManager implements AutoCloseable {
                 }
             }
 
-            // CTC 解码逻辑
-            if (maxIdx > 0 && maxIdx != lastIdx && maxVal > 0.45f) { // 阈值稍微调高一点可以减少误识别
+            if (maxIdx > 0 && maxIdx != lastIdx && maxVal > 0.45f) {
                 if (maxIdx - 1 < dict.size()) {
                     sb.append(dict.get(maxIdx - 1));
                 }
             }
             lastIdx = maxIdx;
         }
-
         return sb.toString();
     }
 
     @Override
     public void close() {
-        // 💡 严谨的关闭顺序
-        if (predictor != null) predictor.close();
-        if (model != null) model.close();
+        if (recManager != null) recManager.close();
+        super.close();
     }
 }

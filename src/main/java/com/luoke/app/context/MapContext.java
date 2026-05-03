@@ -1,12 +1,14 @@
 package com.luoke.app.context;
 
 import com.luoke.app.config.AppConfig;
-import com.luoke.app.event.PlayerPositionEvent;
 import com.luoke.app.hook.HookEventType;
 import com.luoke.app.hook.HookRegistry;
+import com.luoke.app.hook.event.PlayerPositionEvent;
 import javafx.scene.image.Image;
 import lombok.Getter;
 import lombok.Setter;
+
+import java.nio.MappedByteBuffer;
 
 /**
  * 地图上下文管理：负责地图图像、视口状态（缩放/偏移）及玩家位置的维护与转换。
@@ -17,6 +19,7 @@ import lombok.Setter;
 public class MapContext {
 
     private Image mapImage;
+    private MappedByteBuffer mapImageBuffer; // mmap 缓冲区强引用，防止 GC 回收映射内存
     private double mapWidth, mapHeight; // 原始地图尺寸
 
     /** * 视口状态：scale(缩放), offsetX/Y(相对于地图左上角的屏幕偏移)
@@ -54,6 +57,14 @@ public class MapContext {
         MapCoordinateManager.getInstance().registerMap(
                 mapKey, (int) w, (int) h, AppConfig.JSON_ZOOM, AppConfig.MAP_ZOOM
         );
+    }
+
+    /**
+     * mmap 版本：额外持有 MappedByteBuffer 引用防止 GC 回收
+     */
+    public void initWithKey(Image image, double w, double h, String mapKey, MappedByteBuffer buffer) {
+        this.mapImageBuffer = buffer;
+        initWithKey(image, w, h, mapKey);
     }
 
     /** 更新玩家状态并发布 PLAYER_UPDATE 事件 */

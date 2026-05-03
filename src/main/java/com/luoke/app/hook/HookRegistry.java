@@ -23,6 +23,8 @@ public enum HookRegistry {
      * @param hook 要注册的钩子实例，不能为null
      */
     public void register(AbstractGenericHook<?> hook) {
+        //防御型编程，启动事件多播器
+        HookMulticaster.getInstance();
         for (HookEventType eventType : hook.supportedEvents()) {
             container.registerHook(eventType, hook);
         }
@@ -56,5 +58,9 @@ public enum HookRegistry {
     public void destroy() {
         HookMulticaster.getInstance().shutdown();
         container.clear();
+    }
+
+    public void unregister(AbstractGenericHook<?> hook) {
+        container.unregisterHook(hook);
     }
 }

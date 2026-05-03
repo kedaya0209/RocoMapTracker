@@ -10,52 +10,198 @@ import com.luoke.app.macher.map.MapMatcher;
 import com.luoke.app.macher.map.SwitchMapMatcher;
 import com.luoke.app.macher.player.ArrowDetector;
 import com.luoke.app.macher.player.Player;
-import com.luoke.app.utils.CoordinateTransformer;
-import javafx.scene.paint.Color;
 import lombok.extern.slf4j.Slf4j;
+import org.opencv.core.CvType;
+import org.opencv.core.Mat;
+import org.opencv.imgproc.Imgproc;
 
-import java.util.Arrays;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Semaphore;
-import java.util.function.BiConsumer;
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @Slf4j
-public class MapMatcherProcessor implements RoiProcessor {
+public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
 
     private final int targetRoiIndex;
     private final MapMatcher mapMatcher;
     private final ArrowDetector arrowDetector;
     private final StatsContext stats = StatsContext.getInstance();
-    private final BiConsumer<String, Color> statusUpdateHandler;
+    private final ROIData cachedRoi = new ROIData(8900, 700, 1000, 1800);
 
-    private final ROIData cachedRoi = new ROIData(8900, 800, 1000, 1500);
-    private final Semaphore parallel = new Semaphore(1);
+    private final ExecutorService matchExecutor = new ThreadPoolExecutor(
+            1, 1, 0L, TimeUnit.MILLISECONDS,
+            new SynchronousQueue<>(),
+            r -> {
+                Thread t = new Thread(r, "MapMatch-Worker");
+                t.setDaemon(true);
+                return t;
+            },
+            new ThreadPoolExecutor.DiscardPolicy()
+    );
 
     private final long delay = 1000 / AppConfig.TARGET_CAPTURE_FPS;
-    private final ExecutorService siftExecutor = Executors.newFixedThreadPool(1, r -> {
-        Thread t = new Thread(r, "Sift-Async-Worker");
-        t.setDaemon(true);
-        return t;
-    });
     private long prevTime = 0L;
 
-    public MapMatcherProcessor(int targetRoiIndex, BiConsumer<String, Color> statusHandler) {
+    private final int sw = 120;
+    // --- 缓存 Mats ---
+    private Mat grayMat, smallGray, blurMat, circles;
+    private double detectCenterX, detectCenterY;
+    private int detectRadius;
+    private double scale;
+    private byte[] smallGrayData;
+
+    private final AtomicBoolean isMapLost = new AtomicBoolean(false);
+    private int consecutiveFailureCount = 0;
+
+    public MapMatcherProcessor(int targetRoiIndex) {
         this.targetRoiIndex = targetRoiIndex;
-        this.statusUpdateHandler = statusHandler;
         this.mapMatcher = SwitchMapMatcher.getInstance();
         this.mapMatcher.init(ResourceContext.getSiftMap());
         this.arrowDetector = ArrowDetector.getInstance();
         try {
-            arrowDetector.init();
+            this.arrowDetector.init();
         } catch (Exception e) {
-            log.error("玩家朝向服务初始化失败,e", e);
+            log.error("初始化失败", e);
+        }
+    }
+
+    @Override
+    public void onProcess(byte[] data, int width, int height) {
+        long now = System.currentTimeMillis();
+        if (now - prevTime < delay) return;
+        prevTime = now;
+
+        // 必须 clone，因为 data 是外部缓冲区复用的，不 clone 进线程会被下一帧覆盖
+        byte[] taskData = data.clone();
+        matchExecutor.execute(() -> executeMatching(taskData, width, height));
+    }
+
+    private void executeMatching(byte[] data, int width, int height) {
+        stats.onFrameProcessed();
+        long tStart = System.currentTimeMillis();
+
+        // 1. 检测前置校验
+        if (!trackOrDetectMiniMap(data, width, height)) {
+            handleMatchFailure("锁定丢失");
+            stats.reset();
+            stats.recordMapDetect(System.currentTimeMillis() - tStart);
+            return;
+        }
+        stats.recordMapDetect(System.currentTimeMillis() - tStart);
+
+        // 3. 执行 Mask
+        applyFastCircleMask(data, width, height);
+
+        long detStart = System.currentTimeMillis();
+        // 4. 角色与 SIFT 匹配
+        Player player = arrowDetector.detectPlayer(data, width, height);
+        long matchStart = System.currentTimeMillis();
+        stats.recordDirection(matchStart - detStart);
+        double[][] worldCoords = mapMatcher.match(data, width, height);
+        stats.recordMatch(System.currentTimeMillis() - matchStart);
+
+        if (worldCoords != null && worldCoords.length > 0) {
+            handleMatchSuccess(worldCoords[0], player.getAngle());
+        } else {
+            handleMatchFailure("特征点不足");
+        }
+    }
+
+    private boolean trackOrDetectMiniMap(byte[] data, int w, int h) {
+        initMats(w, h);
+
+        if (circles != null) {
+            circles.release();
+        }
+        circles = new Mat();
+
+        grayMat.put(0, 0, data);
+        Imgproc.resize(grayMat, smallGray, smallGray.size());
+
+        // 确保数据刷新到字节数组
+        smallGray.get(0, 0, smallGrayData);
+        Imgproc.medianBlur(smallGray, blurMat, 5);
+
+        int minSide = Math.min(smallGray.cols(), smallGray.rows());
+        Imgproc.HoughCircles(blurMat, circles, Imgproc.HOUGH_GRADIENT,
+                1.2, minSide * 0.6, 50, 35,
+                (int) (minSide * 0.4), (int) (minSide * 0.55));
+
+        // 检查是否真的探测到了列
+        if (circles.empty() || circles.cols() == 0) {
+            return false;
+        }
+
+        double[] c = circles.get(0, 0);
+        double detCx = c[0], detCy = c[1], detR = c[2];
+
+        int blackCount = 0;
+        for (int i = 0; i < 120; i++) {
+            double theta = Math.toRadians(i * 3.0);
+            int sx = (int) (detCx + detR * Math.cos(theta));
+            int sy = (int) (detCy + detR * Math.sin(theta));
+            if (sx >= 0 && sx < sw && sy >= 0 && sy < smallGray.rows()) {
+                if ((smallGrayData[sy * sw + sx] & 0xFF) < 150) blackCount++;
+            }
+        }
+
+        double distToCenter = Math.sqrt(Math.pow(detCx - sw / 2.0, 2) + Math.pow(detCy - smallGray.rows() / 2.0, 2));
+
+        if ((double) blackCount / 120 > 0.15 && distToCenter < (minSide * 0.2)) {
+            detectCenterX = detCx / scale;
+            detectCenterY = detCy / scale;
+            detectRadius = (int) (detR / scale);
+            return true;
+        }
+        return false;
+    }
+
+    private void applyFastCircleMask(byte[] data, int w, int h) {
+        double r2 = (double) detectRadius * detectRadius;
+        for (int y = 0; y < h; y++) {
+            int offset = y * w;
+            for (int x = 0; x < w; x++) {
+                double dx = x - detectCenterX;
+                double dy = y - detectCenterY;
+                if (dx * dx + dy * dy > r2) {
+                    data[offset + x] = 0;
+                }
+            }
+        }
+    }
+
+    private void initMats(int w, int h) {
+        if (grayMat == null || grayMat.cols() != w || grayMat.rows() != h) {
+            releaseDetectMats();
+            scale = (double) sw / w;
+            int sh = (int) (h * scale);
+            grayMat = new Mat(h, w, CvType.CV_8UC1);
+            smallGray = new Mat(sh, sw, CvType.CV_8UC1);
+            smallGrayData = new byte[sw * sh];
+            blurMat = new Mat(sh, sw, CvType.CV_8UC1);
+        }
+    }
+
+    private void handleMatchSuccess(double[] pos, double angle) {
+        consecutiveFailureCount = 0;
+        isMapLost.set(false);
+        MapContext.getInstance().updatePlayerState(pos[0], pos[1], angle);
+    }
+
+    private void handleMatchFailure(String reason) {
+        consecutiveFailureCount++;
+        // 只有连续多次失败才标记 Lost，防止偶发波动导致 UI 闪烁
+        if (consecutiveFailureCount > 5) {
+            isMapLost.set(true);
+            MapContext.getInstance().updatePlayerState(-1, -1, 0);
         }
     }
 
     @Override
     public int targetRoiIndex() {
-        return this.targetRoiIndex;
+        return targetRoiIndex;
     }
 
     @Override
@@ -63,88 +209,26 @@ public class MapMatcherProcessor implements RoiProcessor {
         return cachedRoi;
     }
 
+    private void releaseDetectMats() {
+        if (grayMat != null) grayMat.release();
+        if (smallGray != null) smallGray.release();
+        if (blurMat != null) blurMat.release();
+        if (circles != null) circles.release();
+        grayMat = null;
+        smallGray = null;
+        blurMat = null;
+        circles = null;
+    }
+
     @Override
-    public void onProcess(byte[] data, int width, int height) {
-        long now = System.currentTimeMillis();
-
-        // 1. 粗粒度频率控制：还没到预设间隔，直接丢弃
-        if (now - prevTime < delay) return;
-
-        // 2. 线程安全性控制：如果上一个 SIFT 还在跑，直接丢弃（不排队，保证实时性）
-        if (!parallel.tryAcquire()) return;
-
-        // 【关键】一旦成功抢占，立即记录时间点，保证频率相对稳定
-        prevTime = now;
-
-        siftExecutor.submit(() -> {
-            try {
-                processAsync(data, width, height);
-            } catch (Exception e) {
-                log.error("SIFT 异步链路异常", e);
-            } finally {
-                parallel.release();
-            }
-        });
-    }
-
-    private void processAsync(byte[] data, int width, int height) {
-        stats.onFrameProcessed();
-
-        // --- Step 1: 箭头检测 (使用原始数据) ---
-        // 箭头通常在中心，不受后续 mask 影响，但先检测可以作为 SIFT 的“开关”
-        long t2 = System.currentTimeMillis();
-        Player player = arrowDetector.detectPlayer(data, width, height);
-        stats.recordDirection(System.currentTimeMillis() - t2);
-
-        if (!player.isFound()) {
-            stats.recordMatch(0);
-            return;
+    public void close() {
+        matchExecutor.shutdownNow();
+        releaseDetectMats();
+        if (arrowDetector != null) {
+            arrowDetector.release();
         }
-
-        // --- Step 2: 掩码处理 ---
-        // SIFT 只需要圆形区域内的特征，消除外部 UI 干扰
-        maskCircleOptimized(data, width, height);
-
-        // --- Step 3: SIFT 匹配 ---
-        long t1 = System.currentTimeMillis();
-        double[][] worldCoords = mapMatcher.match(data, width, height);
-        stats.recordMatch(System.currentTimeMillis() - t1);
-
-        if (worldCoords == null) {
-            notifyStatus(AppConfig.STATUS_MATCH_FAILED, Color.RED);
-            return;
+        if (mapMatcher != null) {
+            mapMatcher.destroy();
         }
-
-        // --- Step 4: 数据更新 ---
-        double[] pos = worldCoords[0];
-        MapContext.getInstance().updatePlayerState(pos[0], pos[1], player.getAngle());
-        CoordinateTransformer.updatePositionSmoothly(pos[0], pos[1], 0.5);
-
-        notifyStatus(AppConfig.STATUS_RUNNING, Color.LIGHTGREEN);
-    }
-
-    private void maskCircleOptimized(byte[] data, int w, int h) {
-        int cx = w / 2;
-        int cy = h / 2;
-        int r = Math.min(cx, cy) - 2;
-        int rSq = r * r;
-        for (int y = 0; y < h; y++) {
-            int dy = y - cy;
-            int dy2 = dy * dy;
-            int yOff = y * w;
-            if (dy2 > rSq) {
-                Arrays.fill(data, yOff, yOff + w, (byte) 0);
-            } else {
-                int dx = (int) Math.sqrt(rSq - dy2);
-                int minX = cx - dx;
-                int maxX = cx + dx;
-                if (minX > 0) Arrays.fill(data, yOff, yOff + minX, (byte) 0);
-                if (maxX < w - 1) Arrays.fill(data, yOff + maxX + 1, yOff + w, (byte) 0);
-            }
-        }
-    }
-
-    private void notifyStatus(String msg, Color color) {
-        if (statusUpdateHandler != null) statusUpdateHandler.accept(msg, color);
     }
 }

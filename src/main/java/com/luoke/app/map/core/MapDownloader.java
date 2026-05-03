@@ -115,6 +115,7 @@ public class MapDownloader {
 
             // 4. 清理
             cleanTempFiles();
+            resetState(); // 释放下载过程中积累的集合内存
         } catch (Exception e) {
             log.error("下载流程中断", e);
         }

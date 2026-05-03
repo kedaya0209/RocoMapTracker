@@ -2,9 +2,9 @@ package com.luoke.app.hook.impl;
 
 import com.luoke.app.config.AppConfig;
 import com.luoke.app.context.ResourcePointContext;
-import com.luoke.app.event.PlayerPositionEvent;
 import com.luoke.app.hook.AbstractGenericHook;
 import com.luoke.app.hook.HookEventType;
+import com.luoke.app.hook.event.PlayerPositionEvent;
 import com.luoke.app.map.model.ResourcePoint;
 import javafx.geometry.Point2D;
 
@@ -37,7 +37,7 @@ public class ResourceGrayHook extends AbstractGenericHook<PlayerPositionEvent> {
             // 过滤条件检查：
             // 1. 仅对"采集"类型的资源生效
             // 2. markType > 704是游戏内特定的采集资源分类规则
-            if (res.isCollectible()) {
+            if (!ResourcePointContext.getInstance().isCollect(res.getConfig().getMarkTypeName())) {
                 continue;
             }
 

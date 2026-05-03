@@ -10,15 +10,6 @@
       "type": "ai.djl.onnxruntime.zoo.OrtZooProvider"
     },
     {
-      "type": "ai.djl.opencv.OpenCVImageFactory",
-      "methods": [
-        {
-          "name": "<init>",
-          "parameterTypes": []
-        }
-      ]
-    },
-    {
       "type": "ai.onnxruntime.OnnxTensor",
       "jniAccessible": true,
       "methods": [
@@ -530,6 +521,27 @@
       ]
     },
     {
+      "type": "com.luoke.app.map.model.Point",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        },
+        {
+          "name": "setX",
+          "parameterTypes": [
+            "double"
+          ]
+        },
+        {
+          "name": "setY",
+          "parameterTypes": [
+            "double"
+          ]
+        }
+      ]
+    },
+    {
       "type": "com.luoke.app.map.model.ResourceConfig",
       "methods": [
         {
@@ -562,10 +574,6 @@
         },
         {
           "name": "getType",
-          "parameterTypes": []
-        },
-        {
-          "name": "getZoom",
           "parameterTypes": []
         },
         {
@@ -609,11 +617,54 @@
           "parameterTypes": [
             "java.lang.String"
           ]
+        }
+      ]
+    },
+    {
+      "type": "com.luoke.app.map.model.RoutePath",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
         },
         {
-          "name": "setZoom",
+          "name": "getName",
+          "parameterTypes": []
+        },
+        {
+          "name": "getNodes",
+          "parameterTypes": []
+        },
+        {
+          "name": "getTag",
+          "parameterTypes": []
+        },
+        {
+          "name": "isVisible",
+          "parameterTypes": []
+        },
+        {
+          "name": "setName",
           "parameterTypes": [
-            "java.lang.Integer"
+            "java.lang.String"
+          ]
+        },
+        {
+          "name": "setNodes",
+          "parameterTypes": [
+            "java.util.List"
+          ]
+        },
+        {
+          "name": "setTag",
+          "parameterTypes": [
+            "java.lang.String"
+          ]
+        },
+        {
+          "name": "setVisible",
+          "parameterTypes": [
+            "boolean"
           ]
         }
       ]
@@ -626,6 +677,10 @@
           "parameterTypes": []
         }
       ]
+    },
+    {
+      "type": "com.luoke.app.utils.JNIFrameNative",
+      "jniAccessible": true
     },
     {
       "type": "com.sun.crypto.provider.AESCipher$General",
@@ -772,6 +827,34 @@
         },
         {
           "name": "contentChanged",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "com.sun.glass.ui.CommonDialogs",
+      "jniAccessible": true,
+      "methods": [
+        {
+          "name": "createFileChooserResult",
+          "parameterTypes": [
+            "java.lang.String[]",
+            "com.sun.glass.ui.CommonDialogs$ExtensionFilter[]",
+            "int"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "com.sun.glass.ui.CommonDialogs$ExtensionFilter",
+      "jniAccessible": true,
+      "methods": [
+        {
+          "name": "extensionsToArray",
+          "parameterTypes": []
+        },
+        {
+          "name": "getDescription",
           "parameterTypes": []
         }
       ]
@@ -1566,6 +1649,12 @@
       "type": "com.sun.javafx.PreviewFeature"
     },
     {
+      "type": "com.sun.javafx.collections.ObservableListWrapper"
+    },
+    {
+      "type": "com.sun.javafx.collections.SortableList"
+    },
+    {
       "type": "com.sun.javafx.font.directwrite.DWFactory",
       "methods": [
         {
@@ -1777,7 +1866,24 @@
     },
     {
       "type": "com.sun.jna.CallbackReference$AttachOptions",
-      "jniAccessible": true
+      "jniAccessible": true,
+      "fields": [
+        {
+          "name": "daemon"
+        },
+        {
+          "name": "detach"
+        },
+        {
+          "name": "name"
+        }
+      ],
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
     },
     {
       "type": "com.sun.jna.FromNativeConverter",
@@ -2251,6 +2357,19 @@
       ]
     },
     {
+      "type": "com.sun.scenario.effect.impl.prism.ps.PPSColorAdjustPeer",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": [
+            "com.sun.scenario.effect.FilterContext",
+            "com.sun.scenario.effect.impl.Renderer",
+            "java.lang.String"
+          ]
+        }
+      ]
+    },
+    {
       "type": "com.sun.scenario.effect.impl.prism.ps.PPSLinearConvolveShadowPeer",
       "methods": [
         {
@@ -2273,6 +2392,9 @@
           ]
         }
       ]
+    },
+    {
+      "type": "double"
     },
     {
       "type": "java.awt.AWTEvent",
@@ -2895,6 +3017,9 @@
       ]
     },
     {
+      "type": "java.lang.Iterable"
+    },
+    {
       "type": "java.lang.Long",
       "jniAccessible": true,
       "fields": [
@@ -2980,6 +3105,12 @@
           "name": "<init>",
           "parameterTypes": [
             "byte[]",
+            "java.lang.String"
+          ]
+        },
+        {
+          "name": "concat",
+          "parameterTypes": [
             "java.lang.String"
           ]
         },
@@ -3223,6 +3354,12 @@
       "type": "java.security.interfaces.RSAPublicKey"
     },
     {
+      "type": "java.util.AbstractCollection"
+    },
+    {
+      "type": "java.util.AbstractList"
+    },
+    {
       "type": "java.util.ArrayList",
       "serializable": true,
       "jniAccessible": true,
@@ -3240,6 +3377,9 @@
           ]
         }
       ]
+    },
+    {
+      "type": "java.util.Collection"
     },
     {
       "type": "java.util.Collections",
@@ -3277,6 +3417,9 @@
       ]
     },
     {
+      "type": "java.util.List"
+    },
+    {
       "type": "java.util.Map",
       "jniAccessible": true,
       "methods": [
@@ -3290,16 +3433,53 @@
       ]
     },
     {
+      "type": "java.util.RandomAccess"
+    },
+    {
+      "type": "javafx.animation.Interpolatable"
+    },
+    {
       "type": "javafx.animation.Interpolator"
     },
     {
       "type": "javafx.animation.KeyValue"
     },
     {
+      "type": "javafx.beans.Observable"
+    },
+    {
+      "type": "javafx.beans.Observable[]"
+    },
+    {
+      "type": "javafx.collections.ModifiableObservableListBase"
+    },
+    {
+      "type": "javafx.collections.ObservableList"
+    },
+    {
+      "type": "javafx.collections.ObservableListBase"
+    },
+    {
       "type": "javafx.css.Rule"
     },
     {
+      "type": "javafx.geometry.Point2D",
+      "methods": [
+        {
+          "name": "getX",
+          "parameterTypes": []
+        },
+        {
+          "name": "getY",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
       "type": "javafx.scene.Camera"
+    },
+    {
+      "type": "javafx.scene.Group"
     },
     {
       "type": "javafx.scene.Node"
@@ -3348,6 +3528,18 @@
           ]
         }
       ]
+    },
+    {
+      "type": "javafx.scene.shape.LineTo"
+    },
+    {
+      "type": "javafx.scene.shape.MoveTo"
+    },
+    {
+      "type": "javafx.scene.shape.Path"
+    },
+    {
+      "type": "javafx.scene.shape.PathElement"
     },
     {
       "type": "javafx.scene.shape.Rectangle"
@@ -4136,6 +4328,14 @@
         {
           "name": "getApplicationClass",
           "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "sun.misc.Unsafe",
+      "fields": [
+        {
+          "name": "theUnsafe"
         }
       ]
     },
@@ -9022,6 +9222,9 @@
       "glob": "com/sun/prism/d3d/hlsl/Texture_Color.obj"
     },
     {
+      "glob": "com/sun/scenario/effect/impl/hw/d3d/hlsl/ColorAdjust.obj"
+    },
+    {
       "glob": "com/sun/scenario/effect/impl/hw/d3d/hlsl/LinearConvolveShadow_28.obj"
     },
     {
@@ -9029,6 +9232,9 @@
     },
     {
       "glob": "com/sun/scenario/effect/impl/hw/d3d/hlsl/LinearConvolveShadow_64.obj"
+    },
+    {
+      "glob": "dll/jniframe.dll"
     },
     {
       "glob": "dll/wgc_capture.dll"
@@ -9052,6 +9258,9 @@
       "glob": "logback.xml"
     },
     {
+      "glob": "model/arrow_fp32.onnx"
+    },
+    {
       "glob": "model/ch_PP-OCRv4_det_mobile.onnx"
     },
     {
@@ -9070,13 +9279,136 @@
       "glob": "msvcp140_2.dll"
     },
     {
-      "glob": "nu/pattern/opencv/windows/x86_64/opencv_java490.dll"
-    },
-    {
       "glob": "prism_d3d.dll"
     },
     {
       "glob": "resource-list.txt"
+    },
+    {
+      "glob": "source/icon/player.png"
+    },
+    {
+      "glob": "source/icon/伞伞菌.png"
+    },
+    {
+      "glob": "source/icon/凤眼莲.png"
+    },
+    {
+      "glob": "source/icon/向阳花.png"
+    },
+    {
+      "glob": "source/icon/喵喵草.png"
+    },
+    {
+      "glob": "source/icon/喷气菇.png"
+    },
+    {
+      "glob": "source/icon/大嘴花.png"
+    },
+    {
+      "glob": "source/icon/天使草.png"
+    },
+    {
+      "glob": "source/icon/幽幽草.png"
+    },
+    {
+      "glob": "source/icon/幽幽鬼火.png"
+    },
+    {
+      "glob": "source/icon/彩玉花.png"
+    },
+    {
+      "glob": "source/icon/恶魔雪茄.png"
+    },
+    {
+      "glob": "source/icon/星霜花.png"
+    },
+    {
+      "glob": "source/icon/杏黄贝.png"
+    },
+    {
+      "glob": "source/icon/洋红珊瑚.png"
+    },
+    {
+      "glob": "source/icon/流星兰.png"
+    },
+    {
+      "glob": "source/icon/海桑花.png"
+    },
+    {
+      "glob": "source/icon/海珊瑚.png"
+    },
+    {
+      "glob": "source/icon/海神花.png"
+    },
+    {
+      "glob": "source/icon/火焰花.png"
+    },
+    {
+      "glob": "source/icon/睡铃.png"
+    },
+    {
+      "glob": "source/icon/短木莲.png"
+    },
+    {
+      "glob": "source/icon/石耳.png"
+    },
+    {
+      "glob": "source/icon/紫晶菇.png"
+    },
+    {
+      "glob": "source/icon/紫莲刚玉.png"
+    },
+    {
+      "glob": "source/icon/紫雀花.png"
+    },
+    {
+      "glob": "source/icon/花星角.png"
+    },
+    {
+      "glob": "source/icon/荧光兰.png"
+    },
+    {
+      "glob": "source/icon/蓝掌.png"
+    },
+    {
+      "glob": "source/icon/蓝晶碧玺.png"
+    },
+    {
+      "glob": "source/icon/藻羽花.png"
+    },
+    {
+      "glob": "source/icon/蜜黄菌.png"
+    },
+    {
+      "glob": "source/icon/象牙花.png"
+    },
+    {
+      "glob": "source/icon/雪菇.png"
+    },
+    {
+      "glob": "source/icon/风卷草.png"
+    },
+    {
+      "glob": "source/icon/骨片.png"
+    },
+    {
+      "glob": "source/icon/黄石榴石.png"
+    },
+    {
+      "glob": "source/icon/黑晶琉璃.png"
+    },
+    {
+      "glob": "source/map/WorldMap_SIFT.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show.png"
+    },
+    {
+      "glob": "source/point/collect_set.txt"
+    },
+    {
+      "glob": "source/point/internal_resource_point.json"
     },
     {
       "glob": "ucrtbase.dll"

@@ -3,9 +3,10 @@ package com.luoke.app.hook;
 public enum HookEventType {
 
     PLAYER_UPDATE,
-
-    /**
-     * 配置变更事件
-     */
-    CONFIG_UPDATE
+    UI_NOTIFICATION,
+    INIT_PROGRESS,
+    CAPTURE_STATE,
+    MAP_COORD_UPDATED,
+    MAP_NAME_UPDATED,
+    RESOURCE_FOUND
 }

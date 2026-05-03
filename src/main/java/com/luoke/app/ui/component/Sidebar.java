@@ -2,10 +2,14 @@ package com.luoke.app.ui.component;
 
 import atlantafx.base.theme.Styles;
 import com.luoke.app.config.AppConfig;
+import com.luoke.app.context.ResourceContext;
+import com.luoke.app.hook.HookEventType;
+import com.luoke.app.hook.HookRegistry;
+import com.luoke.app.hook.event.ProgressEvent;
+import com.luoke.app.hook.event.StatusEvent;
 import com.luoke.app.macher.map.SwitchMapMatcher;
 import com.luoke.app.map.MapResourceUpdater;
 import com.luoke.app.map.core.DownloadProgressContext;
-import com.luoke.app.ui.ModernCanvasApp;
 import com.luoke.app.ui.util.DialogUtils;
 import com.luoke.app.ui.util.RestartUtils;
 import javafx.animation.KeyFrame;
@@ -15,7 +19,10 @@ import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Cursor;
-import javafx.scene.control.*;
+import javafx.scene.control.Button;
+import javafx.scene.control.Hyperlink;
+import javafx.scene.control.Label;
+import javafx.scene.control.ProgressBar;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
@@ -33,6 +40,7 @@ public class Sidebar extends VBox {
     private ProgressBar progressBar;
     private Label progressLabel;
     private Label statusLabel;
+    private RouteManagerStage routeManagerStage;
 
     private final String SIDEBAR_BG = "#1e1e1e";
     private final String BUTTON_BG = "#2b2b2b";
@@ -61,48 +69,77 @@ public class Sidebar extends VBox {
 
         // 2. 匹配算法菜单
         VBox algoMenu = createExpandableMenu("匹配算法选择",
-                new String[]{"SIFT", "SIFT-PCA", "SIFT-ULTRA", "SIFT-PCA-ULTRA"},
+                SwitchMapMatcher.getInstance().getMatchers().toArray(new String[0]),
                 AppConfig.MAP_MATCHAER,
                 this::switchAlgorithm,
                 true
         );
-        // 增加边距解决顶部拥挤问题
         VBox.setMargin(algoMenu, new Insets(8, 0, 0, 0));
 
         // 3. 资源模式菜单
         VBox resourceMenu = createExpandableMenu("资源模式切换",
-                new String[]{"内置资源", "WIKI资源"},
+                ResourceContext.getTags().toArray(new String[0]),
                 AppConfig.INTERNAL_RESOURCE ? "内置资源" : "WIKI资源",
                 this::switchResource,
                 false
         );
 
-        // 4. 更新按钮区域
+        // 4. 【新增】路线管理模块
+        VBox routeArea = createRouteArea();
+
+        // 5. 更新按钮区域
         createProgressButton();
 
-        controlsGroup.getChildren().addAll(algoMenu, resourceMenu, btnContainer);
+        controlsGroup.getChildren().addAll(algoMenu, resourceMenu, routeArea, btnContainer);
 
-        // 5. 布局：中间撑开空间
         Region bottomSpacer = new Region();
         VBox.setVgrow(bottomSpacer, Priority.ALWAYS);
 
         getChildren().addAll(title, controlsGroup, bottomSpacer);
 
-        // 6. 底部声明：仅在非内置模式显示
         if (!AppConfig.INTERNAL_RESOURCE) {
             initWikiFooter();
         }
     }
 
     /**
-     * 初始化底部 WIKI 链接声明
+     * 创建路径工具区域
      */
+    private VBox createRouteArea() {
+        VBox container = new VBox(0);
+
+        Button routeBtn = new Button("路线管理");
+        routeBtn.setMaxWidth(Double.MAX_VALUE);
+        routeBtn.setPrefHeight(ITEM_HEIGHT);
+        routeBtn.setStyle("-fx-background-color: " + BUTTON_BG + "; -fx-text-fill: " + BUTTON_TEXT + "; -fx-background-radius: 6;");
+
+        routeBtn.setOnAction(e -> {
+            StackPane rootPane = findRootPane();
+            if (rootPane == null) return;
+
+            if (routeManagerStage == null) {
+                routeManagerStage = RouteManagerStage.getInstance(rootPane);
+                routeManagerStage.initOwner(rootPane.getScene().getWindow());
+            }
+
+            if (routeManagerStage.isShowing()) {
+                routeManagerStage.toFront();
+            } else {
+                routeManagerStage.setX(rootPane.getScene().getWindow().getX() + 250);
+                routeManagerStage.setY(rootPane.getScene().getWindow().getY() + 100);
+                routeManagerStage.show();
+            }
+        });
+
+        container.getChildren().addAll(routeBtn);
+        return container;
+    }
+
     private void initWikiFooter() {
         VBox footer = new VBox(2);
         footer.setAlignment(Pos.CENTER);
         footer.setPadding(new Insets(10, 0, 0, 0));
 
-        // 模拟 a 标签样式的 Hyperlink
         Hyperlink wikiLink = new Hyperlink("数据来源：洛克王国WIKI");
         String linkStyle = "-fx-text-fill: #444444; -fx-font-size: 10px; -fx-underline: true; -fx-border-color: transparent; -fx-padding: 0;";
         wikiLink.setStyle(linkStyle);
@@ -111,7 +148,7 @@ public class Sidebar extends VBox {
         wikiLink.setOnMouseExited(e -> wikiLink.setStyle(linkStyle));
 
         wikiLink.setOnAction(e -> {
-            openWebpage("https://wiki.biligame.com/rocom/"); // 替换为真实的 WIKI URL
+            openWebpage("https://wiki.biligame.com/rocom/");
             wikiLink.setVisited(false);
         });
 
@@ -151,6 +188,7 @@ public class Sidebar extends VBox {
         header.getChildren().addAll(label, spacer, arrow);
 
         VBox content = new VBox(5);
+        content.setPadding(new Insets(8, 0, 0, 0));
         content.setOpacity(0);
         content.setPrefHeight(0);
         content.setMinHeight(0);
@@ -189,7 +227,7 @@ public class Sidebar extends VBox {
             content.getChildren().add(btn);
         }
 
-        double expandedHeight = items.length * 39;
+        double expandedHeight = items.length * 39 + 8;
         Timeline animation = new Timeline();
         header.setOnMouseClicked(e -> {
             boolean opening = content.getPrefHeight() == 0;
@@ -208,8 +246,8 @@ public class Sidebar extends VBox {
     }
 
     private void applySelectedStyle(Button btn) {
-        btn.setStyle("-fx-background-color: rgba(76,175,80,0.1); -fx-text-fill: " + SELECTED_GREEN +
-                "; -fx-font-size: 12px; -fx-font-weight: bold;");
+        btn.setStyle("-fx-background-color: rgba(76,175,80,0.15); -fx-text-fill: " + SELECTED_GREEN +
+                ";");
     }
 
     private boolean isCurrentlySelected(Button btn, boolean isAlgo) {
@@ -230,11 +268,14 @@ public class Sidebar extends VBox {
         Thread.ofVirtual().start(() -> {
             try {
                 SwitchMapMatcher.getInstance().switchMapMatcher(algo);
-                Platform.runLater(() -> ModernCanvasApp.notify("算法已就绪: " + algo, NotificationToast.Type.SUCCESS));
+                HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION,
+                        new StatusEvent("算法已就绪: " + algo, NotificationToast.Type.SUCCESS));
+
                 AppConfig.MAP_MATCHAER = algo;
                 AppConfig.save();
             } catch (Exception e) {
-                Platform.runLater(() -> ModernCanvasApp.notify("切换失败", NotificationToast.Type.ERROR));
+                HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION,
+                        new StatusEvent("切换算法失败", NotificationToast.Type.ERROR));
             } finally {
                 Platform.runLater(() -> isAlgorithmLoading = false);
             }
@@ -254,13 +295,14 @@ public class Sidebar extends VBox {
                     AppConfig.save();
                     RestartUtils.restart();
                 },
-                () -> {} // 取消按钮正常显示
+                () -> {
+                }
         );
     }
 
     private void createProgressButton() {
         btnContainer = new StackPane();
-        btnContainer.setPadding(new Insets(10, 0, 0, 0));
+        btnContainer.setPadding(new Insets(0, 0, 0, 0));
 
         updateBtn = new Button("更新WIKI资源");
         updateBtn.setMaxWidth(Double.MAX_VALUE);
@@ -302,11 +344,13 @@ public class Sidebar extends VBox {
         Thread.ofVirtual().start(() -> {
             try {
                 MapResourceUpdater.updateAllResources();
-                Platform.runLater(() -> ModernCanvasApp.notify("更新成功！", NotificationToast.Type.SUCCESS));
+                HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION,
+                        new StatusEvent("WIKI资源同步完成", NotificationToast.Type.SUCCESS));
             } catch (Exception e) {
                 Platform.runLater(() -> {
                     switchToNormalState();
-                    ModernCanvasApp.notify("更新失败", NotificationToast.Type.ERROR);
+                    HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION,
+                            new StatusEvent("资源同步失败，请检查网络", NotificationToast.Type.ERROR));
                 });
             }
         });
@@ -325,11 +369,26 @@ public class Sidebar extends VBox {
                 progressBar.setProgress(p);
                 progressLabel.setText(completed + " / " + total);
                 statusLabel.setText(DownloadProgressContext.getInstance().getStatusText());
+
+                HookRegistry.INSTANCE.publish(HookEventType.INIT_PROGRESS,
+                        new ProgressEvent(p, "WIKI同步: " + DownloadProgressContext.getInstance().getStatusText()));
+
                 if (completed >= total && total > 0) {
                     new Timeline(new KeyFrame(Duration.seconds(1), e -> switchToNormalState())).play();
                 }
             });
         });
+    }
+
+    /**
+     * 向上遍历节点树找到 StackPane 根容器
+     */
+    private StackPane findRootPane() {
+        javafx.scene.Node node = this;
+        while ((node = node.getParent()) != null) {
+            if (node instanceof StackPane sp) return sp;
+        }
+        return null;
     }
 
     private void switchToNormalState() {

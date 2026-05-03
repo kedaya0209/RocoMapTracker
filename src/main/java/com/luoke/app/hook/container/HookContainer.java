@@ -49,4 +49,10 @@ public class HookContainer {
         // 注意：这不会影响钩子实例本身，只是释放容器中的引用
         eventHookMap.clear();
     }
+
+    public void unregisterHook(AbstractGenericHook<?> hook) {
+        for (List<AbstractGenericHook<?>> value : eventHookMap.values()) {
+            value.remove(hook);
+        }
+    }
 }

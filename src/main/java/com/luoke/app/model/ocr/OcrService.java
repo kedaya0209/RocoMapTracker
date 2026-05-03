@@ -30,6 +30,8 @@ public class OcrService implements AutoCloseable {
     private static final int BINARY_THRESHOLD = 150;
 
     // 预创建 Mat 容器，避免在 recognizeAll 中反复申请 Native 内存
+    private Mat fullMat;  // 复用，尺寸变化时重建
+    private int fullW = -1, fullH = -1;
     private final Mat detResizedMat = new Mat();
     private final Mat letterboxMat = new Mat();
     private final Mat recResizedMat = new Mat();
@@ -39,6 +41,8 @@ public class OcrService implements AutoCloseable {
     private FloatBuffer detFloatBuffer;
     // 线程内复用字节数组，减少 GC 压力
     private byte[] rowCache = new byte[8192];
+    // 复用大 float 数组，避免每帧 new float[3*size]（最多 12MB）
+    private float[] dataCache = new float[0];
 
     private OnnxDetManager detManager;
     private OnnxRecManager recManager;
@@ -66,8 +70,13 @@ public class OcrService implements AutoCloseable {
     public List<String> recognizeAll(byte[] grayData, int width, int height) {
         if (isClosed || grayData == null) return Collections.emptyList();
 
-        // 1. 创建顶层 Mat 包装输入数据
-        Mat fullMat = new Mat(height, width, CvType.CV_8UC1);
+        // 复用 fullMat，尺寸变化时才重建
+        if (fullMat == null || width != fullW || height != fullH) {
+            if (fullMat != null) fullMat.release();
+            fullMat = new Mat(height, width, CvType.CV_8UC1);
+            fullW = width;
+            fullH = height;
+        }
         fullMat.put(0, 0, grayData);
 
         try {
@@ -75,20 +84,18 @@ public class OcrService implements AutoCloseable {
             int detH = alignTo(height, DET_ALIGNMENT);
 
             LetterboxInfo info = new LetterboxInfo();
-            // 2. 更新 letterboxMat (成员变量复用)
             updateLetterbox(fullMat, detW, detH, info);
 
-            // 3. 检测阶段
+            // 检测阶段
             FloatBuffer detBuffer = fastBuildTensor(letterboxMat, detW, detH, true);
             float[] heatMap = detManager.detect(detBuffer, detH, detW);
 
             List<Rect> boxes = extractTextLineBoxes(heatMap, detH, detW, width, height, info);
             if (boxes.isEmpty()) return Collections.emptyList();
 
-            // 4. 识别阶段
+            // 识别阶段
             List<String> resultList = new ArrayList<>(boxes.size());
             for (Rect box : boxes) {
-                // 裁剪行子图（创建的是 Header，必须 release）
                 Mat lineHeader = new Mat(fullMat, box);
                 try {
                     if (lineHeader.empty()) continue;
@@ -98,11 +105,10 @@ public class OcrService implements AutoCloseable {
                     FloatBuffer recBuffer = fastBuildTensor(lineHeader, recW, REC_STD_HEIGHT, false);
                     String text = recManager.recognize(recBuffer, REC_STD_HEIGHT, recW);
 
-                    // 简单清洗结果
                     text = text.replaceAll("[^\\u4e00-\\u9fa5xX×*0-9a-zA-Z]", "").trim();
                     if (!text.isEmpty()) resultList.add(text);
                 } finally {
-                    lineHeader.release(); // 显式释放临时子 Mat
+                    lineHeader.release();
                 }
             }
             return resultList;
@@ -110,9 +116,8 @@ public class OcrService implements AutoCloseable {
         } catch (Exception e) {
             log.error("OCR 匹配链路异常", e);
             return Collections.emptyList();
-        } finally {
-            fullMat.release(); // 显式释放顶层输入 Mat
         }
+        // 注意：fullMat 不在此处释放，作为成员变量复用
     }
 
     /**
@@ -149,9 +154,13 @@ public class OcrService implements AutoCloseable {
 
         if (rowCache.length < tw) rowCache = new byte[tw + 512];
 
-        float[] data = new float[3 * size];
+        // 复用 dataCache，只在需要时扩容
+        int dataLen = 3 * size;
+        if (dataCache.length < dataLen) {
+            dataCache = new float[dataLen];
+        }
+
         for (int y = 0; y < th; y++) {
-            // 批量获取行数据，效率远高于逐像素调用 ptr()
             targetMat.get(y, 0, rowCache);
             for (int x = 0; x < tw; x++) {
                 int gray = rowCache[x] & 0xFF;
@@ -159,13 +168,13 @@ public class OcrService implements AutoCloseable {
                 int idx = y * tw + x;
                 float norm = (val - 0.5f) / 0.5f;
                 // 填充 CHW 格式 Tensor
-                data[idx] = norm;
-                data[size + idx] = norm;
-                data[2 * size + idx] = norm;
+                dataCache[idx] = norm;
+                dataCache[size + idx] = norm;
+                dataCache[2 * size + idx] = norm;
             }
         }
 
-        buffer.put(data);
+        buffer.put(dataCache);
         buffer.flip();
         return buffer;
     }
@@ -218,6 +227,7 @@ public class OcrService implements AutoCloseable {
         if (recManager != null) recManager.close();
 
         // 显式销毁长期持有的 Native 资源
+        if (fullMat != null) fullMat.release();
         detResizedMat.release();
         recResizedMat.release();
         letterboxMat.release();

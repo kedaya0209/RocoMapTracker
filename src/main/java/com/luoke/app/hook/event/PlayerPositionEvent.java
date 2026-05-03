@@ -1,4 +1,4 @@
-package com.luoke.app.event;
+package com.luoke.app.hook.event;
 
 import lombok.Builder;
 

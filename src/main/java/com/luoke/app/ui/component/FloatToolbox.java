@@ -62,8 +62,9 @@ public class FloatToolbox extends VBox {
         btn.getChildren().add(icon);
 
         if (isFollowLogic) {
-            btn.setOnMouseClicked(e -> CameraContext.getInstance().setFollowMode(!CameraContext.getInstance().isFollowMode()));
-            CameraContext.getInstance().followModeProperty().addListener((obs, old, newVal) -> {
+            CameraContext cameraCtx = CameraContext.getInstance();
+            btn.setOnMouseClicked(e -> cameraCtx.setFollowMode(!cameraCtx.isFollowMode()));
+            cameraCtx.followModeProperty().addListener((obs, old, newVal) -> {
                 Platform.runLater(() -> icon.setFill(newVal ? Color.web(unifiedBlueColor) : Color.WHITE));
             });
         } else if (panel != null) {
