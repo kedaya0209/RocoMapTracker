@@ -1,0 +1,11 @@
+/dll/awt.dll:awt.dll
+/dll/fontmanager.dll:fontmanager.dll
+/dll/freetype.dll:freetype.dll
+/dll/java.dll:java.dll
+/dll/javaaccessbridge.dll:javaaccessbridge.dll
+/dll/javajpeg.dll:javajpeg.dll
+/dll/jawt.dll:jawt.dll
+/dll/jvm.dll:jvm.dll
+/dll/lcms.dll:lcms.dll
+/dll/wgc_capture.dll:/dll/wgc_capture.dll
+/source/point/collect_set.txt:/resources/source/point/collect_set.txt
