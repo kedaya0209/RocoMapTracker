@@ -1,0 +1,15 @@
+[package]
+name = "wgc_capture"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+path = "lib.rs"
+
+[dependencies]
+lazy_static = "1.4"
+
+windows-capture = "2.0.0"
+
+tokio = { version = "1", features = ["rt-multi-thread"] }

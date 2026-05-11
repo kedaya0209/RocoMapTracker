@@ -5,9 +5,18 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.luoke</groupId>
-    <artifactId>RocoMapTracker</artifactId>
+    <artifactId>roco-map-tracker</artifactId>
     <version>1.1.0</version>
-    <packaging>jar</packaging>
+    <packaging>pom</packaging>
+
+    <modules>
+        <module>roco-common</module>
+        <module>roco-model</module>
+        <module>roco-map</module>
+        <module>roco-macher</module>
+        <module>roco-engine</module>
+        <module>roco-ui</module>
+    </modules>
 
     <properties>
         <maven.compiler.source>25</maven.compiler.source>
@@ -16,7 +25,6 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
         <javafx.version>25</javafx.version>
-        <javacv.version>1.5.10</javacv.version>
         <jna.version>5.13.0</jna.version>
         <zstd.version>1.5.6-2</zstd.version>
         <jackson.version>2.15.2</jackson.version>
@@ -28,399 +36,202 @@
         <graalvm.version>25.0.2</graalvm.version>
         <djl.version>0.36.0</djl.version>
         <atlantafx.version>2.1.0</atlantafx.version>
-        <opencv.version>4.9.0-0</opencv.version>
+        <javacv.version>4.13.0-1.5.13</javacv.version>
+        <openblas.version>0.3.31-1.5.13</openblas.version>
+        <javacpp.version>1.5.13</javacpp.version>
     </properties>
-    <dependencies>
-        <!-- Source: https://mvnrepository.com/artifact/io.github.mkpaz/atlantafx-base -->
-        <dependency>
-            <groupId>io.github.mkpaz</groupId>
-            <artifactId>atlantafx-base</artifactId>
-            <version>${atlantafx.version}</version>
-            <scope>compile</scope>
-        </dependency>
-        <dependency>
-            <groupId>ai.djl</groupId>
-            <artifactId>api</artifactId>
-            <version>${djl.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>ai.djl.onnxruntime</groupId>
-            <artifactId>onnxruntime-engine</artifactId>
-            <version>${djl.version}</version>
-            <scope>runtime</scope>
-        </dependency>
-        <!-- DJL 的 OpenCV 图像处理支持 -->
-        <dependency>
-            <groupId>ai.djl.opencv</groupId>
-            <artifactId>opencv</artifactId>
-            <version>${djl.version}</version>
-        </dependency>
-        <!-- 核心：提供 OpenCV 的原生二进制库 (DLL/SO) -->
-        <dependency>
-            <groupId>org.openpnp</groupId>
-            <artifactId>opencv</artifactId>
-            <version>${opencv.version}</version>
-        </dependency>
 
-        <dependency>
-            <groupId>com.github.luben</groupId>
-            <artifactId>zstd-jni</artifactId>
-            <version>${zstd.version}</version>
-        </dependency>
+    <dependencyManagement>
+        <dependencies>
+            <!-- Jackson -->
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-databind</artifactId>
+                <version>${jackson.version}</version>
+            </dependency>
 
-        <dependency>
-            <groupId>org.openjfx</groupId>
-            <artifactId>javafx-controls</artifactId>
-            <version>${javafx.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.openjfx</groupId>
-            <artifactId>javafx-graphics</artifactId>
-            <version>${javafx.version}</version>
-        </dependency>
+            <!-- Jsoup -->
+            <dependency>
+                <groupId>org.jsoup</groupId>
+                <artifactId>jsoup</artifactId>
+                <version>${jsoup.version}</version>
+            </dependency>
 
-        <dependency>
-            <groupId>org.openjfx</groupId>
-            <artifactId>javafx-base</artifactId>
-            <version>${javafx.version}</version>
-        </dependency>
+            <!-- Logging -->
+            <dependency>
+                <groupId>org.slf4j</groupId>
+                <artifactId>slf4j-api</artifactId>
+                <version>${sl4j.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>ch.qos.logback</groupId>
+                <artifactId>logback-classic</artifactId>
+                <version>${logback.version}</version>
+            </dependency>
 
-        <dependency>
-            <groupId>org.openjfx</groupId>
-            <artifactId>javafx-fxml</artifactId>
-            <version>${javafx.version}</version>
-        </dependency>
+            <!-- Lombok -->
+            <dependency>
+                <groupId>org.projectlombok</groupId>
+                <artifactId>lombok</artifactId>
+                <version>${lombok.version}</version>
+                <scope>provided</scope>
+            </dependency>
 
-        <!-- JNA -->
-        <dependency>
-            <groupId>net.java.dev.jna</groupId>
-            <artifactId>jna</artifactId>
-            <version>${jna.version}</version>
-        </dependency>
+            <!-- JavaCPP / OpenCV -->
+            <dependency>
+                <groupId>org.bytedeco</groupId>
+                <artifactId>javacpp</artifactId>
+                <version>${javacpp.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.bytedeco</groupId>
+                <artifactId>opencv</artifactId>
+                <version>${javacv.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.bytedeco</groupId>
+                <artifactId>opencv</artifactId>
+                <version>${javacv.version}</version>
+                <classifier>windows-x86_64</classifier>
+            </dependency>
+            <dependency>
+                <groupId>org.bytedeco</groupId>
+                <artifactId>openblas</artifactId>
+                <version>${openblas.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.bytedeco</groupId>
+                <artifactId>openblas</artifactId>
+                <version>${openblas.version}</version>
+                <classifier>windows-x86_64</classifier>
+            </dependency>
 
-        <dependency>
-            <groupId>net.java.dev.jna</groupId>
-            <artifactId>jna-platform</artifactId>
-            <version>${jna.version}</version>
-        </dependency>
+            <!-- DJL -->
+            <dependency>
+                <groupId>ai.djl</groupId>
+                <artifactId>api</artifactId>
+                <version>${djl.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>ai.djl.onnxruntime</groupId>
+                <artifactId>onnxruntime-engine</artifactId>
+                <version>${djl.version}</version>
+                <scope>runtime</scope>
+            </dependency>
 
-        <!-- Logging -->
-        <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-api</artifactId>
-            <version>${sl4j.version}</version>
-        </dependency>
+            <!-- Zstd -->
+            <dependency>
+                <groupId>com.github.luben</groupId>
+                <artifactId>zstd-jni</artifactId>
+                <version>${zstd.version}</version>
+            </dependency>
 
-        <dependency>
-            <groupId>ch.qos.logback</groupId>
-            <artifactId>logback-classic</artifactId>
-            <version>${logback.version}</version>
-        </dependency>
+            <!-- JNA -->
+            <dependency>
+                <groupId>net.java.dev.jna</groupId>
+                <artifactId>jna</artifactId>
+                <version>${jna.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>net.java.dev.jna</groupId>
+                <artifactId>jna-platform</artifactId>
+                <version>${jna.version}</version>
+            </dependency>
 
-        <dependency>
-            <groupId>org.projectlombok</groupId>
-            <artifactId>lombok</artifactId>
-            <version>${lombok.version}</version>
-            <scope>provided</scope>
-        </dependency>
+            <!-- JavaFX -->
+            <dependency>
+                <groupId>org.openjfx</groupId>
+                <artifactId>javafx-controls</artifactId>
+                <version>${javafx.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.openjfx</groupId>
+                <artifactId>javafx-graphics</artifactId>
+                <version>${javafx.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.openjfx</groupId>
+                <artifactId>javafx-base</artifactId>
+                <version>${javafx.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.openjfx</groupId>
+                <artifactId>javafx-fxml</artifactId>
+                <version>${javafx.version}</version>
+            </dependency>
 
-        <dependency>
-            <groupId>org.jsoup</groupId>
-            <artifactId>jsoup</artifactId>
-            <version>${jsoup.version}</version>
-        </dependency>
+            <!-- AtlantaFX -->
+            <dependency>
+                <groupId>io.github.mkpaz</groupId>
+                <artifactId>atlantafx-base</artifactId>
+                <version>${atlantafx.version}</version>
+            </dependency>
 
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-databind</artifactId>
-            <version>${jackson.version}</version>
-        </dependency>
+            <!-- Test -->
+            <dependency>
+                <groupId>org.junit.jupiter</groupId>
+                <artifactId>junit-jupiter-api</artifactId>
+                <version>${junit.version}</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.junit.jupiter</groupId>
+                <artifactId>junit-jupiter-engine</artifactId>
+                <version>${junit.version}</version>
+                <scope>test</scope>
+            </dependency>
 
-        <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter-api</artifactId>
-            <version>${junit.version}</version>
-            <scope>test</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter-engine</artifactId>
-            <version>${junit.version}</version>
-            <scope>test</scope>
-        </dependency>
-    </dependencies>
+            <!-- Internal modules -->
+            <dependency>
+                <groupId>com.luoke</groupId>
+                <artifactId>roco-common</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.luoke</groupId>
+                <artifactId>roco-model</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.luoke</groupId>
+                <artifactId>roco-map</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.luoke</groupId>
+                <artifactId>roco-macher</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.luoke</groupId>
+                <artifactId>roco-engine</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <build>
-        <plugins>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.15.0</version>
-                <configuration>
-                    <source>25</source>
-                    <target>25</target>
-                    <release>25</release>
-                    <encoding>UTF-8</encoding>
-                    <annotationProcessorPaths>
-                        <path>
-                            <groupId>org.projectlombok</groupId>
-                            <artifactId>lombok</artifactId>
-                            <version>${lombok.version}</version>
-                        </path>
-                    </annotationProcessorPaths>
-                </configuration>
-            </plugin>
-
-            <plugin>
-                <groupId>org.openjfx</groupId>
-                <artifactId>javafx-maven-plugin</artifactId>
-                <version>0.0.8</version>
-                <configuration>
-                    <mainClass>com.luoke.app.Main</mainClass>
-                </configuration>
-            </plugin>
-
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-jar-plugin</artifactId>
-                <version>3.3.0</version>
-                <configuration>
-                    <archive>
-                        <manifest>
-                            <mainClass>com.luoke.app.Main</mainClass>
-                        </manifest>
-                    </archive>
-                </configuration>
-            </plugin>
-
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-assembly-plugin</artifactId>
-                <version>3.8.0</version>
-                <configuration>
-                    <archive>
-                        <manifest>
-                            <mainClass>com.luoke.app.Main</mainClass>
-                        </manifest>
-                    </archive>
-                    <descriptorRefs>
-                        <descriptorRef>jar-with-dependencies</descriptorRef>
-                    </descriptorRefs>
-                </configuration>
-                <executions>
-                    <execution>
-                        <id>make-assembly</id>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>single</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
-        </plugins>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>3.15.0</version>
+                    <configuration>
+                        <source>25</source>
+                        <target>25</target>
+                        <release>25</release>
+                        <encoding>UTF-8</encoding>
+                        <annotationProcessorPaths>
+                            <path>
+                                <groupId>org.projectlombok</groupId>
+                                <artifactId>lombok</artifactId>
+                                <version>${lombok.version}</version>
+                            </path>
+                        </annotationProcessorPaths>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
     </build>
-
-    <profiles>
-        <profile>
-            <id>native</id>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.graalvm.buildtools</groupId>
-                        <artifactId>native-maven-plugin</artifactId>
-                        <version>0.10.0</version>
-                        <extensions>true</extensions>
-                        <executions>
-                            <execution>
-                                <id>build-native</id>
-                                <goals>
-                                    <goal>compile</goal>
-                                </goals>
-                                <phase>package</phase>
-                            </execution>
-                        </executions>
-                        <configuration>
-                            <mainClass>com.luoke.app.Main</mainClass>
-                            <imageName>RocoMapTracker</imageName>
-                            <useArgFile>true</useArgFile>
-
-                            <agent>
-                                <enabled>false</enabled>
-                                <options>
-                                    <option>experimental-class-loader-support</option>
-                                    <option>allow-incomplete-classpath</option>
-                                </options>
-                            </agent>
-                            <buildArgs>
-                                <buildArg>-R:MaxHeapSize=1G</buildArg>
-                                <buildArg>-R:MinHeapSize=256M</buildArg>
-                                <buildArg>-R:MaxDirectMemorySize=512M</buildArg>
-
-                                <!-- 企业版特性 -->
-                                <buildArg>-H:+RemoveUnusedSymbols</buildArg>
-
-                                <!-- 基础配置 -->
-                                <buildArg>-H:+AddAllCharsets</buildArg>
-                                <buildArg>-Dfile.encoding=UTF-8</buildArg>
-                                <buildArg>--enable-native-access=ALL-UNNAMED</buildArg>
-                                <buildArg>--no-fallback</buildArg>
-                                <buildArg>-Djava.awt.headless=false</buildArg>
-                                <buildArg>-H:+InstallExitHandlers</buildArg>
-
-                                <!-- I/O & Native 内存 -->
-                                <buildArg>-Djdk.nio.maxCachedBufferSize=262144</buildArg>
-                                <buildArg>-Djna.nosys=true</buildArg>
-
-                                <!-- 编译优化 -->
-                                <buildArg>-J-Xmx24g</buildArg>
-                                <buildArg>-O3</buildArg>
-                                <buildArg>-march=x86-64-v3</buildArg>
-                                <buildArg>-H:+StripDebugInfo</buildArg>
-
-                                <buildArg>--initialize-at-run-time=com.sun.prism.**</buildArg>
-                                <buildArg>--initialize-at-run-time=com.sun.glass.ui.**</buildArg>
-                                <buildArg>--initialize-at-run-time=javafx.**</buildArg>
-                                <buildArg>--initialize-at-run-time=org.opencv.**</buildArg>
-                                <buildArg>--initialize-at-run-time=ai.djl.opencv.**</buildArg>
-                                <buildArg>--initialize-at-run-time=com.sun.jna.**</buildArg>
-
-                                <buildArg>-H:IncludeResources=(META-INF/services/.*|model/.*|com/sun/prism/.*|com/sun/javafx/.*|.*\.(png|properties|json|fxml|xml|dll|txt|css|ttf|woff2|sh|ps|hlsl|cso))$</buildArg>
-                                <buildArg>-H:IncludeResourceBundles=ch.qos.logback.*</buildArg>
-                                <buildArg>-H:ReachabilityMetadataResources=META-INF/native-image/reachability-metadata.json</buildArg>
-
-                                <buildArg>--add-exports=javafx.graphics/com.sun.prism.shader=ALL-UNNAMED</buildArg>
-                                <buildArg>--add-exports=javafx.graphics/com.sun.glass.ui=ALL-UNNAMED</buildArg>
-                                <buildArg>--add-exports=javafx.graphics/com.sun.prism.d3d=ALL-UNNAMED</buildArg>
-                                <buildArg>-H:+ReportExceptionStackTraces</buildArg>
-                                <buildArg>--enable-url-protocols=http,https</buildArg>
-                                <buildArg>-H:+JNI</buildArg>
-                                <buildArg>--initialize-at-run-time=com.luoke.app.utils.JNIFrameNative</buildArg>
-                            </buildArgs>
-                        </configuration>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-
-        <!--
-          PGO Step 1: 构建插桩二进制
-            mvn -Pnative-instrument clean package
-          然后运行生成的 exe 采集代表性场景数据（自动生成 default.iprof）
-        -->
-        <profile>
-            <id>native-instrument</id>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.graalvm.buildtools</groupId>
-                        <artifactId>native-maven-plugin</artifactId>
-                        <version>0.10.0</version>
-                        <extensions>true</extensions>
-                        <executions>
-                            <execution>
-                                <id>build-native</id>
-                                <goals><goal>compile</goal></goals>
-                                <phase>package</phase>
-                            </execution>
-                        </executions>
-                        <configuration>
-                            <mainClass>com.luoke.app.Main</mainClass>
-                            <imageName>RocoMapTracker-instrumented</imageName>
-                            <buildArgs>
-                                <buildArg>--gc=Z</buildArg>
-                                <buildArg>-R:MaxHeapSize=1G</buildArg>
-                                <buildArg>-R:MaxDirectMemorySize=512M</buildArg>
-                                <buildArg>--pgo-instrument</buildArg>
-                                <buildArg>-O3</buildArg>
-                                <buildArg>-march=x86-64-v3</buildArg>
-                                <buildArg>-H:+AddAllCharsets</buildArg>
-                                <buildArg>-Dfile.encoding=UTF-8</buildArg>
-                                <buildArg>--enable-native-access=ALL-UNNAMED</buildArg>
-                                <buildArg>--no-fallback</buildArg>
-                                <buildArg>-Djava.awt.headless=false</buildArg>
-                                <buildArg>-H:+JNI</buildArg>
-                                <buildArg>-H:+ReportExceptionStackTraces</buildArg>
-                                <buildArg>--enable-url-protocols=http,https</buildArg>
-                                <buildArg>-J-Xmx8g</buildArg>
-                                <buildArg>--initialize-at-run-time=com.sun.prism.**</buildArg>
-                                <buildArg>--initialize-at-run-time=com.sun.glass.ui.**</buildArg>
-                                <buildArg>--initialize-at-run-time=javafx.**</buildArg>
-                                <buildArg>--initialize-at-run-time=org.opencv.**</buildArg>
-                                <buildArg>--initialize-at-run-time=ai.djl.opencv.**</buildArg>
-                                <buildArg>--initialize-at-run-time=com.sun.jna.**</buildArg>
-                                <buildArg>--initialize-at-run-time=com.luoke.app.utils.JNIFrameNative</buildArg>
-                                <buildArg>-H:IncludeResources=(META-INF/services/.*|model/.*|com/sun/prism/.*|com/sun/javafx/.*|.*\.(png|properties|json|fxml|xml|dll|txt|css|ttf|woff2|sh|ps|hlsl|cso))$</buildArg>
-                                <buildArg>-H:IncludeResourceBundles=ch.qos.logback.*</buildArg>
-                            </buildArgs>
-                        </configuration>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-
-        <!--
-          PGO Step 2: 用采集的 iprof 数据构建最终优化二进制
-            mvn -Pnative-pgo clean package
-          前提：default.iprof 存在于项目根目录
-        -->
-        <profile>
-            <id>native-pgo</id>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.graalvm.buildtools</groupId>
-                        <artifactId>native-maven-plugin</artifactId>
-                        <version>0.10.0</version>
-                        <extensions>true</extensions>
-                        <executions>
-                            <execution>
-                                <id>build-native</id>
-                                <goals><goal>compile</goal></goals>
-                                <phase>package</phase>
-                            </execution>
-                        </executions>
-                        <configuration>
-                            <mainClass>com.luoke.app.Main</mainClass>
-                            <imageName>RocoMapTracker</imageName>
-                            <buildArgs>
-                                <buildArg>--gc=Z</buildArg>
-<!--                                <buildArg>-H:NativeLinkerOption=/SUBSYSTEM:WINDOWS</buildArg>-->
-<!--                                <buildArg>-H:NativeLinkerOption=/ENTRY:mainCRTStartup</buildArg>-->
-                                <buildArg>-R:MaxHeapSize=1G</buildArg>
-                                <buildArg>-R:MinHeapSize=256M</buildArg>
-                                <buildArg>-R:MaxDirectMemorySize=512M</buildArg>
-                                <buildArg>-H:+OmitInlinedMethodStackTrace</buildArg>
-                                <buildArg>-H:+RemoveUnusedSymbols</buildArg>
-                                <buildArg>--pgo=default.iprof</buildArg>
-                                <buildArg>-O3</buildArg>
-                                <buildArg>-march=x86-64-v3</buildArg>
-                                <buildArg>-H:+AddAllCharsets</buildArg>
-                                <buildArg>-Dfile.encoding=UTF-8</buildArg>
-                                <buildArg>--enable-native-access=ALL-UNNAMED</buildArg>
-                                <buildArg>--no-fallback</buildArg>
-                                <buildArg>-Djava.awt.headless=false</buildArg>
-                                <buildArg>-H:+InstallExitHandlers</buildArg>
-                                <buildArg>-Djdk.nio.maxCachedBufferSize=262144</buildArg>
-                                <buildArg>-Djna.nosys=true</buildArg>
-                                <buildArg>-H:+StripDebugInfo</buildArg>
-                                <buildArg>-H:+JNI</buildArg>
-                                <buildArg>--enable-url-protocols=http,https</buildArg>
-                                <buildArg>-J-Xmx8g</buildArg>
-                                <buildArg>--initialize-at-run-time=com.sun.prism.**</buildArg>
-                                <buildArg>--initialize-at-run-time=com.sun.glass.ui.**</buildArg>
-                                <buildArg>--initialize-at-run-time=javafx.**</buildArg>
-                                <buildArg>--initialize-at-run-time=org.opencv.**</buildArg>
-                                <buildArg>--initialize-at-run-time=ai.djl.opencv.**</buildArg>
-                                <buildArg>--initialize-at-run-time=com.sun.jna.**</buildArg>
-                                <buildArg>--initialize-at-run-time=com.luoke.app.utils.JNIFrameNative</buildArg>
-                                <buildArg>-H:IncludeResources=(META-INF/services/.*|model/.*|com/sun/prism/.*|com/sun/javafx/.*|.*\.(png|properties|json|fxml|xml|dll|txt|css|ttf|woff2|sh|ps|hlsl|cso))$</buildArg>
-                                <buildArg>-H:IncludeResourceBundles=ch.qos.logback.*</buildArg>
-                            </buildArgs>
-                        </configuration>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-    </profiles>
 </project>
