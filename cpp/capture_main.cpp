@@ -5,14 +5,15 @@
 //   Header: [4] msgType (int32 BE) + [4] bodyLength (int32 BE)
 //
 // Message flow:
-//   C++ -> Java: msgType=1 (request ROI list)
-//   Java -> C++: msgType=2 (return ROI list)
-//   C++ -> Java: msgType=3 (capture ready)
-//   Java -> C++: msgType=5 (processing done, request next frame)
-//   C++ -> Java: msgType=4 (frame data, sent only after msgType=5 received)
-//   Java -> C++: msgType=7 (stop request)
-//   C++ -> Java: msgType=6 (window closed)
-//   C++ -> Java: msgType=8 (window minimized/restored)
+//   C++ -> Java: msgType=1   HELLO body="capture" (handshake)
+//   C++ -> Java: msgType=100 (request ROI list)
+//   Java -> C++: msgType=101 (return ROI list)
+//   C++ -> Java: msgType=102 (capture ready)
+//   Java -> C++: msgType=104 (processing done, request next frame)
+//   C++ -> Java: msgType=103 (frame data, sent only after msgType=104 received)
+//   Java -> C++: msgType=106 (stop request)
+//   C++ -> Java: msgType=105 (window closed)
+//   C++ -> Java: msgType=107 (window minimized/restored)
 //
 // Build: build_capture.bat
 // Run:   capture.exe <hwnd_decimal> <port>
@@ -74,14 +75,15 @@ constexpr DXGI_FORMAT kFormat = static_cast<DXGI_FORMAT>(87); // DXGI_FORMAT_B8G
 // Message types
 // ============================================================================
 enum MsgType : int32_t {
-    REQUEST_ROI      = 1,  // C++ -> Java
-    RETURN_ROI       = 2,  // Java -> C++
-    CAPTURE_READY    = 3,  // C++ -> Java
-    FRAME_DATA       = 4,  // C++ -> Java
-    PROCESSING_DONE  = 5,  // Java -> C++
-    WINDOW_CLOSED    = 6,  // C++ -> Java
-    STOP_REQUEST     = 7,  // Java -> C++
-    WINDOW_STATE     = 8,  // C++ -> Java
+    HELLO            = 1,    // C++ -> Java (handshake: body="capture" or "sift")
+    REQUEST_ROI      = 100,  // C++ -> Java
+    RETURN_ROI       = 101,  // Java -> C++
+    CAPTURE_READY    = 102,  // C++ -> Java
+    FRAME_DATA       = 103,  // C++ -> Java
+    PROCESSING_DONE  = 104,  // Java -> C++
+    WINDOW_CLOSED    = 105,  // C++ -> Java
+    STOP_REQUEST     = 106,  // Java -> C++
+    WINDOW_STATE     = 107,  // C++ -> Java
 };
 
 // ============================================================================
@@ -112,6 +114,24 @@ static inline uint16_t read_be16(const uint8_t* buf) {
 static inline uint32_t read_be32(const uint8_t* buf) {
     return ((uint32_t)buf[0] << 24) | ((uint32_t)buf[1] << 16)
          | ((uint32_t)buf[2] << 8)  |  (uint32_t)buf[3];
+}
+
+// ============================================================================
+// Build HELLO body: [2B]clientTypeLen [NB]clientType [2B]msgTypeCount [N*4B]msgTypes
+// ============================================================================
+static std::vector<uint8_t> build_hello(const char* clientType,
+                                         const int32_t* msgTypes, uint16_t count) {
+    size_t nameLen = strlen(clientType);
+    std::vector<uint8_t> buf(2 + nameLen + 2 + (size_t)count * 4);
+    size_t off = 0;
+    write_be16(buf.data() + off, (uint16_t)nameLen); off += 2;
+    memcpy(buf.data() + off, clientType, nameLen);    off += nameLen;
+    write_be16(buf.data() + off, count);               off += 2;
+    for (uint16_t i = 0; i < count; i++) {
+        write_be32(buf.data() + off, (uint32_t)msgTypes[i]);
+        off += 4;
+    }
+    return buf;
 }
 
 // ============================================================================
@@ -256,6 +276,11 @@ public:
     ComPtr<ID3D11Texture2D> staging_tex;
     UINT staging_w = 0, staging_h = 0;
     UINT frame_w = 0, frame_h = 0;
+    HWND m_hwnd = nullptr;
+    std::atomic<bool> need_recreate{false};
+    UINT new_pool_w = 0, new_pool_h = 0;
+    int64_t recreate_count = 0;
+    int caption_px = 0;  // 标题栏像素高度
 
     // ROI list (protected by shared_mutex)
     std::shared_mutex roi_mutex;
@@ -276,6 +301,7 @@ public:
 
     // ---- Init WGC capture for a window ----
     HRESULT init(HWND hwnd) {
+        m_hwnd = hwnd;
         HRESULT hr;
 
         // 1. D3D11 device
@@ -329,8 +355,7 @@ public:
                 sz.Width = r.right - r.left;
                 sz.Height = r.bottom - r.top;
             } else {
-                sz.Width = 1920;
-                sz.Height = 1080;
+                sz.Width = 1920; sz.Height = 1080;
             }
             LOG("Fallback size: %dx%d", sz.Width, sz.Height);
         }
@@ -397,6 +422,70 @@ public:
         d3d_device.Reset();
     }
 
+    // ---- Recreate frame pool after window resize ----
+    // Must NOT be called inside ProcessFrame (staging tex is mapped).
+    // Called from capture_loop() BEFORE the next TryGetNextFrame.
+    bool RecreatePool(UINT newW, UINT newH) {
+        LOG("Recreating frame pool: %ux%u -> %ux%u", frame_w, frame_h, newW, newH);
+
+        // 1. Close old session and pool
+        if (session) {
+            ComPtr<ABI::Windows::Foundation::IClosable> closable;
+            if (SUCCEEDED(session.As(&closable))) closable->Close();
+            session.Reset();
+        }
+        if (frame_pool) {
+            ComPtr<ABI::Windows::Foundation::IClosable> closable;
+            if (SUCCEEDED(frame_pool.As(&closable))) closable->Close();
+            frame_pool.Reset();
+        }
+
+        // 2. Reset staging (will be recreated with new size)
+        staging_tex.Reset();
+        staging_w = 0;
+        staging_h = 0;
+
+        // 3. Get WinRT device from existing D3D device
+        ComPtr<IDXGIDevice> dxgi_dev;
+        if (FAILED(d3d_device.As(&dxgi_dev))) { LOGERR("RecreatePool: IDXGIDevice QI failed"); return false; }
+
+        ComPtr<WGD::IDirect3DDevice> winrt_device;
+        if (FAILED(CreateWinRTDevice(dxgi_dev.Get(), winrt_device)) || !winrt_device) {
+            LOGERR("RecreatePool: CreateWinRTDevice failed");
+            return false;
+        }
+
+        // 4. Create new frame pool with new size
+        ABI::Windows::Graphics::SizeInt32 sz = {(INT32)newW, (INT32)newH};
+        if (FAILED(CreateFramePool(winrt_device.Get(), sz))) {
+            LOGERR("RecreatePool: CreateFramePool failed");
+            return false;
+        }
+
+        // 5. Recreate session
+        if (FAILED(frame_pool->CreateCaptureSession(capture_item.Get(), &session)) || !session) {
+            LOGERR("RecreatePool: CreateCaptureSession failed");
+            return false;
+        }
+
+        // Disable yellow border again
+        {
+            ComPtr<WGC::IGraphicsCaptureSession3> session3;
+            if (SUCCEEDED(session.As(&session3))) session3->put_IsBorderRequired(false);
+        }
+
+        if (FAILED(session->StartCapture())) {
+            LOGERR("RecreatePool: StartCapture failed");
+            return false;
+        }
+
+        frame_w = newW;
+        frame_h = newH;
+        need_recreate.store(false, std::memory_order_release);
+        LOG("Frame pool recreated: %ux%u (#%lld)", newW, newH, (long long)recreate_count);
+        return true;
+    }
+
     // ---- Set ROI list (called from main thread, read by capture thread) ----
     void set_rois(const ROI* ptr, size_t count) {
         std::unique_lock lock(roi_mutex);
@@ -423,6 +512,17 @@ public:
                 last_frame_time = std::chrono::steady_clock::now();
             }
 
+            // 帧尺寸变化 → 安全时机重建 Frame Pool
+            if (need_recreate.load(std::memory_order_acquire)) {
+                recreate_count++;
+                if (!RecreatePool(new_pool_w, new_pool_h)) {
+                    LOGERR("RecreatePool failed, stopping capture");
+                    g_running.store(false, std::memory_order_release);
+                    break;
+                }
+                continue;
+            }
+
             // TryGetNextFrame
             ComPtr<WGC::IDirect3D11CaptureFrame> wgc_frame;
             HRESULT hr = frame_pool->TryGetNextFrame(&wgc_frame);
@@ -435,6 +535,25 @@ public:
                 // Window minimized: TryGetNextFrame returns S_OK + null frame
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
                 continue;
+            }
+
+            // 用 ContentSize 检测窗口尺寸变化 (可信度高于 texture->GetDesc)
+            {
+                ABI::Windows::Graphics::SizeInt32 cs = {};
+                if (SUCCEEDED(wgc_frame->get_ContentSize(&cs))
+                    && cs.Width > 0 && cs.Height > 0) {
+                    UINT cw = (UINT)cs.Width;
+                    UINT ch = (UINT)cs.Height;
+                    if (cw != frame_w || ch != frame_h) {
+                        LOG("ContentSize changed: %ux%u -> %ux%u", frame_w, frame_h, cw, ch);
+                        CloseWgcFrame(wgc_frame.Get());
+                        wgc_frame.Reset();
+                        need_recreate.store(true, std::memory_order_release);
+                        new_pool_w = cw;
+                        new_pool_h = ch;
+                        continue;
+                    }
+                }
             }
 
             // get_Surface -> IDirect3DSurface
@@ -533,11 +652,24 @@ private:
         frame_texture->GetDesc(&desc);
         UINT fw = desc.Width;
         UINT fh = desc.Height;
-        if (fw != frame_w || fh != frame_h) {
-            frame_w = fw; frame_h = fh;
-            LOG("Frame size changed: %dx%d", fw, fh);
-        }
         if (fw == 0 || fh == 0) return false;
+
+        // 每帧检测标题栏高度 (AdjustWindowRectExForDpi, DPI 感知)
+        if (m_hwnd) {
+            DWORD style = GetWindowLongW(m_hwnd, GWL_STYLE);
+            if (style & WS_CAPTION) {
+                DWORD exStyle = GetWindowLongW(m_hwnd, GWL_EXSTYLE);
+                UINT dpi = GetDpiForWindow(m_hwnd);
+                RECT rect = {};
+                AdjustWindowRectExForDpi(&rect, style, FALSE, exStyle, dpi);
+                caption_px = -rect.top;  // 标题栏+上边框(物理像素)
+            } else {
+                caption_px = 0;
+            }
+        }
+        UINT content_h = fh;
+        if ((UINT)caption_px < fh) content_h = fh - (UINT)caption_px;
+
         if (FAILED(EnsureStaging(fw, fh))) return false;
 
         d3d_context->CopyResource(staging_tex.Get(), frame_texture);
@@ -558,25 +690,26 @@ private:
         roi_buf_w.resize(nrois);
         roi_buf_h.resize(nrois);
 
-        const uint8_t* src = static_cast<const uint8_t*>(mapped.pData);
+        const uint8_t* src = static_cast<const uint8_t*>(mapped.pData)
+                             + (size_t)caption_px * mapped.RowPitch;
         UINT pitch = mapped.RowPitch;
         const size_t total_bytes = (size_t)pitch * fh;
 
         for (size_t i = 0; i < nrois; i++) {
             const ROI& r = roi_snap[i];
 
-            // Per-mil coords -> pixel coords
             int rx = (int)((int64_t)r.x * fw / 10000);
-            int ry = (int)((int64_t)r.y * fh / 10000);
+            int ry = (int)((int64_t)r.y * content_h / 10000);
             int rw = (int)((int64_t)r.w * fw / 10000);
-            int rh = (int)((int64_t)r.h * fh / 10000);
+            int rh = (r.h == 0) ? rw : (int)((int64_t)r.h * content_h / 10000);
+            // h==0: 自动正方形, 适应任意窗口宽高比
 
-            // Clamp to frame bounds
+            // Clamp to content bounds (标题栏已裁剪)
             if (rx < 0) { rw += rx; rx = 0; }
             if (ry < 0) { rh += ry; ry = 0; }
-            if (rx >= (int)fw || ry >= (int)fh) continue;
+            if (rx >= (int)fw || ry >= (int)content_h) continue;
             if (rx + rw > (int)fw) rw = (int)fw - rx;
-            if (ry + rh > (int)fh) rh = (int)fh - ry;
+            if (ry + rh > (int)content_h) rh = (int)content_h - ry;
             if (rw <= 0 || rh <= 0) continue;
 
             // Verify row fits within pitch
@@ -850,6 +983,19 @@ int main(int argc, char* argv[]) {
     }
     LOG("Connected to Java");
 
+    // ---- Handshake 1: HELLO (identify + declare supported msg types) ----
+    {
+        const int32_t myTypes[] = { RETURN_ROI, PROCESSING_DONE, STOP_REQUEST };
+        auto hello = build_hello("capture", myTypes, 3);
+        LOG("Sending HELLO (capture, %d types)...", 3);
+        if (!send_message(sock, HELLO, hello.data(), (uint32_t)hello.size())) {
+            LOGERR("Failed to send HELLO");
+            closesocket(sock);
+            WSACleanup();
+            return 1;
+        }
+    }
+
     // ---- WinRT init ----
     HRESULT hr = RoInitialize(RO_INIT_MULTITHREADED);
     if (FAILED(hr)) {
@@ -859,7 +1005,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    // ---- Handshake: request ROI -> receive ROI ----
+    // ---- Handshake 2: request ROI -> receive ROI ----
     LOG("Requesting ROI list...");
     if (!send_message(sock, REQUEST_ROI, nullptr, 0)) {
         LOGERR("Failed to send REQUEST_ROI");

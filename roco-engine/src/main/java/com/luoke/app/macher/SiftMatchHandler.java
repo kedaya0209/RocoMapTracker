@@ -2,6 +2,8 @@ package com.luoke.app.macher;
 
 import com.luoke.app.config.AppConfig;
 import com.luoke.app.context.ResourceConfigContext;
+import com.luoke.app.process.JobObjectManager;
+import com.luoke.app.process.NativeProcess;
 import com.luoke.app.socket.SocketHandler;
 import com.luoke.app.socket.SocketServer;
 import com.luoke.app.socket.SocketSession;
@@ -10,7 +12,6 @@ import com.luoke.app.utils.ResourceUtils;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.BufferedReader;
-import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -59,21 +60,21 @@ public class SiftMatchHandler implements SocketHandler {
     private static final int MSG_READY = 204;
     private static final int MSG_FRAME_DATA = 205;
     private static final int MSG_MATCH_RESULT = 206;
-    private static final int MSG_SHUTDOWN = 210;
-    private static final int MSG_REQUEST_CONFIG = 220;
-    private static final int MSG_CONFIG_DATA = 221;
+    private static final int MSG_SHUTDOWN = 207;
+    private static final int MSG_REQUEST_CONFIG = 208;
+    private static final int MSG_CONFIG_DATA = 209;
     private static final Set<Integer> TYPES = Set.of(
             MSG_REQUEST_MAP, MSG_REQUEST_CONFIG,
             MSG_INIT_COMPLETE, MSG_INIT_FAILED,
             MSG_READY, MSG_MATCH_RESULT);
 
     // ---- 当前服务中的进程 (active) ----
-    private Process activeProcess;
+    private NativeProcess activeProcess;
     private volatile SocketSession activeSession;
     private volatile boolean activeInitialized;
 
     // ---- 正在初始化的新进程 (pending)，用于无感热切换 ----
-    private Process pendingProcess;
+    private NativeProcess pendingProcess;
     private volatile SocketSession pendingSession;
     private volatile boolean pendingInitialized;
     private volatile boolean switching;
@@ -127,9 +128,13 @@ public class SiftMatchHandler implements SocketHandler {
     }
 
     @Override
+    public String clientType() { return "sift"; }
+
+    @Override
     public void onConnect(SocketSession session) {
+        // SocketServer 已按第一条消息 type 精准路由，此方法仅 sift_match.exe 连接时触发。
+        // 不在广播到所有 handler，无需担心 capture.exe 误绑。
         if (switching && pendingSession == null) {
-            // 热切换进行中，新连接绑定到 pending
             this.pendingSession = session;
             log.info("SiftMatchHandler bound pending session #{}", session.id());
         } else if (activeSession == null || activeSession.isClosed()) {
@@ -247,7 +252,7 @@ public class SiftMatchHandler implements SocketHandler {
         // MATCH params
         buf.putDouble(AppConfig.MATCH_RATIO_THRESHOLD);
         buf.putInt(AppConfig.MATCH_MIN_COUNT);
-        buf.putInt(500); // SEARCH_RADIUS
+        buf.putInt(AppConfig.SEARCH_RADIUS);
 
         // FLANN params
         buf.putInt(1);  // KDTreeIndexParams(1)
@@ -339,7 +344,7 @@ public class SiftMatchHandler implements SocketHandler {
         log.info("Pending SIFT ready ({} features), swapping...", featureCount);
 
         // 保存旧进程引用
-        Process oldProcess = this.activeProcess;
+        NativeProcess oldProcess = this.activeProcess;
         SocketSession oldSession = this.activeSession;
 
         // 原子交换
@@ -372,7 +377,7 @@ public class SiftMatchHandler implements SocketHandler {
         log.error("Pending SIFT init failed: {}, keeping current active", msg);
 
         // 清理 pending
-        Process p = this.pendingProcess;
+        NativeProcess p = this.pendingProcess;
         this.pendingProcess = null;
         this.pendingSession = null;
         this.pendingInitialized = false;
@@ -418,23 +423,19 @@ public class SiftMatchHandler implements SocketHandler {
 
         String exePath = FileUtil.getExternalPath(AppConfig.SIFT_MATCH_EXE, false);
 
-        try {
-            ProcessBuilder pb = new ProcessBuilder(
-                    exePath,
-                    Integer.toString(port)
-            );
-            pb.redirectErrorStream(true);
-            pb.directory(new java.io.File(exePath).getParentFile());
-            activeProcess = pb.start();
-
-            startReaderThread(activeProcess, "sift-stdout");
-
-            log.info("sift_match.exe launched, port={}", port);
-            return true;
-        } catch (IOException e) {
-            log.error("Failed to launch sift_match.exe", e);
+        // 通过 FFM CreateProcessW + PROC_THREAD_ATTRIBUTE_JOB_LIST 启动，
+        // 使 sift_match.exe 在任务管理器"进程"页签下归入 Java 父进程
+        String cmdLine = "\"" + exePath + "\" " + port;
+        activeProcess = NativeProcess.create(cmdLine, JobObjectManager.getJobHandle(), true);
+        if (activeProcess == null) {
+            log.error("Failed to launch sift_match.exe via NativeProcess");
             return false;
         }
+
+        startReaderThread(activeProcess, "sift-stdout");
+
+        log.info("sift_match.exe launched (pid={}), port={}", activeProcess.pid(), port);
+        return true;
     }
 
     /**
@@ -449,26 +450,21 @@ public class SiftMatchHandler implements SocketHandler {
 
         String exePath = FileUtil.getExternalPath(AppConfig.SIFT_MATCH_EXE, false);
 
-        try {
-            ProcessBuilder pb = new ProcessBuilder(
-                    exePath,
-                    Integer.toString(port)
-            );
-            pb.redirectErrorStream(true);
-            pb.directory(new java.io.File(exePath).getParentFile());
-            pendingProcess = pb.start();
-
-            startReaderThread(pendingProcess, "sift-stdout-pending");
-
-            log.info("Pending sift_match.exe launched, port={}, variant={}", port, currentVariant);
-            return true;
-        } catch (IOException e) {
-            log.error("Failed to launch pending sift_match.exe", e);
+        String cmdLine = "\"" + exePath + "\" " + port;
+        pendingProcess = NativeProcess.create(cmdLine, JobObjectManager.getJobHandle(), true);
+        if (pendingProcess == null) {
+            log.error("Failed to launch pending sift_match.exe via NativeProcess");
             return false;
         }
+
+        startReaderThread(pendingProcess, "sift-stdout-pending");
+
+        log.info("Pending sift_match.exe launched (pid={}), port={}, variant={}",
+                pendingProcess.pid(), port, currentVariant);
+        return true;
     }
 
-    private void startReaderThread(Process process, String name) {
+    private void startReaderThread(NativeProcess process, String name) {
         Thread.ofVirtual()
                 .name(name)
                 .start(() -> {
@@ -478,30 +474,22 @@ public class SiftMatchHandler implements SocketHandler {
                         while ((line = r.readLine()) != null) {
                             log.info("[{}] {}", name, line);
                         }
-                    } catch (IOException ignored) {
+                    } catch (Exception ignored) {
                     }
-                    try {
-                        int exit = process.waitFor();
-                        log.info("{} exited with code {}", name, exit);
-                    } catch (InterruptedException ignored) {
-                    }
+                    log.info("{} exited with code {}", name, process.exitCode());
                 });
     }
 
     /**
      * 停止指定进程: 先发 SHUTDOWN 消息，再 destroy。
      */
-    private void stopProcess(SocketSession session, Process process) {
+    private void stopProcess(SocketSession session, NativeProcess process) {
         if (session != null && !session.isClosed()) {
             session.send(MSG_SHUTDOWN, null);
         }
         if (process != null && process.isAlive()) {
-            try {
-                process.destroy();
-                if (!process.waitFor(3, TimeUnit.SECONDS)) {
-                    process.destroyForcibly();
-                }
-            } catch (InterruptedException ignored) {
+            process.destroy();
+            if (!process.waitFor(3, TimeUnit.SECONDS)) {
                 process.destroyForcibly();
             }
         }
@@ -592,7 +580,7 @@ public class SiftMatchHandler implements SocketHandler {
      */
     private void cancelPending() {
         log.info("Cancelling previous pending switch");
-        Process p = pendingProcess;
+        NativeProcess p = pendingProcess;
         SocketSession s = pendingSession;
         pendingProcess = null;
         pendingSession = null;

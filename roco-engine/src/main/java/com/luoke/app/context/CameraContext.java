@@ -53,7 +53,7 @@ public class CameraContext {
     public void updateViewport() {
         MapContext mm = MapContext.getInstance();
 
-        if (mm.getMapImage() == null || !isFollowMode() || !hasValidPlayerPosition()) {
+        if (!mm.isInitialized() || !isFollowMode() || !hasValidPlayerPosition()) {
             return;
         }
 

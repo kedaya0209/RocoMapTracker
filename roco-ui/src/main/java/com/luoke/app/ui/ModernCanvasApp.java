@@ -5,15 +5,14 @@ import com.luoke.app.capture.CaptureService;
 import com.luoke.app.capture.ROIData;
 import com.luoke.app.capture.processor.MapMatcherProcessor;
 import com.luoke.app.capture.processor.OcrProcessor;
+import com.luoke.app.capture.processor.SaveImageProcessor;
 import com.luoke.app.config.AppConfig;
 import com.luoke.app.context.*;
 import com.luoke.app.hook.AbstractGenericHook;
 import com.luoke.app.hook.HookEventType;
 import com.luoke.app.hook.event.NotificationType;
-import com.luoke.app.hook.event.PlayerPositionEvent;
 import com.luoke.app.hook.event.ProgressEvent;
 import com.luoke.app.hook.event.StatusEvent;
-import com.luoke.app.hook.impl.ResourceGrayHook;
 import com.luoke.app.hook.impl.UiResponseHook;
 import com.luoke.app.hook.multicast.HookRegistry;
 import com.luoke.app.macher.SiftMatchHandler;
@@ -22,26 +21,23 @@ import com.luoke.app.map.MapResourceUpdater;
 import com.luoke.app.map.core.DownloadProgressContext;
 import com.luoke.app.map.core.IconDownloader;
 import com.luoke.app.map.core.MapDownloader;
+import com.luoke.app.process.JobObjectManager;
 import com.luoke.app.socket.SocketServer;
 import com.luoke.app.ui.component.*;
-import com.luoke.app.ui.render.RenderLoop;
+import com.luoke.app.ui.render.MapRenderer;
 import com.luoke.app.ui.util.DialogUtils;
 import com.luoke.app.ui.util.WindowManager;
-import com.luoke.app.utils.MultiResMapCache;
+import com.luoke.app.utils.FileUtil;
 import com.luoke.app.utils.ResourceUtils;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
-import javafx.geometry.Pos;
 import javafx.scene.Scene;
-import javafx.scene.canvas.Canvas;
 import javafx.scene.control.Button;
 import javafx.scene.image.Image;
-import javafx.scene.image.ImageView;
-import javafx.scene.input.MouseButton;
-import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.Background;
+import javafx.scene.layout.Pane;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
@@ -52,10 +48,19 @@ import javafx.stage.StageStyle;
 import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import javax.imageio.ImageIO;
+import javax.imageio.ImageReader;
+import javax.imageio.stream.ImageInputStream;
+import java.awt.image.BufferedImage;
 import java.io.File;
+import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
@@ -69,12 +74,10 @@ public class ModernCanvasApp extends Application {
     private final WindowManager windowManager = new WindowManager(RESIZE_MARGIN);
     private final UiAnimator uiAnimator = new UiAnimator();
 
-    private RenderLoop renderLoop;
     private LoadingOverlay globalLoading;
     private CaptureService mainCaptureService;
     private SiftMatchHandler siftMatchClient;
     private volatile boolean isAppRunning = true;
-    private volatile Image playerIconImage;
 
     public static void main(String[] args) {
         launch(args);
@@ -85,9 +88,6 @@ public class ModernCanvasApp extends Application {
         super.init();
     }
 
-    /**
-     * 所有可用主题
-     */
     public static String[] getAvailableThemes() {
         return new String[]{"PrimerDark", "PrimerLight", "NordDark", "NordLight",
                 "CupertinoDark", "CupertinoLight", "Dracula"};
@@ -95,9 +95,6 @@ public class ModernCanvasApp extends Application {
 
     // ==================== 主题管理 ====================
 
-    /**
-     * 应用指定主题，失败回退 PrimerDark
-     */
     public static void applyTheme(String name) {
         Theme theme = switch (name) {
             case "PrimerLight" -> new PrimerLight();
@@ -111,9 +108,6 @@ public class ModernCanvasApp extends Application {
         Application.setUserAgentStylesheet(theme.getUserAgentStylesheet());
     }
 
-    /**
-     * 运行时切换主题并持久化
-     */
     public static void switchTheme(String name) {
         AppConfig.THEME = name;
         AppConfig.save();
@@ -122,7 +116,8 @@ public class ModernCanvasApp extends Application {
 
     @Override
     public void start(Stage primaryStage) {
-        // 启动全局 SocketServer (常驻后台)
+        JobObjectManager.init();
+
         try {
             int port = SocketServer.instance().start();
             log.info("SocketServer 已启动, 端口: {}", port);
@@ -130,10 +125,8 @@ public class ModernCanvasApp extends Application {
             log.error("SocketServer 启动失败", e);
         }
 
-        // 启动 SIFT 匹配子进程 (sift_match.exe)
         initSiftMatchClient();
 
-        // 注册算法切换回调 (运行时热切换 C++ 进程变体)
         SwitchMapMatcher.getInstance().setSwitchCallback(newVariant -> {
             log.info("算法变体切换: {}", newVariant);
             if (siftMatchClient != null) {
@@ -143,7 +136,6 @@ public class ModernCanvasApp extends Application {
 
         applyTheme(AppConfig.THEME);
 
-        // 外层容器：透明背景 + 内边距，为阴影留出空间
         StackPane wrapper = new StackPane();
         wrapper.setBackground(Background.EMPTY);
         wrapper.setPadding(new Insets(15));
@@ -153,7 +145,6 @@ public class ModernCanvasApp extends Application {
                 "-fx-background-radius: 12px; " +
                 "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.4), 30, 0, 0, 15);");
 
-        // 圆角裁剪：确保所有子节点（侧边栏等）不会溢出直角挡住圆角
         Rectangle rootClip = new Rectangle();
         rootClip.widthProperty().bind(rootStack.widthProperty());
         rootClip.heightProperty().bind(rootStack.heightProperty());
@@ -165,7 +156,6 @@ public class ModernCanvasApp extends Application {
 
         globalLoading = new LoadingOverlay(null);
         rootStack.getChildren().add(globalLoading);
-        // 注册事件分发逻辑
         HookRegistry.INSTANCE.register(new UiResponseHook(rootStack, globalLoading));
 
         Scene scene = new Scene(wrapper, 1100, 800);
@@ -174,7 +164,6 @@ public class ModernCanvasApp extends Application {
         primaryStage.initStyle(StageStyle.TRANSPARENT);
         primaryStage.setScene(scene);
         primaryStage.show();
-
 
         checkAndInitResourcesAsync(primaryStage);
     }
@@ -198,24 +187,25 @@ public class ModernCanvasApp extends Application {
     private void checkAndInitResourcesAsync(Stage primaryStage) {
         Thread.ofVirtual().start(() -> {
             try {
-                // 1. 初始化 OCR 引擎
                 OcrAsyncManager.initialize(AppConfig.OCR_CORE_SIZE);
 
                 File initFile = ResourceUtils.getExternalFile(AppConfig.SOURCE_INIT);
                 if (initFile.exists()) {
-                    // 分步骤发布进度，增强用户感官
                     publishInitStep(0.2, "初始化逻辑处理器...");
-                    HookRegistry.INSTANCE.registers(new ResourceGrayHook());
 
-                    publishInitStep(0.4, "正在载入大地图纹理...");
-                    initBigMapResource();
+                    publishInitStep(0.4, "正在载入地图元数据...");
+                    initMapMetadata();
+
+                    publishInitStep(0.5, "正在验证地图瓦片...");
+                    if (ResourceConfigContext.getCurrentProfile() != ResourceConfigContext.ResourceProfile.INTERNAL) {
+                        //使用内置资源，不生成
+                        validateAndGenerateTiles();
+                    }
 
                     publishInitStep(0.7, "构建坐标索引系统...");
                     ResourcePointContext.getInstance().loadAndInit();
 
                     publishInitStep(1.0, "核心引擎已就绪");
-
-                    // 确保渲染主循环在 UI 构建前不被触发
                     Platform.runLater(() -> buildMainUI(primaryStage));
                 } else {
                     handleFirstRun(primaryStage, initFile);
@@ -239,9 +229,7 @@ public class ModernCanvasApp extends Application {
     }
 
     private void startResourceDownloadAsync(Stage primaryStage, File initFile) {
-        // 1. 立即在 UI 线程准备好 Overlay
         Platform.runLater(() -> {
-            // 先清理旧的 overlay，确保干净的层级
             rootStack.getChildren().stream()
                     .filter(node -> node instanceof LoadingOverlay)
                     .forEach(node -> ((LoadingOverlay) node).dispose());
@@ -255,15 +243,12 @@ public class ModernCanvasApp extends Application {
 
             rootStack.getChildren().add(downloadOverlay);
 
-            // 2. 绑定进度回调
             DownloadProgressContext.getInstance().setOnProgressUpdate((completed, total) -> {
                 double progress = total <= 0 ? 0 : (double) completed / total;
-                // 确保使用 Hook 发布，因为 UiResponseHook 在监听这个
                 HookRegistry.INSTANCE.publish(HookEventType.INIT_PROGRESS, new ProgressEvent(progress,
                         String.format("%s (%d/%d)", DownloadProgressContext.getInstance().getStatusText(), completed, total)));
             });
 
-            // 3. 进度绑定完成后，再启动下载线程
             Thread.ofVirtual().start(() -> {
                 try {
                     log.info("开始下载地图资源...");
@@ -286,71 +271,63 @@ public class ModernCanvasApp extends Application {
             globalLoading.dispose();
             rootStack.getChildren().clear();
 
-            // 1. 输入与 hover 层 — 处理事件 + hover 高亮
+            // 画布容器
+            Pane canvasContainer = new Pane();
+            canvasContainer.setStyle("-fx-background-color: #1a1a2e;");
+
+            // 地图渲染器（瓦片金字塔 + 双 Canvas 图标 + 玩家）
+            MapRenderer renderer = new MapRenderer(canvasContainer);
+            renderer.init((int) MapContext.getInstance().getMapWidth(), (int) MapContext.getInstance().getMapHeight());
+
+            // 玩家图标
+            try {
+                Image playerIcon = new Image(ResourceUtils.getResourceStream(
+                        ResourceConfigContext.getPlayerIcon()));
+                if (!playerIcon.isError()) {
+                    renderer.setPlayerImage(playerIcon);
+                }
+            } catch (Exception e) {
+                log.warn("玩家图标加载失败", e);
+            }
+
+            // InteractiveCanvas（透明覆盖层，处理鼠标事件）
             InteractiveCanvas interactiveCanvas = new InteractiveCanvas();
-            interactiveCanvas.setPickOnBounds(true);
-
-            // 1.1 地图背景 ImageView — GPU viewport 平移
-            ImageView mapView = new ImageView();
-            mapView.setPreserveRatio(false);
-            mapView.setSmooth(false);
-            mapView.setPickOnBounds(false);
-            mapView.setManaged(false);
-
-            // 1.2 静态层 Canvas — 图标 + 路线，GPU translate 平移。mouseTransparent 避免拦截事件
-            Canvas staticCanvas = new Canvas();
-            staticCanvas.setMouseTransparent(true);
-            staticCanvas.setPickOnBounds(false);
-
-            // 1.3 玩家图标 ImageView — GPU transform，零纹理上传
-            ImageView playerView = new ImageView();
-            playerView.setMouseTransparent(true);
-            playerView.setPickOnBounds(false);
-            playerView.setManaged(false);
-            playerView.setFitWidth(72);
-            playerView.setFitHeight(72);
-            if (playerIconImage != null) {
-                playerView.setImage(playerIconImage);
-            }
-
-            // 1.4 4 层渲染器
-            renderLoop = new RenderLoop(mapView, staticCanvas, playerView, interactiveCanvas);
-            interactiveCanvas.setRenderLoop(renderLoop);
-            if (playerIconImage != null) {
-                renderLoop.setPlayerImage(playerIconImage);
-            }
-
-            StackPane canvasContainer = new StackPane(mapView, staticCanvas, playerView, interactiveCanvas);
-            canvasContainer.setPickOnBounds(false);
-            StackPane.setAlignment(mapView, Pos.CENTER);
-            StackPane.setAlignment(staticCanvas, Pos.CENTER);
-            StackPane.setAlignment(playerView, Pos.CENTER);
-            StackPane.setAlignment(interactiveCanvas, Pos.CENTER);
-
-            Rectangle clip = new Rectangle();
-            clip.widthProperty().bind(canvasContainer.widthProperty());
-            clip.heightProperty().bind(canvasContainer.heightProperty());
-            canvasContainer.setClip(clip);
-
-            mapView.fitWidthProperty().bind(canvasContainer.widthProperty());
-            mapView.fitHeightProperty().bind(canvasContainer.heightProperty());
-            staticCanvas.widthProperty().bind(canvasContainer.widthProperty());
-            staticCanvas.heightProperty().bind(canvasContainer.heightProperty());
+            interactiveCanvas.setMapRenderer(renderer);
+            interactiveCanvas.setUiAnimator(uiAnimator);
             interactiveCanvas.widthProperty().bind(canvasContainer.widthProperty());
             interactiveCanvas.heightProperty().bind(canvasContainer.heightProperty());
+            canvasContainer.getChildren().add(interactiveCanvas);
 
-            // 2. 覆盖层组件初始化 (单例)
+            // 视口大小变化 → 标记脏
+            canvasContainer.widthProperty().addListener(e -> renderer.markDirty());
+            canvasContainer.heightProperty().addListener(e -> renderer.markDirty());
+
+            // 资源点变化 → 标记脏
+            HookRegistry.INSTANCE.register(new AbstractGenericHook<>() {
+                @Override
+                public java.util.Set<HookEventType> supportedEvents() {
+                    return java.util.Set.of(HookEventType.RESOURCE_POINT_CHANGED);
+                }
+
+                @Override
+                public void onEvent(HookEventType eventType, Object data) {
+                    Platform.runLater(renderer::markDirty);
+                }
+            });
+
+            // 覆盖层组件
             StatsOverlay statsOverlay = StatsOverlay.getInstance();
             ResourceCounterPanel resourcePanel = ResourceCounterPanel.getInstance();
 
-            // 3. 布局组装
+            // 侧边栏
             Sidebar sidebar = new Sidebar();
-            sidebar.setTranslateX(-240); // 初始完全隐藏
+            sidebar.setTranslateX(-240);
             AnchorPane sidebarContainer = new AnchorPane(sidebar);
             sidebarContainer.setPickOnBounds(false);
             AnchorPane.setTopAnchor(sidebar, 45.0);
             AnchorPane.setBottomAnchor(sidebar, 0.0);
 
+            // 右侧面板
             AnchorPane panelAnchor = new AnchorPane(statsOverlay, resourcePanel);
             panelAnchor.setPickOnBounds(false);
             AnchorPane.setTopAnchor(statsOverlay, 45.0);
@@ -358,12 +335,14 @@ public class ModernCanvasApp extends Application {
             AnchorPane.setTopAnchor(resourcePanel, 90.0);
             AnchorPane.setRightAnchor(resourcePanel, 20.0);
 
+            // 浮动工具箱
             FloatToolbox floatToolbox = new FloatToolbox(resourcePanel, UNIFIED_BLUE);
             AnchorPane floatContainer = new AnchorPane(floatToolbox);
             floatContainer.setPickOnBounds(false);
             AnchorPane.setTopAnchor(floatToolbox, 90.0);
             AnchorPane.setLeftAnchor(floatToolbox, 20.0);
 
+            // 菜单按钮
             Button menuBtn = createMenuButton();
             TitleBar titleBar = TitleBar.getInstance(primaryStage, menuBtn,
                     canvasContainer, sidebarContainer, panelAnchor, floatContainer);
@@ -375,49 +354,21 @@ public class ModernCanvasApp extends Application {
             resizeLayer.setPickOnBounds(false);
             windowManager.install(primaryStage, resizeLayer);
 
-            // 4. 层级挂载 → size listener 触发 → autoFitMap → markDirty → 首次渲染
+            // 层级
             rootStack.getChildren().addAll(canvasContainer, sidebarContainer, panelAnchor, floatContainer, uiOverlay, resizeLayer);
 
-            // 5. 交互行为绑定
+            // 侧边栏切换
             uiAnimator.setupSidebarToggle(menuBtn, sidebar, floatContainer);
-            interactiveCanvas.addEventHandler(MouseEvent.MOUSE_CLICKED, e -> {
-                if (e.getButton() == MouseButton.PRIMARY && uiAnimator.isSidebarVisible()) {
-                    menuBtn.fire();
-                }
-            });
 
-            // 6. 响应式渲染触发链
-            // 6.1 玩家位置更新 → 仅更新 playerView (GPU transform) + 跟随模式时背景平移
-            HookRegistry.INSTANCE.register(new AbstractGenericHook<PlayerPositionEvent>() {
-                @Override
-                public java.util.Set<HookEventType> supportedEvents() {
-                    return java.util.Set.of(HookEventType.PLAYER_UPDATE);
-                }
-                @Override
-                public void onEvent(HookEventType eventType, PlayerPositionEvent data) {
-                    if (renderLoop != null) {
-                        if (CameraContext.getInstance().isFollowMode()) {
-                            renderLoop.markDirtyBg();    // 跟随：背景 GPU 平移
-                        }
-                        renderLoop.markDirtyOverlay();   // 玩家：ImageView transform
-                    }
-                }
-            });
-            // 6.2 跟随模式切换 → 重绘
-            CameraContext.getInstance().onFollowModeChange(() -> {
-                if (renderLoop != null) renderLoop.markDirty();
-            });
-            // 6.3 窗口恢复 → 重绘
-            primaryStage.iconifiedProperty().addListener((obs, old, minimized) -> {
-                if (!minimized && renderLoop != null) renderLoop.markDirty();
-            });
-
-            // 7. 开启核心服务
+            // 核心服务
             startCaptureWatchdog();
 
-            log.info("主界面构建完成，响应式渲染已就绪");
+            // 启动渲染循环
+            renderer.start();
+
+            log.info("主界面构建完成");
         } catch (Exception e) {
-            log.error("UI渲染过程崩溃: ", e);
+            log.error("UI构建异常: ", e);
             HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION,
                     new StatusEvent("界面加载失败，请尝试重启", NotificationType.ERROR));
         }
@@ -427,11 +378,11 @@ public class ModernCanvasApp extends Application {
         Thread.ofVirtual().start(() -> {
             while (isAppRunning) {
                 try {
-                    // 只有在服务未运行或已失效时才尝试重连
-                    if (mainCaptureService == null || !mainCaptureService.isRunning()) {
+                    if (mainCaptureService == null) {
                         mainCaptureService = new CaptureService("洛克王国：世界");
-                        // 必须先设置 ROI 再加入处理器, tryConnect 会读取 cachedRois
                         setupCaptureProcessors();
+                    }
+                    if (!mainCaptureService.isRunning()) {
                         if (mainCaptureService.tryConnect()) {
                             log.info("采集会话已连接");
                         } else {
@@ -451,7 +402,7 @@ public class ModernCanvasApp extends Application {
 
     private void setupCaptureProcessors() {
         if (mainCaptureService == null) return;
-
+//        SaveImageProcessor saveImageProcessor = new SaveImageProcessor(0);
         MapMatcherProcessor siftProcessor = new MapMatcherProcessor(0, siftMatchClient);
         OcrProcessor ocrProcessor = new OcrProcessor(1);
         mainCaptureService.addProcessors(siftProcessor, ocrProcessor);
@@ -460,32 +411,184 @@ public class ModernCanvasApp extends Application {
         rois.add(siftProcessor.getRoi());
         rois.add(ocrProcessor.getRoi());
 
-        // 批量下发 ROI 配置到 C++ 核心
         mainCaptureService.setRois(ROIData.createContiguousArray(rois));
         log.info("采集处理器配置完成");
     }
 
-    private void initBigMapResource() throws Exception {
+    /**
+     * 初始化 MapContext 元数据（地图宽高）。
+     * 优先从 tiles_meta.json 读取，不存在时回退到解析 PNG 头。
+     */
+    private void initMapMetadata() throws Exception {
         String mapPath = ResourceConfigContext.getShowMap();
-        String cachePath = mapPath + ".raw";
-        try (InputStream is = ResourceUtils.getResourceStream(mapPath)) {
-            MultiResMapCache cache = MultiResMapCache.getInstance();
-            cache.ensureLevels(is, cachePath);
+        int imgW, imgH;
 
-            int fullW = cache.getFullWidth();
-            int fullH = cache.getFullHeight();
+        String metaPath = ResourceConfigContext.getTilesDir() + "/tiles_meta.json";
+        // 优先从瓦片元数据 JSON 读取尺寸
+        try (InputStream metaIn = ResourceUtils.getResourceStream(metaPath)) {
+            com.fasterxml.jackson.databind.JsonNode meta =
+                    com.luoke.app.utils.JsonUtils.getMapper().readTree(metaIn);
+            imgW = meta.get("mapWidth").asInt();
+            imgH = meta.get("mapHeight").asInt();
+            log.info("地图元数据从 tiles_meta.json 读取: {}x{}", imgW, imgH);
+        } catch (Exception metaEx) {
+            // 回退：解析 PNG 头获取尺寸
+            try (InputStream in = ResourceUtils.getResourceStream(mapPath);
+                 ImageInputStream iis = ImageIO.createImageInputStream(in)) {
+                Iterator<ImageReader> readers = ImageIO.getImageReadersBySuffix("png");
+                if (!readers.hasNext()) {
+                    throw new Exception("无可用 PNG ImageReader");
+                }
+                ImageReader reader = readers.next();
+                reader.setInput(iis);
+                imgW = reader.getWidth(0);
+                imgH = reader.getHeight(0);
+                reader.dispose();
+            }
+            log.info("地图元数据从 PNG 读取: {}x{}", imgW, imgH);
+        }
 
-            // 占位 Image 仅用于 null 检查，实际渲染由 RenderLoop 通过 cropViewport() 完成
-            // init() 会用 image 尺寸覆盖 mapWidth/mapHeight，事后手动修正
-            java.awt.image.BufferedImage placeholder = new java.awt.image.BufferedImage(1, 1, java.awt.image.BufferedImage.TYPE_INT_ARGB);
-            MapContext mm = MapContext.getInstance();
-            mm.initWithKey(placeholder, fullW, fullH, "G", null);
-            mm.setMapWidth(fullW);
-            mm.setMapHeight(fullH);
+        MapContext.getInstance().init("G", imgW, imgH);
+    }
+
+    /** 瓦片层级元数据 */
+    private record LevelInfo(int level, int cols, int rows, int total) {}
+
+    /**
+     * 检查各层级瓦片完整性，缺失的从源 PNG 多线程生成。
+     * 通过 tiles_meta.json 元数据快速校验，避免逐层 list 文件。
+     */
+    private void validateAndGenerateTiles() throws IOException {
+        String externalPath = ResourceUtils.getExternalPath(ResourceConfigContext.getShowMap(), false);
+        File sourceFile = new File(externalPath);
+
+        int mapW = (int) MapContext.getInstance().getMapWidth();
+        int mapH = (int) MapContext.getInstance().getMapHeight();
+        int tileSize = 256;
+
+        List<LevelInfo> levels = new ArrayList<>();
+        for (int lv = 0; lv < 5; lv++) {
+            int cols = (int) Math.ceil((double) mapW / (tileSize * (1 << lv)));
+            int rows = (int) Math.ceil((double) mapH / (tileSize * (1 << lv)));
+            levels.add(new LevelInfo(lv, cols, rows, cols * rows));
         }
-        try (InputStream is = ResourceUtils.getResourceStream(ResourceConfigContext.getPlayerIcon())) {
-            playerIconImage = new Image(is);
+        File metaFile = ResourceUtils.getExternalFile(ResourceConfigContext.getTilesDir() + "/tiles_meta.json");
+        if (metaFile.exists() && quickValidate(levels)) {
+            log.info("瓦片元数据校验通过，跳过生成");
+            return;
         }
+        if (!sourceFile.exists()) {
+            log.error("源 PNG 不存在: {}", sourceFile.getAbsolutePath());
+            return;
+        }
+
+        log.info("开始生成瓦片金字塔...");
+
+        // 1. 加载源图一次
+        BufferedImage sourceImage = ImageIO.read(sourceFile);
+        int srcW = sourceImage.getWidth();
+        int srcH = sourceImage.getHeight();
+
+        int threads = Runtime.getRuntime().availableProcessors();
+        try (ExecutorService executor = Executors.newFixedThreadPool(threads)) {
+            List<java.util.concurrent.Future<?>> futures = new ArrayList<>();
+
+            for (LevelInfo li : levels) {
+                // 2. 对该级别缩放一次
+                double factor = 1.0 / (1 << li.level);
+                BufferedImage levelImage;
+                if (li.level == 0) {
+                    levelImage = sourceImage;
+                } else {
+                    int lw = (int) Math.ceil(srcW * factor);
+                    int lh = (int) Math.ceil(srcH * factor);
+                    levelImage = new BufferedImage(lw, lh, BufferedImage.TYPE_INT_ARGB);
+                    java.awt.Graphics2D g = levelImage.createGraphics();
+                    g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION,
+                            java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                    g.drawImage(sourceImage, 0, 0, lw, lh, null);
+                    g.dispose();
+                }
+
+                File levelDir = ResourceUtils.getExternalFile(
+                        ResourceConfigContext.getTilesDir() + "/" + li.level);
+                levelDir.mkdirs();
+
+                // 3. 从缩放图裁剪子图，多线程保存
+                int tileWorldSize = tileSize * (1 << li.level);
+                for (int row = 0; row < li.rows; row++) {
+                    for (int col = 0; col < li.cols; col++) {
+                        File tileFile = new File(levelDir, row + "_" + col + ".png");
+                        if (tileFile.exists()) continue;
+
+                        int x = col * tileSize;
+                        int y = row * tileSize;
+                        int w = Math.min(tileSize, levelImage.getWidth() - x);
+                        int h = Math.min(tileSize, levelImage.getHeight() - y);
+                        if (w <= 0 || h <= 0) continue;
+
+                        BufferedImage tile = levelImage.getSubimage(x, y, w, h);
+                        futures.add(executor.submit(() -> {
+                            try {
+                                ImageIO.write(tile, "png", tileFile);
+                            } catch (IOException e) {
+                                log.warn("瓦片保存失败: {}", tileFile, e);
+                            }
+                        }));
+                    }
+                }
+
+                // 每层处理完确保目录存在
+                if (li.level > 0) {
+                    levelImage.flush();
+                }
+            }
+
+            for (java.util.concurrent.Future<?> f : futures) {
+                try { f.get(); } catch (Exception ignored) {}
+            }
+        }
+
+        log.info("瓦片生成完成");
+        writeMetaFile(metaFile, mapW, mapH, tileSize, levels);
+    }
+
+    /** 快速校验：比对元数据中各级别瓦片数与实际文件数 */
+    private boolean quickValidate(List<LevelInfo> levels) {
+        for (LevelInfo li : levels) {
+            File levelDir = ResourceUtils.getExternalFile(Path.of(ResourceConfigContext.getTilesDir(), String.valueOf(li.level)).toString());
+            if (!levelDir.isDirectory()) return false;
+            int actual = levelDir.list((d, n) -> n.endsWith(".png")).length;
+            if (actual < li.total) {
+                log.warn("瓦片 Level {} 不完整: {}/{}", li.level, actual, li.total);
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** 写入瓦片元数据 JSON */
+    private void writeMetaFile(File metaFile, int mapW, int mapH, int tileSize,
+                               List<LevelInfo> levels) throws IOException {
+        StringBuilder sb = new StringBuilder();
+        sb.append("{\n");
+        sb.append("  \"mapWidth\": ").append(mapW).append(",\n");
+        sb.append("  \"mapHeight\": ").append(mapH).append(",\n");
+        sb.append("  \"tileSize\": ").append(tileSize).append(",\n");
+        sb.append("  \"levels\": [\n");
+        for (int i = 0; i < levels.size(); i++) {
+            LevelInfo li = levels.get(i);
+            sb.append("    {\"level\": ").append(li.level)
+              .append(", \"cols\": ").append(li.cols)
+              .append(", \"rows\": ").append(li.rows)
+              .append(", \"total\": ").append(li.total).append("}");
+            if (i < levels.size() - 1) sb.append(",");
+            sb.append("\n");
+        }
+        sb.append("  ]\n");
+        sb.append("}\n");
+        java.nio.file.Files.writeString(metaFile.toPath(), sb.toString());
+        log.info("瓦片元数据已写入: {}", metaFile);
     }
 
     private void publishInitStep(double progress, String message) {
@@ -504,31 +607,20 @@ public class ModernCanvasApp extends Application {
 
     @Override
     public void stop() {
-        log.info("正在关闭程序并清理资源...");
+        log.info("正在关闭程序...");
         isAppRunning = false;
 
-        // 1. 停止事件总线
         HookRegistry.INSTANCE.destroy();
 
-        // 2. 停止渲染循环
-        if (renderLoop != null) {
-            renderLoop.dispose();
-        }
-
-        // 3. 停止采集服务 (释放 Windows WGC 资源)
         if (mainCaptureService != null) {
             mainCaptureService.stop();
         }
 
-        // 3.5 停止 SIFT 匹配进程
         if (siftMatchClient != null) {
             siftMatchClient.stop();
         }
 
-        // 4. 停止全局 SocketServer
         SocketServer.instance().stop();
-
-        // 5. 清理 OCR 线程池
         OcrAsyncManager.getInstance().close();
 
         Platform.exit();

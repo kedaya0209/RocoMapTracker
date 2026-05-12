@@ -32,6 +32,10 @@ public class ResourceConfigContext {
         return currentProfile.showMap;
     }
 
+    public static String getTilesDir() {
+        return currentProfile.showMap.substring(0, currentProfile.showMap.lastIndexOf('.')) + "_tiles";
+    }
+
     public static String getPlayerIcon() {
         return currentProfile.playerIcon;
     }

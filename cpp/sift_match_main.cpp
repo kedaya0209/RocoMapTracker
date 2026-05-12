@@ -3,9 +3,12 @@
 // Arrow direction (CNN/ONNX) is handled separately; angle always returns NaN from here.
 //
 // Protocol (binary TCP, big-endian):
+//   HELLO:
+//   1   C++→Java: HELLO          "sift"                 — identify client type
+//
 //   HANDSHAKE:
-//   220 C++→Java: REQUEST_CONFIG  {}                    — request algorithm parameters
-//   221 Java→C++: CONFIG_DATA     {binary blob}         — SIFT/FLANN/RANSAC/MATCH params + paths
+//   208 C++→Java: REQUEST_CONFIG  {}                    — request algorithm parameters
+//   209 Java→C++: CONFIG_DATA     {binary blob}         — SIFT/FLANN/RANSAC/MATCH params + paths
 //   200 C++→Java: REQUEST_MAP     {}                    — cache miss, request map pixels
 //   201 Java→C++: MAP_DATA        {w,h,pixelsLen,gray8} — map grayscale data
 //   202 C++→Java: INIT_COMPLETE   {featureCount}        — ready for frames
@@ -17,7 +20,7 @@
 //   206 C++→Java: MATCH_RESULT    {success,x,y,angle}
 //
 //   SHUTDOWN:
-//   210 Java→C++: SHUTDOWN        {}
+//   207 Java→C++: SHUTDOWN        {}
 //
 // Build: build_sift.bat
 // Run:   sift_match.exe <port>
@@ -70,6 +73,7 @@
 // Message types
 // ============================================================================
 enum MsgType : int32_t {
+    HELLO          = 1,    // C++ → Java (handshake: body="capture" or "sift")
     REQUEST_MAP    = 200,  // C++ → Java (cache miss)
     MAP_DATA       = 201,  // Java → C++
     INIT_COMPLETE  = 202,  // C++ → Java
@@ -77,9 +81,9 @@ enum MsgType : int32_t {
     READY          = 204,  // C++ → Java (backpressure)
     FRAME_DATA     = 205,  // Java → C++
     MATCH_RESULT   = 206,  // C++ → Java
-    SHUTDOWN       = 210,  // Java → C++
-    REQUEST_CONFIG = 220,  // C++ → Java (new: request algorithm params)
-    CONFIG_DATA    = 221,  // Java → C++ (new: serialized params)
+    SHUTDOWN       = 207,  // Java → C++
+    REQUEST_CONFIG = 208,  // C++ → Java (request algorithm params)
+    CONFIG_DATA    = 209,  // Java → C++ (serialized params)
 };
 
 // ============================================================================
@@ -126,6 +130,10 @@ struct AlgoParams {
 // ============================================================================
 // Big-endian read/write helpers
 // ============================================================================
+static inline void write_be16(uint8_t* buf, uint16_t v) {
+    buf[0] = (uint8_t)((v >> 8) & 0xFF);
+    buf[1] = (uint8_t)(v & 0xFF);
+}
 static inline void write_be32(uint8_t* buf, uint32_t v) {
     buf[0] = (uint8_t)((v >> 24) & 0xFF);
     buf[1] = (uint8_t)((v >> 16) & 0xFF);
@@ -160,6 +168,24 @@ static inline double read_double(const uint8_t* buf) {
     double v;
     memcpy(&v, &u, sizeof(v));
     return v;
+}
+
+// ============================================================================
+// Build HELLO body: [2B]clientTypeLen [NB]clientType [2B]msgTypeCount [N*4B]msgTypes
+// ============================================================================
+static std::vector<uint8_t> build_hello(const char* clientType,
+                                         const int32_t* msgTypes, uint16_t count) {
+    size_t nameLen = strlen(clientType);
+    std::vector<uint8_t> buf(2 + nameLen + 2 + (size_t)count * 4);
+    size_t off = 0;
+    write_be16(buf.data() + off, (uint16_t)nameLen); off += 2;
+    memcpy(buf.data() + off, clientType, nameLen);    off += nameLen;
+    write_be16(buf.data() + off, count);               off += 2;
+    for (uint16_t i = 0; i < count; i++) {
+        write_be32(buf.data() + off, (uint32_t)msgTypes[i]);
+        off += 4;
+    }
+    return buf;
 }
 
 // ============================================================================
@@ -969,6 +995,19 @@ int main(int argc, char* argv[]) {
         std::this_thread::sleep_for(std::chrono::seconds(1));
     }
     LOG("Connected to Java");
+
+    // ---- Phase 0: HELLO (identify + declare supported msg types) ----
+    {
+        const int32_t myTypes[] = { MAP_DATA, FRAME_DATA, SHUTDOWN, CONFIG_DATA };
+        auto hello = build_hello("sift", myTypes, 4);
+        LOG("Sending HELLO (sift, %d types)...", 4);
+        if (!send_message(sock, HELLO, hello.data(), (uint32_t)hello.size())) {
+            LOGERR("Failed to send HELLO");
+            closesocket(sock);
+            WSACleanup();
+            return 1;
+        }
+    }
 
     // ---- Phase 1: Request algorithm configuration ----
     LOG("Requesting algorithm configuration...");

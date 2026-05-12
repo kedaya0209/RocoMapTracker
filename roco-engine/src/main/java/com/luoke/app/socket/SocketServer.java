@@ -5,6 +5,9 @@ import lombok.extern.slf4j.Slf4j;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -12,12 +15,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Socket Server — 全局单例, 程序启动时开启, 常驻后台
- *
  * 职责:
  *   1. 监听端口, accept 客户端连接
  *   2. 每连接启动一条 recv 线程, 读取消息 → 按 type 分发到注册的 SocketHandler
  *   3. 管理 SocketHandler 注册/移除
- *
  * 用法:
  *   SocketServer server = SocketServer.instance();
  *   int port = server.start();           // 程序启动时
@@ -31,6 +32,11 @@ public class SocketServer {
 
     public static SocketServer instance() { return INSTANCE; }
 
+    // ---- 常量 ----
+
+    /** 握手消息: C++ 连接后第一条消息，body 为 UTF-8 客户端类型 ("capture"/"sift") */
+    static final int MSG_HELLO = 1;
+
     // ---- 状态 ----
     private ServerSocket serverSocket;
     private Thread acceptThread;
@@ -42,8 +48,17 @@ public class SocketServer {
     // msgType → handlers (CopyOnWrite 保证 dispatch 线程安全)
     private final Map<Integer, CopyOnWriteArrayList<SocketHandler>> dispatch = new ConcurrentHashMap<>();
 
-    // 所有注册过的 handler 合集 (用于 onConnect/onDisconnect 通知)
+    // 所有注册过的 handler 合集 (用于 register/unregister/stop)
     private final Set<SocketHandler> allHandlers = ConcurrentHashMap.newKeySet();
+
+    // sessionId → 该连接绑定的 handler 集合 (由 HELLO 消息决定)
+    private final Map<Long, Set<SocketHandler>> sessionHandlers = new ConcurrentHashMap<>();
+
+    // clientType → handler (HELLO 握手路由)
+    private final Map<String, SocketHandler> clientHandlers = new ConcurrentHashMap<>();
+
+    // sessionId → 该连接支持的消息类型 (HELLO 中自报，供转发逻辑使用)
+    private final Map<Long, Set<Integer>> sessionMsgTypes = new ConcurrentHashMap<>();
 
     // ---- 启动 / 停止 ----
 
@@ -85,6 +100,9 @@ public class SocketServer {
         sessions.clear();
         dispatch.clear();
         allHandlers.clear();
+        sessionHandlers.clear();
+        sessionMsgTypes.clear();
+        clientHandlers.clear();
 
         log.info("SocketServer stopped");
     }
@@ -94,6 +112,13 @@ public class SocketServer {
     }
 
     public boolean isRunning() { return running.get(); }
+
+    /**
+     * 返回指定 session 支持的消息类型集合 (由 HELLO 握手上报)，供转发逻辑使用。
+     */
+    public Set<Integer> getSessionMsgTypes(long sessionId) {
+        return sessionMsgTypes.getOrDefault(sessionId, Set.of());
+    }
 
     // ---- Handler 注册 ----
 
@@ -105,8 +130,12 @@ public class SocketServer {
         for (int type : handler.messageTypes()) {
             dispatch.computeIfAbsent(type, k -> new CopyOnWriteArrayList<>()).add(handler);
         }
-        log.debug("Registered handler {} for types {}", handler.getClass().getSimpleName(),
-                handler.messageTypes());
+        String ct = handler.clientType();
+        if (ct != null && !ct.isBlank()) {
+            clientHandlers.put(ct, handler);
+        }
+        log.debug("Registered handler {} clientType={} for types {}", handler.getClass().getSimpleName(),
+                ct, handler.messageTypes());
     }
 
     /**
@@ -118,6 +147,7 @@ public class SocketServer {
             List<SocketHandler> list = dispatch.get(type);
             if (list != null) list.remove(handler);
         }
+        clientHandlers.values().removeIf(h -> h == handler);
     }
 
     // ---- Accept 循环 ----
@@ -125,7 +155,6 @@ public class SocketServer {
     private void acceptLoop() {
         while (running.get()) {
             try {
-                @SuppressWarnings("resource")
                 Socket sock = serverSocket.accept();
                 SocketSession session = new SocketSession(sock);
                 sessions.put(session.id(), session);
@@ -133,12 +162,8 @@ public class SocketServer {
                 log.info("Accepted connection #{} from {}", session.id(),
                         sock.getInetAddress());
 
-                // 通知所有 handler: 新连接
-                for (SocketHandler h : allHandlers) {
-                    try { h.onConnect(session); } catch (Exception e) {
-                        log.error("onConnect error in {}", h.getClass().getSimpleName(), e);
-                    }
-                }
+                // 不在此处广播 onConnect — 由 recvLoop 收到第一条消息后，
+                // 按消息 type 精准路由 onConnect 到对应的 handler。
 
                 // 为此 session 启动 recv 线程
                 Thread recvThread = new Thread(() -> recvLoop(session),
@@ -156,13 +181,78 @@ public class SocketServer {
     // ---- Recv + Dispatch 循环 ----
 
     private void recvLoop(SocketSession session) {
+        boolean firstMessage = true;
+
         while (running.get() && !session.isClosed()) {
             try {
                 SocketSession.Message msg = session.recv();
                 if (msg == null) break;
 
-                // 异步分发: recv 线程不等待 handler, 立即返回读取下一条消息
+                // 第一条消息必须是 HELLO: [2B]clientTypeLen [NB]clientType [2B]msgTypeCount [N*4B]msgTypes
+                if (firstMessage) {
+                    firstMessage = false;
+
+                    if (msg.type() != MSG_HELLO) {
+                        log.warn("Session #{} first msg is not HELLO (type={}), closing",
+                                session.id(), msg.type());
+                        session.close();
+                        break;
+                    }
+
+                    if (msg.body() == null || msg.body().length < 4) {
+                        log.warn("Session #{} HELLO body too short, closing", session.id());
+                        session.close();
+                        break;
+                    }
+
+                    ByteBuffer helloBuf = ByteBuffer.wrap(msg.body()).order(ByteOrder.BIG_ENDIAN);
+
+                    int nameLen = helloBuf.getShort() & 0xFFFF;
+                    if (helloBuf.remaining() < nameLen + 2) {
+                        log.warn("Session #{} HELLO truncated at name, closing", session.id());
+                        session.close();
+                        break;
+                    }
+                    byte[] nameBytes = new byte[nameLen];
+                    helloBuf.get(nameBytes);
+                    String clientType = new String(nameBytes, StandardCharsets.UTF_8);
+
+                    int typeCount = helloBuf.getShort() & 0xFFFF;
+                    if (helloBuf.remaining() < typeCount * 4) {
+                        log.warn("Session #{} HELLO truncated at types, closing", session.id());
+                        session.close();
+                        break;
+                    }
+                    Set<Integer> supportedTypes = new HashSet<>();
+                    for (int i = 0; i < typeCount; i++) {
+                        supportedTypes.add(helloBuf.getInt());
+                    }
+                    sessionMsgTypes.put(session.id(), supportedTypes);
+
+                    SocketHandler handler = clientHandlers.get(clientType);
+                    if (handler == null) {
+                        log.warn("Session #{} unknown clientType='{}', closing",
+                                session.id(), clientType);
+                        session.close();
+                        break;
+                    }
+
+                    Set<SocketHandler> bound = ConcurrentHashMap.newKeySet();
+                    bound.add(handler);
+                    sessionHandlers.put(session.id(), bound);
+
+                    try { handler.onConnect(session); } catch (Exception e) {
+                        log.error("onConnect error in {}", handler.getClass().getSimpleName(), e);
+                    }
+
+                    log.info("Session #{} bound to {} (clientType='{}', types={})",
+                            session.id(), handler.getClass().getSimpleName(), clientType, supportedTypes);
+                    continue; // HELLO 被消费，不分发到 onMessage
+                }
+
+                // 后续消息：按 msgType 查 dispatch 表分发
                 List<SocketHandler> handlers = dispatch.get(msg.type());
+
                 if (handlers != null && !handlers.isEmpty()) {
                     Thread.ofVirtual().start(() -> {
                         for (SocketHandler h : handlers) {
@@ -186,11 +276,15 @@ public class SocketServer {
         // 清理
         session.close();
         sessions.remove(session.id());
+        sessionMsgTypes.remove(session.id());
 
-        // 通知所有 handler: 断连
-        for (SocketHandler h : allHandlers) {
-            try { h.onDisconnect(session, "Connection closed"); } catch (Exception e) {
-                log.error("onDisconnect error in {}", h.getClass().getSimpleName(), e);
+        // 只通知本 session 绑定的 handler 断连
+        Set<SocketHandler> bound = sessionHandlers.remove(session.id());
+        if (bound != null) {
+            for (SocketHandler h : bound) {
+                try { h.onDisconnect(session, "Connection closed"); } catch (Exception e) {
+                    log.error("onDisconnect error in {}", h.getClass().getSimpleName(), e);
+                }
             }
         }
 

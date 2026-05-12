@@ -27,19 +27,6 @@
             <artifactId>onnxruntime-engine</artifactId>
         </dependency>
         <dependency>
-            <groupId>org.bytedeco</groupId>
-            <artifactId>javacpp</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.bytedeco</groupId>
-            <artifactId>opencv</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.bytedeco</groupId>
-            <artifactId>opencv</artifactId>
-            <classifier>windows-x86_64</classifier>
-        </dependency>
-        <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
         </dependency>

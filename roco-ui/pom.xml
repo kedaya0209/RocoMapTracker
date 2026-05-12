@@ -171,9 +171,9 @@
                                 <buildArg>--initialize-at-run-time=com.sun.prism.**</buildArg>
                                 <buildArg>--initialize-at-run-time=com.sun.glass.ui.**</buildArg>
                                 <buildArg>--initialize-at-run-time=javafx.**</buildArg>
-                                <buildArg>--initialize-at-run-time=org.bytedeco.opencv.**</buildArg>
-                                <buildArg>--initialize-at-run-time=org.bytedeco.javacpp.**</buildArg>
-                                <buildArg>--initialize-at-run-time=ai.djl.opencv.**</buildArg>
+
+
+
 
                                 <buildArg>
                                     -H:IncludeResources=(META-INF/services/.*|model/.*|com/sun/prism/.*|com/sun/javafx/.*|.*\.(png|properties|json|fxml|xml|dll|txt|css|ttf|woff2|sh|ps|hlsl|cso))$
@@ -246,9 +246,9 @@
                                 <buildArg>--initialize-at-run-time=com.sun.prism.**</buildArg>
                                 <buildArg>--initialize-at-run-time=com.sun.glass.ui.**</buildArg>
                                 <buildArg>--initialize-at-run-time=javafx.**</buildArg>
-                                <buildArg>--initialize-at-run-time=org.bytedeco.opencv.**</buildArg>
-                                <buildArg>--initialize-at-run-time=org.bytedeco.javacpp.**</buildArg>
-                                <buildArg>--initialize-at-run-time=ai.djl.opencv.**</buildArg>
+
+
+
 
 
                                 <buildArg>
@@ -322,9 +322,9 @@
                                 <buildArg>--initialize-at-run-time=com.sun.prism.**</buildArg>
                                 <buildArg>--initialize-at-run-time=com.sun.glass.ui.**</buildArg>
                                 <buildArg>--initialize-at-run-time=javafx.**</buildArg>
-                                <buildArg>--initialize-at-run-time=org.bytedeco.opencv.**</buildArg>
-                                <buildArg>--initialize-at-run-time=org.bytedeco.javacpp.**</buildArg>
-                                <buildArg>--initialize-at-run-time=ai.djl.opencv.**</buildArg>
+
+
+
 
                                 <buildArg>
                                     -H:IncludeResources=(META-INF/services/.*|model/.*|com/sun/prism/.*|com/sun/javafx/.*|.*\.(png|properties|json|fxml|xml|dll|txt|css|ttf|woff2|sh|ps|hlsl|cso))$

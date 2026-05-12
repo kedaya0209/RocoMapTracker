@@ -37,9 +37,12 @@ public class CaptureService {
         SocketServer.instance().register(handler);
 
         frameCallback = (index, data, w, h, stride) -> {
-            byte[] gray = bgraToGray(data, w, h, stride);
+            // 懒加载灰度图: 有处理器需要时才转换
+            byte[] gray = null;
 
+            // 黑帧检测 (始终用灰度图)
             if (index == 0) {
+                gray = bgraToGray(data, w, h, stride);
                 if (isAllBlack(gray, 100)) {
                     if (continuousBlackFrames.incrementAndGet() > AppConfig.MAX_BLACK_FRAMES) {
                         log.error("持续黑帧, 强制重置采集会话...");
@@ -54,7 +57,14 @@ public class CaptureService {
             for (RoiProcessor processor : processors) {
                 try {
                     if (processor.targetRoiIndex() == -1 || processor.targetRoiIndex() == index) {
-                        processor.onProcess(gray, w, h);
+                        if (processor.requiredImageType() == RoiProcessor.ImageType.BGRA) {
+                            processor.onProcess(data, w, h);
+                        } else {
+                            if (gray == null) {
+                                gray = bgraToGray(data, w, h, stride);
+                            }
+                            processor.onProcess(gray, w, h);
+                        }
                     }
                 } catch (Exception ignore) {
                 }
@@ -130,7 +140,9 @@ public class CaptureService {
 
     public void stop() {
         handler.stop();
-        SocketServer.instance().unregister(handler);
+        // 不反注册 handler — handler 注册于构造函数，生命周期与 CaptureService 相同。
+        // 反注册会导致后续 tryConnect() 启动的 capture.exe 无法完成 Socket 握手（onConnect 不被调用），
+        // 从而 isRunning() 永远返回 false，watchdog 陷入"创建→丢弃→创建"的死循环。
         HookRegistry.INSTANCE.publish(HookEventType.CAPTURE_STATE,
                 new CaptureStateEvent(-1, false, windowTitle));
     }

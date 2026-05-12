@@ -15,6 +15,10 @@
 
     <dependencies>
         <dependency>
+            <groupId>com.github.luben</groupId>
+            <artifactId>zstd-jni</artifactId>
+        </dependency>
+        <dependency>
             <groupId>com.luoke</groupId>
             <artifactId>roco-engine</artifactId>
         </dependency>

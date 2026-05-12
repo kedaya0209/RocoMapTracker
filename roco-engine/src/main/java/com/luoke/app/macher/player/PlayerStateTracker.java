@@ -32,8 +32,9 @@ public class PlayerStateTracker {
      *
      * @param x 匹配得到的 X 坐标
      * @param y 匹配得到的 Y 坐标
+     * @param angle 箭头检测得到的朝向角度 (可为 null)
      */
-    public void onMatchSuccess(double x, double y) {
+    public void onMatchSuccess(double x, double y, Double angle) {
         consecutiveFailureCount = 0;
         isMapLost = false;
 
@@ -54,7 +55,7 @@ public class PlayerStateTracker {
             }
         }
 
-        MapContext.getInstance().updatePlayerState(smoothedX, smoothedY, null);
+        MapContext.getInstance().updatePlayerState(smoothedX, smoothedY, angle);
 
         // 速度预测：需要至少两帧有效数据，避免首帧 prevRawX=0 导致虚假位移
         if (hasPreviousMatch && consecutiveFailureCount == 0) {

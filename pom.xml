@@ -76,7 +76,7 @@
                 <scope>provided</scope>
             </dependency>
 
-            <!-- JavaCPP / OpenCV -->
+            <!-- JavaCPP/OpenCV — 仅 roco-macher 测试模块使用 -->
             <dependency>
                 <groupId>org.bytedeco</groupId>
                 <artifactId>javacpp</artifactId>

@@ -1,12 +1,13 @@
 package com.luoke.app.capture;
 
+import com.luoke.app.process.JobObjectManager;
+import com.luoke.app.process.NativeProcess;
 import com.luoke.app.socket.SocketHandler;
 import com.luoke.app.socket.SocketServer;
 import com.luoke.app.socket.SocketSession;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.BufferedReader;
-import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -22,30 +23,33 @@ import java.util.concurrent.atomic.AtomicLong;
  * 注册到 SocketServer, 接收采集事件 (帧数据/窗口状态)
  *
  * 协议消息:
- *   msgType=1: C++ → Java, 请求 ROI    (握手)
- *   msgType=2: Java → C++, 返回 ROI    (握手)
- *   msgType=3: C++ → Java, 采集就绪    (握手)
- *   msgType=4: C++ → Java, 帧数据
- *   msgType=5: Java → C++, 处理完成    (背压)
- *   msgType=6: C++ → Java, 窗口关闭
- *   msgType=7: Java → C++, 停止请求
- *   msgType=8: C++ → Java, 窗口状态
+ *   msgType=100: C++ → Java, 请求 ROI    (握手)
+ *   msgType=101: Java → C++, 返回 ROI    (握手)
+ *   msgType=102: C++ → Java, 采集就绪    (握手)
+ *   msgType=103: C++ → Java, 帧数据
+ *   msgType=104: Java → C++, 处理完成    (背压)
+ *   msgType=105: C++ → Java, 窗口关闭
+ *   msgType=106: Java → C++, 停止请求
+ *   msgType=107: C++ → Java, 窗口状态
  */
 @Slf4j
 public class CaptureHandler implements SocketHandler {
 
-    private static final int MSG_REQUEST_ROI     = 1;
-    private static final int MSG_RETURN_ROI      = 2;
-    private static final int MSG_CAPTURE_READY   = 3;
-    private static final int MSG_FRAME_DATA      = 4;
-    private static final int MSG_PROCESSING_DONE = 5;
-    private static final int MSG_WINDOW_CLOSED   = 6;
-    private static final int MSG_STOP_REQUEST    = 7;
-    private static final int MSG_WINDOW_STATE    = 8;
+    private static final int MSG_REQUEST_ROI = 100;
+    private static final int MSG_RETURN_ROI = 101;
+    private static final int MSG_CAPTURE_READY = 102;
+    private static final int MSG_FRAME_DATA = 103;
+    private static final int MSG_PROCESSING_DONE = 104;
+    private static final int MSG_WINDOW_CLOSED = 105;
+    private static final int MSG_STOP_REQUEST = 106;
+    private static final int MSG_WINDOW_STATE = 107;
 
     private static final Set<Integer> TYPES = Set.of(
             MSG_REQUEST_ROI, MSG_CAPTURE_READY, MSG_FRAME_DATA,
             MSG_WINDOW_CLOSED, MSG_WINDOW_STATE);
+
+    @Override
+    public String clientType() { return "capture"; }
 
     // ---- 回调接口 ----
 
@@ -61,7 +65,7 @@ public class CaptureHandler implements SocketHandler {
 
     // ---- 状态 ----
 
-    private Process process;
+    private NativeProcess process;
     private volatile SocketSession session;
     private volatile FrameCallback frameCallback;
     private volatile StateCallback stateCallback;
@@ -231,31 +235,32 @@ public class CaptureHandler implements SocketHandler {
         this.frameCallback = frameCb;
         this.stateCallback = stateCb;
 
+        // 先清理旧进程，防止孤儿进程累积
+        if (process != null && process.isAlive()) {
+            log.warn("旧 capture.exe 进程仍存活，强制终止");
+            process.destroyForcibly();
+        }
+
         int port = SocketServer.instance().getPort();
         if (port <= 0) {
             log.error("SocketServer is not running");
             return false;
         }
 
-        try {
-            ProcessBuilder pb = new ProcessBuilder(
-                    exePath,
-                    Long.toString(hwnd),
-                    Integer.toString(port),
-                    Integer.toString(maxFps)
-            );
-            pb.redirectErrorStream(true);
-            process = pb.start();
-
-            // 消费 stdout
-            startReaderThread();
-
-            log.info("capture.exe launched, hwnd=0x{}", Long.toHexString(hwnd));
-            return true;
-        } catch (IOException e) {
-            log.error("Failed to launch capture.exe", e);
+        // 通过 FFM CreateProcessW + PROC_THREAD_ATTRIBUTE_JOB_LIST 启动，
+        // 使 capture.exe 在任务管理器"进程"页签下归入 Java 父进程
+        String cmdLine = "\"" + exePath + "\" " + hwnd + " " + port + " " + maxFps;
+        process = NativeProcess.create(cmdLine, JobObjectManager.getJobHandle(), true);
+        if (process == null) {
+            log.error("Failed to launch capture.exe via NativeProcess");
             return false;
         }
+
+        // 消费 stdout
+        startReaderThread();
+
+        log.info("capture.exe launched (pid={}), hwnd=0x{}", process.pid(), Long.toHexString(hwnd));
+        return true;
     }
 
     private void startReaderThread() {
@@ -268,7 +273,7 @@ public class CaptureHandler implements SocketHandler {
                         while ((line = r.readLine()) != null) {
                             log.debug("[capture.exe] {}", line);
                         }
-                    } catch (IOException ignored) {
+                    } catch (Exception ignored) {
                     }
                 });
     }
@@ -285,12 +290,8 @@ public class CaptureHandler implements SocketHandler {
 
         // 销毁子进程
         if (process != null && process.isAlive()) {
-            try {
-                process.destroy();
-                if (!process.waitFor(3, TimeUnit.SECONDS)) {
-                    process.destroyForcibly();
-                }
-            } catch (InterruptedException ignored) {
+            process.destroy();
+            if (!process.waitFor(3, TimeUnit.SECONDS)) {
                 process.destroyForcibly();
             }
         }

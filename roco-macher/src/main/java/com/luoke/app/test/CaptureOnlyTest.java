@@ -6,8 +6,6 @@ import com.luoke.app.socket.SocketServer;
 import com.luoke.app.capture.RoiProcessor;
 import com.luoke.app.config.AppConfig;
 import lombok.extern.slf4j.Slf4j;
-import org.bytedeco.javacpp.Loader;
-import org.bytedeco.opencv.global.opencv_core;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -21,10 +19,9 @@ import java.util.concurrent.atomic.AtomicLong;
  * 运行方式: 直接运行本类 main() 方法。
  * <p>
  * 行为:
- * 1. 初始化 OpenCV 原生库（仅加载 DLL）
- * 2. 创建 CaptureService 连接到游戏窗口
- * 3. 使用最小 RoiProcessor 仅计数、不匹配
- * 4. 每 5 秒输出 FPS 和内存统计
+ * 1. 创建 CaptureService 连接到游戏窗口
+ * 2. 使用最小 RoiProcessor 仅计数、不匹配
+ * 3. 每 5 秒输出 FPS 和内存统计
  * <p>
  * 不加载: MapMatcherProcessor, SwitchMapMatcher, ArrowDetector,
  * ONNX 模型, SIFT, OCR, HookRegistry, 任何 JavaFX 类
@@ -42,16 +39,6 @@ public class CaptureOnlyTest {
         log.info("========================================");
         log.info("  纯 WGC 采集测试 — 不加载匹配管线");
         log.info("========================================");
-
-        // 仅初始化 OpenCV 原生库（CaptureService 回调里用不到，但保险起见）
-        try {
-            System.setProperty("org.bytedeco.javacpp.nopointergc", "true");
-            Loader.load(opencv_core.class);
-            log.info("OpenCV (JavaCPP) DLL 加载成功");
-        } catch (Throwable e) {
-            log.error("OpenCV DLL 加载失败", e);
-            return;
-        }
 
         // 注册 JVM 关闭钩子
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {

@@ -29,7 +29,7 @@ public class OcrProcessor implements RoiProcessor {
     private List<ItemResult> lastConfirmedList = new ArrayList<>();
     private List<ItemResult> pendingList = new ArrayList<>();
     private int stabilityCount = 0;
-    private final ROIData cachedRoi = new ROIData(8750, 2870, 1100, 1700);
+    private final ROIData cachedRoi = new ROIData(8750, 2070, 1100, 2100);
 
     public OcrProcessor(int targetRoiIndex) {
         this.targetRoiIndex = targetRoiIndex;

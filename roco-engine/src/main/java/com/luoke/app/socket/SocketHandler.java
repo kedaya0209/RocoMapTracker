@@ -15,6 +15,9 @@ public interface SocketHandler {
     /** 返回此处理器关心的消息类型集合 */
     Set<Integer> messageTypes();
 
+    /** 客户端类型标识 (用于 HELLO 握手路由)，如 "capture" / "sift" */
+    String clientType();
+
     /** 新客户端连接 */
     default void onConnect(SocketSession session) {}
 

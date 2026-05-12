@@ -5,10 +5,9 @@ import com.luoke.app.capture.RoiProcessor;
 import com.luoke.app.config.AppConfig;
 import com.luoke.app.context.StatsContext;
 import com.luoke.app.macher.SiftMatchHandler;
+import com.luoke.app.macher.player.ArrowDetector;
 import com.luoke.app.macher.player.PlayerStateTracker;
 import lombok.extern.slf4j.Slf4j;
-
-import java.util.concurrent.Semaphore;
 
 /**
  * 地图匹配处理器 — 通过独立 C++ 进程 (sift_match.exe) 执行 SIFT 匹配。
@@ -25,7 +24,8 @@ import java.util.concurrent.Semaphore;
 public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
 
     private final int targetRoiIndex;
-    private final ROIData cachedRoi = new ROIData(8900, 700, 1000, 1800);
+    //roi h为0, 自动截取正方形
+    private final ROIData cachedRoi = new ROIData(8900, 300, 1000, 0);
 
     // 超时配置
     private static final long MATCH_TIMEOUT_MS = 500;
@@ -38,14 +38,20 @@ public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
     private final long delay = 1000L / AppConfig.TARGET_CAPTURE_FPS;
     private long prevTime = 0L;
 
+    private boolean arrowInit = false;
+    private volatile Double lastDetectedAngle = null;
+
     // 统计
     private final StatsContext stats = StatsContext.getInstance();
-    // 并发控制
-    private final Semaphore matchSemaphore = new Semaphore(1);
 
     public MapMatcherProcessor(int targetRoiIndex, SiftMatchHandler matchClient) {
         this.targetRoiIndex = targetRoiIndex;
         this.matchClient = matchClient;
+        try {
+            ArrowDetector.getInstance().init();
+            arrowInit = true;
+        } catch (Exception ignore) {
+        }
     }
 
     @Override
@@ -53,16 +59,19 @@ public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
         long now = System.currentTimeMillis();
         if (now - prevTime < delay) return;
         prevTime = now;
+        if (arrowInit) Thread.startVirtualThread(() -> executeArrowDect(data, width, height));
+        Thread.startVirtualThread(() -> executeMatching(data, width, height));
+    }
 
-        if (matchSemaphore.tryAcquire()) {
-            Thread.startVirtualThread(() -> {
-                try {
-                    executeMatching(data, width, height);
-                } finally {
-                    matchSemaphore.release();
-                }
-            });
+    private void executeArrowDect(byte[] data, int width, int height) {
+        // 截取中心64*64区域
+        byte[] dest = new byte[64 * 64];
+        int offsetX = width / 2 - 32;
+        int offsetY = height / 2 - 32;
+        for (int i = 0; i < 64; i++) {
+            System.arraycopy(data, (offsetY + i) * width + offsetX, dest, i * 64, 64);
         }
+        lastDetectedAngle = ArrowDetector.getInstance().detectPlayer(dest, 64, 64);
     }
 
     private void executeMatching(byte[] data, int width, int height) {
@@ -84,7 +93,7 @@ public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
             stats.recordMatch(elapsed);
 
             if (result.success()) {
-                stateTracker.onMatchSuccess(result.x(), result.y());
+                stateTracker.onMatchSuccess(result.x(), result.y(), lastDetectedAngle);
             } else {
                 stateTracker.onMatchFailure("C++ match failed");
             }
