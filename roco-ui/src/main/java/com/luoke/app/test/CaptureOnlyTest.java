@@ -2,7 +2,8 @@ package com.luoke.app.test;
 
 import com.luoke.app.capture.CaptureService;
 import com.luoke.app.capture.ROIData;
-import com.luoke.app.capture.processor.RoiProcessor;
+import com.luoke.app.socket.SocketServer;
+import com.luoke.app.capture.RoiProcessor;
 import com.luoke.app.config.AppConfig;
 import lombok.extern.slf4j.Slf4j;
 import org.bytedeco.javacpp.Loader;
@@ -55,11 +56,21 @@ public class CaptureOnlyTest {
         // 注册 JVM 关闭钩子
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             log.info("正在停止采集...");
-            if (captureService != null && captureService.getId() > 0) {
+            if (captureService != null && captureService.isRunning()) {
                 captureService.stop();
             }
+            SocketServer.instance().stop();
             log.info("采集已停止，共收到 {} 帧", totalFrames.get());
         }, "shutdown-hook"));
+
+        // 启动全局 SocketServer
+        try {
+            int port = SocketServer.instance().start();
+            log.info("SocketServer 已启动, 端口: {}", port);
+        } catch (Exception e) {
+            log.error("SocketServer 启动失败", e);
+            return;
+        }
 
         // 创建采集服务
         captureService = new CaptureService(AppConfig.TARGET_WINDOW_NAME);
@@ -67,22 +78,21 @@ public class CaptureOnlyTest {
         // 附加最小处理器：仅计数，不做任何匹配
         captureService.addProcessors(new CountingProcessor(0), new CountingProcessor(1));
 
+        // 必须在 tryConnect 前设置 ROI (tryConnect 时携带给 capture.exe)
+        List<ROIData> rois = new ArrayList<>();
+        rois.add(new ROIData(8900, 700, 1000, 1800));  // 小地图
+        rois.add(new ROIData(8750, 2870, 1100, 1700)); // 物品栏
+        captureService.setRois(ROIData.createContiguousArray(rois));
+
         log.info("目标窗口: {}", AppConfig.TARGET_WINDOW_NAME);
         log.info("开始尝试连接...");
 
         // 连接 + 心跳循环
         while (!Thread.currentThread().isInterrupted()) {
             try {
-                if (captureService.getId() <= 0) {
+                if (!captureService.isRunning()) {
                     if (captureService.tryConnect()) {
-                        log.info("连接成功! sessionId={}", captureService.getId());
-
-                        // 下发 ROI（只定义裁剪区域，不影响匹配）
-                        List<ROIData> rois = new ArrayList<>();
-                        rois.add(new ROIData(8900, 700, 1000, 1800));  // 小地图
-                        rois.add(new ROIData(8750, 2870, 1100, 1700)); // 物品栏
-                        captureService.setRois(ROIData.createContiguousArray(rois));
-                        log.info("ROI 配置已下发");
+                        log.info("连接成功!");
                     } else {
                         log.info("未找到游戏窗口 [{}]，5秒后重试...", AppConfig.TARGET_WINDOW_NAME);
                     }
@@ -121,7 +131,7 @@ public class CaptureOnlyTest {
             }
         }
 
-        if (captureService != null && captureService.getId() > 0) {
+        if (captureService != null && captureService.isRunning()) {
             captureService.stop();
         }
         log.info("测试结束，总帧数: {}", totalFrames.get());

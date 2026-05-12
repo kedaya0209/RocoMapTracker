@@ -277,10 +277,7 @@ public class Sidebar extends VBox {
             try {
                 SwitchMapMatcher.getInstance().switchMapMatcher(algo);
                 HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION,
-                        new StatusEvent("算法已就绪: " + algo, NotificationType.SUCCESS));
-
-                AppConfig.MAP_MATCHAER = algo;
-                AppConfig.save();
+                        new StatusEvent("正在重启匹配引擎: " + algo + " ...", NotificationType.INFO));
             } catch (Exception e) {
                 HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION,
                         new StatusEvent("切换算法失败", NotificationType.ERROR));

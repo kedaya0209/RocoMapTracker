@@ -3,12 +3,17 @@ package com.luoke.app.utils;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.util.Scanner;
 
 @Slf4j
@@ -95,31 +100,24 @@ public class FileUtil {
             try (Scanner sc = new Scanner(in)) {
 
                 sc.tokens().forEach(line -> {
-                String[] split = line.split(":");
-                String sourcePath, destPath;
-                if (split.length == 2) {
-                    sourcePath = split[0];
-                    destPath = split[1];
-                } else {
-                    sourcePath = split[0];
-                    destPath = split[0];
-                }
-                String formatDestPath = destPath.replaceFirst("^[/\\\\]+", "");
-                File destFile = getRelativeFile(formatDestPath);
-                if (destFile.exists()) return;
-
-                try (InputStream is = FileUtil.class.getResourceAsStream(sourcePath)) {
-                    if (is == null) {
-                        log.warn("资源不存在：{}", sourcePath);
-                        return;
+                    String[] split = line.split(":");
+                    String sourcePath, destPath, operator = null;
+                    if (split.length == 2) {
+                        sourcePath = split[0];
+                        destPath = split[1];
+                    } else if (split.length == 3) {
+                        sourcePath = split[0];
+                        destPath = split[1];
+                        operator = split[2];
+                    } else {
+                        sourcePath = split[0];
+                        destPath = split[0];
                     }
-                    destFile.getParentFile().mkdirs();
-                    Files.copy(is, destFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
-                    log.info("释放：{} → {}", sourcePath, destFile.getAbsolutePath());
-                } catch (Exception e) {
-                    log.error("释放资源失败，e:", e);
-                }
-
+                    String formatDestPath = destPath.replaceFirst("^[/\\\\]+", "");
+                    File destFile = getRelativeFile(formatDestPath);
+                    //如果是native环境才解压的
+                    if ("native".equalsIgnoreCase(operator) && !isNative()) return;
+                    extractSingleFile(sourcePath, destFile);
             });
 
         } catch (Exception e) {
@@ -130,4 +128,133 @@ public class FileUtil {
             log.error("释放资源失败，e:", e);
         }
     }
+
+    // ==================== MD5 校验 ====================
+
+    public static String computeResourceMD5(String internalPath) {
+        try (InputStream in = FileUtil.class.getResourceAsStream(internalPath)) {
+            if (in == null) return null;
+            return computeMD5(in);
+        } catch (IOException e) {
+            log.warn("计算内置资源 MD5 失败：{}", internalPath, e);
+            return null;
+        }
+    }
+
+    public static String computeFileMD5(File file) {
+        try (InputStream in = new FileInputStream(file)) {
+            return computeMD5(in);
+        } catch (IOException e) {
+            log.warn("计算文件 MD5 失败：{}", file.getAbsolutePath(), e);
+            return "";
+        }
+    }
+
+    public static String computeMD5(InputStream in) throws IOException {
+        try {
+            MessageDigest md = MessageDigest.getInstance("MD5");
+            byte[] buf = new byte[8192];
+            int n;
+            while ((n = in.read(buf)) != -1) {
+                md.update(buf, 0, n);
+            }
+            return HexFormat.of().formatHex(md.digest());
+        } catch (NoSuchAlgorithmException e) {
+            throw new IOException("MD5 算法不可用", e);
+        }
+    }
+
+    // ==================== 外部文件路径解析 ====================
+
+    /**
+     * 将 classpath 资源路径映射为外部物理文件（相对于 app root）。
+     * 例: {@code getExternalFile("/dll/sift/sift_match.exe") → <appRoot>/dll/sift/sift_match.exe}
+     */
+    public static File getExternalFile(String internalPath) {
+        String safePath = internalPath.replaceFirst("^[/\\\\]+", "");
+        return getRelativeFile(safePath);
+    }
+
+    /**
+     * 将 classpath 资源路径映射为外部物理文件（相对于 appRoot/baseDir）。
+     * 例: {@code getExternalFile("resources", "/dll/foo.dll") → <appRoot>/resources/dll/foo.dll}
+     */
+    public static File getExternalFile(String baseDir, String internalPath) {
+        String safePath = internalPath.replaceFirst("^[/\\\\]+", "");
+        return getRelativeFile(baseDir, safePath);
+    }
+
+    /**
+     * 获取外部绝对路径，可选自动提取内置资源。
+     */
+    public static String getExternalPath(String internalPath, boolean isExtract) {
+        File externalFile = getExternalFile(internalPath);
+        ensureExternalFile(internalPath, externalFile, isExtract);
+        return externalFile.getAbsolutePath();
+    }
+
+    /**
+     * 获取外部绝对路径（带 baseDir），可选自动提取内置资源。
+     */
+    public static String getExternalPath(String baseDir, String internalPath, boolean isExtract) {
+        File externalFile = getExternalFile(baseDir, internalPath);
+        ensureExternalFile(internalPath, externalFile, isExtract);
+        return externalFile.getAbsolutePath();
+    }
+
+    /**
+     * 单个文件释放（从 classpath 到外部物理路径），带 MD5 校验。
+     */
+    public static void extractSingleFile(String internalPath) {
+        extractSingleFile(internalPath, getExternalFile(internalPath));
+    }
+
+    /**
+     * 单个文件释放（带 baseDir），带 MD5 校验。
+     */
+    public static void extractSingleFile(String baseDir, String internalPath) {
+        extractSingleFile(internalPath, getExternalFile(baseDir, internalPath));
+    }
+
+    private static void ensureExternalFile(String internalPath, File externalFile, boolean isExtract) {
+        if (!externalFile.exists() && isExtract) {
+            log.info("外部路径不存在，尝试从内置资源释放：{}", internalPath);
+            extractSingleFile(internalPath, externalFile);
+        }
+        if (!externalFile.exists()) {
+            log.error("无法获取有效的物理资源路径：{} → {}", internalPath, externalFile.getAbsolutePath());
+        }
+    }
+
+    private static void extractSingleFile(String internalPath, File externalFile) {
+        try {
+            if (externalFile.exists()) {
+                String internalMD5 = computeResourceMD5(internalPath);
+                if (internalMD5 != null) {
+                    String externalMD5 = computeFileMD5(externalFile);
+                    if (internalMD5.equals(externalMD5)) {
+                        log.debug("MD5 一致，跳过：{}", internalPath);
+                        return;
+                    }
+                    log.info("MD5 不一致，覆盖更新：{}", internalPath);
+                } else {
+                    log.debug("无法计算内置资源 MD5，复用已有文件：{}", internalPath);
+                    return;
+                }
+            }
+
+            try (InputStream in = FileUtil.class.getResourceAsStream(internalPath)) {
+                if (in == null) {
+                    log.warn("资源不存在：{}", internalPath);
+                    return;
+                }
+                externalFile.getParentFile().mkdirs();
+                Files.copy(in, externalFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                log.info("释放：{} → {}", internalPath, externalFile.getAbsolutePath());
+            }
+        } catch (Exception e) {
+            log.error("释放失败：{}", internalPath, e);
+        }
+    }
+
 }

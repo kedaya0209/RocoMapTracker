@@ -12,9 +12,7 @@ public class Main {
 
     static {
         try {
-            if (FileUtil.isNative()) {
-                FileUtil.extractAll();
-            }
+            FileUtil.extractAll();
             System.setProperty("org.bytedeco.javacpp.nopointergc", "true");
             Loader.load(opencv_core.class);
             log.info("OpenCV (JavaCPP) 环境初始化成功");

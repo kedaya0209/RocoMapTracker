@@ -28,13 +28,12 @@ public class PlayerStateTracker {
     private Double predictedX, predictedY;
 
     /**
-     * 更新匹配成功时的位置和角度
+     * 更新匹配成功时的位置
      *
-     * @param x     匹配得到的 X 坐标
-     * @param y     匹配得到的 Y 坐标
-     * @param angle 玩家朝向角度
+     * @param x 匹配得到的 X 坐标
+     * @param y 匹配得到的 Y 坐标
      */
-    public void onMatchSuccess(double x, double y, Double angle) {
+    public void onMatchSuccess(double x, double y) {
         consecutiveFailureCount = 0;
         isMapLost = false;
 
@@ -55,7 +54,7 @@ public class PlayerStateTracker {
             }
         }
 
-        MapContext.getInstance().updatePlayerState(smoothedX, smoothedY, angle);
+        MapContext.getInstance().updatePlayerState(smoothedX, smoothedY, null);
 
         // 速度预测：需要至少两帧有效数据，避免首帧 prevRawX=0 导致虚假位移
         if (hasPreviousMatch && consecutiveFailureCount == 0) {

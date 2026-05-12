@@ -21,7 +21,8 @@ public final class AppConfig {
     // ============================================================
     // 1. 静态资源常量 (Final) - 程序的物理路径，不可更改
     // ============================================================
-    public static final String CAPTURE_DLL = "/dll/wgc_capture.dll";
+    public static final String CAPTURE_EXE = "/capture/capture.exe";
+    public static final String SIFT_MATCH_EXE = "/sift/sift_match.exe";
     public static final String SOURCE_INIT = "/source/init";
     public static final String MAP_RESOURCE_PATH = "/source/map/map_G.png";
     public static final String MAP_RESOURCE_DIR = "/source/map/";

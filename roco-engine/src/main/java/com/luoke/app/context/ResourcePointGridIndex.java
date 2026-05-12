@@ -1,7 +1,7 @@
 package com.luoke.app.context;
 
+import com.luoke.app.map.model.Point;
 import com.luoke.app.map.model.ResourcePoint;
-import javafx.geometry.Point2D;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -13,14 +13,13 @@ import java.util.Map;
  */
 public class ResourcePointGridIndex {
     private static final int CELL_SIZE = 120;
-    // 使用 Long 键值对：高32位存储 X，低32位存储 Y
     private final Map<Long, List<ResourcePoint>> grid = new HashMap<>();
 
     public void buildIndex(List<ResourcePoint> points) {
         grid.clear();
         if (points == null) return;
         for (ResourcePoint p : points) {
-            Point2D pos = p.getScreenPosition();
+            Point pos = p.getScreenPosition();
             grid.computeIfAbsent(calculateKey(pos.getX(), pos.getY()), k -> new ArrayList<>()).add(p);
         }
     }

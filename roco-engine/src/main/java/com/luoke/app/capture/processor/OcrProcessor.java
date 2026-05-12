@@ -1,7 +1,7 @@
-package com.luoke.app.capture.processor.impl;
+package com.luoke.app.capture.processor;
 
 import com.luoke.app.capture.ROIData;
-import com.luoke.app.capture.processor.RoiProcessor;
+import com.luoke.app.capture.RoiProcessor;
 import com.luoke.app.config.AppConfig;
 import com.luoke.app.context.MaterialCollectionContext;
 import com.luoke.app.context.OcrAsyncManager;

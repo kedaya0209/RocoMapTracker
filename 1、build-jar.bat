@@ -1,5 +1,4 @@
 @echo off
-chcp 65001 >nul
 cls
 
 set GRAALVM_HOME=D:\Documents\environment\java\graalvm-win\graalvm-jdk-25.0.2+10.1
@@ -15,7 +14,7 @@ echo ==============================
 echo Step 1: Build JAR file
 echo ==============================
 
-%MAVEN_BIN% clean package -DskipTests
+%MAVEN_BIN% clean package -pl roco-ui -am -DskipTests
 
 echo.
 echo JAR build completed!

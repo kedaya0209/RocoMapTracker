@@ -1,0 +1,326 @@
+package com.luoke.app.capture;
+
+import com.luoke.app.socket.SocketHandler;
+import com.luoke.app.socket.SocketServer;
+import com.luoke.app.socket.SocketSession;
+import lombok.extern.slf4j.Slf4j;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
+
+/**
+ * 截图处理器 — 实现 SocketHandler, 管理 capture.exe 子进程
+ * 注册到 SocketServer, 接收采集事件 (帧数据/窗口状态)
+ *
+ * 协议消息:
+ *   msgType=1: C++ → Java, 请求 ROI    (握手)
+ *   msgType=2: Java → C++, 返回 ROI    (握手)
+ *   msgType=3: C++ → Java, 采集就绪    (握手)
+ *   msgType=4: C++ → Java, 帧数据
+ *   msgType=5: Java → C++, 处理完成    (背压)
+ *   msgType=6: C++ → Java, 窗口关闭
+ *   msgType=7: Java → C++, 停止请求
+ *   msgType=8: C++ → Java, 窗口状态
+ */
+@Slf4j
+public class CaptureHandler implements SocketHandler {
+
+    private static final int MSG_REQUEST_ROI     = 1;
+    private static final int MSG_RETURN_ROI      = 2;
+    private static final int MSG_CAPTURE_READY   = 3;
+    private static final int MSG_FRAME_DATA      = 4;
+    private static final int MSG_PROCESSING_DONE = 5;
+    private static final int MSG_WINDOW_CLOSED   = 6;
+    private static final int MSG_STOP_REQUEST    = 7;
+    private static final int MSG_WINDOW_STATE    = 8;
+
+    private static final Set<Integer> TYPES = Set.of(
+            MSG_REQUEST_ROI, MSG_CAPTURE_READY, MSG_FRAME_DATA,
+            MSG_WINDOW_CLOSED, MSG_WINDOW_STATE);
+
+    // ---- 回调接口 ----
+
+    @FunctionalInterface
+    public interface FrameCallback {
+        void onFrame(int index, byte[] data, int w, int h, int stride);
+    }
+
+    @FunctionalInterface
+    public interface StateCallback {
+        void onStateChange(boolean connected, String detail);
+    }
+
+    // ---- 状态 ----
+
+    private Process process;
+    private volatile SocketSession session;
+    private volatile FrameCallback frameCallback;
+    private volatile StateCallback stateCallback;
+    private volatile boolean handshakeDone;
+    private ROIData[] pendingRois;
+
+    private final AtomicLong frameCount = new AtomicLong(0);
+    private long totalBytes;
+    private long lastStatsTime;
+
+    // ---- SocketHandler 实现 ----
+
+    @Override
+    public Set<Integer> messageTypes() { return TYPES; }
+
+    @Override
+    public void onConnect(SocketSession session) {
+        this.session = session;
+        this.handshakeDone = false;
+        log.debug("CaptureHandler connected on session#{}", session.id());
+    }
+
+    @Override
+    public void onMessage(int type, byte[] body, SocketSession session) {
+        switch (type) {
+            case MSG_REQUEST_ROI  -> handleRequestRoi(session);
+            case MSG_CAPTURE_READY -> handleCaptureReady(session);
+            case MSG_FRAME_DATA   -> handleFrameData(body, session);
+            case MSG_WINDOW_CLOSED -> handleWindowClosed();
+            case MSG_WINDOW_STATE -> handleWindowState(body);
+        }
+    }
+
+    @Override
+    public void onDisconnect(SocketSession session, String reason) {
+        log.warn("CaptureHandler disconnected: {}", reason);
+        this.session = null;
+        this.handshakeDone = false;
+        if (stateCallback != null) {
+            stateCallback.onStateChange(false, reason);
+        }
+    }
+
+    // ---- 握手 ----
+
+    private void handleRequestRoi(SocketSession session) {
+        log.info("Received REQUEST_ROI");
+        ROIData[] rois = pendingRois != null ? pendingRois : new ROIData[0];
+        session.send(MSG_RETURN_ROI, serializeRois(rois));
+        log.debug("Sent ROI list: {} ROIs", rois.length);
+    }
+
+    private void handleCaptureReady(SocketSession session) {
+        log.info("Received CAPTURE_READY");
+        handshakeDone = true;
+
+        if (stateCallback != null) {
+            stateCallback.onStateChange(true, "Connected");
+        }
+
+        // 发送起搏信号, 开始接收帧
+        session.send(MSG_PROCESSING_DONE, null);
+    }
+
+    // ---- 帧数据 ----
+
+    /**
+     * msgType=4 body:
+     *   [2] roi_count (BE uint16)
+     *   Per ROI: [1] index, [2] w, [2] h, [2] stride, [4] dataLen, [dataLen] BGRA
+     *
+     * 帧内 ROI 使用 CountDownLatch 并行处理, 全部完成后回发 PROCESSING_DONE (背压)
+     */
+    private void handleFrameData(byte[] body, SocketSession session) {
+        if (body == null || body.length < 2) return;
+        ByteBuffer buf = ByteBuffer.wrap(body).order(ByteOrder.BIG_ENDIAN);
+
+        int roiCount = buf.getShort() & 0xFFFF;
+        FrameCallback cb = frameCallback;
+        if (cb == null) {
+            session.send(MSG_PROCESSING_DONE, null);
+            return;
+        }
+
+        // 第一步: 解析所有 ROI 数据 (ByteBuffer 非线程安全, 在主线程解析)
+        record RoiSlot(int index, byte[] pixels, int w, int h, int stride) {}
+        List<RoiSlot> slots = new ArrayList<>(roiCount);
+
+        for (int i = 0; i < roiCount; i++) {
+            if (buf.remaining() < 11) break;
+
+            int index   = buf.get() & 0xFF;
+            int w       = buf.getShort() & 0xFFFF;
+            int h       = buf.getShort() & 0xFFFF;
+            int stride  = buf.getShort() & 0xFFFF;
+            int dataLen = buf.getInt();
+
+            if (dataLen <= 0 || buf.remaining() < dataLen) break;
+
+            byte[] pixels = new byte[dataLen];
+            buf.get(pixels);
+            slots.add(new RoiSlot(index, pixels, w, h, stride));
+
+            frameCount.incrementAndGet();
+            totalBytes += dataLen;
+        }
+
+        // 第二步: 虚拟线程并行处理各 ROI, CountDownLatch 等待全部完成
+        CountDownLatch latch = new CountDownLatch(slots.size());
+        for (RoiSlot slot : slots) {
+            Thread.ofVirtual().start(() -> {
+                try {
+                    cb.onFrame(slot.index, slot.pixels, slot.w, slot.h, slot.stride);
+                } catch (Exception e) {
+                    log.error("Frame callback error ROI[{}]", slot.index, e);
+                } finally {
+                    latch.countDown();
+                }
+            });
+        }
+
+        try {
+            latch.await();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+
+        // 全部 ROI 处理完成, 通知 C++ 发送下一帧
+        session.send(MSG_PROCESSING_DONE, null);
+
+        // 每 10s 诊断
+        long now = System.currentTimeMillis();
+        if (lastStatsTime == 0) lastStatsTime = now;
+        if (now - lastStatsTime > 10000) {
+            double mbps = totalBytes / (1024.0 * 1024.0) / ((now - lastStatsTime) / 1000.0);
+            log.debug("Frames: {}, Rate: {} MB/s", frameCount.get(),
+                    String.format("%.1f", mbps));
+            totalBytes = 0;
+            lastStatsTime = now;
+        }
+    }
+
+    // ---- 窗口事件 ----
+
+    private void handleWindowClosed() {
+        log.warn("capture.exe reports window closed");
+        if (stateCallback != null) {
+            stateCallback.onStateChange(false, "Window closed");
+        }
+    }
+
+    private void handleWindowState(byte[] body) {
+        if (body != null && body.length >= 1) {
+            log.info("Window {}", body[0] == 0 ? "minimized" : "restored");
+        }
+    }
+
+    // ---- 公开 API ----
+
+    /**
+     * 启动 capture.exe 子进程 (SocketServer 必须已启动)
+     * capture.exe 将连接到 SocketServer 的端口, 握手自动完成
+     */
+    public boolean start(long hwnd, int maxFps, String exePath,
+                         ROIData[] rois, FrameCallback frameCb, StateCallback stateCb) {
+        this.pendingRois = rois;
+        this.frameCallback = frameCb;
+        this.stateCallback = stateCb;
+
+        int port = SocketServer.instance().getPort();
+        if (port <= 0) {
+            log.error("SocketServer is not running");
+            return false;
+        }
+
+        try {
+            ProcessBuilder pb = new ProcessBuilder(
+                    exePath,
+                    Long.toString(hwnd),
+                    Integer.toString(port),
+                    Integer.toString(maxFps)
+            );
+            pb.redirectErrorStream(true);
+            process = pb.start();
+
+            // 消费 stdout
+            startReaderThread();
+
+            log.info("capture.exe launched, hwnd=0x{}", Long.toHexString(hwnd));
+            return true;
+        } catch (IOException e) {
+            log.error("Failed to launch capture.exe", e);
+            return false;
+        }
+    }
+
+    private void startReaderThread() {
+        Thread.ofVirtual()
+                .name("capture-stdout")
+                .start(() -> {
+                    try (BufferedReader r = new BufferedReader(
+                            new InputStreamReader(process.getInputStream()))) {
+                        String line;
+                        while ((line = r.readLine()) != null) {
+                            log.debug("[capture.exe] {}", line);
+                        }
+                    } catch (IOException ignored) {
+                    }
+                });
+    }
+
+    /**
+     * 停止截图
+     */
+    public void stop() {
+        // 发送停止请求
+        SocketSession s = session;
+        if (s != null && !s.isClosed()) {
+            s.send(MSG_STOP_REQUEST, null);
+        }
+
+        // 销毁子进程
+        if (process != null && process.isAlive()) {
+            try {
+                process.destroy();
+                if (!process.waitFor(3, TimeUnit.SECONDS)) {
+                    process.destroyForcibly();
+                }
+            } catch (InterruptedException ignored) {
+                process.destroyForcibly();
+            }
+        }
+
+        session = null;
+        handshakeDone = false;
+        log.info("CaptureHandler stopped");
+    }
+
+    public boolean isRunning() {
+        return session != null && !session.isClosed()
+                && handshakeDone
+                && process != null && process.isAlive();
+    }
+
+    // ---- ROI 序列化 ----
+
+    /** msgType=2 body: [2] count + per-ROI [2]x,y,w,h (BE int16) */
+    private static byte[] serializeRois(ROIData[] rois) {
+        int count = (rois != null) ? rois.length : 0;
+        ByteBuffer buf = ByteBuffer.allocate(2 + count * 8).order(ByteOrder.BIG_ENDIAN);
+        buf.putShort((short) count);
+        if (rois != null) {
+            for (ROIData r : rois) {
+                buf.putShort((short) r.x);
+                buf.putShort((short) r.y);
+                buf.putShort((short) r.w);
+                buf.putShort((short) r.h);
+            }
+        }
+        return buf.array();
+    }
+}

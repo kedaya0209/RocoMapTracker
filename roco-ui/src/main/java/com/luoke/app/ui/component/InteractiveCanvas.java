@@ -7,17 +7,17 @@ import com.luoke.app.context.PathContext;
 import com.luoke.app.context.ResourcePointContext;
 import com.luoke.app.hook.HookEventType;
 import com.luoke.app.hook.multicast.HookRegistry;
-import com.luoke.app.map.loader.ImageLoader;
 import com.luoke.app.map.model.Point;
 import com.luoke.app.map.model.ResourcePoint;
 import com.luoke.app.map.model.RoutePath;
 
+import com.luoke.app.ui.render.IconCache;
 import com.luoke.app.ui.render.RenderLoop;
+import com.luoke.app.ui.render.ResourcePointRenderer;
 import com.luoke.app.ui.util.DialogUtils;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
-import javafx.geometry.Point2D;
 import javafx.geometry.Pos;
 import javafx.scene.Cursor;
 import javafx.scene.canvas.Canvas;
@@ -44,7 +44,7 @@ public class InteractiveCanvas extends Canvas {
     private final CameraContext cameraManager = CameraContext.getInstance();
     private final ResourcePointContext pointContext = ResourcePointContext.getInstance();
     private final PathContext pathContext = PathContext.getInstance();
-    private final ImageLoader imageLoader = ImageLoader.getInstance();
+    private final IconCache iconCache = IconCache.getInstance();
 
     private final Tooltip hintTooltip = new Tooltip();
     private final Robot robot = new Robot();
@@ -190,7 +190,7 @@ public class InteractiveCanvas extends Canvas {
                 ResourcePoint snapTarget = findPointAt(e.getX(), e.getY());
 
                 if (snapTarget != null) {
-                    Point2D snapPos = snapTarget.getScreenPosition();
+                    Point snapPos = snapTarget.getScreenPosition();
                     pathContext.getActiveRoute().setNode(draggedNodeIndex, new Point(snapPos.getX(), snapPos.getY()));
                 } else {
                     pathContext.getActiveRoute().setNode(draggedNodeIndex, new Point(rawLx, rawLy));
@@ -267,16 +267,16 @@ public class InteractiveCanvas extends Canvas {
         double viewH = getHeight() / scale;
         double padding = 32.0;
         for (ResourcePoint point : points) {
-            Point2D pos = point.getScreenPosition();
+            Point pos = point.getScreenPosition();
             if (pos.getX() < viewX - padding || pos.getX() > viewX + viewW + padding ||
                     pos.getY() < viewY - padding || pos.getY() > viewY + viewH + padding) continue;
             String iconPath = point.getConfig().getIcon();
             if (iconPath != null && !iconPath.isBlank()) {
                 String fullPath = AppConfig.ICON_DIR + iconPath;
                 Image icon = point.isGrayed()
-                        ? imageLoader.loadGrayIcon(fullPath)
-                        : imageLoader.loadScaledIcon(fullPath);
-                point.renderForCache(gc, icon);
+                        ? iconCache.getGrayIcon(fullPath)
+                        : iconCache.getIcon(fullPath);
+                ResourcePointRenderer.renderForCache(gc, icon, pos);
             }
         }
     }
@@ -290,7 +290,7 @@ public class InteractiveCanvas extends Canvas {
         // 超过 300ms 没收到鼠标移动事件，用 Robot 获取真实屏幕坐标复查
         if (System.currentTimeMillis() - lastHoverCheckTime > 300) {
             javafx.geometry.Point2D screenPos = robot.getMousePosition();
-            Point2D localPos = screenToLocal(screenPos);
+            javafx.geometry.Point2D localPos = screenToLocal(screenPos);
             if (localPos != null) {
                 ResourcePoint actual = findPointAt(localPos.getX(), localPos.getY());
                 if (actual != hoveredPoint) {
@@ -304,8 +304,8 @@ public class InteractiveCanvas extends Canvas {
 
         String iconPath = hoveredPoint.getConfig().getIcon();
         if (iconPath == null || iconPath.isBlank()) return;
-        Image icon = imageLoader.loadScaledIcon(AppConfig.ICON_DIR + iconPath);
-        hoveredPoint.renderHoverOverlay(gc, icon);
+        Image icon = iconCache.getIcon(AppConfig.ICON_DIR + iconPath);
+        ResourcePointRenderer.renderHoverOverlay(gc, icon, hoveredPoint.getScreenPosition());
     }
 
     private double toLogicX(double canvasX) {
@@ -322,7 +322,7 @@ public class InteractiveCanvas extends Canvas {
         double lx = toLogicX(mx);
         double ly = toLogicY(my);
         double threshold = 15.0 / mapManager.getScale();
-        List<Point2D> nodes = active.getNodes();
+        List<Point> nodes = active.getNodes();
         for (int i = 0; i < nodes.size(); i++) {
             if (nodes.get(i).distance(lx, ly) < threshold) return i;
         }
@@ -335,7 +335,7 @@ public class InteractiveCanvas extends Canvas {
         double lx = toLogicX(mx);
         double ly = toLogicY(my);
         double threshold = 12.0 / mapManager.getScale();
-        List<Point2D> nodes = active.getNodes();
+        List<Point> nodes = active.getNodes();
         for (int i = 0; i < nodes.size() - 1; i++) {
             if (distancePointToSegment(lx, ly, nodes.get(i).getX(), nodes.get(i).getY(), nodes.get(i + 1).getX(), nodes.get(i + 1).getY()) < threshold)
                 return i + 1;
@@ -379,7 +379,7 @@ public class InteractiveCanvas extends Canvas {
         if (nearbyPoints.isEmpty()) return null;
         for (int i = nearbyPoints.size() - 1; i >= 0; i--) {
             ResourcePoint p = nearbyPoints.get(i);
-            Point2D pos = p.getScreenPosition();
+            Point pos = p.getScreenPosition();
             double r = 16.0;
             if (lx >= pos.getX() - r && lx <= pos.getX() + r && ly >= pos.getY() - r * 2 && ly <= pos.getY()) return p;
         }

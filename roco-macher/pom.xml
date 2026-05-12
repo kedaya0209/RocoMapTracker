@@ -16,6 +16,10 @@
     <dependencies>
         <dependency>
             <groupId>com.luoke</groupId>
+            <artifactId>roco-engine</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.luoke</groupId>
             <artifactId>roco-common</artifactId>
         </dependency>
         <dependency>

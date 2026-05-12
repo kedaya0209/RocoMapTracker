@@ -1,0 +1,73 @@
+package com.luoke.app.socket;
+
+import lombok.extern.slf4j.Slf4j;
+
+import java.io.*;
+import java.net.Socket;
+import java.util.concurrent.atomic.AtomicLong;
+
+/**
+ * TCP Socket 会话 — 纯传输层, 只负责 send/recv/close
+ * 消息路由和 recv 循环由 SocketServer 统一管理
+ */
+@Slf4j
+public class SocketSession implements AutoCloseable {
+
+    private static final AtomicLong ID_GEN = new AtomicLong(0);
+
+    private final long id;
+    private final Socket socket;
+    private final DataInputStream in;
+    private final DataOutputStream out;
+    private volatile boolean closed;
+
+    SocketSession(Socket socket) throws IOException {
+        this.id = ID_GEN.incrementAndGet();
+        this.socket = socket;
+        socket.setTcpNoDelay(true);
+        this.in = new DataInputStream(new BufferedInputStream(socket.getInputStream()));
+        this.out = new DataOutputStream(new BufferedOutputStream(socket.getOutputStream()));
+    }
+
+    public long id() { return id; }
+
+    /** 同步读取一条消息 (由 SocketServer 的 recv 线程调用) */
+    public Message recv() throws IOException {
+        int type = in.readInt();
+        int len  = in.readInt();
+        byte[] body = null;
+        if (len > 0) {
+            body = new byte[len];
+            in.readFully(body);
+        }
+        return new Message(type, body);
+    }
+
+    /** 线程安全发送 */
+    public synchronized boolean send(int msgType, byte[] body) {
+        if (closed) return false;
+        try {
+            out.writeInt(msgType);
+            out.writeInt(body != null ? body.length : 0);
+            if (body != null && body.length > 0) out.write(body);
+            out.flush();
+            return true;
+        } catch (IOException e) {
+            closed = true;
+            log.error("Send failed on session#{}", id, e);
+            return false;
+        }
+    }
+
+    public boolean isClosed() { return closed || socket.isClosed(); }
+
+    @Override
+    public void close() {
+        if (closed) return;
+        closed = true;
+        try { socket.close(); } catch (IOException ignored) {}
+    }
+
+    /** 一条消息 */
+    public record Message(int type, byte[] body) {}
+}

@@ -65,16 +65,13 @@ public final class MapResourceUpdater {
     public static final int MAX_RETRY = 3;
 
     /** 并发下载线程数 */
-    public static final int THREAD_COUNT = 10;
+    public static final int THREAD_COUNT = 16;
 
     /** 瓦片下载延迟（毫秒） */
     public static final long TILE_DELAY_MS = 30;
 
     /** 图标下载延迟（毫秒） */
     public static final long ICON_DELAY_MS = 100;
-
-    /** 默认地图缩放级别 */
-    public static final int DEFAULT_ZOOM = 4;
 
     // ========== 构造方法 ==========
 

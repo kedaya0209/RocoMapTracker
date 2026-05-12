@@ -1,11 +1,9 @@
 package com.luoke.app.map.model;
 
-import javafx.geometry.Point2D;
 import lombok.Data;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Data
 public class RoutePath {
@@ -18,16 +16,8 @@ public class RoutePath {
     public RoutePath() {
     } // 序列化需要
 
-    public List<Point2D> getNodes() {
-        return nodes.stream().map(Point::toPoint2D).collect(Collectors.toCollection(ArrayList::new));
-    }
-
     public void remove(int index) {
         nodes.remove(index);
-    }
-
-    public void addNode(Point2D point2D) {
-        nodes.add(new Point(point2D.getX(), point2D.getY()));
     }
 
     public void addNode(Point point) {

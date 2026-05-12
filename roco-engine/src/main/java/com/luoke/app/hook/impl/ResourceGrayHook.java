@@ -6,8 +6,8 @@ import com.luoke.app.hook.AbstractGenericHook;
 import com.luoke.app.hook.HookEventType;
 import com.luoke.app.hook.event.PlayerPositionEvent;
 import com.luoke.app.hook.multicast.HookRegistry;
+import com.luoke.app.map.model.Point;
 import com.luoke.app.map.model.ResourcePoint;
-import javafx.geometry.Point2D;
 
 import java.util.Set;
 
@@ -36,7 +36,7 @@ public class ResourceGrayHook extends AbstractGenericHook<PlayerPositionEvent> {
                 continue;
             }
 
-            Point2D resPos = res.getScreenPosition();
+            Point resPos = res.getScreenPosition();
 
             double dx = resPos.getX() - px;
             double dy = resPos.getY() - py;

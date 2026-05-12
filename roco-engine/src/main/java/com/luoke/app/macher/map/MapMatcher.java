@@ -8,6 +8,7 @@ public interface MapMatcher {
 
     /**
      * 初始化匹配器
+     *
      * @param largeMapPath 大图的资源路径
      * @return 初始化是否成功
      */
@@ -15,9 +16,10 @@ public interface MapMatcher {
 
     /**
      * 执行匹配（字节数组版本）
+     *
      * @param imageBytes BGRA格式的像素字节数组
-     * @param width 图像宽度（像素）
-     * @param height 图像高度（像素）
+     * @param width      图像宽度（像素）
+     * @param height     图像高度（像素）
      * @return 匹配到的4个角点坐标数组，失败返回 null
      */
     double[][] match(byte[] imageBytes, int width, int height);

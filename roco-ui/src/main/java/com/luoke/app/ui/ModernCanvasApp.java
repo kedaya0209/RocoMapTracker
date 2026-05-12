@@ -3,8 +3,8 @@ package com.luoke.app.ui;
 import atlantafx.base.theme.*;
 import com.luoke.app.capture.CaptureService;
 import com.luoke.app.capture.ROIData;
-import com.luoke.app.capture.processor.impl.MapMatcherProcessor;
-import com.luoke.app.capture.processor.impl.OcrProcessor;
+import com.luoke.app.capture.processor.MapMatcherProcessor;
+import com.luoke.app.capture.processor.OcrProcessor;
 import com.luoke.app.config.AppConfig;
 import com.luoke.app.context.*;
 import com.luoke.app.hook.AbstractGenericHook;
@@ -16,10 +16,13 @@ import com.luoke.app.hook.event.StatusEvent;
 import com.luoke.app.hook.impl.ResourceGrayHook;
 import com.luoke.app.hook.impl.UiResponseHook;
 import com.luoke.app.hook.multicast.HookRegistry;
+import com.luoke.app.macher.SiftMatchHandler;
+import com.luoke.app.macher.map.SwitchMapMatcher;
 import com.luoke.app.map.MapResourceUpdater;
 import com.luoke.app.map.core.DownloadProgressContext;
 import com.luoke.app.map.core.IconDownloader;
 import com.luoke.app.map.core.MapDownloader;
+import com.luoke.app.socket.SocketServer;
 import com.luoke.app.ui.component.*;
 import com.luoke.app.ui.render.RenderLoop;
 import com.luoke.app.ui.util.DialogUtils;
@@ -69,6 +72,7 @@ public class ModernCanvasApp extends Application {
     private RenderLoop renderLoop;
     private LoadingOverlay globalLoading;
     private CaptureService mainCaptureService;
+    private SiftMatchHandler siftMatchClient;
     private volatile boolean isAppRunning = true;
     private volatile Image playerIconImage;
 
@@ -118,6 +122,25 @@ public class ModernCanvasApp extends Application {
 
     @Override
     public void start(Stage primaryStage) {
+        // 启动全局 SocketServer (常驻后台)
+        try {
+            int port = SocketServer.instance().start();
+            log.info("SocketServer 已启动, 端口: {}", port);
+        } catch (Exception e) {
+            log.error("SocketServer 启动失败", e);
+        }
+
+        // 启动 SIFT 匹配子进程 (sift_match.exe)
+        initSiftMatchClient();
+
+        // 注册算法切换回调 (运行时热切换 C++ 进程变体)
+        SwitchMapMatcher.getInstance().setSwitchCallback(newVariant -> {
+            log.info("算法变体切换: {}", newVariant);
+            if (siftMatchClient != null) {
+                siftMatchClient.restart(SiftMatchHandler.variantOrdinal(newVariant));
+            }
+        });
+
         applyTheme(AppConfig.THEME);
 
         // 外层容器：透明背景 + 内边距，为阴影留出空间
@@ -154,6 +177,22 @@ public class ModernCanvasApp extends Application {
 
 
         checkAndInitResourcesAsync(primaryStage);
+    }
+
+    private void initSiftMatchClient() {
+        siftMatchClient = new SiftMatchHandler();
+        SocketServer.instance().register(siftMatchClient);
+
+        siftMatchClient.start((ready, detail) -> {
+            if (ready) {
+                log.info("SIFT 匹配引擎就绪: {}", detail);
+            } else {
+                log.warn("SIFT 匹配引擎未就绪: {}", detail);
+            }
+            HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION,
+                    new StatusEvent(ready ? "SIFT引擎已就绪" : "SIFT引擎未连接: " + detail,
+                            ready ? NotificationType.SUCCESS : NotificationType.ERROR));
+        });
     }
 
     private void checkAndInitResourcesAsync(Stage primaryStage) {
@@ -365,7 +404,7 @@ public class ModernCanvasApp extends Application {
                 }
             });
             // 6.2 跟随模式切换 → 重绘
-            CameraContext.getInstance().followModeProperty().addListener((obs, old, val) -> {
+            CameraContext.getInstance().onFollowModeChange(() -> {
                 if (renderLoop != null) renderLoop.markDirty();
             });
             // 6.3 窗口恢复 → 重绘
@@ -389,10 +428,12 @@ public class ModernCanvasApp extends Application {
             while (isAppRunning) {
                 try {
                     // 只有在服务未运行或已失效时才尝试重连
-                    if (mainCaptureService == null || mainCaptureService.getId() <= 0) {
+                    if (mainCaptureService == null || !mainCaptureService.isRunning()) {
                         mainCaptureService = new CaptureService("洛克王国：世界");
+                        // 必须先设置 ROI 再加入处理器, tryConnect 会读取 cachedRois
+                        setupCaptureProcessors();
                         if (mainCaptureService.tryConnect()) {
-                            setupCaptureProcessors();
+                            log.info("采集会话已连接");
                         } else {
                             log.info("未找到游戏窗口，5秒后重试...");
                         }
@@ -411,7 +452,7 @@ public class ModernCanvasApp extends Application {
     private void setupCaptureProcessors() {
         if (mainCaptureService == null) return;
 
-        MapMatcherProcessor siftProcessor = new MapMatcherProcessor(0);
+        MapMatcherProcessor siftProcessor = new MapMatcherProcessor(0, siftMatchClient);
         OcrProcessor ocrProcessor = new OcrProcessor(1);
         mainCaptureService.addProcessors(siftProcessor, ocrProcessor);
 
@@ -436,7 +477,7 @@ public class ModernCanvasApp extends Application {
 
             // 占位 Image 仅用于 null 检查，实际渲染由 RenderLoop 通过 cropViewport() 完成
             // init() 会用 image 尺寸覆盖 mapWidth/mapHeight，事后手动修正
-            javafx.scene.image.WritableImage placeholder = new javafx.scene.image.WritableImage(1, 1);
+            java.awt.image.BufferedImage placeholder = new java.awt.image.BufferedImage(1, 1, java.awt.image.BufferedImage.TYPE_INT_ARGB);
             MapContext mm = MapContext.getInstance();
             mm.initWithKey(placeholder, fullW, fullH, "G", null);
             mm.setMapWidth(fullW);
@@ -479,7 +520,15 @@ public class ModernCanvasApp extends Application {
             mainCaptureService.stop();
         }
 
-        // 4. 清理 OCR 线程池
+        // 3.5 停止 SIFT 匹配进程
+        if (siftMatchClient != null) {
+            siftMatchClient.stop();
+        }
+
+        // 4. 停止全局 SocketServer
+        SocketServer.instance().stop();
+
+        // 5. 清理 OCR 线程池
         OcrAsyncManager.getInstance().close();
 
         Platform.exit();

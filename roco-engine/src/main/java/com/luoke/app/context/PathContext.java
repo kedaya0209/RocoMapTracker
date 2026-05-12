@@ -2,34 +2,36 @@ package com.luoke.app.context;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.luoke.app.map.model.RoutePath;
+import com.luoke.app.utils.FileUtil;
 import com.luoke.app.utils.JsonUtils;
 import com.luoke.app.utils.ResourceUtils;
-import javafx.collections.FXCollections;
-import javafx.collections.ObservableList;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Consumer;
 
 @Slf4j
 public class PathContext {
     private static final PathContext INSTANCE = new PathContext();
+
     @Getter
-    private final ObservableList<RoutePath> savedRoutes = FXCollections.observableArrayList();
-    @Getter
-    @Setter
+    private final ArrayList<RoutePath> savedRoutes = new ArrayList<>();
+    private final CopyOnWriteArrayList<Consumer<List<RoutePath>>> changeListeners = new CopyOnWriteArrayList<>();
+
+    @Getter @Setter
     private Mode currentMode = Mode.VIEW;
-    @Getter
-    @Setter
+    @Getter @Setter
     private RoutePath activeRoute;
-    @Getter
-    @Setter
+    @Getter @Setter
     private double mouseLogicX;
-    @Getter
-    @Setter
+    @Getter @Setter
     private double mouseLogicY;
+
     private PathContext() {
         loadFromLocal();
     }
@@ -38,12 +40,23 @@ public class PathContext {
         return INSTANCE;
     }
 
+    /** 注册列表变化回调 (用于 UI 层绑定) */
+    public void onChange(Consumer<List<RoutePath>> listener) {
+        changeListeners.add(listener);
+    }
+
+    private void notifyChanged() {
+        for (Consumer<List<RoutePath>> r : changeListeners) {
+            r.accept(savedRoutes);
+        }
+    }
+
     public void startNewRoute() {
         activeRoute = new RoutePath("未命名路线_" + (savedRoutes.size() + 1));
         currentMode = Mode.DRAWING;
-        // 如果新路线还没在列表里，先加进去
         if (!savedRoutes.contains(activeRoute)) {
             savedRoutes.add(activeRoute);
+            notifyChanged();
         }
     }
 
@@ -57,11 +70,21 @@ public class PathContext {
         this.currentMode = Mode.VIEW;
     }
 
+    public void removeRoute(RoutePath route) {
+        savedRoutes.remove(route);
+        notifyChanged();
+    }
+
+    public void addRoutes(List<RoutePath> routes) {
+        savedRoutes.addAll(routes);
+        notifyChanged();
+    }
+
     public boolean saveToLocal() {
         try {
-            File file = ResourceUtils.getExternalFile(ResourceConfigContext.getPaths());
+            File file = FileUtil.getExternalFile(ResourceConfigContext.getPaths());
             JsonUtils.getMapper().writerWithDefaultPrettyPrinter().writeValue(file, savedRoutes);
-            this.currentMode = Mode.VIEW; // 保存后恢复视角模式
+            this.currentMode = Mode.VIEW;
             log.info("路线已持久化");
             return true;
         } catch (Exception e) {
@@ -73,8 +96,7 @@ public class PathContext {
     public List<RoutePath> resolve(File file) {
         try {
             return JsonUtils.getMapper().readValue(file,
-                    new TypeReference<List<RoutePath>>() {
-                    });
+                    new TypeReference<List<RoutePath>>() {});
         } catch (Exception e) {
             log.error("解析失败，e:", e);
             return null;
@@ -96,8 +118,7 @@ public class PathContext {
             File file = ResourceUtils.getExternalFile(ResourceConfigContext.getPaths());
             if (file.exists()) {
                 List<RoutePath> loaded = JsonUtils.getMapper().readValue(file,
-                        new TypeReference<List<RoutePath>>() {
-                        });
+                        new TypeReference<List<RoutePath>>() {});
                 savedRoutes.addAll(loaded);
             }
         } catch (Exception e) {

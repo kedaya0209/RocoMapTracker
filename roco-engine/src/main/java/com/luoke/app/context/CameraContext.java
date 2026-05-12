@@ -1,25 +1,23 @@
 package com.luoke.app.context;
 
 import com.luoke.app.config.AppConfig;
-import javafx.beans.property.BooleanProperty;
-import javafx.beans.property.SimpleBooleanProperty;
 import lombok.Getter;
 import lombok.Setter;
+
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * 摄像机上下文管理类
  * 负责管理摄像机视角和跟随模式，实现地图视口的自动跟随玩家功能
  */
 public class CameraContext {
-    /**
-     * 跟随模式开关
-     * true=自动跟随玩家，false=固定位置
-     */
-    private final BooleanProperty followMode = new SimpleBooleanProperty(AppConfig.DEFAULT_FOLLOW_MODE);
+    /** 跟随模式开关 */
+    private final AtomicBoolean followMode = new AtomicBoolean(AppConfig.DEFAULT_FOLLOW_MODE);
 
-    /**
-     * 跟随模式下的缩放比例
-     */
+    /** 跟随模式变化监听器 */
+    private final CopyOnWriteArrayList<Runnable> followModeListeners = new CopyOnWriteArrayList<>();
+
     @Getter
     @Setter
     private double followScale = AppConfig.DEFAULT_FOLLOW_SCALE;
@@ -27,32 +25,25 @@ public class CameraContext {
     private CameraContext() {
     }
 
-    /**
-     * 获取单例实例
-     */
     public static CameraContext getInstance() {
         return Holder.INSTANCE;
     }
 
-    /**
-     * 获取跟随模式属性对象
-     */
-    public BooleanProperty followModeProperty() {
-        return followMode;
+    /** 注册跟随模式变化回调 */
+    public void onFollowModeChange(Runnable listener) {
+        followModeListeners.add(listener);
     }
 
-    /**
-     * 获取跟随模式开关状态
-     */
     public boolean isFollowMode() {
         return followMode.get();
     }
 
-    /**
-     * 设置跟随模式开关状态
-     */
     public void setFollowMode(boolean followMode) {
-        this.followMode.set(followMode);
+        if (this.followMode.compareAndSet(!followMode, followMode)) {
+            for (Runnable r : followModeListeners) {
+                r.run();
+            }
+        }
     }
 
     /**

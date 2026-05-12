@@ -13,6 +13,10 @@
     <artifactId>roco-ui</artifactId>
     <packaging>jar</packaging>
 
+    <properties>
+        <pgo.file>default.iprof</pgo.file>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>com.luoke</groupId>
@@ -57,6 +61,10 @@
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-engine</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.luoke</groupId>
+            <artifactId>roco-macher</artifactId>
         </dependency>
     </dependencies>
 
@@ -154,19 +162,19 @@
                                 <buildArg>-Djava.awt.headless=false</buildArg>
                                 <buildArg>-H:+InstallExitHandlers</buildArg>
                                 <buildArg>-Djdk.nio.maxCachedBufferSize=262144</buildArg>
-                                <buildArg>-Djna.nosys=true</buildArg>
+
                                 <buildArg>-J-Xmx24g</buildArg>
                                 <buildArg>-O3</buildArg>
                                 <buildArg>-march=x86-64-v3</buildArg>
                                 <buildArg>-H:+StripDebugInfo</buildArg>
-                                <buildArg>--pgo=default.iprof</buildArg>
+                                <buildArg>--pgo=${pgo.file}</buildArg>
                                 <buildArg>--initialize-at-run-time=com.sun.prism.**</buildArg>
                                 <buildArg>--initialize-at-run-time=com.sun.glass.ui.**</buildArg>
                                 <buildArg>--initialize-at-run-time=javafx.**</buildArg>
                                 <buildArg>--initialize-at-run-time=org.bytedeco.opencv.**</buildArg>
                                 <buildArg>--initialize-at-run-time=org.bytedeco.javacpp.**</buildArg>
                                 <buildArg>--initialize-at-run-time=ai.djl.opencv.**</buildArg>
-                                <buildArg>--initialize-at-run-time=com.sun.jna.**</buildArg>
+
                                 <buildArg>
                                     -H:IncludeResources=(META-INF/services/.*|model/.*|com/sun/prism/.*|com/sun/javafx/.*|.*\.(png|properties|json|fxml|xml|dll|txt|css|ttf|woff2|sh|ps|hlsl|cso))$
                                 </buildArg>
@@ -180,7 +188,7 @@
                                 <buildArg>-H:+ReportExceptionStackTraces</buildArg>
                                 <buildArg>--enable-url-protocols=http,https</buildArg>
                                 <buildArg>-H:+JNI</buildArg>
-                                <buildArg>--initialize-at-run-time=com.luoke.app.utils.JNIFrameNative</buildArg>
+
                             </buildArgs>
                         </configuration>
                     </plugin>
@@ -231,7 +239,7 @@
                                 <buildArg>-Djava.awt.headless=false</buildArg>
                                 <buildArg>-H:+InstallExitHandlers</buildArg>
                                 <buildArg>-Djdk.nio.maxCachedBufferSize=262144</buildArg>
-                                <buildArg>-Djna.nosys=true</buildArg>
+
                                 <buildArg>-H:+JNI</buildArg>
                                 <buildArg>-H:+ReportExceptionStackTraces</buildArg>
                                 <buildArg>--enable-url-protocols=http,https</buildArg>
@@ -241,8 +249,8 @@
                                 <buildArg>--initialize-at-run-time=org.bytedeco.opencv.**</buildArg>
                                 <buildArg>--initialize-at-run-time=org.bytedeco.javacpp.**</buildArg>
                                 <buildArg>--initialize-at-run-time=ai.djl.opencv.**</buildArg>
-                                <buildArg>--initialize-at-run-time=com.sun.jna.**</buildArg>
-                                <buildArg>--initialize-at-run-time=com.luoke.app.utils.JNIFrameNative</buildArg>
+
+
                                 <buildArg>
                                     -H:IncludeResources=(META-INF/services/.*|model/.*|com/sun/prism/.*|com/sun/javafx/.*|.*\.(png|properties|json|fxml|xml|dll|txt|css|ttf|woff2|sh|ps|hlsl|cso))$
                                 </buildArg>
@@ -295,7 +303,7 @@
                                 <buildArg>-R:MaxDirectMemorySize=512M</buildArg>
                                 <buildArg>-H:+StaticExecutableWithDynamicLibC</buildArg>
                                 <buildArg>-H:+RemoveUnusedSymbols</buildArg>
-                                <buildArg>--pgo=default.iprof</buildArg>
+                                <buildArg>--pgo=${pgo.file}</buildArg>
                                 <buildArg>-J-Xmx24g</buildArg>
                                 <buildArg>-O3</buildArg>
                                 <buildArg>-march=x86-64-v3</buildArg>
@@ -307,7 +315,7 @@
                                 <buildArg>-Djava.awt.headless=false</buildArg>
                                 <buildArg>-H:+InstallExitHandlers</buildArg>
                                 <buildArg>-Djdk.nio.maxCachedBufferSize=262144</buildArg>
-                                <buildArg>-Djna.nosys=true</buildArg>
+
                                 <buildArg>-H:+JNI</buildArg>
                                 <buildArg>-H:+ReportExceptionStackTraces</buildArg>
                                 <buildArg>--enable-url-protocols=http,https</buildArg>
@@ -317,8 +325,7 @@
                                 <buildArg>--initialize-at-run-time=org.bytedeco.opencv.**</buildArg>
                                 <buildArg>--initialize-at-run-time=org.bytedeco.javacpp.**</buildArg>
                                 <buildArg>--initialize-at-run-time=ai.djl.opencv.**</buildArg>
-                                <buildArg>--initialize-at-run-time=com.sun.jna.**</buildArg>
-                                <buildArg>--initialize-at-run-time=com.luoke.app.utils.JNIFrameNative</buildArg>
+
                                 <buildArg>
                                     -H:IncludeResources=(META-INF/services/.*|model/.*|com/sun/prism/.*|com/sun/javafx/.*|.*\.(png|properties|json|fxml|xml|dll|txt|css|ttf|woff2|sh|ps|hlsl|cso))$
                                 </buildArg>

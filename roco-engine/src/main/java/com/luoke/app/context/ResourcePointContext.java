@@ -11,7 +11,7 @@ import com.luoke.app.map.model.ResourceConfig;
 import com.luoke.app.map.model.ResourcePoint;
 import com.luoke.app.utils.JsonUtils;
 import com.luoke.app.utils.ResourceUtils;
-import javafx.geometry.Point2D;
+import com.luoke.app.map.model.Point;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.File;
@@ -62,7 +62,7 @@ public class ResourcePointContext {
         MapCoordinateManager coordManager = MapCoordinateManager.getInstance();
 
         for (ResourceConfig config : rawResourceList) {
-            Point2D screenPos = coordManager.toScreen(config.getLng(), config.getLat());
+            Point screenPos = coordManager.toScreen(config.getLng(), config.getLat());
             ResourcePoint point = new ResourcePoint(config, screenPos);
             pointList.add(point);
             // 模板缓存：以每类点位的第一个配置作为新增点位时的参考（图标、层级等）
@@ -81,7 +81,7 @@ public class ResourcePointContext {
             if (template == null) throw new RuntimeException("找不到原始模板点位: " + markTypeName);
 
             // 转换坐标
-            Point2D rawPoint = MapCoordinateManager.getInstance().fromScreen(canvasX, canvasY);
+            Point rawPoint = MapCoordinateManager.getInstance().fromScreen(canvasX, canvasY);
 
             ResourceConfig nc = new ResourceConfig();
             nc.setMarkTypeName(markTypeName);

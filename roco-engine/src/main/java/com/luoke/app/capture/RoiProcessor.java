@@ -1,6 +1,4 @@
-package com.luoke.app.capture.processor;
-
-import com.luoke.app.capture.ROIData;
+package com.luoke.app.capture;
 
 public interface RoiProcessor {
     /**

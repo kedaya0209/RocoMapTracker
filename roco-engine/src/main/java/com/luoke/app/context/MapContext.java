@@ -4,10 +4,10 @@ import com.luoke.app.config.AppConfig;
 import com.luoke.app.hook.HookEventType;
 import com.luoke.app.hook.event.PlayerPositionEvent;
 import com.luoke.app.hook.multicast.HookRegistry;
-import javafx.scene.image.Image;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.awt.image.BufferedImage;
 import java.nio.MappedByteBuffer;
 
 /**
@@ -18,7 +18,7 @@ import java.nio.MappedByteBuffer;
 @Setter
 public class MapContext {
 
-    private Image mapImage;
+    private BufferedImage mapImage;
     private MappedByteBuffer mapImageBuffer; // mmap 缓冲区强引用，防止 GC 回收映射内存
     private double mapWidth, mapHeight; // 原始地图尺寸
 
@@ -31,6 +31,7 @@ public class MapContext {
 
     private double playerX = -1, playerY = -1; // 玩家世界坐标
     private double playerAngle = 0;             // 玩家朝向
+    private boolean hasAngle = false;           // 是否有有效朝向数据
     private boolean playerInitialized = false;  // 是否已定位
 
     private String currentMapKey; // 当前地图唯一标识
@@ -42,7 +43,7 @@ public class MapContext {
     }
 
     /** 基础初始化：设置地图图源及视口尺寸 */
-    public void init(Image image, double w, double h) {
+    public void init(BufferedImage image, double w, double h) {
         this.mapImage = image;
         this.mapWidth = image.getWidth();
         this.mapHeight = image.getHeight();
@@ -51,7 +52,7 @@ public class MapContext {
     }
 
     /** 完整初始化：初始化参数并注册到 MapCoordinateManager */
-    public void initWithKey(Image image, double w, double h, String mapKey) {
+    public void initWithKey(BufferedImage image, double w, double h, String mapKey) {
         init(image, w, h);
         this.currentMapKey = mapKey;
         MapCoordinateManager.getInstance().registerMap(
@@ -62,7 +63,7 @@ public class MapContext {
     /**
      * mmap 版本：额外持有 MappedByteBuffer 引用防止 GC 回收
      */
-    public void initWithKey(Image image, double w, double h, String mapKey, MappedByteBuffer buffer) {
+    public void initWithKey(BufferedImage image, double w, double h, String mapKey, MappedByteBuffer buffer) {
         this.mapImageBuffer = buffer;
         initWithKey(image, w, h, mapKey);
     }
@@ -71,7 +72,7 @@ public class MapContext {
     public void updatePlayerState(double x, double y, Double visualAngle) {
         this.playerX = x;
         this.playerY = y;
-        if (visualAngle != null) this.playerAngle = visualAngle;
+        if (visualAngle != null) { this.playerAngle = visualAngle; this.hasAngle = true; }
         this.playerInitialized = true;
         HookRegistry.INSTANCE.publish(
                 HookEventType.PLAYER_UPDATE,
