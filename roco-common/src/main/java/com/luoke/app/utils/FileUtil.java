@@ -26,7 +26,8 @@ public class FileUtil {
     public static Path getAppRootDir() {
         // 1. 判定是否为 GraalVM Native Image
         // Native Image环境会设置此系统属性指向可执行文件的完整路径
-        String nativeImagePath = ProcessProperties.getExecutableName();
+        String nativeImagePath = null;
+        if (isNative()) nativeImagePath = ProcessProperties.getExecutableName();
         if (nativeImagePath != null && !nativeImagePath.isEmpty()) {
             // 返回可执行文件的父目录（即应用根目录）
             return Paths.get(nativeImagePath).getParent().toAbsolutePath();
