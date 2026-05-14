@@ -1,33 +1,26 @@
 package com.luoke.app.ui.component;
 
-import com.luoke.app.config.AppConfig;
 import com.luoke.app.context.CameraContext;
 import com.luoke.app.context.MapContext;
 import com.luoke.app.context.PathContext;
 import com.luoke.app.context.ResourcePointContext;
 import com.luoke.app.hook.HookEventType;
 import com.luoke.app.hook.multicast.HookRegistry;
-import com.luoke.app.map.loader.ImageLoader;
 import com.luoke.app.map.model.Point;
 import com.luoke.app.map.model.ResourcePoint;
 import com.luoke.app.map.model.RoutePath;
-
-import com.luoke.app.ui.render.RenderLoop;
+import com.luoke.app.ui.render.MapRenderer;
 import com.luoke.app.ui.util.DialogUtils;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
-import javafx.geometry.Point2D;
 import javafx.geometry.Pos;
 import javafx.scene.Cursor;
 import javafx.scene.canvas.Canvas;
-import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.*;
-import javafx.scene.image.Image;
 import javafx.scene.input.*;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
-import javafx.scene.robot.Robot;
 import javafx.stage.Popup;
 import javafx.util.Duration;
 import lombok.Setter;
@@ -44,14 +37,15 @@ public class InteractiveCanvas extends Canvas {
     private final CameraContext cameraManager = CameraContext.getInstance();
     private final ResourcePointContext pointContext = ResourcePointContext.getInstance();
     private final PathContext pathContext = PathContext.getInstance();
-    private final ImageLoader imageLoader = ImageLoader.getInstance();
 
     private final Tooltip hintTooltip = new Tooltip();
-    private final Robot robot = new Robot();
     private double lastMouseX, lastMouseY;
-    private long lastHoverCheckTime;
     private boolean firstResize = true;
     private ResourcePoint hoveredPoint = null;
+    @Setter
+    private MapRenderer mapRenderer;
+    @Setter
+    private UiAnimator uiAnimator;
     private ContextMenu mapContextMenu;
     private ContextMenu imageContextMenu;
 
@@ -61,12 +55,6 @@ public class InteractiveCanvas extends Canvas {
     private final KeyCombination saveCombo = new KeyCodeCombination(KeyCode.S, KeyCombination.CONTROL_ANY);
     private final KeyCombination undoCombo = new KeyCodeCombination(KeyCode.Z, KeyCombination.CONTROL_ANY);
     private int draggedNodeIndex = -1;
-
-    // hover 节流：~60fps
-    private long lastHoverDirtyTime;
-
-    @Setter
-    private RenderLoop renderLoop;
 
     public InteractiveCanvas() {
         setFocusTraversable(true);
@@ -85,12 +73,12 @@ public class InteractiveCanvas extends Canvas {
         widthProperty().addListener(e -> {
             mapManager.setViewWidth(getWidth());
             handleInitialFit();
-            if (renderLoop != null) renderLoop.markDirty();
+            // noop: renderLoop removed
         });
         heightProperty().addListener(e -> {
             mapManager.setViewHeight(getHeight());
             handleInitialFit();
-            if (renderLoop != null) renderLoop.markDirty();
+            // noop: renderLoop removed
         });
 
         // 拦截按键事件
@@ -100,11 +88,6 @@ public class InteractiveCanvas extends Canvas {
             pathContext.setMouseLogicX(toLogicX(e.getX()));
             pathContext.setMouseLogicY(toLogicY(e.getY()));
             handlePointHover(e);
-            long now = System.currentTimeMillis();
-            if (now - lastHoverDirtyTime >= 16) { // ~60fps 节流
-                lastHoverDirtyTime = now;
-                if (renderLoop != null) renderLoop.markDirtyHover();
-            }
         });
 
         setOnMouseExited(e -> {
@@ -112,13 +95,15 @@ public class InteractiveCanvas extends Canvas {
             if (hoveredPoint != null) {
                 hoveredPoint.setHovered(false);
                 hoveredPoint = null;
+                if (mapRenderer != null) mapRenderer.setHoveredPoint(null);
             }
             setCursor(Cursor.DEFAULT);
-            if (renderLoop != null) renderLoop.markDirtyHover();
         });
 
         setOnMousePressed(e -> {
             requestFocus();
+            // 点击画布时收起侧边栏
+            if (uiAnimator != null) uiAnimator.closeSidebar();
             lastMouseX = e.getX();
             lastMouseY = e.getY();
             hideAllMenus();
@@ -146,7 +131,7 @@ public class InteractiveCanvas extends Canvas {
                     double finalX = (hoveredPoint != null) ? hoveredPoint.getScreenPosition().getX() : lx;
                     double finalY = (hoveredPoint != null) ? hoveredPoint.getScreenPosition().getY() : ly;
                     pathContext.getActiveRoute().addNode(new Point(finalX, finalY));
-                    if (renderLoop != null) renderLoop.markDirtyStatic();
+                    if (mapRenderer != null) mapRenderer.markDirty();
                     return;
                 }
 
@@ -159,7 +144,7 @@ public class InteractiveCanvas extends Canvas {
                             pathContext.getActiveRoute().addNode(new Point(lx, ly));
                         }
                     }
-                    if (renderLoop != null) renderLoop.markDirtyStatic();
+                    if (mapRenderer != null) mapRenderer.markDirty();
                     return;
                 }
             }
@@ -169,7 +154,7 @@ public class InteractiveCanvas extends Canvas {
                     int nodeIdx = findNodeIndexAt(e.getX(), e.getY());
                     if (nodeIdx != -1) {
                         pathContext.getActiveRoute().remove(nodeIdx);
-                        if (renderLoop != null) renderLoop.markDirtyStatic();
+                        if (mapRenderer != null) mapRenderer.markDirty();
                         return;
                     }
                 }
@@ -190,12 +175,12 @@ public class InteractiveCanvas extends Canvas {
                 ResourcePoint snapTarget = findPointAt(e.getX(), e.getY());
 
                 if (snapTarget != null) {
-                    Point2D snapPos = snapTarget.getScreenPosition();
+                    Point snapPos = snapTarget.getScreenPosition();
                     pathContext.getActiveRoute().setNode(draggedNodeIndex, new Point(snapPos.getX(), snapPos.getY()));
                 } else {
                     pathContext.getActiveRoute().setNode(draggedNodeIndex, new Point(rawLx, rawLy));
                 }
-                if (renderLoop != null) renderLoop.markDirtyStatic();
+                if (mapRenderer != null) mapRenderer.markDirty();
                 return;
             }
 
@@ -212,7 +197,7 @@ public class InteractiveCanvas extends Canvas {
             mapManager.ensureBounds();
             lastMouseX = e.getX();
             lastMouseY = e.getY();
-            if (renderLoop != null) renderLoop.markDirty();
+            // noop: renderLoop removed
         });
 
         setOnMouseReleased(e -> draggedNodeIndex = -1);
@@ -225,7 +210,7 @@ public class InteractiveCanvas extends Canvas {
             } else {
                 mapManager.zoom(factor, e.getX(), e.getY());
             }
-            if (renderLoop != null) renderLoop.markDirty();
+            // noop: renderLoop removed
         });
     }
 
@@ -238,7 +223,7 @@ public class InteractiveCanvas extends Canvas {
                 RoutePath active = pathContext.getActiveRoute();
                 if (active != null && !active.getNodes().isEmpty()) {
                     active.remove(active.getNodes().size() - 1);
-                    if (renderLoop != null) renderLoop.markDirtyStatic();
+                    if (mapRenderer != null) mapRenderer.markDirty();
                 }
             }
             event.consume();
@@ -247,66 +232,12 @@ public class InteractiveCanvas extends Canvas {
             hintTooltip.hide();
             pathContext.setActiveRoute(null);
             pathContext.setCurrentMode(PathContext.Mode.VIEW);
-            if (renderLoop != null) renderLoop.markDirtyStatic();
+            if (mapRenderer != null) mapRenderer.markDirty();
             event.consume();
             log.info("ESC 已成功触发一键退出并清理数据");
         }
     }
 
-
-    /**
-     * 绘制资源图标层（视锥裁剪，只绘制屏幕可见范围内的图标），不含 hover
-     */
-    public void drawAllResourceIcons(GraphicsContext gc) {
-        List<ResourcePoint> points = pointContext.getAllPoints();
-        if (points.isEmpty()) return;
-        double scale = mapManager.getScale();
-        double viewX = -mapManager.getOffsetX() / scale;
-        double viewY = -mapManager.getOffsetY() / scale;
-        double viewW = getWidth() / scale;
-        double viewH = getHeight() / scale;
-        double padding = 32.0;
-        for (ResourcePoint point : points) {
-            Point2D pos = point.getScreenPosition();
-            if (pos.getX() < viewX - padding || pos.getX() > viewX + viewW + padding ||
-                    pos.getY() < viewY - padding || pos.getY() > viewY + viewH + padding) continue;
-            String iconPath = point.getConfig().getIcon();
-            if (iconPath != null && !iconPath.isBlank()) {
-                String fullPath = AppConfig.ICON_DIR + iconPath;
-                Image icon = point.isGrayed()
-                        ? imageLoader.loadGrayIcon(fullPath)
-                        : imageLoader.loadScaledIcon(fullPath);
-                point.renderForCache(gc, icon);
-            }
-        }
-    }
-
-    /**
-     * 在缓存层之上绘制 hover 高亮（每帧调用，不进入快照）。鼠标静止超时后用 Robot 获取实时位置复查。
-     */
-    public void drawHoverOverlay(GraphicsContext gc) {
-        if (hoveredPoint == null) return;
-
-        // 超过 300ms 没收到鼠标移动事件，用 Robot 获取真实屏幕坐标复查
-        if (System.currentTimeMillis() - lastHoverCheckTime > 300) {
-            javafx.geometry.Point2D screenPos = robot.getMousePosition();
-            Point2D localPos = screenToLocal(screenPos);
-            if (localPos != null) {
-                ResourcePoint actual = findPointAt(localPos.getX(), localPos.getY());
-                if (actual != hoveredPoint) {
-                    hoveredPoint.setHovered(false);
-                    hoveredPoint = null;
-                    return;
-                }
-            }
-            lastHoverCheckTime = System.currentTimeMillis(); // 避免每帧都查
-        }
-
-        String iconPath = hoveredPoint.getConfig().getIcon();
-        if (iconPath == null || iconPath.isBlank()) return;
-        Image icon = imageLoader.loadScaledIcon(AppConfig.ICON_DIR + iconPath);
-        hoveredPoint.renderHoverOverlay(gc, icon);
-    }
 
     private double toLogicX(double canvasX) {
         return (canvasX - mapManager.getOffsetX()) / mapManager.getScale();
@@ -322,7 +253,7 @@ public class InteractiveCanvas extends Canvas {
         double lx = toLogicX(mx);
         double ly = toLogicY(my);
         double threshold = 15.0 / mapManager.getScale();
-        List<Point2D> nodes = active.getNodes();
+        List<Point> nodes = active.getNodes();
         for (int i = 0; i < nodes.size(); i++) {
             if (nodes.get(i).distance(lx, ly) < threshold) return i;
         }
@@ -335,7 +266,7 @@ public class InteractiveCanvas extends Canvas {
         double lx = toLogicX(mx);
         double ly = toLogicY(my);
         double threshold = 12.0 / mapManager.getScale();
-        List<Point2D> nodes = active.getNodes();
+        List<Point> nodes = active.getNodes();
         for (int i = 0; i < nodes.size() - 1; i++) {
             if (distancePointToSegment(lx, ly, nodes.get(i).getX(), nodes.get(i).getY(), nodes.get(i + 1).getX(), nodes.get(i + 1).getY()) < threshold)
                 return i + 1;
@@ -346,16 +277,16 @@ public class InteractiveCanvas extends Canvas {
     private double distancePointToSegment(double px, double py, double x1, double y1, double x2, double y2) {
         double l2 = Math.pow(x1 - x2, 2) + Math.pow(y1 - y2, 2);
         if (l2 == 0) return Math.sqrt(Math.pow(px - x1, 2) + Math.pow(py - y1, 2));
-        double t = Math.max(0, Math.min(1, ((px - x1) * (x2 - x1) + (py - y1) * (y2 - y1)) / l2));
+        double t = Math.clamp(((px - x1) * (x2 - x1) + (py - y1) * (y2 - y1)) / l2, 0, 1);
         return Math.sqrt(Math.pow(px - (x1 + t * (x2 - x1)), 2) + Math.pow(py - (y1 + t * (y2 - y1)), 2));
     }
 
     private void handlePointHover(MouseEvent e) {
-        lastHoverCheckTime = System.currentTimeMillis();
         ResourcePoint point = findPointAt(e.getX(), e.getY());
         if (point != hoveredPoint) {
             if (hoveredPoint != null) hoveredPoint.setHovered(false);
             hoveredPoint = point;
+            if (mapRenderer != null) mapRenderer.setHoveredPoint(hoveredPoint);
             if (hoveredPoint != null) {
                 hoveredPoint.setHovered(true);
                 setCursor(Cursor.HAND);
@@ -379,7 +310,7 @@ public class InteractiveCanvas extends Canvas {
         if (nearbyPoints.isEmpty()) return null;
         for (int i = nearbyPoints.size() - 1; i >= 0; i--) {
             ResourcePoint p = nearbyPoints.get(i);
-            Point2D pos = p.getScreenPosition();
+            Point pos = p.getScreenPosition();
             double r = 16.0;
             if (lx >= pos.getX() - r && lx <= pos.getX() + r && ly >= pos.getY() - r * 2 && ly <= pos.getY()) return p;
         }
@@ -421,8 +352,7 @@ public class InteractiveCanvas extends Canvas {
         addPoint.setOnAction(e -> openAddPointDialog(clickSceneX, clickSceneY));
         MenuItem resetCam = new MenuItem("重置视角");
         resetCam.setOnAction(e -> {
-            autoFitMap();
-            if (renderLoop != null) renderLoop.markDirty();
+            if (mapRenderer != null) mapRenderer.resetViewport();
         });
         mapContextMenu.getItems().addAll(addPoint, new SeparatorMenuItem(), resetCam);
         imageContextMenu = new ContextMenu();
@@ -549,39 +479,9 @@ public class InteractiveCanvas extends Canvas {
     private void handleInitialFit() {
         if (getWidth() > 0 && getHeight() > 0) {
             if (firstResize) {
-                autoFitMap();
                 firstResize = false;
-            } else {
-                // 如果窗口被拉伸导致图片太小产生留白，重新调用 autoFit
-                double minScale = Math.max(getWidth() / mapManager.getMapWidth(), getHeight() / mapManager.getMapHeight());
-                if (mapManager.getScale() < minScale) {
-                    autoFitMap();
-                } else {
-                    mapManager.ensureBounds();
-                }
             }
         }
-    }
-
-    /**
-     * 自动缩放地图以撑满窗口（Cover 模式），消除留白。
-     */
-    public void autoFitMap() {
-        if (mapManager.getMapWidth() <= 0 || mapManager.getMapHeight() <= 0) return;
-
-        // 使用 Math.max：确保较长的一边也被填满，从而消除留白
-        double scale = Math.max(getWidth() / mapManager.getMapWidth(), getHeight() / mapManager.getMapHeight());
-        mapManager.setScale(scale);
-
-        // 计算偏移量，使地图在多余的部分对称溢出（即居中显示）
-        double offsetX = (getWidth() - mapManager.getMapWidth() * scale) / 2.0;
-        double offsetY = (getHeight() - mapManager.getMapHeight() * scale) / 2.0;
-
-        mapManager.setOffsetX(offsetX);
-        mapManager.setOffsetY(offsetY);
-
-        // 强行约束一次边界，防止计算误差产生空隙
-        mapManager.ensureBounds();
     }
 
 }

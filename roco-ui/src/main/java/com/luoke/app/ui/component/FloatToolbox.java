@@ -64,8 +64,8 @@ public class FloatToolbox extends VBox {
         if (isFollowLogic) {
             CameraContext cameraCtx = CameraContext.getInstance();
             btn.setOnMouseClicked(e -> cameraCtx.setFollowMode(!cameraCtx.isFollowMode()));
-            cameraCtx.followModeProperty().addListener((obs, old, newVal) -> {
-                Platform.runLater(() -> icon.setFill(newVal ? Color.web(unifiedBlueColor) : Color.WHITE));
+            cameraCtx.onFollowModeChange(() -> {
+                Platform.runLater(() -> icon.setFill(cameraCtx.isFollowMode() ? Color.web(unifiedBlueColor) : Color.WHITE));
             });
         } else if (panel != null) {
             // 切换面板显示的逻辑

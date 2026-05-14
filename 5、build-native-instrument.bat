@@ -1,5 +1,5 @@
 @echo off
-chcp 65001 >nul
+chcp 65001
 cls
 
 set GRAALVM_HOME=D:\Documents\environment\java\graalvm-win\graalvm-jdk-25.0.2+10.1
@@ -15,13 +15,13 @@ echo ==============================
 echo Step 5: Build PGO Instrumented EXE
 echo ==============================
 
-%MAVEN_BIN% clean native:compile -Pnative-instrument -DskipTests
+%MAVEN_BIN% clean package -Pnative-instrument -pl roco-ui -am -DskipTests
 
 echo.
 echo ======================================
 echo Instrumented EXE Build Completed!
-echo File: target/RocoMapTracker-instrumented.exe
-echo Next: Run this EXE to collect PGO data
+echo File: roco-ui\target\RocoMapTracker-instrumented.exe
+echo Next: Run 6、run-pgo.bat to collect PGO data
 echo ======================================
 
 pause

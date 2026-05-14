@@ -1,23 +1,18 @@
 package com.luoke.app.map.loader;
 
 import com.luoke.app.utils.ResourceUtils;
-import javafx.scene.image.Image;
-import javafx.scene.image.PixelReader;
-import javafx.scene.image.PixelWriter;
-import javafx.scene.image.WritableImage;
-import javafx.scene.paint.Color;
 
+import java.io.InputStream;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * 原始图标字节缓存 — 只缓存 PNG byte[]，不做解码/缩放，由 UI 层负责渲染。
+ */
 public class ImageLoader {
     private static final ImageLoader INSTANCE = new ImageLoader();
-    private static final int MAX_ICON_SIZE = 32;
-    private static final boolean SMOOTH_SCALE = true;
 
-    // 强引用缓存，不给 GC 回收图标的机会，确保渲染循环 0 延迟
-    private final Map<String, Image> imageCache = new ConcurrentHashMap<>();
-    private final Map<String, Image> imageGrayCache = new ConcurrentHashMap<>();
+    private final Map<String, byte[]> byteCache = new ConcurrentHashMap<>();
 
     private ImageLoader() {
     }
@@ -26,47 +21,20 @@ public class ImageLoader {
         return INSTANCE;
     }
 
-    public Image loadScaledIcon(String resourcePath) {
-        return imageCache.computeIfAbsent(resourcePath, path -> {
-            try (var ins = ResourceUtils.getResourceStream(path)) {
-                Image result = new Image(ins, MAX_ICON_SIZE, MAX_ICON_SIZE, true, SMOOTH_SCALE);
-                if (result.isError()) return null;
-                return result;
+    /**
+     * 返回原始 PNG 字节，由 UI 层自行解码与缩放。
+     */
+    public byte[] loadIconBytes(String resourcePath) {
+        return byteCache.computeIfAbsent(resourcePath, path -> {
+            try (InputStream ins = ResourceUtils.getResourceStream(path)) {
+                return ins.readAllBytes();
             } catch (Exception e) {
                 return null;
             }
         });
     }
 
-    /**
-     * 加载预计算灰度版图标，避免渲染时使用 setEffect(GRAY_EFFECT) 创建 GPU 离屏缓冲区
-     */
-    public Image loadGrayIcon(String resourcePath) {
-        return imageGrayCache.computeIfAbsent(resourcePath, path -> {
-            Image colorIcon = loadScaledIcon(path);
-            if (colorIcon == null) return null;
-            return createGrayscale(colorIcon);
-        });
-    }
-
-    private static Image createGrayscale(Image source) {
-        int w = (int) source.getWidth();
-        int h = (int) source.getHeight();
-        WritableImage gray = new WritableImage(w, h);
-        PixelReader reader = source.getPixelReader();
-        PixelWriter writer = gray.getPixelWriter();
-        for (int y = 0; y < h; y++) {
-            for (int x = 0; x < w; x++) {
-                Color c = reader.getColor(x, y);
-                double lum = 0.299 * c.getRed() + 0.587 * c.getGreen() + 0.114 * c.getBlue();
-                writer.setColor(x, y, new Color(lum, lum, lum, c.getOpacity()));
-            }
-        }
-        return gray;
-    }
-
     public void clearCache() {
-        imageCache.clear();
-        imageGrayCache.clear();
+        byteCache.clear();
     }
 }

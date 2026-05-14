@@ -2,8 +2,8 @@ package com.luoke.app.ui.render;
 
 import com.luoke.app.context.MapContext;
 import com.luoke.app.context.PathContext;
+import com.luoke.app.map.model.Point;
 import com.luoke.app.map.model.RoutePath;
-import javafx.geometry.Point2D;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.paint.Color;
 
@@ -36,7 +36,7 @@ public class PathRenderer {
         if (pc.getCurrentMode() != PathContext.Mode.VIEW) {
             // 画预览虚线（橡皮筋）
             if (pc.getCurrentMode() == PathContext.Mode.DRAWING && !active.getNodes().isEmpty()) {
-                Point2D lastNode = active.getNodes().get(active.getNodes().size() - 1);
+                Point lastNode = active.getNodes().get(active.getNodes().size() - 1);
                 gc.setStroke(Color.web("#FFFFFF", 0.7));
                 gc.setLineDashes(5.0 / scale);
                 gc.strokeLine(lastNode.getX(), lastNode.getY(), pc.getMouseLogicX(), pc.getMouseLogicY());
@@ -47,13 +47,13 @@ public class PathRenderer {
         gc.setFill(Color.WHITE);
         gc.setStroke(Color.BLUE);
         double r = 4.5 / scale;
-        for (Point2D node : active.getNodes()) {
+        for (Point node : active.getNodes()) {
             gc.fillOval(node.getX() - r, node.getY() - r, r * 2, r * 2);
             gc.strokeOval(node.getX() - r, node.getY() - r, r * 2, r * 2);
         }
     }
 
-    private static void renderSinglePath(GraphicsContext gc, List<Point2D> nodes, boolean isActive) {
+    private static void renderSinglePath(GraphicsContext gc, List<Point> nodes, boolean isActive) {
         if (nodes.size() < 2) return;
         gc.beginPath();
         gc.moveTo(nodes.get(0).getX(), nodes.get(0).getY());

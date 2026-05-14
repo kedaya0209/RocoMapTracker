@@ -6,11 +6,11 @@
 
 | 层 | 技术 | 版本 |
 |---|---|---|
-| 语言 | Java + Rust + C + Python | Java 25, Rust 1.x |
+| 语言 | Java + C++ + Rust + C + Python | Java 25, C++17 |
 | UI 框架 | JavaFX (AtlantaFX 主题) | JavaFX 25, AtlantaFX 2.1.0 |
 | 视觉库 | JavaCPP OpenCV (nopointergc) | 4.13.0-1.5.13 |
 | 推理引擎 | DJL + ONNX Runtime | DJL 0.36.0 |
-| 截图引擎 | Rust WGC (D3D11) + JNA | JNA 5.13.0 |
+| 截图引擎 | C++ WGC (D3D11) + Socket IO | 独立子进程 |
 | 编译目标 | GraalVM Native Image | GraalVM 25.0.2 |
 | 序列化 | Zstd + Jackson | Zstd 1.5.6-2 |
 
@@ -28,16 +28,17 @@
 
 ```
 roco-map-tracker/
-├── roco-common/     # 基础工具层 — 配置/资源/JSON/JNI帧管理
+├── roco-common/     # 基础工具层 — 配置/资源/JSON
 ├── roco-model/      # 模型推理层 — ONNX 推理/CNN 箭头/OCR
 ├── roco-map/        # 地图管理层 — 下载/拼接/图标缓存/资源点
-├── roco-macher/     # 匹配算法层 — SIFT 匹配/小地图检测/箭头
-├── roco-engine/     # 核心引擎层 — 截图/上下文/Hook 事件
-├── roco-ui/         # 用户界面层 — JavaFX 界面/Native Image
-├── rust/            # WGC 截图引擎 (独立 Cargo 构建)
+├── roco-macher/     # 匹配算法层 — SIFT 匹配器/小地图检测
+├── roco-engine/     # 核心引擎层 — 截图/上下文/匹配调度/Hook 事件
+├── roco-ui/         # 用户界面层 — JavaFX 界面/MapRenderer 渲染引擎
+├── cpp/             # C++ 子进程 — WGC 截图 + SIFT 匹配 (Socket IO)
+├── rust/            # WGC 截图引擎 (遗留, 已由 C++ 替代)
 ├── c/               # JNI 局部引用帧管理 (jniframe.dll)
 ├── python/          # CNN 模型训练脚本
-├── dll/             # 运行时 DLL
+├── dll/             # 运行时 DLL/EXE
 └── resources/       # 外部资源 (运行时释放)
 ```
 
@@ -75,9 +76,8 @@ mvn javafx:run -pl roco-ui
 mvn clean package
 # 产物: roco-ui/target/roco-ui-1.1.0-jar-with-dependencies.jar
 
-# 编译 Rust 原生库
-cd rust && cargo build --release
-# 产物: rust/target/release/wgc_capture.dll → 复制到 dll/ 目录
+# 编译 C++ 子进程 (Visual Studio MSVC)
+# 产物: cpp/capture.exe, cpp/sift_match.exe → 复制到 dll/ 目录
 
 # 编译 C JNI 库
 cl /LD /Fe:jniframe.dll c/jniframe.c /I"%JAVA_HOME%\include" /I"%JAVA_HOME%\include\win32"
@@ -106,7 +106,8 @@ mvn -Pnative-pgo clean package -pl roco-ui -am
 | 文件                   | 用途                                   |
 |----------------------|--------------------------------------|
 | `opencv_java490.dll` | JavaCPP OpenCV native (Maven 依赖自动提供) |
-| `wgc_capture.dll`    | Rust WGC 截图引擎                        |
+| `capture.exe`        | C++ WGC 截图子进程                        |
+| `sift_match.exe`     | C++ SIFT 匹配子进程                       |
 | `jniframe.dll`       | JNI 局部引用帧管理                          |
 
 首次运行时会自动将内置资源释放到 `resources/` 目录，并生成 SIFT 特征缓存文件。
@@ -114,16 +115,23 @@ mvn -Pnative-pgo clean package -pl roco-ui -am
 ## 数据流
 
 ```
-Rust WGC → JniCallback → CaptureService
+C++ capture.exe → Socket → CaptureService
   ├─ ROI-0 (小地图) → MapMatcherProcessor
   │    ├─ 霍夫圆检测 → 圆遮罩
-  │    ├─ CNN 方向推理 → ArrowPredictService
-  │    ├─ SIFT 匹配 → 玩家坐标
-  │    └─ MapContext.updatePlayerState()
+  │    ├─ CNN 方向推理 → ArrowDetector → ArrowPredictService
+  │    ├─ SIFT 匹配 → SiftMatchHandler → C++ sift_match.exe
+  │    └─ MapContext.updatePlayerState(x, y, angle)
+  │         ├─ PlayerRenderer (角度旋转箭头图标)
+  │         └─ CameraContext (自动跟随偏移)
   │
   └─ ROI-1 (物品栏) → OcrProcessor
        ├─ OCR 识别 (det + rec)
        └─ MaterialCollectionContext.addMaterial()
+
+MapRenderer (AnimationTimer)
+  ├─ StatsOverlay.update() (每帧 33ms)
+  ├─ viewportDirty 快照复用 (地图 + 图标 + 路线)
+  └─ 每帧动态层 (玩家图标旋转 + hover)
 ```
 
 ## 坐标系

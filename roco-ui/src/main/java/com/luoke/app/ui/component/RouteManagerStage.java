@@ -8,6 +8,8 @@ import com.luoke.app.hook.multicast.HookRegistry;
 import com.luoke.app.map.model.RoutePath;
 import com.luoke.app.ui.util.DialogUtils;
 import javafx.application.Platform;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
@@ -107,7 +109,10 @@ public class RouteManagerStage extends Stage {
         });
 
         // --- 路线列表 ---
-        listView.setItems(PathContext.getInstance().getSavedRoutes());
+        PathContext pc = PathContext.getInstance();
+        ObservableList<RoutePath> routeItems = FXCollections.observableArrayList(pc.getSavedRoutes());
+        pc.onChange(routes -> Platform.runLater(() -> routeItems.setAll(routes)));
+        listView.setItems(routeItems);
         listView.setPrefHeight(200);
         VBox.setVgrow(listView, Priority.ALWAYS);
         listView.setStyle("-fx-background-color: #252525; -fx-control-inner-background: #252525; -fx-background-insets: 0;");
@@ -242,16 +247,14 @@ public class RouteManagerStage extends Stage {
                 "确认删除",
                 "确定要永久删除路线 [" + selected.getName() + "] 吗？",
                 () -> {
-                    PathContext.getInstance().getSavedRoutes().remove(selected);
+                    PathContext.getInstance().removeRoute(selected);
                     if (PathContext.getInstance().getActiveRoute() == selected) {
                         PathContext.getInstance().setActiveRoute(null);
                         PathContext.getInstance().setCurrentMode(PathContext.Mode.VIEW);
                     }
                     if (PathContext.getInstance().saveToLocal()) {
-                        refreshList();
                         HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION, new StatusEvent("删除成功", NotificationType.SUCCESS));
                     }
-                    refreshList();
                 },
                 null
         );
@@ -296,9 +299,8 @@ public class RouteManagerStage extends Stage {
                 "确认导入",
                 content,
                 () -> {
-                    PathContext.getInstance().getSavedRoutes().addAll(importedPaths);
+                    PathContext.getInstance().addRoutes(importedPaths);
                     if (PathContext.getInstance().saveToLocal()) {
-                        refreshList();
                         HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION, new StatusEvent("成功导入路线", NotificationType.SUCCESS));
                     }
                 },

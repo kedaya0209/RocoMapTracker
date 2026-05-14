@@ -36,6 +36,8 @@ public enum HookRegistry {
      * @param hooks 要注册的钩子实例数组，不能为null
      */
     public void registers(AbstractGenericHook<?>... hooks) {
+        // 防御性：确保 HookMulticast 已初始化（与 register() 保持一致）
+        HookMulticast.getInstance();
         for (AbstractGenericHook<?> hook : hooks) {
             for (HookEventType eventType : hook.supportedEvents()) {
                 container.registerHook(eventType, hook);

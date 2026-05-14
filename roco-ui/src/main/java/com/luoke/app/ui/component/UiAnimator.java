@@ -13,7 +13,13 @@ public class UiAnimator {
     @Getter
     private boolean sidebarVisible = false;
 
+    private Node sidebarNode;
+    private Node floatNode;
+
     public void setupSidebarToggle(Button menuBtn, Node sidebar, Node floatContainer) {
+        this.sidebarNode = sidebar;
+        this.floatNode = floatContainer;
+
         // 创建动画对象
         TranslateTransition st = new TranslateTransition(Duration.millis(250), sidebar);
         TranslateTransition ft = new TranslateTransition(Duration.millis(250), floatContainer);
@@ -32,29 +38,31 @@ public class UiAnimator {
             log.debug("侧边栏初始化完成，动态宽度: {}", width);
         });
 
-        menuBtn.setOnAction(e -> {
-            st.stop();
-            ft.stop();
+        menuBtn.setOnAction(e -> toggleSidebar());
+    }
 
-            // 动态获取当前宽度，防止界面调整大小后宽度变化
-            double currentWidth = sidebar.getLayoutBounds().getWidth();
+    private void toggleSidebar() {
+        if (sidebarNode == null) return;
+        double currentWidth = sidebarNode.getLayoutBounds().getWidth();
 
-            // 计算目标位置
-            // 关闭状态 -> 目标 X 是 0 (完全显示)
-            // 打开状态 -> 目标 X 是 -宽度 (完全隐藏)
-            double targetX = sidebarVisible ? -currentWidth : 0;
+        TranslateTransition st = new TranslateTransition(Duration.millis(250), sidebarNode);
+        TranslateTransition ft = new TranslateTransition(Duration.millis(250), floatNode);
 
-            // 悬浮容器（如果有的话）随之向右偏移
-            double floatTargetX = sidebarVisible ? 0 : currentWidth;
+        double targetX = sidebarVisible ? -currentWidth : 0;
+        double floatTargetX = sidebarVisible ? 0 : currentWidth;
 
-            st.setToX(targetX);
-            ft.setToX(floatTargetX);
+        st.setToX(targetX);
+        ft.setToX(floatTargetX);
+        st.play();
+        ft.play();
 
-            st.play();
-            ft.play();
+        sidebarVisible = !sidebarVisible;
+    }
 
-            sidebarVisible = !sidebarVisible;
-            log.debug("侧边栏状态: {}，目标位置: {}", sidebarVisible ? "打开" : "关闭", targetX);
-        });
+    /** 画布点击时收起侧边栏 */
+    public void closeSidebar() {
+        if (sidebarVisible) {
+            toggleSidebar();
+        }
     }
 }

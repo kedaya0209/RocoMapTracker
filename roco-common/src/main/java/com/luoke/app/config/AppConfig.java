@@ -21,7 +21,8 @@ public final class AppConfig {
     // ============================================================
     // 1. 静态资源常量 (Final) - 程序的物理路径，不可更改
     // ============================================================
-    public static final String CAPTURE_DLL = "/dll/wgc_capture.dll";
+    public static final String CAPTURE_EXE = "/capture/capture.exe";
+    public static final String SIFT_MATCH_EXE = "/sift/sift_match.exe";
     public static final String SOURCE_INIT = "/source/init";
     public static final String MAP_RESOURCE_PATH = "/source/map/map_G.png";
     public static final String MAP_RESOURCE_DIR = "/source/map/";
@@ -72,7 +73,7 @@ public final class AppConfig {
     public static int MAP_MAX_ZOOM = 8;
     public static int JSON_ZOOM = 7;
     public static double COORDINATE_SMOOTH_FACTOR = 0.8;
-    public static double GRAY_DISTANCE = 5;
+    public static double GRAY_DISTANCE = 10;
     public static boolean MATERIAL_COLLECTION = false;
 
     // 算法参数
@@ -90,6 +91,7 @@ public final class AppConfig {
     public static double RANSAC_REPROJ_THRESHOLD = 10.0;
     public static int RANSAC_MAX_ITERS = 200;
     public static double RANSAC_CONFIDENCE = 0.95;
+    public static int SEARCH_RADIUS = 500;
 
     public static boolean SHOW_STATS_MAP_TIME = true;
     public static boolean SHOW_STATS_CIRCLE_MASK = true;

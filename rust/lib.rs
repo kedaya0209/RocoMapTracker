@@ -64,6 +64,7 @@ struct CaptureInstance {
 
     frame_slot: Arc<(Mutex<Option<FrameBatch>>, Condvar)>,
 
+    #[allow(dead_code)]
     max_fps: i32,
 }
 
@@ -76,6 +77,14 @@ lazy_static! {
 
     static ref NEXT_ID: Mutex<i32> =
         Mutex::new(1);
+
+    static ref TOKIO_RT: tokio::runtime::Runtime =
+        tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(2)
+            .thread_name("wgc-tokio")
+            .enable_all()
+            .build()
+            .expect("Failed to build tokio runtime");
 }
 
 fn worker_loop(
@@ -111,7 +120,7 @@ fn worker_loop(
             result
         };
 
-        let mut batch = match batch {
+        let batch = match batch {
             Some(v) => v,
             None => break,
         };
@@ -128,8 +137,7 @@ fn worker_loop(
             );
         }
 
-        // 自动 drop Vec<u8>
-        batch.rois.clear();
+        // batch drop -> 自动释放 Vec
     }
 
     cb(
@@ -218,7 +226,7 @@ impl GraphicsCaptureApiHandler
             self.last_frame = now;
         }
 
-        // worker busy => drop frame
+        // worker busy -> drop frame
         if self.frame_slot
             .0
             .lock()
@@ -229,29 +237,47 @@ impl GraphicsCaptureApiHandler
         }
 
         let width =
-            frame.width() as i32;
+            frame.width() as usize;
 
         let height =
-            frame.height() as i32;
-
-        let frame_buffer =
-            frame.buffer()?;
-
-        let mut nopadding =
-            Vec::new();
-
-        let bytes =
-            frame_buffer.as_nopadding_buffer(
-                &mut nopadding,
-            );
-
-        let stride =
-            width as usize * 4;
+            frame.height() as usize;
 
         let rois =
             self.roi_list.read().unwrap();
 
         if rois.is_empty() {
+            return Ok(());
+        }
+
+        // =========================
+        // 直接读取原始 buffer
+        // 不再使用 as_nopadding_buffer
+        // =========================
+
+        let mut frame_buffer =
+            frame.buffer()?;
+
+        let row_pitch =
+            frame_buffer.row_pitch() as usize;
+
+        let bytes =
+            frame_buffer.as_raw_buffer();
+
+        // 防止 windows-capture 偶发空 buffer
+        if bytes.is_empty() {
+            return Ok(());
+        }
+
+        let required =
+            row_pitch * height;
+
+        if bytes.len() < required {
+            println!(
+                "[wgc] invalid frame buffer len={} required={}",
+                bytes.len(),
+                required
+            );
+
             return Ok(());
         }
 
@@ -265,73 +291,79 @@ impl GraphicsCaptureApiHandler
                 ((roi.x as i64
                     * width as i64
                     / 10000)
-                    as i32)
-                    .max(0);
+                    as usize)
+                    .min(width);
 
             let ry =
                 ((roi.y as i64
                     * height as i64
                     / 10000)
-                    as i32)
-                    .max(0);
+                    as usize)
+                    .min(height);
 
             let rw =
                 ((roi.w as i64
                     * width as i64
                     / 10000)
-                    as i32)
+                    as usize)
                     .min(width - rx);
 
             let rh =
                 ((roi.h as i64
                     * height as i64
                     / 10000)
-                    as i32)
+                    as usize)
                     .min(height - ry);
 
-            if rw <= 0 || rh <= 0 {
+            if rw == 0 || rh == 0 {
                 continue;
             }
 
-            let size =
-                rw as usize
-                    * rh as usize
-                    * 4;
-
             let mut data =
-                vec![0u8; size];
+                vec![0u8; rw * rh * 4];
 
-            for y in 0..rh as usize {
+            let mut valid = true;
+
+            for y in 0..rh {
                 let src_y =
-                    ry as usize + y;
+                    ry + y;
 
                 let src_start =
-                    src_y * stride
-                        + rx as usize * 4;
+                    src_y * row_pitch
+                        + rx * 4;
 
                 let src_end =
-                    src_start
-                        + rw as usize * 4;
+                    src_start + rw * 4;
+
+                // 防止越界
+                if src_end > bytes.len() {
+                    valid = false;
+                    break;
+                }
 
                 let dst_start =
-                    y * rw as usize * 4;
+                    y * rw * 4;
 
                 data[dst_start
-                    ..dst_start
-                        + rw as usize * 4]
+                    ..dst_start + rw * 4]
                     .copy_from_slice(
-                        &bytes
-                            [src_start..src_end],
+                        &bytes[src_start..src_end],
                     );
+            }
+
+            if !valid {
+                continue;
             }
 
             roi_caps.push(RoiCapture {
                 index: idx as i32,
                 data,
-                rw,
-                rh,
+                rw: rw as i32,
+                rh: rh as i32,
             });
         }
+
+        drop(frame_buffer);
 
         if !roi_caps.is_empty() {
             let (lock, cvar) =
@@ -411,6 +443,7 @@ pub extern "C" fn create(
         .unwrap()
         .insert(id, inst);
 
+    // worker
     {
         let worker_running =
             running.clone();
@@ -418,53 +451,63 @@ pub extern "C" fn create(
         let worker_slot =
             frame_slot.clone();
 
-        thread::spawn(move || {
-            worker_loop(
-                id,
-                worker_running,
-                worker_slot,
-                cb,
-            );
-        });
+        thread::Builder::new()
+            .name("wgc-worker".into())
+            .spawn(move || {
+                worker_loop(
+                    id,
+                    worker_running,
+                    worker_slot,
+                    cb,
+                );
+            })
+            .expect("Failed to spawn worker thread");
     }
 
+    // capture
     {
-        thread::spawn(move || {
-            let window =
-                Window::from_raw_hwnd(
-                    hwnd_i64
-                        as *mut c_void,
-                );
+        thread::Builder::new()
+            .name("wgc-capture".into())
+            .spawn(move || {
+                let _rt_guard =
+                    TOKIO_RT.enter();
 
-            let settings =
-                Settings::new(
-                    window,
+                let window =
+                    Window::from_raw_hwnd(
+                        hwnd_i64
+                            as *mut c_void,
+                    );
 
-                    CursorCaptureSettings::WithoutCursor,
+                let settings =
+                    Settings::new(
+                        window,
 
-                    DrawBorderSettings::WithoutBorder,
+                        CursorCaptureSettings::WithoutCursor,
 
-                    SecondaryWindowSettings::Default,
+                        DrawBorderSettings::WithoutBorder,
 
-                    MinimumUpdateIntervalSettings::Default,
+                        SecondaryWindowSettings::Default,
 
-                    DirtyRegionSettings::Default,
+                        MinimumUpdateIntervalSettings::Default,
 
-                    ColorFormat::Bgra8,
+                        DirtyRegionSettings::Default,
 
-                    (
-                        running,
-                        roi_list,
-                        frame_slot,
-                        max_fps,
-                    ),
-                );
+                        ColorFormat::Bgra8,
 
-            let _ =
-                CaptureHandler::start(
-                    settings,
-                );
-        });
+                        (
+                            running,
+                            roi_list,
+                            frame_slot,
+                            max_fps,
+                        ),
+                    );
+
+                let _ =
+                    CaptureHandler::start(
+                        settings,
+                    );
+            })
+            .expect("Failed to spawn capture thread");
     }
 
     id

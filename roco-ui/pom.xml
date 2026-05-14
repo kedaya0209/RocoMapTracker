@@ -13,6 +13,10 @@
     <artifactId>roco-ui</artifactId>
     <packaging>jar</packaging>
 
+    <properties>
+        <pgo.file>default.iprof</pgo.file>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>com.luoke</groupId>
@@ -57,6 +61,10 @@
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-engine</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.luoke</groupId>
+            <artifactId>roco-macher</artifactId>
         </dependency>
     </dependencies>
 
@@ -142,7 +150,13 @@
                                 </options>
                             </agent>
                             <buildArgs>
-                                <buildArg>-R:MaxHeapSize=256M</buildArg>
+                                <!-- =====调试时需要将这两项注释掉，有些错误不会被记录在日志中====== -->
+                                <!-- 指定链接器子系统为 WINDOWS -->
+                                <arg>-H:NativeLinkerOption=/SUBSYSTEM:WINDOWS</arg>
+                                <!-- 指定入口点，确保在无控制台模式下正确启动 -->
+                                <arg>-H:NativeLinkerOption=/ENTRY:mainCRTStartup</arg>
+                                <!-- ==================================================== -->
+                                <buildArg>-R:MaxHeapSize=512M</buildArg>
                                 <buildArg>-R:MinHeapSize=128M</buildArg>
                                 <buildArg>-R:MaxDirectMemorySize=512M</buildArg>
                                 <buildArg>-H:+StaticExecutableWithDynamicLibC</buildArg>
@@ -154,19 +168,14 @@
                                 <buildArg>-Djava.awt.headless=false</buildArg>
                                 <buildArg>-H:+InstallExitHandlers</buildArg>
                                 <buildArg>-Djdk.nio.maxCachedBufferSize=262144</buildArg>
-                                <buildArg>-Djna.nosys=true</buildArg>
                                 <buildArg>-J-Xmx24g</buildArg>
                                 <buildArg>-O3</buildArg>
                                 <buildArg>-march=x86-64-v3</buildArg>
                                 <buildArg>-H:+StripDebugInfo</buildArg>
-                                <buildArg>--pgo=default.iprof</buildArg>
+                                <buildArg>--pgo=${pgo.file}</buildArg>
                                 <buildArg>--initialize-at-run-time=com.sun.prism.**</buildArg>
                                 <buildArg>--initialize-at-run-time=com.sun.glass.ui.**</buildArg>
                                 <buildArg>--initialize-at-run-time=javafx.**</buildArg>
-                                <buildArg>--initialize-at-run-time=org.bytedeco.opencv.**</buildArg>
-                                <buildArg>--initialize-at-run-time=org.bytedeco.javacpp.**</buildArg>
-                                <buildArg>--initialize-at-run-time=ai.djl.opencv.**</buildArg>
-                                <buildArg>--initialize-at-run-time=com.sun.jna.**</buildArg>
                                 <buildArg>
                                     -H:IncludeResources=(META-INF/services/.*|model/.*|com/sun/prism/.*|com/sun/javafx/.*|.*\.(png|properties|json|fxml|xml|dll|txt|css|ttf|woff2|sh|ps|hlsl|cso))$
                                 </buildArg>
@@ -180,7 +189,7 @@
                                 <buildArg>-H:+ReportExceptionStackTraces</buildArg>
                                 <buildArg>--enable-url-protocols=http,https</buildArg>
                                 <buildArg>-H:+JNI</buildArg>
-                                <buildArg>--initialize-at-run-time=com.luoke.app.utils.JNIFrameNative</buildArg>
+
                             </buildArgs>
                         </configuration>
                     </plugin>
@@ -218,8 +227,8 @@
                                 </options>
                             </agent>
                             <buildArgs>
-                                <buildArg>-R:MaxHeapSize=1G</buildArg>
-                                <buildArg>-R:MinHeapSize=256M</buildArg>
+                                <buildArg>-R:MaxHeapSize=512M</buildArg>
+                                <buildArg>-R:MinHeapSize=128M</buildArg>
                                 <buildArg>-R:MaxDirectMemorySize=512M</buildArg>
                                 <buildArg>--pgo-instrument</buildArg>
                                 <buildArg>-J-Xmx24g</buildArg>
@@ -231,18 +240,12 @@
                                 <buildArg>-Djava.awt.headless=false</buildArg>
                                 <buildArg>-H:+InstallExitHandlers</buildArg>
                                 <buildArg>-Djdk.nio.maxCachedBufferSize=262144</buildArg>
-                                <buildArg>-Djna.nosys=true</buildArg>
                                 <buildArg>-H:+JNI</buildArg>
                                 <buildArg>-H:+ReportExceptionStackTraces</buildArg>
                                 <buildArg>--enable-url-protocols=http,https</buildArg>
                                 <buildArg>--initialize-at-run-time=com.sun.prism.**</buildArg>
                                 <buildArg>--initialize-at-run-time=com.sun.glass.ui.**</buildArg>
                                 <buildArg>--initialize-at-run-time=javafx.**</buildArg>
-                                <buildArg>--initialize-at-run-time=org.bytedeco.opencv.**</buildArg>
-                                <buildArg>--initialize-at-run-time=org.bytedeco.javacpp.**</buildArg>
-                                <buildArg>--initialize-at-run-time=ai.djl.opencv.**</buildArg>
-                                <buildArg>--initialize-at-run-time=com.sun.jna.**</buildArg>
-                                <buildArg>--initialize-at-run-time=com.luoke.app.utils.JNIFrameNative</buildArg>
                                 <buildArg>
                                     -H:IncludeResources=(META-INF/services/.*|model/.*|com/sun/prism/.*|com/sun/javafx/.*|.*\.(png|properties|json|fxml|xml|dll|txt|css|ttf|woff2|sh|ps|hlsl|cso))$
                                 </buildArg>
@@ -290,12 +293,18 @@
                                 </options>
                             </agent>
                             <buildArgs>
-                                <buildArg>-R:MaxHeapSize=256M</buildArg>
+                                <!-- =====调试时需要将这两项注释掉，有些错误不会被记录在日志中====== -->
+                                <!-- 指定链接器子系统为 WINDOWS -->
+                                <arg>-H:NativeLinkerOption=/SUBSYSTEM:WINDOWS</arg>
+                                <!-- 指定入口点，确保在无控制台模式下正确启动 -->
+                                <arg>-H:NativeLinkerOption=/ENTRY:mainCRTStartup</arg>
+                                <!-- ==================================================== -->
+                                <buildArg>-R:MaxHeapSize=512M</buildArg>
                                 <buildArg>-R:MinHeapSize=128M</buildArg>
                                 <buildArg>-R:MaxDirectMemorySize=512M</buildArg>
                                 <buildArg>-H:+StaticExecutableWithDynamicLibC</buildArg>
                                 <buildArg>-H:+RemoveUnusedSymbols</buildArg>
-                                <buildArg>--pgo=default.iprof</buildArg>
+                                <buildArg>--pgo=${pgo.file}</buildArg>
                                 <buildArg>-J-Xmx24g</buildArg>
                                 <buildArg>-O3</buildArg>
                                 <buildArg>-march=x86-64-v3</buildArg>
@@ -307,18 +316,13 @@
                                 <buildArg>-Djava.awt.headless=false</buildArg>
                                 <buildArg>-H:+InstallExitHandlers</buildArg>
                                 <buildArg>-Djdk.nio.maxCachedBufferSize=262144</buildArg>
-                                <buildArg>-Djna.nosys=true</buildArg>
+
                                 <buildArg>-H:+JNI</buildArg>
                                 <buildArg>-H:+ReportExceptionStackTraces</buildArg>
                                 <buildArg>--enable-url-protocols=http,https</buildArg>
                                 <buildArg>--initialize-at-run-time=com.sun.prism.**</buildArg>
                                 <buildArg>--initialize-at-run-time=com.sun.glass.ui.**</buildArg>
                                 <buildArg>--initialize-at-run-time=javafx.**</buildArg>
-                                <buildArg>--initialize-at-run-time=org.bytedeco.opencv.**</buildArg>
-                                <buildArg>--initialize-at-run-time=org.bytedeco.javacpp.**</buildArg>
-                                <buildArg>--initialize-at-run-time=ai.djl.opencv.**</buildArg>
-                                <buildArg>--initialize-at-run-time=com.sun.jna.**</buildArg>
-                                <buildArg>--initialize-at-run-time=com.luoke.app.utils.JNIFrameNative</buildArg>
                                 <buildArg>
                                     -H:IncludeResources=(META-INF/services/.*|model/.*|com/sun/prism/.*|com/sun/javafx/.*|.*\.(png|properties|json|fxml|xml|dll|txt|css|ttf|woff2|sh|ps|hlsl|cso))$
                                 </buildArg>

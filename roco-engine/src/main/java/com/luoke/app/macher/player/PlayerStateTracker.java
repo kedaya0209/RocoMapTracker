@@ -28,11 +28,11 @@ public class PlayerStateTracker {
     private Double predictedX, predictedY;
 
     /**
-     * 更新匹配成功时的位置和角度
+     * 更新匹配成功时的位置
      *
-     * @param x     匹配得到的 X 坐标
-     * @param y     匹配得到的 Y 坐标
-     * @param angle 玩家朝向角度
+     * @param x 匹配得到的 X 坐标
+     * @param y 匹配得到的 Y 坐标
+     * @param angle 箭头检测得到的朝向角度 (可为 null)
      */
     public void onMatchSuccess(double x, double y, Double angle) {
         consecutiveFailureCount = 0;

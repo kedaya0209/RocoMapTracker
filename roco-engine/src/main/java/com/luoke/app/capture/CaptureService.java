@@ -1,10 +1,11 @@
 package com.luoke.app.capture;
 
-import com.luoke.app.capture.processor.RoiProcessor;
 import com.luoke.app.config.AppConfig;
 import com.luoke.app.hook.HookEventType;
 import com.luoke.app.hook.event.CaptureStateEvent;
 import com.luoke.app.hook.multicast.HookRegistry;
+import com.luoke.app.socket.SocketServer;
+import com.luoke.app.utils.FileUtil;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 
@@ -12,6 +13,10 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
+/**
+ * 截图会话管理器 — 通过 SocketServer + CaptureHandler 获取 WGC 帧数据
+ * Socket 由 SocketServer 常驻, CaptureHandler 按需启动 capture.exe
+ */
 @Data
 @Slf4j
 public class CaptureService {
@@ -19,41 +24,28 @@ public class CaptureService {
     private final AtomicInteger continuousBlackFrames = new AtomicInteger(0);
 
     private final CopyOnWriteArrayList<RoiProcessor> processors = new CopyOnWriteArrayList<>();
-    private volatile int id = -1;
+    private final CaptureHandler handler = new CaptureHandler();
     private ROIData[] cachedRois;
 
-    // 复用 byte[] 缓冲区, 避免每帧 new byte[] 产生的 GC 压力
-    private final byte[][] roiBuffers = new byte[2][];
-
-    private final WgcCaptureLib.JniCallback captureCallback;
+    private final CaptureHandler.FrameCallback frameCallback;
+    private final CaptureHandler.StateCallback stateCallback;
 
     public CaptureService(String windowTitle) {
         this.windowTitle = windowTitle;
-        captureCallback = (id, index, data, len, w, h, stride) -> {
-            // stride == -1 表示 Rust 侧断开连接
-            if (stride == -1 || index < 0 || data == null) {
-                log.warn("Rust 侧捕获流已断开: id={}", id);
-                this.id = -1;
-                HookRegistry.INSTANCE.publish(HookEventType.CAPTURE_STATE,
-                        new CaptureStateEvent(-1, false, windowTitle));
-                return;
-            }
 
-            int dataLen = (int) len;
-            byte[] rawBuffer = roiBuffers[index];
-            if (rawBuffer == null || rawBuffer.length < dataLen) {
-                rawBuffer = new byte[dataLen];
-                roiBuffers[index] = rawBuffer;
-            }
-            data.read(0, rawBuffer, 0, dataLen);
+        // 注册 handler 到全局 SocketServer
+        SocketServer.instance().register(handler);
 
-            // Rust 侧不再做 BGRA→Gray，传原始 BGRA + stride（GPU row_pitch），Java 侧负责转换
-            byte[] gray = bgraToGray(rawBuffer, w, h, stride);
+        frameCallback = (index, data, w, h, stride) -> {
+            // 懒加载灰度图: 有处理器需要时才转换
+            byte[] gray = null;
 
+            // 黑帧检测 (始终用灰度图)
             if (index == 0) {
+                gray = bgraToGray(data, w, h, stride);
                 if (isAllBlack(gray, 100)) {
                     if (continuousBlackFrames.incrementAndGet() > AppConfig.MAX_BLACK_FRAMES) {
-                        log.error("检测到持续黑帧，强制重置采集会话...");
+                        log.error("持续黑帧, 强制重置采集会话...");
                         this.stop();
                         return;
                     }
@@ -65,30 +57,45 @@ public class CaptureService {
             for (RoiProcessor processor : processors) {
                 try {
                     if (processor.targetRoiIndex() == -1 || processor.targetRoiIndex() == index) {
-                        processor.onProcess(gray, w, h);
+                        if (processor.requiredImageType() == RoiProcessor.ImageType.BGRA) {
+                            processor.onProcess(data, w, h);
+                        } else {
+                            if (gray == null) {
+                                gray = bgraToGray(data, w, h, stride);
+                            }
+                            processor.onProcess(gray, w, h);
+                        }
                     }
                 } catch (Exception ignore) {
                 }
             }
         };
 
+        stateCallback = (connected, detail) -> {
+            if (!connected) {
+                log.warn("capture.exe 断开: {}", detail);
+                HookRegistry.INSTANCE.publish(HookEventType.CAPTURE_STATE,
+                        new CaptureStateEvent(-1, false, windowTitle));
+            }
+        };
     }
 
+    /**
+     * 查找窗口 → 启动 capture.exe → 由 SocketServer 已注册的 CaptureHandler 接管通信
+     */
     public boolean tryConnect() {
         long hwnd = WindowFinder.findWindowByKeyword(windowTitle);
         if (hwnd <= 0) return false;
 
-        this.id = WgcCaptureLib.INSTANCE.create(hwnd, AppConfig.TARGET_CAPTURE_FPS, captureCallback);
+        String exePath = FileUtil.getExternalPath(AppConfig.CAPTURE_EXE, true);
 
-        if (this.id > 0) {
-            log.info("✅ 成功连接窗口 [{}], HWND: {}, ID: {}", windowTitle, hwnd, this.id);
-            // 发送连接成功事件
+        boolean ok = handler.start(hwnd, AppConfig.TARGET_CAPTURE_FPS, exePath,
+                cachedRois, frameCallback, stateCallback);
+
+        if (ok) {
+            log.info("成功连接窗口 [{}], HWND: 0x{}", windowTitle, Long.toHexString(hwnd));
             HookRegistry.INSTANCE.publish(HookEventType.CAPTURE_STATE,
-                    new CaptureStateEvent(this.id, true, windowTitle));
-
-            if (cachedRois != null) {
-                WgcCaptureLib.INSTANCE.set_rois(this.id, cachedRois, cachedRois.length);
-            }
+                    new CaptureStateEvent(1, true, windowTitle));
             return true;
         }
         return false;
@@ -103,10 +110,6 @@ public class CaptureService {
         return result == 0;
     }
 
-    /**
-     * BGRA (带 GPU row_pitch stride 对齐) → 灰度字节数组。
-     * ITU-R BT.601 luma: Y = 0.299R + 0.587G + 0.114B
-     */
     private static byte[] bgraToGray(byte[] bgra, int w, int h, int stride) {
         byte[] gray = new byte[w * h];
         for (int y = 0; y < h; y++) {
@@ -125,22 +128,22 @@ public class CaptureService {
 
     public void setRois(ROIData[] rois) {
         this.cachedRois = rois;
-        if (this.id > 0) {
-            WgcCaptureLib.INSTANCE.set_rois(this.id, rois, rois.length);
-        }
     }
 
     public void addProcessors(RoiProcessor... processors) {
         this.processors.addAll(List.of(processors));
     }
 
+    public boolean isRunning() {
+        return handler.isRunning();
+    }
+
     public void stop() {
-        if (this.id > 0) {
-            WgcCaptureLib.INSTANCE.stop(this.id);
-            this.id = -1;
-            // 发送停止事件
-            HookRegistry.INSTANCE.publish(HookEventType.CAPTURE_STATE,
-                    new CaptureStateEvent(-1, false, windowTitle));
-        }
+        handler.stop();
+        // 不反注册 handler — handler 注册于构造函数，生命周期与 CaptureService 相同。
+        // 反注册会导致后续 tryConnect() 启动的 capture.exe 无法完成 Socket 握手（onConnect 不被调用），
+        // 从而 isRunning() 永远返回 false，watchdog 陷入"创建→丢弃→创建"的死循环。
+        HookRegistry.INSTANCE.publish(HookEventType.CAPTURE_STATE,
+                new CaptureStateEvent(-1, false, windowTitle));
     }
 }

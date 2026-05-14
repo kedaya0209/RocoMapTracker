@@ -1,0 +1,12 @@
+{
+  "mapWidth": 8192,
+  "mapHeight": 8192,
+  "tileSize": 256,
+  "levels": [
+    {"level": 0, "cols": 32, "rows": 32, "total": 1024},
+    {"level": 1, "cols": 16, "rows": 16, "total": 256},
+    {"level": 2, "cols": 8, "rows": 8, "total": 64},
+    {"level": 3, "cols": 4, "rows": 4, "total": 16},
+    {"level": 4, "cols": 2, "rows": 2, "total": 4}
+  ]
+}
