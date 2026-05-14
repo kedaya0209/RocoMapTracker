@@ -131,7 +131,7 @@ public class InteractiveCanvas extends Canvas {
                     double finalX = (hoveredPoint != null) ? hoveredPoint.getScreenPosition().getX() : lx;
                     double finalY = (hoveredPoint != null) ? hoveredPoint.getScreenPosition().getY() : ly;
                     pathContext.getActiveRoute().addNode(new Point(finalX, finalY));
-                    // noop: renderLoop removed
+                    if (mapRenderer != null) mapRenderer.markDirty();
                     return;
                 }
 
@@ -144,7 +144,7 @@ public class InteractiveCanvas extends Canvas {
                             pathContext.getActiveRoute().addNode(new Point(lx, ly));
                         }
                     }
-                    // noop: renderLoop removed
+                    if (mapRenderer != null) mapRenderer.markDirty();
                     return;
                 }
             }
@@ -154,7 +154,7 @@ public class InteractiveCanvas extends Canvas {
                     int nodeIdx = findNodeIndexAt(e.getX(), e.getY());
                     if (nodeIdx != -1) {
                         pathContext.getActiveRoute().remove(nodeIdx);
-                        // noop: renderLoop removed
+                        if (mapRenderer != null) mapRenderer.markDirty();
                         return;
                     }
                 }
@@ -180,7 +180,7 @@ public class InteractiveCanvas extends Canvas {
                 } else {
                     pathContext.getActiveRoute().setNode(draggedNodeIndex, new Point(rawLx, rawLy));
                 }
-                // noop: renderLoop removed
+                if (mapRenderer != null) mapRenderer.markDirty();
                 return;
             }
 
@@ -223,7 +223,7 @@ public class InteractiveCanvas extends Canvas {
                 RoutePath active = pathContext.getActiveRoute();
                 if (active != null && !active.getNodes().isEmpty()) {
                     active.remove(active.getNodes().size() - 1);
-                    // noop: renderLoop removed
+                    if (mapRenderer != null) mapRenderer.markDirty();
                 }
             }
             event.consume();
@@ -232,7 +232,7 @@ public class InteractiveCanvas extends Canvas {
             hintTooltip.hide();
             pathContext.setActiveRoute(null);
             pathContext.setCurrentMode(PathContext.Mode.VIEW);
-            // noop: renderLoop removed
+            if (mapRenderer != null) mapRenderer.markDirty();
             event.consume();
             log.info("ESC 已成功触发一键退出并清理数据");
         }

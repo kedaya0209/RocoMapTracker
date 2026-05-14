@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # RocoMapTracker 架构索引与逻辑约束文档
 
 > **AI 协作专用** — 供 Claude 在后续开发中快速定位类、理解坐标转换与跨语言边界。
-> 生成日期: 2026-05-09 | 项目版本: 1.1.0 | Java 25 + GraalVM Native Image | OpenCV: JavaCPP 4.13.0-1.5.13
+> 生成日期: 2026-05-15 | 项目版本: 1.1.0 | Java 25 + GraalVM Native Image | OpenCV: JavaCPP 4.13.0-1.5.13 | 截图: C++ 子进程 + Socket IO
 
 ---
 
@@ -25,9 +25,14 @@ mvn test -Dtest=ClassName                      # 运行单个测试类
 mvn clean package                              # 打包所有模块
 # fat jar 产物: roco-ui/target/roco-ui-1.1.0-jar-with-dependencies.jar
 
-# === Rust 原生库编译 ===
+# === Rust 原生库编译 (遗留) ===
 cd rust && cargo build --release               # 编译 wgc_capture.dll
 # 产物: rust/target/release/wgc_capture.dll → 复制到 dll/ 目录
+
+# === C++ 子进程编译 ===
+# capture.exe:   WGC 截图引擎 (Visual Studio MSVC)
+# sift_match.exe: SIFT 匹配引擎 (Visual Studio MSVC)
+# 产物: cpp/capture.exe, cpp/sift_match.exe → 复制到 dll/ 目录
 
 # === C JNI 库编译 (jniframe.c) ===
 # Windows: cl /LD /Fe:jniframe.dll c/jniframe.c /I"%JAVA_HOME%\include" /I"%JAVA_HOME%\include\win32"
@@ -41,7 +46,8 @@ mvn -Pnative-pgo clean package -pl roco-ui -am         # PGO Step 2: 优化构�
 # === 运行时 DLL 目录 ===
 # 以下文件必须与 exe/jar 同目录:
 #   opencv_java490.dll  — JavaCPP OpenCV native (由 Maven 依赖自动提供)
-#   wgc_capture.dll     — Rust WGC 截图引擎
+#   capture.exe         — C++ WGC 截图子进程
+#   sift_match.exe      — C++ SIFT 匹配子进程
 #   jniframe.dll        — JNI 局部引用帧管理
 ```
 
@@ -75,13 +81,14 @@ roco-ui ───────────── 最终应用 (JavaFX 界面 + �
 
 | 模块              | 文件数            | 资源                                       | 职责                                          |
 |-----------------|----------------|------------------------------------------|---------------------------------------------|
-| **roco-common** | 7              | extract-list.txt                         | 配置中心、JSON/资源工具、JNI帧管理、ResourceConfigContext |
+| **roco-common** | 5              | extract-list.txt                         | 配置中心、JSON/资源工具、ResourceConfigContext        |
 | **roco-model**  | 7              | model/*.onnx, model/ppocr_keys_v1.txt    | ONNX 推理基类、CNN 箭头检测、OCR 服务                   |
-| **roco-map**    | 28             | source/map/, source/icon/, source/point/ | 地图下载/拼接/瓦片、图标缓存、资源点模型                       |
-| **roco-macher** | 13             | —                                        | SIFT 匹配器 (4 变体)、小地图检测、箭头检测                  |
-| **roco-engine** | 33             | —                                        | 截图采集、上下文管理 (MapContext等)、Hook 事件系统          |
-| **roco-ui**     | 20             | dll/, logback.xml, META-INF/             | JavaFX 界面、渲染循环、Native Image 配置              |
-| **rust/**       | 1 (lib.rs)     | —                                        | WGC 截图引擎 (独立 Cargo 构建)                      |
+| **roco-map**    | 26             | source/map/, source/icon/, source/point/ | 地图下载/拼接/瓦片、图标缓存、资源点模型                       |
+| **roco-macher** | 15             | —                                        | SIFT 匹配器 (4 变体)、小地图检测、数据集工具                |
+| **roco-engine** | 39             | —                                        | 截图采集 (C++子进程)、上下文管理、Hook 事件系统、匹配器调度       |
+| **roco-ui**     | 21             | dll/, logback.xml, META-INF/             | JavaFX 界面、MapRenderer 渲染引擎、Native Image 配置   |
+| **rust/**       | 1 (lib.rs)     | —                                        | WGC 截图引擎 (独立 Cargo 构建，已由 C++ 替代)            |
+| **cpp/**        | 2 (.exe)       | —                                        | C++ WGC 截图 + SIFT 匹配子进程 (Socket IO)        |
 | **c/**          | 1 (jniframe.c) | —                                        | JNI 局部引用帧管理 (独立 MSVC 构建)                    |
 | **python/**     | 10+            | —                                        | CNN 模型训练/数据集/验证脚本                           |
 
@@ -103,9 +110,7 @@ roco-ui ───────────── 最终应用 (JavaFX 界面 + �
 |-------------------------|------------------------------------------|
 | `AppConfig`             | 静态配置中心：final 常量 + 可持久化变量 (Properties)    |
 | `ResourceConfigContext` | 资源套件枚举：INTERNAL / EXTERNAL 路径切换          |
-| `BrightnessExtractor`   | 亮度提取                                     |
 | `FileUtil`              | 文件工具：native 检测 + 资源释放 (extract-list.txt) |
-| `JNIFrameNative`        | JNI 帧管理：push/pop 本地引用帧                   |
 | `JsonUtils`             | Jackson ObjectMapper 单例                  |
 | `ResourceUtils`         | 资源路径工具：内嵌/外部/下载                          |
 
@@ -158,8 +163,6 @@ roco-ui ───────────── 最终应用 (JavaFX 界面 + �
 
 | 类名                       | 职责简述                          |
 |--------------------------|-------------------------------|
-| `MapMatcher`             | 接口：init / match / destroy     |
-| `SwitchMapMatcher`       | 策略切换器：4 种 SIFT 变体热切换          |
 | `SiftMapMatcher`         | 🔴 统一 SIFT 匹配器：4 个静态工厂覆盖全部变体  |
 | `SiftPCAMapMatcher`      | PCA 降维变体                      |
 | `SiftUltraMapMatcher`    | 8-bit 量化变体                    |
@@ -167,24 +170,33 @@ roco-ui ───────────── 最终应用 (JavaFX 界面 + �
 | `DescriptorTransform`    | 描述符变换管道：Variant 枚举 + PCA + 量化 |
 | `CircleMaskApplier`      | 圆遮罩应用                         |
 | `MiniMapDetector`        | 霍夫圆检测                         |
-| `ArrowDetector`          | 单例：CNN 箭头方向检测入口               |
 | `PlayerAngle`            | 结果容器：found + angle            |
 | `ImageProcessorTest`     | 图像处理测试 (独立 main)              |
 | `ImageProcessorTest1`    | 图像处理测试 (独立 main)              |
+| `MatchOnlyTest`          | 纯匹配测试 (独立 main)              |
+| `CaptureOnlyTest`        | 纯截图测试 (独立 main)              |
+| `DatasetGeneratorServer` | 数据集生成服务                      |
+| `MoveValidationDataSet`  | 移动验证数据集                      |
+| `PCARecalibrator`        | PCA 重校准工具                     |
 
 ### 1.5 roco-engine (核心引擎层)
 
 | 类名                                 | 职责简述                                            |
 |------------------------------------|-------------------------------------------------|
-| `CaptureService`                   | 截图会话管理：回调分发 + 黑帧检测 + ROI 下发                     |
-| `WgcCaptureLib`                    | JNA 接口，加载 `wgc_capture.dll`                     |
-| `ROIData`                          | JNA Structure，与 Rust `ROI` 结构体 1:1 对应           |
+| `CaptureService`                   | 截图会话管理：Socket 连接 C++ 子进程 + 黑帧检测 + ROI 下发         |
+| `CaptureHandler`                   | Socket 帧数据接收与分发                                 |
+| `SocketServer`                     | Socket 服务端，管理 C++ 子进程连接                         |
+| `SocketSession`                    | Socket 会话封装                                      |
+| `SocketHandler`                    | Socket 事件处理器接口                                   |
+| `NativeProcess`                    | C++ 子进程生命周期管理                                   |
+| `JobObjectManager`                 | Windows Job Object 包装，子进程随父进程自动销毁               |
+| `SiftMatchHandler`                 | 🔴 SIFT 匹配请求/响应处理器 (与 C++ sift_match.exe 通信)    |
 | `WindowFinder`                     | User32.EnumWindows 按标题查找目标窗口                    |
 | `RoiProcessor`                     | 处理器接口：targetRoiIndex() / onProcess() / getRoi() |
-| `MapMatcherProcessor`              | ROI-0：小地图检测→圆遮罩→SIFT 匹配→玩家定位                    |
+| `MapMatcherProcessor`              | ROI-0：小地图检测→圆遮罩→箭头检测→SIFT 匹配→玩家定位             |
 | `OcrProcessor`                     | ROI-1：OCR 文字识别→稳定性判定→物资计数                       |
 | `SaveImageProcessor`               | 调试用灰度图保存                                        |
-| `MapContext`                       | 🔴 核心枢纽：地图图像/视口(scale,offset)/玩家坐标              |
+| `MapContext`                       | 🔴 核心枢纽：地图图像/视口(scale,offset)/玩家坐标/角度          |
 | `MapCoordinateManager`             | 坐标转换器：地图逻辑坐标 ↔ 屏幕坐标                             |
 | `CameraContext`                    | 摄像机跟随：followMode + followScale                  |
 | `PathContext`                      | 路线管理：绘制/编辑/视图模式 + 持久化                           |
@@ -193,8 +205,11 @@ roco-ui ───────────── 最终应用 (JavaFX 界面 + �
 | `MaterialCollectionContext`        | 物资采集统计：累计计数 + 历史流水                              |
 | `OcrAsyncManager`                  | OCR 线程池管理：服务池 + 任务队列                            |
 | `StatsContext`                     | 性能统计：检测/匹配/方向耗时 + FPS                           |
-| `PlayerStateTracker`               | 玩家状态追踪：EMA 平滑 + 瞬移检测 + 地图丢失                     |
+| `PlayerStateTracker`               | 玩家状态追踪：EMA 平滑 + 瞬移检测 + 地图丢失 + 角度传递             |
 | `OcrResultValidator`               | OCR 结果解析与校验                                     |
+| `MapMatcher`                       | 匹配器接口：init / match / destroy                     |
+| `SwitchMapMatcher`                 | 策略切换器：4 种 SIFT 变体热切换                            |
+| `ArrowDetector`                    | 单例：CNN 箭头方向检测入口                                |
 | `IHook` / `AbstractGenericHook<T>` | 钩子接口与泛型基类                                       |
 | `HookEventType`                    | 事件枚举：8 种事件类型                                    |
 | `HookContainer`                    | 钩子容器：事件类型 → CopyOnWriteArrayList                |
@@ -215,38 +230,46 @@ roco-ui ───────────── 最终应用 (JavaFX 界面 + �
 |------------------------|----------------------------------------------------|
 | `Main`                 | 入口点：初始化 OpenCV → launch JavaFX                     |
 | `ModernCanvasApp`      | 🔴 主 Application：初始化流程 + UI 构建 + 截图守护              |
-| `InteractiveCanvas`    | 🔴 交互画布：鼠标/键盘事件 + 图标渲染 + hover + 路线编辑              |
+| `InteractiveCanvas`    | 🔴 交互画布：鼠标/键盘事件 + hover + 路线编辑                    |
 | `FloatToolbox`         | 浮动工具箱                                              |
 | `LoadingOverlay`       | 加载遮罩                                               |
 | `NotificationToast`    | Toast 通知 (跟随主题)                                    |
 | `ResourceCounterPanel` | 物资计数面板                                             |
 | `RouteManagerStage`    | 路线管理器                                              |
 | `Sidebar`              | 侧边栏                                                |
-| `StatsOverlay`         | 统计信息覆盖层                                            |
+| `StatsOverlay`         | 统计信息覆盖层 (每帧更新)                                     |
 | `TitleBar`             | 标题栏                                                |
 | `UiAnimator`           | UI 动画                                              |
-| `RenderLoop`           | 🔴 渲染循环：快照复用 + 地图层 + 动态层分离                         |
-| `PlayerRenderer`       | 玩家图标渲染                                             |
-| `PathRenderer`         | 路线渲染                                               |
+| `MapRenderer`          | 🔴 渲染引擎：AnimationTimer 驱动，viewportDirty 快照复用       |
+| `PlayerRenderer`       | 玩家图标渲染 (角度旋转)                                     |
+| `PathRenderer`         | 路线渲染 (viewportDirty 触发)                            |
+| `IconCache`            | 🔴 图标缓存：ConcurrentHashMap + 离屏渲染                   |
+| `ResourcePointRenderer`| 资源点渲染器                                             |
 | `DialogUtils`          | 对话框工具 (跟随主题)                                       |
 | `WindowManager`        | 窗口拖拽/缩放                                            |
 | `RestartUtils`         | 重启工具                                               |
 | `UiResponseHook`       | 监听 UI_NOTIFICATION / INIT_PROGRESS / CAPTURE_STATE |
-| `MapRawCache`          | 🔴 mmap 缓存：PNG→.raw→内存映射，零堆占用                      |
 
-### 1.7 Rust 源文件
+### 1.7 Rust 源文件 (遗留)
 
 | 文件            | 核心导出                                                                | 职责                                                       |
 |---------------|---------------------------------------------------------------------|----------------------------------------------------------|
-| `rust/lib.rs` | `create(hwnd, max_fps, cb)` / `set_rois(id, ptr, len)` / `stop(id)` | WGC 截图引擎：D3D11 → FramePool → ROI 裁剪 → BGRA→Gray → JNI 回调 |
+| `rust/lib.rs` | `create(hwnd, max_fps, cb)` / `set_rois(id, ptr, len)` / `stop(id)` | WGC 截图引擎 (已由 C++ capture.exe 替代)                       |
 
-### 1.8 C 源文件
+### 1.8 C++ 源文件
+
+| 文件                  | 职责                                       |
+|----------------------|------------------------------------------|
+| `cpp/capture.exe`    | WGC 截图子进程：D3D11 截图 → Socket 推送灰度帧数据     |
+| `cpp/sift_match.exe` | SIFT 匹配子进程：Socket 接收匹配请求 → 返回坐标结果      |
+
+### 1.9 C 源文件
 
 | 文件             | 核心导出                                    | 职责                                         |
 |----------------|-----------------------------------------|--------------------------------------------|
 | `c/jniframe.c` | `JNI_OnLoad` → 注册 `push(I)I` / `pop()I` | JNI 局部引用帧管理：PushLocalFrame / PopLocalFrame |
 
-### 1.9 Python 源文件
+### 1.10 Python 源文件
 
 | 文件                                          | 职责            |
 |---------------------------------------------|---------------|
@@ -264,7 +287,7 @@ roco-ui ───────────── 最终应用 (JavaFX 界面 + �
 
 | 类                           | 所在模块        | 单例方式       | 持有全局状态                                                                                                       |
 |-----------------------------|-------------|------------|--------------------------------------------------------------------------------------------------------------|
-| `MapContext`                | roco-engine | Holder 内部类 | mapImage, mapImageBuffer(mmap), mapWidth/Height, **scale**, **offsetX/Y**, viewWidth/Height, playerX/Y/Angle |
+| `MapContext`                | roco-engine | Holder 内部类 | mapImage, mapWidth/Height, **scale**, **offsetX/Y**, viewWidth/Height, playerX/Y/Angle                       |
 | `CameraContext`             | roco-engine | Holder 内部类 | followMode (BooleanProperty), followScale                                                                    |
 | `MapCoordinateManager`      | roco-engine | 饿汉式        | mapConfigMap: `Map<String, MapConfig>`                                                                       |
 | `PathContext`               | roco-engine | 饿汉式        | savedRoutes, currentMode, activeRoute                                                                        |
@@ -273,21 +296,23 @@ roco-ui ───────────── 最终应用 (JavaFX 界面 + �
 | `StatsContext`              | roco-engine | 饿汉式        | lastMapDetectMs, lastMatchMs, lastDirectionMs, frequency                                                     |
 | `MaterialCollectionContext` | roco-engine | 饿汉式        | summaryMap, historyLog, filters                                                                              |
 | `OcrAsyncManager`           | roco-engine | DCL        | executorService, servicePool                                                                                 |
-| `SwitchMapMatcher`          | roco-macher | DCL        | volatile mapMatcher                                                                                          |
-| `ArrowDetector`             | roco-macher | DCL        | ArrowPredictService                                                                                          |
+| `SwitchMapMatcher`          | roco-engine | DCL        | volatile mapMatcher                                                                                          |
+| `ArrowDetector`             | roco-engine | DCL        | ArrowPredictService                                                                                          |
 | `ImageLoader`               | roco-map    | 饿汉式        | **imageCache**: ConcurrentHashMap                                                                            |
+| `IconCache`                 | roco-ui     | 懒汉式        | iconCache: ConcurrentHashMap                                                                                 |
 | `HookRegistry`              | roco-engine | 枚举单例       | HookContainer + HookMulticast                                                                                |
+| `MapRenderer`               | roco-ui     | DCL        | AnimationTimer, viewportDirty, mapSnapshot                                                                   |
 | `PlayerRenderer`            | roco-ui     | Holder 内部类 | playerImage                                                                                                  |
 
 ### 2.2 数据流枢纽图
 
 ```
-Rust WGC → JniCallback → CaptureService
+C++ capture.exe → Socket → CaptureService
   ├─ ROI-0 (小地图) → MapMatcherProcessor
   │    ├─ trackOrDetectMiniMap (霍夫圆检测)
   │    ├─ applyFastCircleMask (圆遮罩)
-  │    ├─ ArrowDetector → ArrowPredictService → CNN (角度)
-  │    ├─ SwitchMapMatcher → SIFT 匹配 (坐标)
+  │    ├─ executeArrowDect → ArrowDetector → ArrowPredictService → CNN (角度)
+  │    ├─ executeMatching → SiftMatchHandler → C++ sift_match.exe (坐标)
   │    └─ MapContext.updatePlayerState(x, y, angle)
   │         └─ HookRegistry.publish(PLAYER_UPDATE)
   │              ├─ ResourceGrayHook → 邻近点置灰
@@ -299,60 +324,34 @@ Rust WGC → JniCallback → CaptureService
        ├─ OcrResultValidator.parse → ItemResult
        └─ MaterialCollectionContext.addMaterial
 
-MapContext (scale/offset) ← CameraContext ← RenderLoop (AnimationTimer)
-  ├─ RenderLoop.renderMapLayer (地图+图标快照)
-  ├─ RenderLoop.drawPlayer → PlayerRenderer
-  ├─ RenderLoop.drawPaths → PathRenderer
-  └─ RenderLoop.drawHoverOverlay → InteractiveCanvas
+MapContext (scale/offset) ← CameraContext ← MapRenderer (AnimationTimer)
+  ├─ StatsOverlay.update() (每帧)
+  ├─ viewportDirty 检测 (offset/scale/路线状态变化)
+  ├─ MapRenderer.drawMapLayer (地图+图标+路线快照, 仅在 viewportDirty 时)
+  ├─ MapRenderer.drawPlayer → PlayerRenderer (每帧, 含角度旋转)
+  └─ MapRenderer.drawHoverOverlay → InteractiveCanvas
 ```
 
 ---
 
 ## Step 3 — 跨语言边界逻辑 (Cross-Language Boundary)
 
-### 3.1 Rust ↔ Java 数据对应
+### 3.1 C++ 子进程 ↔ Java Socket 通信
 
-| Rust 侧                                   | Java 侧                                                     | 说明                                    |
-|------------------------------------------|------------------------------------------------------------|---------------------------------------|
-| `ROI { x: i32, y: i32, w: i32, h: i32 }` | `ROIData extends Structure { int x,y,w,h }`                | 内存布局完全一致                              |
-| `ROI` 坐标使用 **万分数** (0~10000)             | `ROIData(8900, 700, 1000, 1800)` 表示 x=89%, y=7%            | 百分比定位，自适应分辨率                          |
-| `fn create(hwnd_i64, max_fps, cb)`       | `WgcCaptureLib.INSTANCE.create(hwnd, maxFps, callback)`    | hwnd 为 WinDef.HWND 指针值转 long          |
-| `JniCallback: extern "C" fn(...)`        | `JniCallback.invoke(int id, int index, Pointer data, ...)` | JNA Callback 接口映射                     |
-| `code = 0` 正常帧 / `code = -1` 断开          | `CaptureService` 判断 `code == -1` 标记断开                      | 灰度数据通过 `data.getByteArray(0, len)` 拷贝 |
+| C++ 侧 | Java 侧 | 说明 |
+|--------|--------|------|
+| `capture.exe` (WGC 截图) | `NativeProcess` + `CaptureHandler` | Socket IO 多路复用，灰度帧数据传输 |
+| `sift_match.exe` (SIFT 匹配) | `SiftMatchHandler` | 请求-响应模式，特征匹配卸载到独立进程 |
+| ROI 坐标使用 **万分数** (0~10000) | `MapMatcherProcessor` 配置 ROI 范围 | 百分比定位，自适应分辨率 |
+| `SocketSession` 协议 | 帧头 + 数据体，code=0 正常 / code=-1 断开 | `CaptureService` 判断 code 标记断开 |
 
-### 3.2 FrameArrived FPS 限流逻辑
+### 3.2 子进程生命周期管理
 
-```rust
-// rust/lib.rs — FrameArrived 内限流
-if inst_cb.max_fps > 0 {
-    let mut last = inst_cb.last_frame_time.lock().unwrap();
-    let min_interval = Duration::from_secs_f64(1.0 / inst_cb.max_fps as f64);
-    if last.elapsed() < min_interval { return Ok(()); }
-    *last = Instant::now();
-}
-```
+- `NativeProcess` — 启动/监控/重启 C++ 子进程
+- `JobObjectManager` — Windows Job Object 包装，父进程退出时子进程自动销毁
+- `SocketServer` — 管理多个 C++ 子进程的 Socket 连接和会话
 
-- **限流位置**: FrameArrived 回调内部，GPU 裁剪之前
-- **Java 侧**: `CaptureService.MAX_FPS = 30`，传入 `create(hwnd, 30, callback)`
-
-### 3.3 CopySubresourceRegion 局部裁剪
-
-```rust
-// rust/lib.rs — ROI 万分数 → 像素坐标
-let rx = ((roi.x as i64 * f_size.Width as i64 / 10000) as i32).max(0);
-let ry = ((roi.y as i64 * f_size.Height as i64 / 10000) as i32).max(0);
-let rw = ((roi.w as i64 * f_size.Width as i64 / 10000) as i32).min(f_size.Width - rx);
-let rh = ((roi.h as i64 * f_size.Height as i64 / 10000) as i32).min(f_size.Height - ry);
-```
-
-**降低 DWM 占用的关键**:
-
-1. Staging Texture 按索引缓存复用，仅在尺寸变化时重建
-2. 只 `CopySubresourceRegion` 指定 Box，不映射全帧
-3. BGRA→Gray 在 Rust 侧完成，只传 `rw × rh` 字节给 Java
-4. Worker Thread 解耦：FrameArrived 填充 FrameBatch，转换+回调在独立线程
-
-### 3.4 JNI 局部引用管理
+### 3.3 JNI 局部引用管理
 
 ```java
 // SiftPCAUltraMapMatcher.match() 中:
@@ -413,14 +412,14 @@ $$\text{offsetX} = \frac{\text{viewWidth}}{2} - \text{playerX} \times \text{foll
 
 ## Step 5 — 约束守则 (Development Constraints)
 
-### 5.1 Rust 侧硬约束
+### 5.1 C++ 子进程硬约束
 
 | 约束                     | 原因                            |
 |------------------------|-------------------------------|
 | ROI 坐标使用万分数 (0~10000)  | 自适应不同分辨率/DPI                  |
-| Staging Texture 必须缓存复用 | 避免每帧 CreateTexture2D 的 GPU 开销 |
-| FrameArrived 内禁止耗时操作   | 回调在 WGC 线程池，阻塞导致帧丢失           |
-| Worker Thread 解耦灰度转换   | JNI 回调+转换不能在 GPU 回调中完成        |
+| Socket IO 多路复用           | 单 Socket 连接处理多 ROI 帧数据        |
+| 子进程随父进程自动销毁           | JobObjectManager 绑定，防止孤儿进程     |
+| 子进程崩溃自动重连             | NativeProcess 监控 + CaptureService 重连 |
 
 ### 5.2 Java 侧硬约束
 
@@ -430,8 +429,8 @@ $$\text{offsetX} = \frac{\text{viewWidth}}{2} - \text{playerX} \times \text{foll
 | `ArrowPredictService` 每 200 帧重置 NDManager   | DJL + ORT 内部 Arena 分配器累积内存      |
 | `OcrService` 成员 Mat 在 `close()` 前禁止 release | 复用容器，后续访问已释放指针 → JVM 崩溃         |
 | `ImageLoader.imageCache` 强引用，不可清除           | 渲染循环每帧读取，GC 回收导致图标闪烁            |
-| `MapRawCache.mapImageBuffer` 必须强引用          | PixelBuffer 依赖 mmap 映射，GC 回收后失效 |
-| `RenderLoop.mapSnapshot` 只含地图+图标            | 快照复用策略，动态元素每帧独立绘制               |
+| `IconCache.iconCache` 强引用，不可清除              | 渲染循环每帧读取，GC 回收导致图标闪烁            |
+| `MapRenderer.mapSnapshot` 只含地图+图标+路线         | viewportDirty 快照复用，动态元素每帧独立绘制        |
 
 ### 5.3 架构级约束
 
@@ -442,7 +441,7 @@ $$\text{offsetX} = \frac{\text{viewWidth}}{2} - \text{playerX} \times \text{foll
 | CaptureService 黑帧检测阈值: 30 帧                            | 连续 30 帧全黑 → 强停 + 自动重连             |
 | OCR 稳定性判定: 2 次连续相同                                     | 防止 OCR 误识别导致计数跳变                  |
 | 地图匹配连续失败 5 次才标记 Lost                                   | 防止偶发失败导致玩家图标闪烁                    |
-| `MapMatcherProcessor.matchExecutor` 使用 `DiscardPolicy` | 丢弃溢出任务保证实时性                       |
+| SIFT 匹配通过 C++ 子进程异步执行，不阻塞主线程 | Socket 通信模式，匹配请求与箭头检测并行执行        |
 
 ### 5.4 模块间依赖约束
 
@@ -477,6 +476,7 @@ $$\text{offsetX} = \frac{\text{viewWidth}}{2} - \text{playerX} \times \text{foll
 | `reachability-metadata.json` 必须完整 | 反射/JNI 访问类必须在元数据中声明             |
 | JNI 局部引用泄漏风险更高                    | Serial GC 不像 G1 那样频繁触发          |
 | `System.gc()` 在 Serial GC 下有效     | 同步全量回收                          |
+| roco-common 需依赖 `graal-sdk` (provided) | `--release 25` 限制 classpath，ImageInfo 需显式依赖 |
 
 ### 5.7 JavaCPP OpenCV 约束 (nopointergc=true)
 
@@ -588,12 +588,12 @@ HookEventType.INIT_PROGRESS
 
 HookEventType.CAPTURE_STATE
   ← CaptureService (tryConnect/stop/callback)
-  → UiResponseHook → NotificationToast + StatsOverlay.update()
+  → UiResponseHook → NotificationToast
 
 HookEventType.RESOURCE_POINT_CHANGED
   ← ResourcePointContext (loadAndInit/savePoint/deletePoint)
   ← ResourceGrayHook (置灰后通知)
-  → RenderLoop.SnapshotInvalidationHook → mapSnapshot = null
+  → MapRenderer.markDirty() → mapSnapshot = null
 
 HookEventType.MATERIAL_COLLECTION_UPDATED
   ← MaterialCollectionContext.addMaterial/removeMaterial

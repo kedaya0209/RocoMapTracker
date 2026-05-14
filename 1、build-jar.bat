@@ -1,4 +1,5 @@
 @echo off
+chcp 65001
 cls
 
 set GRAALVM_HOME=D:\Documents\environment\java\graalvm-win\graalvm-jdk-25.0.2+10.1

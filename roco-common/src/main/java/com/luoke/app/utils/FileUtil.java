@@ -1,6 +1,8 @@
 package com.luoke.app.utils;
 
 import lombok.extern.slf4j.Slf4j;
+import org.graalvm.nativeimage.ImageInfo;
+import org.graalvm.nativeimage.ProcessProperties;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -24,7 +26,7 @@ public class FileUtil {
     public static Path getAppRootDir() {
         // 1. 判定是否为 GraalVM Native Image
         // Native Image环境会设置此系统属性指向可执行文件的完整路径
-        String nativeImagePath = System.getProperty("org.graalvm.nativeimage.imagepath");
+        String nativeImagePath = ProcessProperties.getExecutableName();
         if (nativeImagePath != null && !nativeImagePath.isEmpty()) {
             // 返回可执行文件的父目录（即应用根目录）
             return Paths.get(nativeImagePath).getParent().toAbsolutePath();
@@ -57,7 +59,7 @@ public class FileUtil {
     public static boolean isNative() {
         // 检查GraalVM Native Image特有系统属性
         // 此属性仅在Native Image环境中存在
-        return System.getProperty("org.graalvm.nativeimage.kind") != null;
+        return ImageInfo.isExecutable();
     }
 
     public static File getRelativeFile(String... subPaths) {
@@ -98,7 +100,6 @@ public class FileUtil {
                 return;
             }
             try (Scanner sc = new Scanner(in)) {
-
                 sc.tokens().forEach(line -> {
                     String[] split = line.split(":");
                     String sourcePath, destPath, operator = null;
@@ -115,8 +116,11 @@ public class FileUtil {
                     }
                     String formatDestPath = destPath.replaceFirst("^[/\\\\]+", "");
                     File destFile = getRelativeFile(formatDestPath);
-                    //如果是native环境才解压的
-                    if ("native".equalsIgnoreCase(operator) && !isNative()) return;
+                    if ("native".equalsIgnoreCase(operator)) {
+                        //如果是native环境才解压的
+                        if (isNative()) extractSingleFile(sourcePath, destFile);
+                        return;
+                    }
                     extractSingleFile(sourcePath, destFile);
             });
 

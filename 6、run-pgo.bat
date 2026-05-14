@@ -1,4 +1,5 @@
 @echo off
+chcp 65001
 setlocal enabledelayedexpansion
 cls
 
@@ -24,7 +25,7 @@ echo !RUN_COUNT! > "%COUNTER_FILE%"
 
 set "PROFILE_FILE=%PROFILE_DIR%\run_!RUN_COUNT!.iprof"
 
-:: 统计已有数据
+echo 统计已有数据
 set TOTAL_SIZE=0
 for %%A in ("%PROFILE_DIR%\*.iprof") do set /a TOTAL_SIZE+=%%~zA
 set /a TOTAL_KB=%TOTAL_SIZE% / 1024
@@ -58,7 +59,7 @@ echo ==============================================
 echo Run #!RUN_COUNT! finished.
 echo ==============================================
 
-:: 兼容不支持 -XX:ProfilesDumpFile 的版本
+echo 兼容不支持 -XX:ProfilesDumpFile 的版本
 if exist "default.iprof" (
     echo [INFO] Moving default.iprof to: !PROFILE_FILE!
     move /y "default.iprof" "!PROFILE_FILE!" >nul
@@ -94,7 +95,7 @@ echo ==============================================
 
 set "GRAALVM_HOME=D:\Documents\environment\java\graalvm-win\graalvm-jdk-25.0.2+10.1"
 
-:: 尝试用 native-image-configure 合并（GraalVM 工具）
+echo 尝试用 native-image-configure 合并（GraalVM 工具）
 set "MERGE_TOOL=%GRAALVM_HOME%\bin\native-image-configure.cmd"
 set "INPUT_ARGS="
 for %%f in ("%PROFILE_DIR%\run_*.iprof") do (
@@ -116,7 +117,7 @@ if exist "%MERGE_TOOL%" (
     echo [WARN] merge tool failed, profiles will be passed individually to build.
 )
 
-:: 回退：保留独立文件，build 脚本会合并传参
+echo 回退：保留独立文件，build 脚本会合并传参
 echo.
 echo [INFO] Profiles remain in %PROFILE_DIR%\
 echo Build script will pass all files to native-image via --pgo=file1,file2,...

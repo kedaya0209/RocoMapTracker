@@ -78,7 +78,7 @@ public class MapContext {
      */
     public void zoom(double factor, double mx, double my) {
         double minScale = Math.max(viewWidth / mapWidth, viewHeight / mapHeight);
-        double newScale = Math.max(minScale, Math.min(scale * factor, 15));
+        double newScale = Math.clamp(scale * factor, minScale, 15);
         double f = newScale / scale;
 
         offsetX = mx - (mx - offsetX) * f;
@@ -94,8 +94,8 @@ public class MapContext {
         double w = mapWidth * scale;
         double h = mapHeight * scale;
 
-        offsetX = (w >= viewWidth) ? Math.min(0, Math.max(offsetX, viewWidth - w)) : (viewWidth - w) / 2;
-        offsetY = (h >= viewHeight) ? Math.min(0, Math.max(offsetY, viewHeight - h)) : (viewHeight - h) / 2;
+        offsetX = (w >= viewWidth) ? Math.clamp(offsetX, viewWidth - w, 0) : (viewWidth - w) / 2;
+        offsetY = (h >= viewHeight) ? Math.clamp(offsetY, viewHeight - h, 0) : (viewHeight - h) / 2;
     }
 
     /** 线程安全的单例持有类 */

@@ -4,6 +4,7 @@ import com.luoke.app.config.AppConfig;
 import com.luoke.app.context.*;
 import com.luoke.app.map.model.Point;
 import com.luoke.app.map.model.ResourcePoint;
+import com.luoke.app.map.model.RoutePath;
 import com.luoke.app.ui.component.StatsOverlay;
 import com.luoke.app.utils.ResourceUtils;
 import javafx.animation.KeyFrame;
@@ -84,6 +85,10 @@ public class MapRenderer {
 
     // 跟随模式首次关闭标记
     private boolean followWasOn;
+
+    // 路线状态追踪：检测 activeRoute/mode 变化以触发重绘
+    private RoutePath lastActiveRoute;
+    private PathContext.Mode lastMode;
 
     public MapRenderer(Pane parent) {
         this.parent = parent;
@@ -257,13 +262,19 @@ public class MapRenderer {
             lastLevel = level;
         }
 
-        // 路线重绘（仅在编辑/绘制模式下，鼠标预览虚线需要实时更新）
-        if (PathContext.getInstance().getCurrentMode() != PathContext.Mode.VIEW) {
-            drawRoutes(ox, oy, scale);
+        // 检测路线状态变化（窗口关闭/选中/绘制时会变化，需要触发重绘）
+        PathContext pc = PathContext.getInstance();
+        RoutePath activeRoute = pc.getActiveRoute();
+        PathContext.Mode mode = pc.getCurrentMode();
+        if (activeRoute != lastActiveRoute || mode != lastMode) {
+            viewportDirty = true;
+            lastActiveRoute = activeRoute;
+            lastMode = mode;
         }
 
-        // 图标重绘（视口变化时立即执行，轻量操作，保证与瓦片缩放同步）
+        // 路线 + 图标重绘（视口变化时执行，与资源层行为一致：钉在地图上）
         if (viewportDirty) {
+            drawRoutes(ox, oy, scale);
             fullIconRedraw(ox, oy, scale);
         }
 

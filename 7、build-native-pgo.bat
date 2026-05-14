@@ -57,7 +57,7 @@ echo   !PGO_LIST!
 echo.
 
 echo Building optimized native image...
-%MAVEN_BIN% clean native:compile -Pnative-pgo -pl roco-ui -am -DskipTests "-Dpgo.file=!PGO_LIST!"
+%MAVEN_BIN% clean package -Pnative-pgo -pl roco-ui -am -DskipTests "-Dpgo.file=!PGO_LIST!"
 
 echo.
 echo ======================================

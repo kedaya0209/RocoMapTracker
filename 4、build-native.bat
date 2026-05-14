@@ -1,4 +1,5 @@
 @echo off
+chcp 65001
 cls
 
 set GRAALVM_HOME=D:\Documents\environment\java\graalvm-win\graalvm-jdk-25.0.2+10.1
@@ -14,7 +15,7 @@ echo ==============================
 echo Step 4: Build Native EXE
 echo ==============================
 
-%MAVEN_BIN% clean native:compile -Pnative -pl roco-ui -am -DskipTests
+%MAVEN_BIN% clean package -Pnative -pl roco-ui -am -DskipTests
 
 echo.
 echo ======================================

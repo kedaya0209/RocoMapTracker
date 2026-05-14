@@ -1,4 +1,5 @@
 @echo off
+chcp 65001
 cls
 
 set GRAALVM_HOME=D:\Documents\environment\java\graalvm-win\graalvm-jdk-25.0.2+10.1
@@ -14,7 +15,7 @@ echo ==============================
 echo Step 5: Build PGO Instrumented EXE
 echo ==============================
 
-%MAVEN_BIN% clean native:compile -Pnative-instrument -pl roco-ui -am -DskipTests
+%MAVEN_BIN% clean package -Pnative-instrument -pl roco-ui -am -DskipTests
 
 echo.
 echo ======================================

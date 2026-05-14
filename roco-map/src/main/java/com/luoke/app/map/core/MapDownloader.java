@@ -103,13 +103,15 @@ public class MapDownloader {
                 if (isStopRequested.get()) {
                     return;
                 }
-                // 保存剩余分片并持久化元数据
-                if (!chunkBuffer.isEmpty()) saveChunk(tag);
-                saveMeta(validTiles, tag);
+                ArrayList<Tile> clone = new ArrayList<>(validTiles);
+                Thread.ofVirtual().start(() -> {
+                    // 保存剩余分片并持久化元数据
+                    if (!chunkBuffer.isEmpty()) saveChunk(tag);
+                    saveMeta(clone, tag);
 
-                // 3. 拼接图片
-                progress.setStatusText("正在拼接大图: " + tag);
-                MapStitcher.stitch(validTiles, tag, tileW, tileH);
+                    // 3. 拼接图片
+                    MapStitcher.stitch(clone, tag, tileW, tileH);
+                });
             }
 
             // 4. 清理

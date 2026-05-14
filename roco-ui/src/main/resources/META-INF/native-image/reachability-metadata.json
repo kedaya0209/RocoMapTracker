@@ -322,9 +322,6 @@
       ]
     },
     {
-      "type": "com.github.luben.zstd.AutoCloseBase"
-    },
-    {
       "type": "com.luoke.app.Main",
       "jniAccessible": true,
       "methods": [
@@ -337,44 +334,13 @@
       ]
     },
     {
-      "type": "com.luoke.app.capture.ROIData",
-      "fields": [
-        {
-          "name": "h"
-        },
-        {
-          "name": "w"
-        },
-        {
-          "name": "x"
-        },
-        {
-          "name": "y"
-        }
-      ],
+      "type": "com.luoke.app.capture.WindowFinder",
       "methods": [
         {
-          "name": "<init>",
-          "parameterTypes": []
-        }
-      ]
-    },
-    {
-      "type": "com.luoke.app.capture.ROIData[]"
-    },
-    {
-      "type": "com.luoke.app.capture.WgcCaptureLib$JniCallback",
-      "methods": [
-        {
-          "name": "invoke",
+          "name": "enumProcImpl",
           "parameterTypes": [
-            "int",
-            "int",
-            "com.sun.jna.Pointer",
             "long",
-            "int",
-            "int",
-            "int"
+            "java.lang.foreign.MemorySegment"
           ]
         }
       ]
@@ -525,6 +491,14 @@
       "methods": [
         {
           "name": "<init>",
+          "parameterTypes": []
+        },
+        {
+          "name": "getX",
+          "parameterTypes": []
+        },
+        {
+          "name": "getY",
           "parameterTypes": []
         },
         {
@@ -1645,10 +1619,124 @@
       "type": "com.sun.javafx.PreviewFeature"
     },
     {
-      "type": "com.sun.javafx.collections.ObservableListWrapper"
+      "type": "com.sun.javafx.font.directwrite.D2D1_COLOR_F",
+      "jniAccessible": true,
+      "fields": [
+        {
+          "name": "a"
+        },
+        {
+          "name": "b"
+        },
+        {
+          "name": "g"
+        },
+        {
+          "name": "r"
+        }
+      ],
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
     },
     {
-      "type": "com.sun.javafx.collections.SortableList"
+      "type": "com.sun.javafx.font.directwrite.D2D1_MATRIX_3X2_F",
+      "jniAccessible": true,
+      "fields": [
+        {
+          "name": "_11"
+        },
+        {
+          "name": "_12"
+        },
+        {
+          "name": "_21"
+        },
+        {
+          "name": "_22"
+        },
+        {
+          "name": "_31"
+        },
+        {
+          "name": "_32"
+        }
+      ],
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "com.sun.javafx.font.directwrite.D2D1_PIXEL_FORMAT",
+      "jniAccessible": true,
+      "fields": [
+        {
+          "name": "alphaMode"
+        },
+        {
+          "name": "format"
+        }
+      ],
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "com.sun.javafx.font.directwrite.D2D1_POINT_2F",
+      "jniAccessible": true,
+      "fields": [
+        {
+          "name": "x"
+        },
+        {
+          "name": "y"
+        }
+      ],
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "com.sun.javafx.font.directwrite.D2D1_RENDER_TARGET_PROPERTIES",
+      "jniAccessible": true,
+      "fields": [
+        {
+          "name": "dpiX"
+        },
+        {
+          "name": "dpiY"
+        },
+        {
+          "name": "minLevel"
+        },
+        {
+          "name": "pixelFormat"
+        },
+        {
+          "name": "type"
+        },
+        {
+          "name": "usage"
+        }
+      ],
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
     },
     {
       "type": "com.sun.javafx.font.directwrite.DWFactory",
@@ -1810,314 +1898,6 @@
       ]
     },
     {
-      "type": "com.sun.jna.Callback",
-      "jniAccessible": true
-    },
-    {
-      "type": "com.sun.jna.CallbackProxy",
-      "jniAccessible": true,
-      "methods": [
-        {
-          "name": "callback",
-          "parameterTypes": [
-            "java.lang.Object[]"
-          ]
-        }
-      ]
-    },
-    {
-      "type": "com.sun.jna.CallbackReference",
-      "jniAccessible": true,
-      "methods": [
-        {
-          "name": "getCallback",
-          "parameterTypes": [
-            "java.lang.Class",
-            "com.sun.jna.Pointer",
-            "boolean"
-          ]
-        },
-        {
-          "name": "getFunctionPointer",
-          "parameterTypes": [
-            "com.sun.jna.Callback",
-            "boolean"
-          ]
-        },
-        {
-          "name": "getNativeString",
-          "parameterTypes": [
-            "java.lang.Object",
-            "boolean"
-          ]
-        },
-        {
-          "name": "initializeThread",
-          "parameterTypes": [
-            "com.sun.jna.Callback",
-            "com.sun.jna.CallbackReference$AttachOptions"
-          ]
-        }
-      ]
-    },
-    {
-      "type": "com.sun.jna.CallbackReference$AttachOptions",
-      "jniAccessible": true,
-      "fields": [
-        {
-          "name": "daemon"
-        },
-        {
-          "name": "detach"
-        },
-        {
-          "name": "name"
-        }
-      ],
-      "methods": [
-        {
-          "name": "<init>",
-          "parameterTypes": []
-        }
-      ]
-    },
-    {
-      "type": "com.sun.jna.FromNativeConverter",
-      "jniAccessible": true,
-      "methods": [
-        {
-          "name": "nativeType",
-          "parameterTypes": []
-        }
-      ]
-    },
-    {
-      "type": "com.sun.jna.IntegerType",
-      "jniAccessible": true,
-      "fields": [
-        {
-          "name": "value"
-        }
-      ]
-    },
-    {
-      "type": "com.sun.jna.JNIEnv",
-      "jniAccessible": true
-    },
-    {
-      "type": "com.sun.jna.Native",
-      "jniAccessible": true,
-      "methods": [
-        {
-          "name": "dispose",
-          "parameterTypes": []
-        },
-        {
-          "name": "fromNative",
-          "parameterTypes": [
-            "com.sun.jna.FromNativeConverter",
-            "java.lang.Object",
-            "java.lang.reflect.Method"
-          ]
-        },
-        {
-          "name": "fromNative",
-          "parameterTypes": [
-            "java.lang.Class",
-            "java.lang.Object"
-          ]
-        },
-        {
-          "name": "fromNative",
-          "parameterTypes": [
-            "java.lang.reflect.Method",
-            "java.lang.Object"
-          ]
-        },
-        {
-          "name": "nativeType",
-          "parameterTypes": [
-            "java.lang.Class"
-          ]
-        },
-        {
-          "name": "toNative",
-          "parameterTypes": [
-            "com.sun.jna.ToNativeConverter",
-            "java.lang.Object"
-          ]
-        }
-      ]
-    },
-    {
-      "type": "com.sun.jna.Native$ffi_callback",
-      "jniAccessible": true,
-      "methods": [
-        {
-          "name": "invoke",
-          "parameterTypes": [
-            "long",
-            "long",
-            "long"
-          ]
-        }
-      ]
-    },
-    {
-      "type": "com.sun.jna.NativeMapped",
-      "jniAccessible": true,
-      "methods": [
-        {
-          "name": "toNative",
-          "parameterTypes": []
-        }
-      ]
-    },
-    {
-      "type": "com.sun.jna.Pointer",
-      "jniAccessible": true,
-      "fields": [
-        {
-          "name": "peer"
-        }
-      ],
-      "methods": [
-        {
-          "name": "<init>",
-          "parameterTypes": [
-            "long"
-          ]
-        }
-      ]
-    },
-    {
-      "type": "com.sun.jna.PointerType",
-      "jniAccessible": true,
-      "fields": [
-        {
-          "name": "pointer"
-        }
-      ]
-    },
-    {
-      "type": "com.sun.jna.Structure",
-      "jniAccessible": true,
-      "fields": [
-        {
-          "name": "memory"
-        },
-        {
-          "name": "typeInfo"
-        }
-      ],
-      "methods": [
-        {
-          "name": "autoRead",
-          "parameterTypes": []
-        },
-        {
-          "name": "autoWrite",
-          "parameterTypes": []
-        },
-        {
-          "name": "getTypeInfo",
-          "parameterTypes": []
-        },
-        {
-          "name": "newInstance",
-          "parameterTypes": [
-            "java.lang.Class",
-            "long"
-          ]
-        }
-      ]
-    },
-    {
-      "type": "com.sun.jna.Structure$ByValue",
-      "jniAccessible": true
-    },
-    {
-      "type": "com.sun.jna.Structure$FFIType$FFITypes",
-      "jniAccessible": true,
-      "fields": [
-        {
-          "name": "ffi_type_double"
-        },
-        {
-          "name": "ffi_type_float"
-        },
-        {
-          "name": "ffi_type_longdouble"
-        },
-        {
-          "name": "ffi_type_pointer"
-        },
-        {
-          "name": "ffi_type_sint16"
-        },
-        {
-          "name": "ffi_type_sint32"
-        },
-        {
-          "name": "ffi_type_sint64"
-        },
-        {
-          "name": "ffi_type_sint8"
-        },
-        {
-          "name": "ffi_type_uint16"
-        },
-        {
-          "name": "ffi_type_uint32"
-        },
-        {
-          "name": "ffi_type_uint64"
-        },
-        {
-          "name": "ffi_type_uint8"
-        },
-        {
-          "name": "ffi_type_void"
-        }
-      ]
-    },
-    {
-      "type": "com.sun.jna.WString",
-      "jniAccessible": true,
-      "methods": [
-        {
-          "name": "<init>",
-          "parameterTypes": [
-            "java.lang.String"
-          ]
-        }
-      ]
-    },
-    {
-      "type": "com.sun.jna.platform.win32.WinDef$HWND",
-      "methods": [
-        {
-          "name": "<init>",
-          "parameterTypes": []
-        }
-      ]
-    },
-    {
-      "type": "com.sun.jna.platform.win32.WinUser$WNDENUMPROC",
-      "methods": [
-        {
-          "name": "callback",
-          "parameterTypes": [
-            "com.sun.jna.platform.win32.WinDef$HWND",
-            "com.sun.jna.Pointer"
-          ]
-        }
-      ]
-    },
-    {
-      "type": "com.sun.jna.win32.DLLCallback"
-    },
-    {
       "type": "com.sun.org.apache.xerces.internal.jaxp.SAXParserFactoryImpl",
       "methods": [
         {
@@ -2165,19 +1945,6 @@
     },
     {
       "type": "com.sun.prism.shader.DrawCircle_Color_Loader",
-      "methods": [
-        {
-          "name": "loadShader",
-          "parameterTypes": [
-            "com.sun.prism.ps.ShaderFactory",
-            "java.lang.String",
-            "java.io.InputStream"
-          ]
-        }
-      ]
-    },
-    {
-      "type": "com.sun.prism.shader.DrawEllipse_Color_Loader",
       "methods": [
         {
           "name": "loadShader",
@@ -2340,7 +2107,7 @@
       ]
     },
     {
-      "type": "com.sun.scenario.effect.impl.prism.ps.PPSColorAdjustPeer",
+      "type": "com.sun.scenario.effect.impl.prism.ps.PPSBlend_SRC_INPeer",
       "methods": [
         {
           "name": "<init>",
@@ -2849,21 +2616,9 @@
         },
         {
           "name": "TRUE"
-        },
-        {
-          "name": "TYPE"
-        },
-        {
-          "name": "value"
         }
       ],
       "methods": [
-        {
-          "name": "<init>",
-          "parameterTypes": [
-            "boolean"
-          ]
-        },
         {
           "name": "getBoolean",
           "parameterTypes": [
@@ -2873,43 +2628,8 @@
       ]
     },
     {
-      "type": "java.lang.Byte",
-      "jniAccessible": true,
-      "fields": [
-        {
-          "name": "TYPE"
-        },
-        {
-          "name": "value"
-        }
-      ],
-      "methods": [
-        {
-          "name": "<init>",
-          "parameterTypes": [
-            "byte"
-          ]
-        }
-      ]
-    },
-    {
       "type": "java.lang.Character",
-      "jniAccessible": true,
-      "fields": [
-        {
-          "name": "TYPE"
-        },
-        {
-          "name": "value"
-        }
-      ],
       "methods": [
-        {
-          "name": "<init>",
-          "parameterTypes": [
-            "char"
-          ]
-        },
         {
           "name": "isIdeographic",
           "parameterTypes": [
@@ -2929,10 +2649,6 @@
             "boolean",
             "java.lang.ClassLoader"
           ]
-        },
-        {
-          "name": "getComponentType",
-          "parameterTypes": []
         }
       ]
     },
@@ -2940,99 +2656,7 @@
       "type": "java.lang.Comparable"
     },
     {
-      "type": "java.lang.Double",
-      "jniAccessible": true,
-      "fields": [
-        {
-          "name": "TYPE"
-        },
-        {
-          "name": "value"
-        }
-      ],
-      "methods": [
-        {
-          "name": "<init>",
-          "parameterTypes": [
-            "double"
-          ]
-        }
-      ]
-    },
-    {
-      "type": "java.lang.Float",
-      "jniAccessible": true,
-      "fields": [
-        {
-          "name": "TYPE"
-        },
-        {
-          "name": "value"
-        }
-      ],
-      "methods": [
-        {
-          "name": "<init>",
-          "parameterTypes": [
-            "float"
-          ]
-        }
-      ]
-    },
-    {
-      "type": "java.lang.Integer",
-      "jniAccessible": true,
-      "fields": [
-        {
-          "name": "TYPE"
-        },
-        {
-          "name": "value"
-        }
-      ],
-      "methods": [
-        {
-          "name": "<init>",
-          "parameterTypes": [
-            "int"
-          ]
-        }
-      ]
-    },
-    {
-      "type": "java.lang.Iterable"
-    },
-    {
-      "type": "java.lang.Long",
-      "jniAccessible": true,
-      "fields": [
-        {
-          "name": "TYPE"
-        },
-        {
-          "name": "value"
-        }
-      ],
-      "methods": [
-        {
-          "name": "<init>",
-          "parameterTypes": [
-            "long"
-          ]
-        }
-      ]
-    },
-    {
-      "type": "java.lang.NullPointerException",
-      "jniAccessible": true,
-      "methods": [
-        {
-          "name": "<init>",
-          "parameterTypes": [
-            "java.lang.String"
-          ]
-        }
-      ]
+      "type": "java.lang.Double"
     },
     {
       "type": "java.lang.Number"
@@ -3046,15 +2670,8 @@
           "parameterTypes": [
             "java.lang.Object"
           ]
-        },
-        {
-          "name": "toString",
-          "parameterTypes": []
         }
       ]
-    },
-    {
-      "type": "java.lang.Object[]"
     },
     {
       "type": "java.lang.Runnable",
@@ -3067,64 +2684,14 @@
       ]
     },
     {
-      "type": "java.lang.RuntimeException"
-    },
-    {
-      "type": "java.lang.Short",
-      "jniAccessible": true,
-      "fields": [
-        {
-          "name": "TYPE"
-        },
-        {
-          "name": "value"
-        }
-      ],
-      "methods": [
-        {
-          "name": "<init>",
-          "parameterTypes": [
-            "short"
-          ]
-        }
-      ]
-    },
-    {
       "type": "java.lang.String",
       "jniAccessible": true,
       "methods": [
-        {
-          "name": "<init>",
-          "parameterTypes": [
-            "byte[]"
-          ]
-        },
-        {
-          "name": "<init>",
-          "parameterTypes": [
-            "byte[]",
-            "java.lang.String"
-          ]
-        },
         {
           "name": "concat",
           "parameterTypes": [
             "java.lang.String"
           ]
-        },
-        {
-          "name": "getBytes",
-          "parameterTypes": []
-        },
-        {
-          "name": "getBytes",
-          "parameterTypes": [
-            "java.lang.String"
-          ]
-        },
-        {
-          "name": "toCharArray",
-          "parameterTypes": []
         },
         {
           "name": "toLowerCase",
@@ -3139,41 +2706,10 @@
     },
     {
       "type": "java.lang.System",
-      "jniAccessible": true,
       "methods": [
-        {
-          "name": "getProperty",
-          "parameterTypes": [
-            "java.lang.String"
-          ]
-        },
         {
           "name": "getSecurityManager",
           "parameterTypes": []
-        }
-      ]
-    },
-    {
-      "type": "java.lang.Throwable"
-    },
-    {
-      "type": "java.lang.UnsatisfiedLinkError",
-      "jniAccessible": true,
-      "methods": [
-        {
-          "name": "<init>",
-          "parameterTypes": [
-            "java.lang.String"
-          ]
-        }
-      ]
-    },
-    {
-      "type": "java.lang.Void",
-      "jniAccessible": true,
-      "fields": [
-        {
-          "name": "TYPE"
         }
       ]
     },
@@ -3184,76 +2720,8 @@
       "type": "java.lang.constant.ConstantDesc"
     },
     {
-      "type": "java.lang.invoke.MethodHandle"
-    },
-    {
-      "type": "java.lang.invoke.MethodHandles"
-    },
-    {
-      "type": "java.lang.invoke.MethodHandles$Lookup"
-    },
-    {
-      "type": "java.lang.invoke.MethodType"
-    },
-    {
-      "type": "java.lang.reflect.Method",
-      "jniAccessible": true,
-      "methods": [
-        {
-          "name": "getParameterTypes",
-          "parameterTypes": []
-        },
-        {
-          "name": "getReturnType",
-          "parameterTypes": []
-        },
-        {
-          "name": "isDefault",
-          "parameterTypes": []
-        }
-      ]
-    },
-    {
-      "type": "java.nio.Buffer",
-      "jniAccessible": true,
-      "fields": [
-        {
-          "name": "capacity"
-        },
-        {
-          "name": "limit"
-        },
-        {
-          "name": "position"
-        }
-      ],
-      "methods": [
-        {
-          "name": "array",
-          "parameterTypes": []
-        },
-        {
-          "name": "arrayOffset",
-          "parameterTypes": []
-        },
-        {
-          "name": "position",
-          "parameterTypes": []
-        }
-      ]
-    },
-    {
       "type": "java.nio.ByteBuffer",
-      "jniAccessible": true,
       "methods": [
-        {
-          "name": "array",
-          "parameterTypes": []
-        },
-        {
-          "name": "arrayOffset",
-          "parameterTypes": []
-        },
         {
           "name": "order",
           "parameterTypes": [
@@ -3267,90 +2735,6 @@
       "methods": [
         {
           "name": "nativeOrder",
-          "parameterTypes": []
-        }
-      ]
-    },
-    {
-      "type": "java.nio.CharBuffer",
-      "jniAccessible": true,
-      "methods": [
-        {
-          "name": "array",
-          "parameterTypes": []
-        },
-        {
-          "name": "arrayOffset",
-          "parameterTypes": []
-        }
-      ]
-    },
-    {
-      "type": "java.nio.DoubleBuffer",
-      "jniAccessible": true,
-      "methods": [
-        {
-          "name": "array",
-          "parameterTypes": []
-        },
-        {
-          "name": "arrayOffset",
-          "parameterTypes": []
-        }
-      ]
-    },
-    {
-      "type": "java.nio.FloatBuffer",
-      "jniAccessible": true,
-      "methods": [
-        {
-          "name": "array",
-          "parameterTypes": []
-        },
-        {
-          "name": "arrayOffset",
-          "parameterTypes": []
-        }
-      ]
-    },
-    {
-      "type": "java.nio.IntBuffer",
-      "jniAccessible": true,
-      "methods": [
-        {
-          "name": "array",
-          "parameterTypes": []
-        },
-        {
-          "name": "arrayOffset",
-          "parameterTypes": []
-        }
-      ]
-    },
-    {
-      "type": "java.nio.LongBuffer",
-      "jniAccessible": true,
-      "methods": [
-        {
-          "name": "array",
-          "parameterTypes": []
-        },
-        {
-          "name": "arrayOffset",
-          "parameterTypes": []
-        }
-      ]
-    },
-    {
-      "type": "java.nio.ShortBuffer",
-      "jniAccessible": true,
-      "methods": [
-        {
-          "name": "array",
-          "parameterTypes": []
-        },
-        {
-          "name": "arrayOffset",
           "parameterTypes": []
         }
       ]
@@ -3371,12 +2755,6 @@
       "type": "java.security.interfaces.RSAPublicKey"
     },
     {
-      "type": "java.util.AbstractCollection"
-    },
-    {
-      "type": "java.util.AbstractList"
-    },
-    {
       "type": "java.util.ArrayList",
       "serializable": true,
       "jniAccessible": true,
@@ -3394,9 +2772,6 @@
           ]
         }
       ]
-    },
-    {
-      "type": "java.util.Collection"
     },
     {
       "type": "java.util.Collections",
@@ -3434,9 +2809,6 @@
       ]
     },
     {
-      "type": "java.util.List"
-    },
-    {
       "type": "java.util.Map",
       "jniAccessible": true,
       "methods": [
@@ -3450,47 +2822,13 @@
       ]
     },
     {
-      "type": "java.util.RandomAccess"
-    },
-    {
-      "type": "javafx.animation.Interpolatable"
-    },
-    {
       "type": "javafx.animation.Interpolator"
     },
     {
       "type": "javafx.animation.KeyValue"
     },
     {
-      "type": "javafx.beans.Observable"
-    },
-    {
-      "type": "javafx.beans.Observable[]"
-    },
-    {
-      "type": "javafx.collections.ModifiableObservableListBase"
-    },
-    {
-      "type": "javafx.collections.ObservableList"
-    },
-    {
-      "type": "javafx.collections.ObservableListBase"
-    },
-    {
       "type": "javafx.css.Rule"
-    },
-    {
-      "type": "javafx.geometry.Point2D",
-      "methods": [
-        {
-          "name": "getX",
-          "parameterTypes": []
-        },
-        {
-          "name": "getY",
-          "parameterTypes": []
-        }
-      ]
     },
     {
       "type": "javafx.scene.Camera"
@@ -3524,6 +2862,9 @@
     },
     {
       "type": "javafx.scene.image.Image"
+    },
+    {
+      "type": "javafx.scene.image.ImageView"
     },
     {
       "type": "javafx.scene.layout.Pane"
@@ -3589,1125 +2930,19 @@
       "type": "javax.imageio.spi.ImageReaderSpi"
     },
     {
+      "type": "javax.imageio.spi.ImageReaderWriterSpi",
+      "methods": [
+        {
+          "name": "getFileSuffixes",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
       "type": "javax.imageio.spi.ImageWriterSpi"
     },
     {
-      "type": "org.bytedeco.javacpp.BoolPointer"
-    },
-    {
-      "type": "org.bytedeco.javacpp.BooleanPointer"
-    },
-    {
-      "type": "org.bytedeco.javacpp.BytePointer",
-      "unsafeAllocated": true
-    },
-    {
-      "type": "org.bytedeco.javacpp.CLongPointer"
-    },
-    {
-      "type": "org.bytedeco.javacpp.CharPointer"
-    },
-    {
-      "type": "org.bytedeco.javacpp.DoublePointer"
-    },
-    {
-      "type": "org.bytedeco.javacpp.FloatPointer"
-    },
-    {
-      "type": "org.bytedeco.javacpp.IntPointer"
-    },
-    {
-      "type": "org.bytedeco.javacpp.Loader",
-      "jniAccessible": true,
-      "methods": [
-        {
-          "name": "putMemberOffset",
-          "parameterTypes": [
-            "java.lang.String",
-            "java.lang.String",
-            "int"
-          ]
-        }
-      ]
-    },
-    {
-      "type": "org.bytedeco.javacpp.Loader$Helper"
-    },
-    {
-      "type": "org.bytedeco.javacpp.LongPointer"
-    },
-    {
-      "type": "org.bytedeco.javacpp.Pointer",
-      "jniAccessible": true,
-      "fields": [
-        {
-          "name": "address"
-        },
-        {
-          "name": "capacity"
-        },
-        {
-          "name": "deallocator"
-        },
-        {
-          "name": "limit"
-        },
-        {
-          "name": "position"
-        }
-      ],
-      "methods": [
-        {
-          "name": "init",
-          "parameterTypes": [
-            "long",
-            "long",
-            "long",
-            "long"
-          ]
-        }
-      ]
-    },
-    {
-      "type": "org.bytedeco.javacpp.Pointer$NativeDeallocator",
-      "jniAccessible": true,
-      "fields": [
-        {
-          "name": "ownerAddress"
-        }
-      ]
-    },
-    {
-      "type": "org.bytedeco.javacpp.PointerPointer"
-    },
-    {
-      "type": "org.bytedeco.javacpp.ShortPointer"
-    },
-    {
-      "type": "org.bytedeco.javacpp.SizeTPointer"
-    },
-    {
-      "type": "org.bytedeco.javacpp.presets.javacpp",
-      "methods": [
-        {
-          "name": "<init>",
-          "parameterTypes": []
-        }
-      ]
-    },
-    {
-      "type": "org.bytedeco.openblas.global.openblas"
-    },
-    {
-      "type": "org.bytedeco.openblas.global.openblas$LAPACK_C_SELECT1"
-    },
-    {
-      "type": "org.bytedeco.openblas.global.openblas$LAPACK_C_SELECT2"
-    },
-    {
-      "type": "org.bytedeco.openblas.global.openblas$LAPACK_D_SELECT2"
-    },
-    {
-      "type": "org.bytedeco.openblas.global.openblas$LAPACK_D_SELECT3"
-    },
-    {
-      "type": "org.bytedeco.openblas.global.openblas$LAPACK_S_SELECT2"
-    },
-    {
-      "type": "org.bytedeco.openblas.global.openblas$LAPACK_S_SELECT3"
-    },
-    {
-      "type": "org.bytedeco.openblas.global.openblas$LAPACK_Z_SELECT1"
-    },
-    {
-      "type": "org.bytedeco.openblas.global.openblas$LAPACK_Z_SELECT2"
-    },
-    {
-      "type": "org.bytedeco.openblas.global.openblas$openblas_dojob_callback"
-    },
-    {
-      "type": "org.bytedeco.openblas.global.openblas$openblas_threads_callback"
-    },
-    {
-      "type": "org.bytedeco.openblas.global.openblas_nolapack"
-    },
-    {
-      "type": "org.bytedeco.openblas.global.openblas_nolapack$openblas_dojob_callback"
-    },
-    {
-      "type": "org.bytedeco.openblas.global.openblas_nolapack$openblas_threads_callback"
-    },
-    {
-      "type": "org.bytedeco.openblas.presets.openblas",
-      "methods": [
-        {
-          "name": "<init>",
-          "parameterTypes": []
-        }
-      ]
-    },
-    {
-      "type": "org.bytedeco.openblas.presets.openblas_nolapack",
-      "methods": [
-        {
-          "name": "<init>",
-          "parameterTypes": []
-        }
-      ]
-    },
-    {
-      "type": "org.bytedeco.openblas.presets.openblas_nolapack$MklDomainSetNumThreads"
-    },
-    {
-      "type": "org.bytedeco.openblas.presets.openblas_nolapack$MklSetNumThreadsLocal"
-    },
-    {
-      "type": "org.bytedeco.openblas.presets.openblas_nolapack$SetNumThreads"
-    },
-    {
-      "type": "org.bytedeco.opencv.global.opencv_calib3d"
-    },
-    {
-      "type": "org.bytedeco.opencv.global.opencv_core"
-    },
-    {
-      "type": "org.bytedeco.opencv.global.opencv_features2d"
-    },
-    {
-      "type": "org.bytedeco.opencv.global.opencv_flann"
-    },
-    {
-      "type": "org.bytedeco.opencv.global.opencv_highgui"
-    },
-    {
-      "type": "org.bytedeco.opencv.global.opencv_imgcodecs"
-    },
-    {
-      "type": "org.bytedeco.opencv.global.opencv_imgcodecs$Animation"
-    },
-    {
-      "type": "org.bytedeco.opencv.global.opencv_imgcodecs$ImageCollection"
-    },
-    {
-      "type": "org.bytedeco.opencv.global.opencv_imgcodecs$ImageCollection$Impl"
-    },
-    {
-      "type": "org.bytedeco.opencv.global.opencv_imgcodecs$ImageCollection$iterator"
-    },
-    {
-      "type": "org.bytedeco.opencv.global.opencv_imgproc"
-    },
-    {
-      "type": "org.bytedeco.opencv.global.opencv_videoio"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_calib3d.CirclesGridFinderParameters"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_calib3d.CvLevMarq"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_calib3d.LMSolver"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_calib3d.StereoBM"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_calib3d.StereoMatcher"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_calib3d.StereoSGBM"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_calib3d.UsacParams"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.AbstractArray"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Algorithm"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.AsyncArray"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.AutoLock"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.BufferPool"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.BufferPoolController"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.ByteVectorVector"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Complexd"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Complexf"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.ConjGradSolver"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Context"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Context$Impl"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Context$UserContext"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Cv16suf"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Cv32suf"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Cv64suf"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.CvArr"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.CvArrArray"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.CvBox2D"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.CvChain"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.CvCmpFunc"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.CvContour"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.CvErrorCallback"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.CvGraph"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.CvGraphEdge"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.CvGraphScanner"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.CvGraphVtx"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.CvGraphVtx2D"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.CvHistogram"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.CvLineIterator"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.CvMat"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.CvMatArray"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.CvMatND"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.CvMatNDArray"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.CvMemBlock"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.CvMemStorage"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.CvMemStoragePos"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.CvNArrayIterator"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.CvPoint"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.CvPoint2D32f"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.CvPoint2D64f"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.CvPoint3D32f"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.CvPoint3D64f"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.CvRect"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.CvScalar"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.CvSeq"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.CvSeqBlock"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.CvSeqReader"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.CvSeqWriter"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.CvSet"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.CvSetElem"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.CvSize"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.CvSize2D32f"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.CvSlice",
-      "unsafeAllocated": true
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.CvSparseMat"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.CvSparseMatIterator"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.CvSparseNode"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.CvTermCriteria"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.CvTreeNodeIterator"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Cv_iplAllocateImageData"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Cv_iplCloneImage"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Cv_iplCreateImageHeader"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Cv_iplCreateROI"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Cv_iplDeallocate"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.DCT2D"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.DFT1D"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.DFT2D"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.DMatch",
-      "unsafeAllocated": true
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.DMatchVector",
-      "unsafeAllocated": true
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.DMatchVector$Iterator"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.DMatchVectorVector"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.DMatchVectorVector$Iterator"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Device"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Device$Impl"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.DeviceInfo"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.DownhillSolver"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.ErrorCallback"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Event"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.FileNode"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.FileNodeIterator"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.FileStorage"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.FloatVectorVector"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Formatted"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Formatter"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.GpuData"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.GpuMat"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.GpuMat$Allocator"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.GpuMatND"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.GpuMatVector"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.GpuMatVector$Iterator"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Hamming"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.HostMem"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Image2D"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.InstrNode"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.IntDoubleMap"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.IntDoubleMap$Iterator"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.IntDoublePairVector"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.IntIntPair"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.IntIntPairVector"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.IntVectorVector"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.IplConvKernel"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.IplConvKernelFP"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.IplImage"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.IplImageArray"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.IplROI"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.IplTileInfo"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Kernel"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.KernelArg"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.KeyPoint",
-      "unsafeAllocated": true
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.KeyPointVector"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.KeyPointVector$Iterator"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.KeyPointVectorVector"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.KeyPointVectorVector$Iterator"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.LDA"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Mat",
-      "unsafeAllocated": true
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.MatAllocator"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.MatBytePairVector"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.MatConstIterator"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.MatExpr"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.MatOp"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.MatSize"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.MatStep"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.MatVector"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.MatVector$Iterator"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.MatVectorVector"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.MatVectorVector$Iterator"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.MinProblemSolver"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.MinProblemSolver$Function"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Moments"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Mutex"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.NAryMatIterator"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.NodeData"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.NodeDataTls"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.NodeDataTlsData"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.NodeDataTlsVector"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.NodeDataTlsVector$Iterator"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.OclPlatform"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.OclPlatform$Impl"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.OpenCLExecutionContext"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.OpenCLExecutionContextScope"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.PCA"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.ParallelLoopBodyLambdaWrapper"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.PlatformInfo"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Point"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Point2d"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Point2dVector"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Point2dVector$Iterator"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Point2dVectorVector"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Point2dVectorVector$Iterator"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Point2f",
-      "unsafeAllocated": true
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Point2fVector"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Point2fVector$Iterator"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Point2fVectorVector"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Point2fVectorVector$Iterator"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Point3d"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Point3f",
-      "unsafeAllocated": true
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Point3fVector"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Point3fVector$Iterator"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Point3fVectorVector"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Point3fVectorVector$Iterator"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Point3i"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Point3iVector"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Point3iVector$Iterator"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.PointVector"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.PointVector$Iterator"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.PointVectorVector"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.PointVectorVector$Iterator"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Program"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.ProgramSource"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Queue"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.RNG"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.RNG_MT19937"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Range"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.RangeVector"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.RangeVector$Iterator"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Rect"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Rect2d"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Rect2dVector"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Rect2dVector$Iterator"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Rect2f"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.RectVector"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.RectVector$Iterator"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.RectVectorVector"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.RectVectorVector$Iterator"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.RotatedRect"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.SVD"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Scalar"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Scalar4f"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Scalar4i"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.ScalarVector"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.ScalarVector$Iterator"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Size",
-      "unsafeAllocated": true
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Size2d"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Size2f"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.SizeVector"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.SizeVector$Iterator"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.SparseMat"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.SparseMat$Hdr"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.SparseMat$Node"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.SparseMatConstIterator"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.SparseMatIterator"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Stream"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Stream$StreamCallback"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.StringVector"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.StringVector$Iterator"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.TargetArchs"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.TermCriteria"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.TickMeter"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.Timer"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.UMat"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.UMatBytePairVector"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.UMatData"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.UMatVector"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.UMatVector$Iterator"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.WriteStructContext"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_core.hfloat"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_features2d.AKAZE"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_features2d.AffineFeature"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_features2d.AgastFeatureDetector"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_features2d.BFMatcher"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_features2d.BOWImgDescriptorExtractor"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_features2d.BOWKMeansTrainer"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_features2d.BRISK"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_features2d.DescriptorMatcher"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_features2d.FastFeatureDetector"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_features2d.Feature2D"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_features2d.FlannBasedMatcher"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_features2d.GFTTDetector"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_features2d.KAZE"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_features2d.KeyPointsFilter"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_features2d.MSER"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_features2d.ORB"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_features2d.SIFT",
-      "unsafeAllocated": true
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_features2d.SimpleBlobDetector"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_features2d.SimpleBlobDetector$Params"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_flann.AutotunedIndexParams"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_flann.CompositeIndexParams"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_flann.HierarchicalClusteringIndexParams"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_flann.Index"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_flann.IndexParams"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_flann.KDTreeIndexParams"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_flann.KMeansIndexParams"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_flann.LinearIndexParams"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_flann.LshIndexParams"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_flann.SavedIndexParams"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_flann.SearchParams"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_highgui.ButtonCallback"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_highgui.CvButtonCallback"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_highgui.CvMouseCallback"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_highgui.CvOpenGlDrawCallback"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_highgui.CvTrackbarCallback"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_highgui.CvTrackbarCallback2"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_highgui.MouseCallback"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_highgui.OpenGlDrawCallback"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_highgui.Pt2Func_int_ByteBuffer"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_highgui.Pt2Func_int_BytePointer"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_highgui.Pt2Func_int_PointerPointer"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_highgui.Pt2Func_int_byte__"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_highgui.QtFont"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_highgui.TrackbarCallback"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_imgproc.CLAHE"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_imgproc.CvChainPtReader"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_imgproc.CvConnectedComp"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_imgproc.CvContourScanner"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_imgproc.CvConvexityDefect"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_imgproc.CvDistanceFunction"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_imgproc.CvFont"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_imgproc.CvHuMoments"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_imgproc.CvMoments"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_imgproc.GeneralizedHough"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_imgproc.GeneralizedHoughBallard"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_imgproc.GeneralizedHoughGuil"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_imgproc.LineIterator"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_imgproc.LineSegmentDetector"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_imgproc.Subdiv2D"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_imgproc.Vec2fVector"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_imgproc.Vec2fVector$Iterator"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_imgproc.Vec3fVector"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_imgproc.Vec3fVector$Iterator"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_imgproc.Vec4fVector"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_imgproc.Vec4fVector$Iterator"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_imgproc.Vec4iVector"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_imgproc.Vec4iVector$Iterator"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_imgproc.Vec6fVector"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_imgproc.Vec6fVector$Iterator"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_videoio.VideoCapture"
-    },
-    {
-      "type": "org.bytedeco.opencv.opencv_videoio.VideoWriter"
-    },
-    {
-      "type": "org.bytedeco.opencv.presets.opencv_core",
-      "methods": [
-        {
-          "name": "<init>",
-          "parameterTypes": []
-        }
-      ]
-    },
-    {
-      "type": "org.bytedeco.opencv.presets.opencv_core$Functor"
-    },
-    {
       "type": "org.jsoup.helper.HttpClientExecutor"
-    },
-    {
-      "type": "org.osgi.framework.BundleEvent"
     },
     {
       "type": "sun.awt.SunHints",
@@ -5818,44 +4053,11 @@
     },
     {
       "type": "sun.util.resources.cldr.CalendarData"
-    },
-    {
-      "type": {
-        "proxy": [
-          "com.luoke.app.capture.WgcCaptureLib"
-        ]
-      }
-    },
-    {
-      "type": {
-        "proxy": [
-          "com.sun.jna.platform.win32.User32"
-        ]
-      }
-    },
-    {
-      "type": {
-        "lambda": {
-          "declaringClass": "com.luoke.app.capture.WindowFinder",
-          "interfaces": [
-            "com.sun.jna.platform.win32.WinUser$WNDENUMPROC"
-          ]
-        }
-      }
     }
   ],
   "resources": [
     {
       "glob": "META-INF/fonts.mf"
-    },
-    {
-      "glob": "META-INF/maven/org.bytedeco/javacpp/pom.properties"
-    },
-    {
-      "glob": "META-INF/maven/org.bytedeco/openblas/pom.properties"
-    },
-    {
-      "glob": "META-INF/maven/org.bytedeco/opencv/pom.properties"
     },
     {
       "glob": "META-INF/services/ai.djl.engine.EngineProvider"
@@ -6038,7 +4240,28 @@
       "glob": "api-ms-win-crt-utility-l1-1-0.dll"
     },
     {
+      "glob": "atlantafx/base/theme/cupertino-dark.bss"
+    },
+    {
+      "glob": "atlantafx/base/theme/cupertino-light.bss"
+    },
+    {
+      "glob": "atlantafx/base/theme/dracula.bss"
+    },
+    {
+      "glob": "atlantafx/base/theme/nord-dark.bss"
+    },
+    {
+      "glob": "atlantafx/base/theme/nord-light.bss"
+    },
+    {
       "glob": "atlantafx/base/theme/primer-dark.bss"
+    },
+    {
+      "glob": "atlantafx/base/theme/primer-light.bss"
+    },
+    {
+      "glob": "capture/capture.exe"
     },
     {
       "glob": "com/sun/glass/ui/win/themes.properties"
@@ -10310,13 +8533,7 @@
       "glob": "com/sun/javafx/tk/quantum/QuantumMessagesBundle_zh_Hans_CN.properties"
     },
     {
-      "glob": "com/sun/jna/win32-x86-64/jnidispatch.dll"
-    },
-    {
       "glob": "com/sun/prism/d3d/hlsl/DrawCircle_Color.obj"
-    },
-    {
-      "glob": "com/sun/prism/d3d/hlsl/DrawEllipse_Color.obj"
     },
     {
       "glob": "com/sun/prism/d3d/hlsl/DrawPgram_Color.obj"
@@ -10349,7 +8566,10 @@
       "glob": "com/sun/prism/d3d/hlsl/Texture_Color.obj"
     },
     {
-      "glob": "com/sun/scenario/effect/impl/hw/d3d/hlsl/ColorAdjust.obj"
+      "glob": "com/sun/scenario/effect/impl/hw/d3d/hlsl/Blend_SRC_IN.obj"
+    },
+    {
+      "glob": "com/sun/scenario/effect/impl/hw/d3d/hlsl/LinearConvolveShadow_12.obj"
     },
     {
       "glob": "com/sun/scenario/effect/impl/hw/d3d/hlsl/LinearConvolveShadow_28.obj"
@@ -10361,34 +8581,10 @@
       "glob": "com/sun/scenario/effect/impl/hw/d3d/hlsl/LinearConvolveShadow_64.obj"
     },
     {
-      "glob": "dll/awt.dll"
+      "glob": "com/sun/scenario/effect/impl/hw/d3d/hlsl/LinearConvolveShadow_96.obj"
     },
     {
-      "glob": "dll/fontmanager.dll"
-    },
-    {
-      "glob": "dll/freetype.dll"
-    },
-    {
-      "glob": "dll/java.dll"
-    },
-    {
-      "glob": "dll/javaaccessbridge.dll"
-    },
-    {
-      "glob": "dll/javajpeg.dll"
-    },
-    {
-      "glob": "dll/jawt.dll"
-    },
-    {
-      "glob": "dll/jvm.dll"
-    },
-    {
-      "glob": "dll/lcms.dll"
-    },
-    {
-      "glob": "dll/wgc_capture.dll"
+      "glob": "extract-list.txt"
     },
     {
       "glob": "glass.dll"
@@ -10430,1969 +8626,91 @@
       "glob": "msvcp140_2.dll"
     },
     {
-      "glob": "org/bytedeco/cuda/windows-x86_64-gpu/cublas64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64-gpu/cublasLt64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64-gpu/cudart64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64-gpu/cudnn64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64-gpu/cudnn_adv64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64-gpu/cudnn_cnn64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64-gpu/cudnn_engines_precompiled64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64-gpu/cudnn_engines_runtime_compiled64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64-gpu/cudnn_graph64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64-gpu/cudnn_heuristic64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64-gpu/cudnn_ops64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64-gpu/cufft64_12.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64-gpu/jniopencv_calib3d.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64-gpu/jniopencv_core.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64-gpu/jniopencv_features2d.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64-gpu/jniopencv_flann.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64-gpu/jniopencv_highgui.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64-gpu/jniopencv_imgcodecs.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64-gpu/jniopencv_imgproc.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64-gpu/jniopencv_videoio.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64-gpu/nppc64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64-gpu/nppial64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64-gpu/nppicc64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64-gpu/nppicom64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64-gpu/nppidei64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64-gpu/nppif64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64-gpu/nppig64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64-gpu/nppim64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64-gpu/nppist64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64-gpu/nppisu64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64-gpu/nppitc64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64-gpu/npps64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64-gpu/opencv_calib3d4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64-gpu/opencv_core4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64-gpu/opencv_cudev4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64-gpu/opencv_features2d4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64-gpu/opencv_ffmpeg4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64-gpu/opencv_ffmpeg4130_64.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64-gpu/opencv_flann4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64-gpu/opencv_highgui4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64-gpu/opencv_imgcodecs4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64-gpu/opencv_imgproc4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64-gpu/opencv_videoio4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64-gpu/zlibwapi.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64/cublas64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64/cublasLt64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64/cudart64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64/cudnn64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64/cudnn_adv64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64/cudnn_cnn64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64/cudnn_engines_precompiled64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64/cudnn_engines_runtime_compiled64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64/cudnn_graph64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64/cudnn_heuristic64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64/cudnn_ops64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64/cufft64_12.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64/jniopencv_calib3d.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64/jniopencv_core.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64/jniopencv_features2d.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64/jniopencv_flann.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64/jniopencv_highgui.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64/jniopencv_imgcodecs.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64/jniopencv_imgproc.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64/jniopencv_videoio.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64/nppc64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64/nppial64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64/nppicc64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64/nppicom64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64/nppidei64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64/nppif64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64/nppig64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64/nppim64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64/nppist64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64/nppisu64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64/nppitc64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64/npps64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64/opencv_calib3d4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64/opencv_core4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64/opencv_cudev4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64/opencv_features2d4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64/opencv_ffmpeg4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64/opencv_ffmpeg4130_64.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64/opencv_flann4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64/opencv_highgui4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64/opencv_imgcodecs4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64/opencv_imgproc4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64/opencv_videoio4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/cuda/windows-x86_64/zlibwapi.dll"
-    },
-    {
-      "glob": "org/bytedeco/javacpp/properties/windows-x86_64.properties"
-    },
-    {
-      "glob": "org/bytedeco/javacpp/windows-x86_64/jnijavacpp.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/api-ms-win-core-console-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/api-ms-win-core-console-l1-2-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/api-ms-win-core-datetime-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/api-ms-win-core-debug-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/api-ms-win-core-errorhandling-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/api-ms-win-core-file-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/api-ms-win-core-file-l1-2-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/api-ms-win-core-file-l2-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/api-ms-win-core-handle-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/api-ms-win-core-heap-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/api-ms-win-core-interlocked-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/api-ms-win-core-libraryloader-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/api-ms-win-core-localization-l1-2-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/api-ms-win-core-memory-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/api-ms-win-core-namedpipe-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/api-ms-win-core-processenvironment-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/api-ms-win-core-processthreads-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/api-ms-win-core-processthreads-l1-1-1.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/api-ms-win-core-profile-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/api-ms-win-core-rtlsupport-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/api-ms-win-core-string-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/api-ms-win-core-synch-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/api-ms-win-core-synch-l1-2-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/api-ms-win-core-sysinfo-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/api-ms-win-core-timezone-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/api-ms-win-core-util-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/api-ms-win-crt-conio-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/api-ms-win-crt-convert-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/api-ms-win-crt-environment-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/api-ms-win-crt-filesystem-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/api-ms-win-crt-heap-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/api-ms-win-crt-locale-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/api-ms-win-crt-math-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/api-ms-win-crt-multibyte-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/api-ms-win-crt-private-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/api-ms-win-crt-process-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/api-ms-win-crt-runtime-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/api-ms-win-crt-stdio-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/api-ms-win-crt-string-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/api-ms-win-crt-time-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/api-ms-win-crt-utility-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/concrt140.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/jniopenblas.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/jniopenblas_nolapack.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/libomp140.aarch64.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/libomp140.i386.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/libomp140.x86_64.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/libopenblas.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/msvcp140.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/msvcp140_1.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/msvcp140_2.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/openblas.0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/openblas.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/openblas.dll.0"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/openblas_nolapack.0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/openblas_nolapack.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/openblas_nolapack.dll.0"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/ucrtbase.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/vcomp140.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/vcruntime140.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/vcruntime140_1.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/global/windows-x86_64/vcruntime140_threads.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/api-ms-win-core-console-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/api-ms-win-core-console-l1-2-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/api-ms-win-core-datetime-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/api-ms-win-core-debug-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/api-ms-win-core-errorhandling-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/api-ms-win-core-file-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/api-ms-win-core-file-l1-2-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/api-ms-win-core-file-l2-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/api-ms-win-core-handle-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/api-ms-win-core-heap-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/api-ms-win-core-interlocked-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/api-ms-win-core-libraryloader-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/api-ms-win-core-localization-l1-2-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/api-ms-win-core-memory-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/api-ms-win-core-namedpipe-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/api-ms-win-core-processenvironment-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/api-ms-win-core-processthreads-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/api-ms-win-core-processthreads-l1-1-1.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/api-ms-win-core-profile-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/api-ms-win-core-rtlsupport-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/api-ms-win-core-string-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/api-ms-win-core-synch-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/api-ms-win-core-synch-l1-2-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/api-ms-win-core-sysinfo-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/api-ms-win-core-timezone-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/api-ms-win-core-util-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/api-ms-win-crt-conio-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/api-ms-win-crt-convert-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/api-ms-win-crt-environment-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/api-ms-win-crt-filesystem-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/api-ms-win-crt-heap-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/api-ms-win-crt-locale-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/api-ms-win-crt-math-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/api-ms-win-crt-multibyte-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/api-ms-win-crt-private-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/api-ms-win-crt-process-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/api-ms-win-crt-runtime-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/api-ms-win-crt-stdio-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/api-ms-win-crt-string-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/api-ms-win-crt-time-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/api-ms-win-crt-utility-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/concrt140.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/jniopenblas.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/jniopenblas_nolapack.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/libomp140.aarch64.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/libomp140.i386.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/libomp140.x86_64.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/libopenblas.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/msvcp140.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/msvcp140_1.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/msvcp140_2.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/openblas.0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/openblas.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/openblas.dll.0"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/openblas_nolapack.0.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/openblas_nolapack.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/openblas_nolapack.dll.0"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/ucrtbase.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/vcomp140.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/vcruntime140.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/vcruntime140_1.dll"
-    },
-    {
-      "glob": "org/bytedeco/openblas/windows-x86_64/vcruntime140_threads.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64-gpu/cublas64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64-gpu/cublasLt64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64-gpu/cudart64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64-gpu/cudnn64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64-gpu/cudnn_adv64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64-gpu/cudnn_cnn64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64-gpu/cudnn_engines_precompiled64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64-gpu/cudnn_engines_runtime_compiled64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64-gpu/cudnn_graph64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64-gpu/cudnn_heuristic64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64-gpu/cudnn_ops64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64-gpu/cufft64_12.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64-gpu/jniopencv_calib3d.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64-gpu/jniopencv_core.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64-gpu/jniopencv_features2d.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64-gpu/jniopencv_flann.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64-gpu/jniopencv_highgui.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64-gpu/jniopencv_imgcodecs.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64-gpu/jniopencv_imgproc.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64-gpu/jniopencv_videoio.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64-gpu/nppc64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64-gpu/nppial64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64-gpu/nppicc64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64-gpu/nppicom64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64-gpu/nppidei64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64-gpu/nppif64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64-gpu/nppig64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64-gpu/nppim64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64-gpu/nppist64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64-gpu/nppisu64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64-gpu/nppitc64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64-gpu/npps64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64-gpu/opencv_calib3d4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64-gpu/opencv_core4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64-gpu/opencv_cudev4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64-gpu/opencv_features2d4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64-gpu/opencv_ffmpeg4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64-gpu/opencv_ffmpeg4130_64.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64-gpu/opencv_flann4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64-gpu/opencv_highgui4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64-gpu/opencv_imgcodecs4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64-gpu/opencv_imgproc4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64-gpu/opencv_videoio4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64-gpu/zlibwapi.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64/cublas64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64/cublasLt64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64/cudart64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64/cudnn64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64/cudnn_adv64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64/cudnn_cnn64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64/cudnn_engines_precompiled64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64/cudnn_engines_runtime_compiled64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64/cudnn_graph64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64/cudnn_heuristic64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64/cudnn_ops64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64/cufft64_12.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64/jniopencv_calib3d.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64/jniopencv_core.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64/jniopencv_features2d.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64/jniopencv_flann.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64/jniopencv_highgui.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64/jniopencv_imgcodecs.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64/jniopencv_imgproc.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64/jniopencv_videoio.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64/nppc64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64/nppial64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64/nppicc64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64/nppicom64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64/nppidei64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64/nppif64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64/nppig64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64/nppim64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64/nppist64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64/nppisu64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64/nppitc64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64/npps64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64/opencv_calib3d4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64/opencv_core4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64/opencv_cudev4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64/opencv_features2d4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64/opencv_ffmpeg4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64/opencv_ffmpeg4130_64.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64/opencv_flann4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64/opencv_highgui4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64/opencv_imgcodecs4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64/opencv_imgproc4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64/opencv_videoio4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/global/windows-x86_64/zlibwapi.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64-gpu/cublas64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64-gpu/cublasLt64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64-gpu/cudart64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64-gpu/cudnn64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64-gpu/cudnn_adv64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64-gpu/cudnn_cnn64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64-gpu/cudnn_engines_precompiled64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64-gpu/cudnn_engines_runtime_compiled64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64-gpu/cudnn_graph64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64-gpu/cudnn_heuristic64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64-gpu/cudnn_ops64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64-gpu/cufft64_12.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64-gpu/jniopencv_calib3d.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64-gpu/jniopencv_core.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64-gpu/jniopencv_features2d.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64-gpu/jniopencv_flann.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64-gpu/jniopencv_highgui.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64-gpu/jniopencv_imgcodecs.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64-gpu/jniopencv_imgproc.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64-gpu/jniopencv_videoio.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64-gpu/nppc64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64-gpu/nppial64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64-gpu/nppicc64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64-gpu/nppicom64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64-gpu/nppidei64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64-gpu/nppif64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64-gpu/nppig64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64-gpu/nppim64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64-gpu/nppist64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64-gpu/nppisu64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64-gpu/nppitc64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64-gpu/npps64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64-gpu/opencv_calib3d4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64-gpu/opencv_core4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64-gpu/opencv_cudev4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64-gpu/opencv_features2d4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64-gpu/opencv_ffmpeg4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64-gpu/opencv_ffmpeg4130_64.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64-gpu/opencv_flann4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64-gpu/opencv_highgui4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64-gpu/opencv_imgcodecs4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64-gpu/opencv_imgproc4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64-gpu/opencv_videoio4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64-gpu/zlibwapi.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64/cublas64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64/cublasLt64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64/cudart64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64/cudnn64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64/cudnn_adv64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64/cudnn_cnn64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64/cudnn_engines_precompiled64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64/cudnn_engines_runtime_compiled64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64/cudnn_graph64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64/cudnn_heuristic64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64/cudnn_ops64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64/cufft64_12.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64/jniopencv_calib3d.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64/jniopencv_core.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64/jniopencv_features2d.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64/jniopencv_flann.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64/jniopencv_highgui.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64/jniopencv_imgcodecs.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64/jniopencv_imgproc.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64/jniopencv_videoio.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64/nppc64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64/nppial64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64/nppicc64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64/nppicom64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64/nppidei64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64/nppif64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64/nppig64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64/nppim64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64/nppist64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64/nppisu64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64/nppitc64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64/npps64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64/opencv_calib3d4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64/opencv_core4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64/opencv_cudev4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64/opencv_features2d4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64/opencv_ffmpeg4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64/opencv_ffmpeg4130_64.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64/opencv_flann4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64/opencv_highgui4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64/opencv_imgcodecs4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64/opencv_imgproc4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64/opencv_videoio4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/opencv/windows-x86_64/zlibwapi.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64-gpu/cublas64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64-gpu/cublasLt64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64-gpu/cudart64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64-gpu/cudnn64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64-gpu/cudnn_adv64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64-gpu/cudnn_cnn64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64-gpu/cudnn_engines_precompiled64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64-gpu/cudnn_engines_runtime_compiled64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64-gpu/cudnn_graph64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64-gpu/cudnn_heuristic64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64-gpu/cudnn_ops64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64-gpu/cufft64_12.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64-gpu/jniopencv_calib3d.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64-gpu/jniopencv_core.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64-gpu/jniopencv_features2d.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64-gpu/jniopencv_flann.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64-gpu/jniopencv_highgui.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64-gpu/jniopencv_imgcodecs.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64-gpu/jniopencv_imgproc.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64-gpu/jniopencv_videoio.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64-gpu/nppc64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64-gpu/nppial64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64-gpu/nppicc64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64-gpu/nppicom64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64-gpu/nppidei64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64-gpu/nppif64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64-gpu/nppig64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64-gpu/nppim64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64-gpu/nppist64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64-gpu/nppisu64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64-gpu/nppitc64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64-gpu/npps64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64-gpu/opencv_calib3d4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64-gpu/opencv_core4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64-gpu/opencv_cudev4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64-gpu/opencv_features2d4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64-gpu/opencv_ffmpeg4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64-gpu/opencv_ffmpeg4130_64.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64-gpu/opencv_flann4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64-gpu/opencv_highgui4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64-gpu/opencv_imgcodecs4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64-gpu/opencv_imgproc4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64-gpu/opencv_videoio4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64-gpu/zlibwapi.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/api-ms-win-core-console-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/api-ms-win-core-console-l1-2-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/api-ms-win-core-datetime-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/api-ms-win-core-debug-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/api-ms-win-core-errorhandling-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/api-ms-win-core-file-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/api-ms-win-core-file-l1-2-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/api-ms-win-core-file-l2-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/api-ms-win-core-handle-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/api-ms-win-core-heap-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/api-ms-win-core-interlocked-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/api-ms-win-core-libraryloader-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/api-ms-win-core-localization-l1-2-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/api-ms-win-core-memory-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/api-ms-win-core-namedpipe-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/api-ms-win-core-processenvironment-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/api-ms-win-core-processthreads-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/api-ms-win-core-processthreads-l1-1-1.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/api-ms-win-core-profile-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/api-ms-win-core-rtlsupport-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/api-ms-win-core-string-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/api-ms-win-core-synch-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/api-ms-win-core-synch-l1-2-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/api-ms-win-core-sysinfo-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/api-ms-win-core-timezone-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/api-ms-win-core-util-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/api-ms-win-crt-conio-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/api-ms-win-crt-convert-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/api-ms-win-crt-environment-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/api-ms-win-crt-filesystem-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/api-ms-win-crt-heap-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/api-ms-win-crt-locale-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/api-ms-win-crt-math-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/api-ms-win-crt-multibyte-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/api-ms-win-crt-private-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/api-ms-win-crt-process-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/api-ms-win-crt-runtime-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/api-ms-win-crt-stdio-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/api-ms-win-crt-string-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/api-ms-win-crt-time-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/api-ms-win-crt-utility-l1-1-0.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/concrt140.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/cublas64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/cublasLt64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/cudart64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/cudnn64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/cudnn_adv64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/cudnn_cnn64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/cudnn_engines_precompiled64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/cudnn_engines_runtime_compiled64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/cudnn_graph64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/cudnn_heuristic64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/cudnn_ops64_9.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/cufft64_12.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/jnijavacpp.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/libomp140.aarch64.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/libomp140.i386.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/libomp140.x86_64.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/msvcp140.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/msvcp140_1.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/msvcp140_2.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/nppc64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/nppial64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/nppicc64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/nppicom64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/nppidei64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/nppif64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/nppig64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/nppim64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/nppist64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/nppisu64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/nppitc64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/npps64_13.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/openblas.0.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/openblas.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/openblas.dll.0"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/openblas_nolapack.0.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/openblas_nolapack.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/openblas_nolapack.dll.0"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/opencv_cudev4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/opencv_ffmpeg4130.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/opencv_ffmpeg4130_64.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/ucrtbase.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/vcomp140.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/vcruntime140.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/vcruntime140_1.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/vcruntime140_threads.dll"
-    },
-    {
-      "glob": "org/bytedeco/windows-x86_64/zlibwapi.dll"
-    },
-    {
-      "glob": "org/windows-x86_64-gpu/cublas64_13.dll"
-    },
-    {
-      "glob": "org/windows-x86_64-gpu/cublasLt64_13.dll"
-    },
-    {
-      "glob": "org/windows-x86_64-gpu/cudart64_13.dll"
-    },
-    {
-      "glob": "org/windows-x86_64-gpu/cudnn64_9.dll"
-    },
-    {
-      "glob": "org/windows-x86_64-gpu/cudnn_adv64_9.dll"
-    },
-    {
-      "glob": "org/windows-x86_64-gpu/cudnn_cnn64_9.dll"
-    },
-    {
-      "glob": "org/windows-x86_64-gpu/cudnn_engines_precompiled64_9.dll"
-    },
-    {
-      "glob": "org/windows-x86_64-gpu/cudnn_engines_runtime_compiled64_9.dll"
-    },
-    {
-      "glob": "org/windows-x86_64-gpu/cudnn_graph64_9.dll"
-    },
-    {
-      "glob": "org/windows-x86_64-gpu/cudnn_heuristic64_9.dll"
-    },
-    {
-      "glob": "org/windows-x86_64-gpu/cudnn_ops64_9.dll"
-    },
-    {
-      "glob": "org/windows-x86_64-gpu/cufft64_12.dll"
-    },
-    {
-      "glob": "org/windows-x86_64-gpu/jniopencv_calib3d.dll"
-    },
-    {
-      "glob": "org/windows-x86_64-gpu/jniopencv_core.dll"
-    },
-    {
-      "glob": "org/windows-x86_64-gpu/jniopencv_features2d.dll"
-    },
-    {
-      "glob": "org/windows-x86_64-gpu/jniopencv_flann.dll"
-    },
-    {
-      "glob": "org/windows-x86_64-gpu/jniopencv_highgui.dll"
-    },
-    {
-      "glob": "org/windows-x86_64-gpu/jniopencv_imgcodecs.dll"
-    },
-    {
-      "glob": "org/windows-x86_64-gpu/jniopencv_imgproc.dll"
-    },
-    {
-      "glob": "org/windows-x86_64-gpu/jniopencv_videoio.dll"
-    },
-    {
-      "glob": "org/windows-x86_64-gpu/nppc64_13.dll"
-    },
-    {
-      "glob": "org/windows-x86_64-gpu/nppial64_13.dll"
-    },
-    {
-      "glob": "org/windows-x86_64-gpu/nppicc64_13.dll"
-    },
-    {
-      "glob": "org/windows-x86_64-gpu/nppicom64_13.dll"
-    },
-    {
-      "glob": "org/windows-x86_64-gpu/nppidei64_13.dll"
-    },
-    {
-      "glob": "org/windows-x86_64-gpu/nppif64_13.dll"
-    },
-    {
-      "glob": "org/windows-x86_64-gpu/nppig64_13.dll"
-    },
-    {
-      "glob": "org/windows-x86_64-gpu/nppim64_13.dll"
-    },
-    {
-      "glob": "org/windows-x86_64-gpu/nppist64_13.dll"
-    },
-    {
-      "glob": "org/windows-x86_64-gpu/nppisu64_13.dll"
-    },
-    {
-      "glob": "org/windows-x86_64-gpu/nppitc64_13.dll"
-    },
-    {
-      "glob": "org/windows-x86_64-gpu/npps64_13.dll"
-    },
-    {
-      "glob": "org/windows-x86_64-gpu/opencv_calib3d4130.dll"
-    },
-    {
-      "glob": "org/windows-x86_64-gpu/opencv_core4130.dll"
-    },
-    {
-      "glob": "org/windows-x86_64-gpu/opencv_cudev4130.dll"
-    },
-    {
-      "glob": "org/windows-x86_64-gpu/opencv_features2d4130.dll"
-    },
-    {
-      "glob": "org/windows-x86_64-gpu/opencv_ffmpeg4130.dll"
-    },
-    {
-      "glob": "org/windows-x86_64-gpu/opencv_ffmpeg4130_64.dll"
-    },
-    {
-      "glob": "org/windows-x86_64-gpu/opencv_flann4130.dll"
-    },
-    {
-      "glob": "org/windows-x86_64-gpu/opencv_highgui4130.dll"
-    },
-    {
-      "glob": "org/windows-x86_64-gpu/opencv_imgcodecs4130.dll"
-    },
-    {
-      "glob": "org/windows-x86_64-gpu/opencv_imgproc4130.dll"
-    },
-    {
-      "glob": "org/windows-x86_64-gpu/opencv_videoio4130.dll"
-    },
-    {
-      "glob": "org/windows-x86_64-gpu/zlibwapi.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/api-ms-win-core-console-l1-1-0.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/api-ms-win-core-console-l1-2-0.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/api-ms-win-core-datetime-l1-1-0.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/api-ms-win-core-debug-l1-1-0.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/api-ms-win-core-errorhandling-l1-1-0.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/api-ms-win-core-file-l1-1-0.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/api-ms-win-core-file-l1-2-0.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/api-ms-win-core-file-l2-1-0.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/api-ms-win-core-handle-l1-1-0.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/api-ms-win-core-heap-l1-1-0.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/api-ms-win-core-interlocked-l1-1-0.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/api-ms-win-core-libraryloader-l1-1-0.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/api-ms-win-core-localization-l1-2-0.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/api-ms-win-core-memory-l1-1-0.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/api-ms-win-core-namedpipe-l1-1-0.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/api-ms-win-core-processenvironment-l1-1-0.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/api-ms-win-core-processthreads-l1-1-0.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/api-ms-win-core-processthreads-l1-1-1.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/api-ms-win-core-profile-l1-1-0.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/api-ms-win-core-rtlsupport-l1-1-0.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/api-ms-win-core-string-l1-1-0.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/api-ms-win-core-synch-l1-1-0.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/api-ms-win-core-synch-l1-2-0.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/api-ms-win-core-sysinfo-l1-1-0.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/api-ms-win-core-timezone-l1-1-0.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/api-ms-win-core-util-l1-1-0.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/api-ms-win-crt-conio-l1-1-0.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/api-ms-win-crt-convert-l1-1-0.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/api-ms-win-crt-environment-l1-1-0.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/api-ms-win-crt-filesystem-l1-1-0.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/api-ms-win-crt-heap-l1-1-0.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/api-ms-win-crt-locale-l1-1-0.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/api-ms-win-crt-math-l1-1-0.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/api-ms-win-crt-multibyte-l1-1-0.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/api-ms-win-crt-private-l1-1-0.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/api-ms-win-crt-process-l1-1-0.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/api-ms-win-crt-runtime-l1-1-0.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/api-ms-win-crt-stdio-l1-1-0.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/api-ms-win-crt-string-l1-1-0.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/api-ms-win-crt-time-l1-1-0.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/api-ms-win-crt-utility-l1-1-0.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/concrt140.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/cublas64_13.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/cublasLt64_13.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/cudart64_13.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/cudnn64_9.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/cudnn_adv64_9.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/cudnn_cnn64_9.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/cudnn_engines_precompiled64_9.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/cudnn_engines_runtime_compiled64_9.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/cudnn_graph64_9.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/cudnn_heuristic64_9.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/cudnn_ops64_9.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/cufft64_12.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/jnijavacpp.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/libomp140.aarch64.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/libomp140.i386.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/libomp140.x86_64.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/msvcp140.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/msvcp140_1.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/msvcp140_2.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/nppc64_13.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/nppial64_13.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/nppicc64_13.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/nppicom64_13.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/nppidei64_13.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/nppif64_13.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/nppig64_13.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/nppim64_13.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/nppist64_13.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/nppisu64_13.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/nppitc64_13.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/npps64_13.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/openblas.0.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/openblas.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/openblas.dll.0"
-    },
-    {
-      "glob": "org/windows-x86_64/openblas_nolapack.0.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/openblas_nolapack.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/openblas_nolapack.dll.0"
-    },
-    {
-      "glob": "org/windows-x86_64/opencv_cudev4130.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/opencv_ffmpeg4130.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/opencv_ffmpeg4130_64.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/ucrtbase.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/vcomp140.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/vcruntime140.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/vcruntime140_1.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/vcruntime140_threads.dll"
-    },
-    {
-      "glob": "org/windows-x86_64/zlibwapi.dll"
-    },
-    {
       "glob": "prism_d3d.dll"
+    },
+    {
+      "glob": "sift/abseil_dll.dll"
+    },
+    {
+      "glob": "sift/concrt140.dll"
+    },
+    {
+      "glob": "sift/libprotobuf.dll"
+    },
+    {
+      "glob": "sift/msvcp140.dll"
+    },
+    {
+      "glob": "sift/msvcp140_1.dll"
+    },
+    {
+      "glob": "sift/msvcp140_2.dll"
+    },
+    {
+      "glob": "sift/msvcp140_atomic_wait.dll"
+    },
+    {
+      "glob": "sift/opencv_calib3d4.dll"
+    },
+    {
+      "glob": "sift/opencv_core4.dll"
+    },
+    {
+      "glob": "sift/opencv_dnn4.dll"
+    },
+    {
+      "glob": "sift/opencv_features2d4.dll"
+    },
+    {
+      "glob": "sift/opencv_flann4.dll"
+    },
+    {
+      "glob": "sift/opencv_imgproc4.dll"
+    },
+    {
+      "glob": "sift/opencv_xfeatures2d4.dll"
+    },
+    {
+      "glob": "sift/sift_match.exe"
+    },
+    {
+      "glob": "sift/vcruntime140.dll"
+    },
+    {
+      "glob": "sift/vcruntime140_1.dll"
+    },
+    {
+      "glob": "sift/vcruntime140_threads.dll"
+    },
+    {
+      "glob": "sift/zlib1.dll"
+    },
+    {
+      "glob": "dll/awt.dll"
+    },
+    {
+      "glob": "dll/fontmanager.dll"
+    },
+    {
+      "glob": "dll/freetype.dll"
+    },
+    {
+      "glob": "dll/java.dll"
+    },
+    {
+      "glob": "dll/javaaccessbridge.dll"
+    },
+    {
+      "glob": "dll/javajpeg.dll"
+    },
+    {
+      "glob": "dll/jawt.dll"
+    },
+    {
+      "glob": "dll/jvm.dll"
+    },
+    {
+      "glob": "dll/lcms.dll"
     },
     {
       "glob": "source/icon/player.png"
@@ -12512,7 +8830,679 @@
       "glob": "source/map/WorldMap_SIFT.png"
     },
     {
-      "glob": "source/map/WorldMap_Show.png"
+      "glob": "source/map/WorldMap_Show_tiles/0/11_19.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/11_20.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/11_21.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/11_22.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/11_23.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/11_24.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/11_25.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/11_26.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/11_27.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/12_18.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/12_19.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/12_20.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/12_21.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/12_22.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/12_23.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/12_24.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/12_25.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/12_26.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/12_27.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/13_13.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/13_14.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/13_15.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/13_16.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/13_17.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/13_18.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/13_19.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/13_20.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/13_21.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/13_22.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/13_23.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/13_24.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/13_25.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/13_26.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/13_27.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/13_28.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/13_29.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/13_30.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/14_13.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/14_14.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/14_15.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/14_16.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/14_17.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/14_18.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/14_19.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/14_20.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/14_21.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/14_22.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/14_23.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/14_24.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/14_25.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/14_26.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/14_27.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/14_28.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/14_29.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/14_30.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/15_13.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/15_14.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/15_15.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/15_16.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/15_17.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/15_18.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/15_19.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/15_20.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/15_21.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/15_22.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/15_23.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/15_24.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/15_25.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/15_26.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/15_27.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/15_28.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/15_29.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/15_30.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/15_31.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/16_13.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/16_14.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/16_15.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/16_16.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/16_17.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/16_18.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/16_19.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/16_20.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/16_21.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/16_22.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/16_23.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/16_24.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/16_25.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/16_26.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/16_27.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/16_28.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/16_29.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/16_30.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/16_31.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/17_13.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/17_14.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/17_15.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/17_16.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/17_17.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/17_18.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/17_19.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/17_20.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/17_21.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/17_22.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/17_23.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/17_24.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/17_25.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/17_26.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/17_27.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/17_28.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/17_29.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/17_30.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/17_31.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/18_13.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/18_14.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/18_15.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/18_16.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/18_17.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/18_18.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/18_19.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/18_20.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/18_21.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/18_22.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/18_23.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/18_24.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/18_25.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/18_26.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/18_27.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/18_28.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/18_29.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/18_30.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/18_31.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/19_13.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/19_14.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/19_15.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/19_16.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/19_17.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/19_18.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/19_19.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/19_20.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/19_21.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/19_22.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/19_23.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/19_24.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/19_25.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/19_26.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/19_27.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/19_28.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/19_29.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/19_30.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/19_31.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/20_13.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/20_14.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/20_15.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/20_16.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/20_17.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/20_18.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/20_19.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/20_20.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/20_21.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/20_22.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/20_23.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/20_24.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/20_25.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/20_26.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/20_27.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/20_28.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/20_29.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/20_30.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/20_31.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/21_18.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/21_19.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/21_20.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/21_21.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/21_22.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/21_23.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/21_24.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/21_25.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/21_26.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/21_27.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/21_28.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/21_29.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/21_30.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/21_31.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/22_19.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/22_20.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/22_21.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/22_22.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/22_23.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/22_24.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/22_25.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/22_26.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/22_27.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/22_28.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/22_29.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/22_30.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/22_31.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/23_21.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/23_22.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/23_23.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/23_24.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/23_25.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/23_26.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/23_27.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/23_28.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/23_29.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/23_30.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/3/0_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/3/0_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/3/0_2.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/3/0_3.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/3/1_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/3/1_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/3/1_2.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/3/1_3.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/3/2_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/3/2_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/3/2_2.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/3/2_3.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/3/3_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/3/3_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/3/3_2.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/3/3_3.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/tiles_meta.json"
+    },
+    {
+      "glob": "source/map/map_G.png"
+    },
+    {
+      "glob": "source/map/map_G_tiles/tiles_meta.json"
     },
     {
       "glob": "source/point/collect_set.txt"
@@ -12528,405 +9518,6 @@
     },
     {
       "glob": "vcruntime140_1.dll"
-    },
-    {
-      "glob": "win/amd64/libzstd-jni-1.5.6-2.dll"
-    },
-    {
-      "glob": "windows-x86_64-gpu/cublas64_13.dll"
-    },
-    {
-      "glob": "windows-x86_64-gpu/cublasLt64_13.dll"
-    },
-    {
-      "glob": "windows-x86_64-gpu/cudart64_13.dll"
-    },
-    {
-      "glob": "windows-x86_64-gpu/cudnn64_9.dll"
-    },
-    {
-      "glob": "windows-x86_64-gpu/cudnn_adv64_9.dll"
-    },
-    {
-      "glob": "windows-x86_64-gpu/cudnn_cnn64_9.dll"
-    },
-    {
-      "glob": "windows-x86_64-gpu/cudnn_engines_precompiled64_9.dll"
-    },
-    {
-      "glob": "windows-x86_64-gpu/cudnn_engines_runtime_compiled64_9.dll"
-    },
-    {
-      "glob": "windows-x86_64-gpu/cudnn_graph64_9.dll"
-    },
-    {
-      "glob": "windows-x86_64-gpu/cudnn_heuristic64_9.dll"
-    },
-    {
-      "glob": "windows-x86_64-gpu/cudnn_ops64_9.dll"
-    },
-    {
-      "glob": "windows-x86_64-gpu/cufft64_12.dll"
-    },
-    {
-      "glob": "windows-x86_64-gpu/jniopencv_calib3d.dll"
-    },
-    {
-      "glob": "windows-x86_64-gpu/jniopencv_core.dll"
-    },
-    {
-      "glob": "windows-x86_64-gpu/jniopencv_features2d.dll"
-    },
-    {
-      "glob": "windows-x86_64-gpu/jniopencv_flann.dll"
-    },
-    {
-      "glob": "windows-x86_64-gpu/jniopencv_highgui.dll"
-    },
-    {
-      "glob": "windows-x86_64-gpu/jniopencv_imgcodecs.dll"
-    },
-    {
-      "glob": "windows-x86_64-gpu/jniopencv_imgproc.dll"
-    },
-    {
-      "glob": "windows-x86_64-gpu/jniopencv_videoio.dll"
-    },
-    {
-      "glob": "windows-x86_64-gpu/nppc64_13.dll"
-    },
-    {
-      "glob": "windows-x86_64-gpu/nppial64_13.dll"
-    },
-    {
-      "glob": "windows-x86_64-gpu/nppicc64_13.dll"
-    },
-    {
-      "glob": "windows-x86_64-gpu/nppicom64_13.dll"
-    },
-    {
-      "glob": "windows-x86_64-gpu/nppidei64_13.dll"
-    },
-    {
-      "glob": "windows-x86_64-gpu/nppif64_13.dll"
-    },
-    {
-      "glob": "windows-x86_64-gpu/nppig64_13.dll"
-    },
-    {
-      "glob": "windows-x86_64-gpu/nppim64_13.dll"
-    },
-    {
-      "glob": "windows-x86_64-gpu/nppist64_13.dll"
-    },
-    {
-      "glob": "windows-x86_64-gpu/nppisu64_13.dll"
-    },
-    {
-      "glob": "windows-x86_64-gpu/nppitc64_13.dll"
-    },
-    {
-      "glob": "windows-x86_64-gpu/npps64_13.dll"
-    },
-    {
-      "glob": "windows-x86_64-gpu/opencv_calib3d4130.dll"
-    },
-    {
-      "glob": "windows-x86_64-gpu/opencv_core4130.dll"
-    },
-    {
-      "glob": "windows-x86_64-gpu/opencv_cudev4130.dll"
-    },
-    {
-      "glob": "windows-x86_64-gpu/opencv_features2d4130.dll"
-    },
-    {
-      "glob": "windows-x86_64-gpu/opencv_ffmpeg4130.dll"
-    },
-    {
-      "glob": "windows-x86_64-gpu/opencv_ffmpeg4130_64.dll"
-    },
-    {
-      "glob": "windows-x86_64-gpu/opencv_flann4130.dll"
-    },
-    {
-      "glob": "windows-x86_64-gpu/opencv_highgui4130.dll"
-    },
-    {
-      "glob": "windows-x86_64-gpu/opencv_imgcodecs4130.dll"
-    },
-    {
-      "glob": "windows-x86_64-gpu/opencv_imgproc4130.dll"
-    },
-    {
-      "glob": "windows-x86_64-gpu/opencv_videoio4130.dll"
-    },
-    {
-      "glob": "windows-x86_64-gpu/zlibwapi.dll"
-    },
-    {
-      "glob": "windows-x86_64/api-ms-win-core-console-l1-1-0.dll"
-    },
-    {
-      "glob": "windows-x86_64/api-ms-win-core-console-l1-2-0.dll"
-    },
-    {
-      "glob": "windows-x86_64/api-ms-win-core-datetime-l1-1-0.dll"
-    },
-    {
-      "glob": "windows-x86_64/api-ms-win-core-debug-l1-1-0.dll"
-    },
-    {
-      "glob": "windows-x86_64/api-ms-win-core-errorhandling-l1-1-0.dll"
-    },
-    {
-      "glob": "windows-x86_64/api-ms-win-core-file-l1-1-0.dll"
-    },
-    {
-      "glob": "windows-x86_64/api-ms-win-core-file-l1-2-0.dll"
-    },
-    {
-      "glob": "windows-x86_64/api-ms-win-core-file-l2-1-0.dll"
-    },
-    {
-      "glob": "windows-x86_64/api-ms-win-core-handle-l1-1-0.dll"
-    },
-    {
-      "glob": "windows-x86_64/api-ms-win-core-heap-l1-1-0.dll"
-    },
-    {
-      "glob": "windows-x86_64/api-ms-win-core-interlocked-l1-1-0.dll"
-    },
-    {
-      "glob": "windows-x86_64/api-ms-win-core-libraryloader-l1-1-0.dll"
-    },
-    {
-      "glob": "windows-x86_64/api-ms-win-core-localization-l1-2-0.dll"
-    },
-    {
-      "glob": "windows-x86_64/api-ms-win-core-memory-l1-1-0.dll"
-    },
-    {
-      "glob": "windows-x86_64/api-ms-win-core-namedpipe-l1-1-0.dll"
-    },
-    {
-      "glob": "windows-x86_64/api-ms-win-core-processenvironment-l1-1-0.dll"
-    },
-    {
-      "glob": "windows-x86_64/api-ms-win-core-processthreads-l1-1-0.dll"
-    },
-    {
-      "glob": "windows-x86_64/api-ms-win-core-processthreads-l1-1-1.dll"
-    },
-    {
-      "glob": "windows-x86_64/api-ms-win-core-profile-l1-1-0.dll"
-    },
-    {
-      "glob": "windows-x86_64/api-ms-win-core-rtlsupport-l1-1-0.dll"
-    },
-    {
-      "glob": "windows-x86_64/api-ms-win-core-string-l1-1-0.dll"
-    },
-    {
-      "glob": "windows-x86_64/api-ms-win-core-synch-l1-1-0.dll"
-    },
-    {
-      "glob": "windows-x86_64/api-ms-win-core-synch-l1-2-0.dll"
-    },
-    {
-      "glob": "windows-x86_64/api-ms-win-core-sysinfo-l1-1-0.dll"
-    },
-    {
-      "glob": "windows-x86_64/api-ms-win-core-timezone-l1-1-0.dll"
-    },
-    {
-      "glob": "windows-x86_64/api-ms-win-core-util-l1-1-0.dll"
-    },
-    {
-      "glob": "windows-x86_64/api-ms-win-crt-conio-l1-1-0.dll"
-    },
-    {
-      "glob": "windows-x86_64/api-ms-win-crt-convert-l1-1-0.dll"
-    },
-    {
-      "glob": "windows-x86_64/api-ms-win-crt-environment-l1-1-0.dll"
-    },
-    {
-      "glob": "windows-x86_64/api-ms-win-crt-filesystem-l1-1-0.dll"
-    },
-    {
-      "glob": "windows-x86_64/api-ms-win-crt-heap-l1-1-0.dll"
-    },
-    {
-      "glob": "windows-x86_64/api-ms-win-crt-locale-l1-1-0.dll"
-    },
-    {
-      "glob": "windows-x86_64/api-ms-win-crt-math-l1-1-0.dll"
-    },
-    {
-      "glob": "windows-x86_64/api-ms-win-crt-multibyte-l1-1-0.dll"
-    },
-    {
-      "glob": "windows-x86_64/api-ms-win-crt-private-l1-1-0.dll"
-    },
-    {
-      "glob": "windows-x86_64/api-ms-win-crt-process-l1-1-0.dll"
-    },
-    {
-      "glob": "windows-x86_64/api-ms-win-crt-runtime-l1-1-0.dll"
-    },
-    {
-      "glob": "windows-x86_64/api-ms-win-crt-stdio-l1-1-0.dll"
-    },
-    {
-      "glob": "windows-x86_64/api-ms-win-crt-string-l1-1-0.dll"
-    },
-    {
-      "glob": "windows-x86_64/api-ms-win-crt-time-l1-1-0.dll"
-    },
-    {
-      "glob": "windows-x86_64/api-ms-win-crt-utility-l1-1-0.dll"
-    },
-    {
-      "glob": "windows-x86_64/concrt140.dll"
-    },
-    {
-      "glob": "windows-x86_64/cublas64_13.dll"
-    },
-    {
-      "glob": "windows-x86_64/cublasLt64_13.dll"
-    },
-    {
-      "glob": "windows-x86_64/cudart64_13.dll"
-    },
-    {
-      "glob": "windows-x86_64/cudnn64_9.dll"
-    },
-    {
-      "glob": "windows-x86_64/cudnn_adv64_9.dll"
-    },
-    {
-      "glob": "windows-x86_64/cudnn_cnn64_9.dll"
-    },
-    {
-      "glob": "windows-x86_64/cudnn_engines_precompiled64_9.dll"
-    },
-    {
-      "glob": "windows-x86_64/cudnn_engines_runtime_compiled64_9.dll"
-    },
-    {
-      "glob": "windows-x86_64/cudnn_graph64_9.dll"
-    },
-    {
-      "glob": "windows-x86_64/cudnn_heuristic64_9.dll"
-    },
-    {
-      "glob": "windows-x86_64/cudnn_ops64_9.dll"
-    },
-    {
-      "glob": "windows-x86_64/cufft64_12.dll"
-    },
-    {
-      "glob": "windows-x86_64/jnijavacpp.dll"
-    },
-    {
-      "glob": "windows-x86_64/libomp140.aarch64.dll"
-    },
-    {
-      "glob": "windows-x86_64/libomp140.i386.dll"
-    },
-    {
-      "glob": "windows-x86_64/libomp140.x86_64.dll"
-    },
-    {
-      "glob": "windows-x86_64/msvcp140.dll"
-    },
-    {
-      "glob": "windows-x86_64/msvcp140_1.dll"
-    },
-    {
-      "glob": "windows-x86_64/msvcp140_2.dll"
-    },
-    {
-      "glob": "windows-x86_64/nppc64_13.dll"
-    },
-    {
-      "glob": "windows-x86_64/nppial64_13.dll"
-    },
-    {
-      "glob": "windows-x86_64/nppicc64_13.dll"
-    },
-    {
-      "glob": "windows-x86_64/nppicom64_13.dll"
-    },
-    {
-      "glob": "windows-x86_64/nppidei64_13.dll"
-    },
-    {
-      "glob": "windows-x86_64/nppif64_13.dll"
-    },
-    {
-      "glob": "windows-x86_64/nppig64_13.dll"
-    },
-    {
-      "glob": "windows-x86_64/nppim64_13.dll"
-    },
-    {
-      "glob": "windows-x86_64/nppist64_13.dll"
-    },
-    {
-      "glob": "windows-x86_64/nppisu64_13.dll"
-    },
-    {
-      "glob": "windows-x86_64/nppitc64_13.dll"
-    },
-    {
-      "glob": "windows-x86_64/npps64_13.dll"
-    },
-    {
-      "glob": "windows-x86_64/openblas.0.dll"
-    },
-    {
-      "glob": "windows-x86_64/openblas.dll"
-    },
-    {
-      "glob": "windows-x86_64/openblas.dll.0"
-    },
-    {
-      "glob": "windows-x86_64/openblas_nolapack.0.dll"
-    },
-    {
-      "glob": "windows-x86_64/openblas_nolapack.dll"
-    },
-    {
-      "glob": "windows-x86_64/openblas_nolapack.dll.0"
-    },
-    {
-      "glob": "windows-x86_64/opencv_cudev4130.dll"
-    },
-    {
-      "glob": "windows-x86_64/opencv_ffmpeg4130.dll"
-    },
-    {
-      "glob": "windows-x86_64/opencv_ffmpeg4130_64.dll"
-    },
-    {
-      "glob": "windows-x86_64/ucrtbase.dll"
-    },
-    {
-      "glob": "windows-x86_64/vcomp140.dll"
-    },
-    {
-      "glob": "windows-x86_64/vcruntime140.dll"
-    },
-    {
-      "glob": "windows-x86_64/vcruntime140_1.dll"
-    },
-    {
-      "glob": "windows-x86_64/vcruntime140_threads.dll"
-    },
-    {
-      "glob": "windows-x86_64/zlibwapi.dll"
     },
     {
       "module": "java.base",
@@ -12987,5 +9578,162 @@
     {
       "bundle": "sun.util.logging.resources.logging"
     }
-  ]
+  ],
+  "foreign": {
+    "downcalls": [
+      {
+        "returnType": "jint",
+        "parameterTypes": [
+          "void*",
+          "jint",
+          "jlong",
+          "void*",
+          "jlong",
+          "void*",
+          "void*"
+        ]
+      },
+      {
+        "returnType": "jint",
+        "parameterTypes": [
+          "void*",
+          "void*"
+        ]
+      },
+      {
+        "returnType": "jint",
+        "parameterTypes": [
+          "void*",
+          "void*",
+          "void*",
+          "void*",
+          "jint",
+          "jint",
+          "void*",
+          "void*",
+          "void*",
+          "void*"
+        ],
+        "options": {
+          "captureCallState": true
+        }
+      },
+      {
+        "returnType": "jint",
+        "parameterTypes": [
+          "jlong",
+          "void*"
+        ]
+      },
+      {
+        "returnType": "jlong",
+        "parameterTypes": [
+          "jint",
+          "jint",
+          "jint"
+        ]
+      },
+      {
+        "returnType": "jint",
+        "parameterTypes": [
+          "jlong"
+        ]
+      },
+      {
+        "returnType": "jint",
+        "parameterTypes": [
+          "jlong",
+          "void*",
+          "jint"
+        ]
+      },
+      {
+        "returnType": "jint",
+        "parameterTypes": [
+          "void*",
+          "jint",
+          "jint",
+          "void*"
+        ]
+      },
+      {
+        "returnType": "jint",
+        "parameterTypes": [
+          "jlong",
+          "void*",
+          "jint",
+          "void*",
+          "void*"
+        ]
+      },
+      {
+        "returnType": "void",
+        "parameterTypes": [
+          "void*"
+        ]
+      },
+      {
+        "returnType": "jint",
+        "parameterTypes": [
+          "jlong",
+          "jlong"
+        ]
+      },
+      {
+        "returnType": "jint",
+        "parameterTypes": [
+          "jlong",
+          "jint"
+        ]
+      },
+      {
+        "returnType": "jint",
+        "parameterTypes": [
+          "void*",
+          "void*",
+          "void*",
+          "jint"
+        ]
+      },
+      {
+        "returnType": "jint",
+        "parameterTypes": [
+          "jlong",
+          "jint",
+          "void*",
+          "jint"
+        ]
+      },
+      {
+        "returnType": "jint",
+        "parameterTypes": [
+          "jlong",
+          "jlong",
+          "void*"
+        ]
+      },
+      {
+        "returnType": "jint",
+        "parameterTypes": []
+      },
+      {
+        "returnType": "jlong",
+        "parameterTypes": [
+          "void*",
+          "void*"
+        ]
+      }
+    ],
+    "directUpcalls": [
+      {
+        "class": "com.luoke.app.capture.WindowFinder",
+        "method": "enumProcImpl",
+        "returnType": "jint",
+        "parameterTypes": [
+          "jlong",
+          "void*"
+        ]
+      }
+    ]
+  }
 }

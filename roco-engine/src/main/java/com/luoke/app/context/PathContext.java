@@ -82,7 +82,7 @@ public class PathContext {
 
     public boolean saveToLocal() {
         try {
-            File file = FileUtil.getExternalFile(ResourceConfigContext.getPaths());
+            File file = ResourceUtils.getExternalFile(ResourceConfigContext.getPaths());
             JsonUtils.getMapper().writerWithDefaultPrettyPrinter().writeValue(file, savedRoutes);
             this.currentMode = Mode.VIEW;
             log.info("路线已持久化");

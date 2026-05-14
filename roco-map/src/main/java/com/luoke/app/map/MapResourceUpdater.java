@@ -62,10 +62,10 @@ public final class MapResourceUpdater {
     public static final int READ = 30000;
 
     /** 最大重试次数 */
-    public static final int MAX_RETRY = 3;
+    public static final int MAX_RETRY = 1;
 
     /** 并发下载线程数 */
-    public static final int THREAD_COUNT = 16;
+    public static final int THREAD_COUNT = 32;
 
     /** 瓦片下载延迟（毫秒） */
     public static final long TILE_DELAY_MS = 30;

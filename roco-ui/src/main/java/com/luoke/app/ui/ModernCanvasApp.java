@@ -116,6 +116,9 @@ public class ModernCanvasApp extends Application {
 
     @Override
     public void start(Stage primaryStage) {
+
+        checkAndInitResourcesAsync(primaryStage);
+
         JobObjectManager.init();
 
         try {
@@ -124,8 +127,6 @@ public class ModernCanvasApp extends Application {
         } catch (Exception e) {
             log.error("SocketServer 启动失败", e);
         }
-
-        initSiftMatchClient();
 
         SwitchMapMatcher.getInstance().setSwitchCallback(newVariant -> {
             log.info("算法变体切换: {}", newVariant);
@@ -165,7 +166,6 @@ public class ModernCanvasApp extends Application {
         primaryStage.setScene(scene);
         primaryStage.show();
 
-        checkAndInitResourcesAsync(primaryStage);
     }
 
     private void initSiftMatchClient() {
@@ -185,37 +185,35 @@ public class ModernCanvasApp extends Application {
     }
 
     private void checkAndInitResourcesAsync(Stage primaryStage) {
-        Thread.ofVirtual().start(() -> {
-            try {
-                OcrAsyncManager.initialize(AppConfig.OCR_CORE_SIZE);
+        try {
+            OcrAsyncManager.initialize(AppConfig.OCR_CORE_SIZE);
 
-                File initFile = ResourceUtils.getExternalFile(AppConfig.SOURCE_INIT);
-                if (initFile.exists()) {
-                    publishInitStep(0.2, "初始化逻辑处理器...");
+            File initFile = ResourceUtils.getExternalFile(AppConfig.SOURCE_INIT);
+            if (initFile.exists()) {
+                publishInitStep(0.2, "初始化逻辑处理器...");
 
-                    publishInitStep(0.4, "正在载入地图元数据...");
-                    initMapMetadata();
+                publishInitStep(0.4, "正在载入地图元数据...");
+                initMapMetadata();
 
-                    publishInitStep(0.5, "正在验证地图瓦片...");
-                    if (ResourceConfigContext.getCurrentProfile() != ResourceConfigContext.ResourceProfile.INTERNAL) {
-                        //使用内置资源，不生成
-                        validateAndGenerateTiles();
-                    }
-
-                    publishInitStep(0.7, "构建坐标索引系统...");
-                    ResourcePointContext.getInstance().loadAndInit();
-
-                    publishInitStep(1.0, "核心引擎已就绪");
-                    Platform.runLater(() -> buildMainUI(primaryStage));
-                } else {
-                    handleFirstRun(primaryStage, initFile);
+                publishInitStep(0.5, "正在验证地图瓦片...");
+                if (ResourceConfigContext.getCurrentProfile() != ResourceConfigContext.ResourceProfile.INTERNAL) {
+                    //使用内置资源，不生成
+                    validateAndGenerateTiles();
                 }
-            } catch (Exception e) {
-                log.error("环境初始化致命异常: ", e);
-                HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION,
-                        new StatusEvent("核心服务启动失败: " + e.getMessage(), NotificationType.ERROR));
+
+                publishInitStep(0.7, "构建坐标索引系统...");
+                ResourcePointContext.getInstance().loadAndInit();
+
+                publishInitStep(1.0, "核心引擎已就绪");
+                Platform.runLater(() -> buildMainUI(primaryStage));
+            } else {
+                handleFirstRun(primaryStage, initFile);
             }
-        });
+        } catch (Exception e) {
+            log.error("环境初始化致命异常: ", e);
+            HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION,
+                    new StatusEvent("核心服务启动失败: " + e.getMessage(), NotificationType.ERROR));
+        }
     }
 
     private void handleFirstRun(Stage primaryStage, File initFile) {
@@ -361,6 +359,7 @@ public class ModernCanvasApp extends Application {
             uiAnimator.setupSidebarToggle(menuBtn, sidebar, floatContainer);
 
             // 核心服务
+            initSiftMatchClient();
             startCaptureWatchdog();
 
             // 启动渲染循环
