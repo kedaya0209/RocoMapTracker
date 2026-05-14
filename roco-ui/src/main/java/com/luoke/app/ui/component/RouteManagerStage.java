@@ -1,5 +1,6 @@
 package com.luoke.app.ui.component;
 
+import atlantafx.base.theme.Styles;
 import com.luoke.app.context.PathContext;
 import com.luoke.app.hook.HookEventType;
 import com.luoke.app.hook.event.NotificationType;
@@ -80,7 +81,13 @@ public class RouteManagerStage extends Stage {
     private void initUI() {
         VBox mainLayout = new VBox(15);
         mainLayout.setPadding(new Insets(15));
-        mainLayout.setStyle("-fx-background-color: #1e1e1e; -fx-background-radius: 12; -fx-border-color: #333333; -fx-border-radius: 12; -fx-border-width: 1.5;");
+        mainLayout.setStyle(
+                "-fx-background-color: -color-bg-default; " +
+                        "-fx-background-radius: 12; " +
+                        "-fx-border-color: -color-border-muted; " +
+                        "-fx-border-radius: 12; " +
+                        "-fx-border-width: 1.5;"
+        );
 
         // --- 标题栏 ---
         HBox titleBar = new HBox();
@@ -88,13 +95,14 @@ public class RouteManagerStage extends Stage {
         titleBar.setCursor(javafx.scene.Cursor.MOVE);
 
         Label titleLabel = new Label("路线管理工具");
-        titleLabel.setStyle("-fx-text-fill: white; -fx-font-weight: bold; -fx-font-size: 14px;");
+        titleLabel.setStyle("-fx-text-fill: -color-fg-default; -fx-font-weight: bold; -fx-font-size: 14px;");
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
         Button closeBtn = new Button("×");
-        closeBtn.setStyle("-fx-background-color: transparent; -fx-text-fill: #888888; -fx-font-size: 20px; -fx-cursor: hand;");
+        closeBtn.getStyleClass().addAll(Styles.BUTTON_CIRCLE, Styles.FLAT);
+        closeBtn.setStyle("-fx-font-size: 18px;");
         closeBtn.setOnAction(e -> this.hide());
 
         titleBar.getChildren().addAll(titleLabel, spacer, closeBtn);
@@ -108,6 +116,10 @@ public class RouteManagerStage extends Stage {
             this.setY(event.getScreenY() - yOffset);
         });
 
+        // --- 说明文字 ---
+        Label hintLabel = new Label("路线列表 (单击选中，双击修改，右键删除):");
+        hintLabel.setStyle("-fx-text-fill: -color-fg-muted; -fx-font-size: 12px;");
+
         // --- 路线列表 ---
         PathContext pc = PathContext.getInstance();
         ObservableList<RoutePath> routeItems = FXCollections.observableArrayList(pc.getSavedRoutes());
@@ -115,12 +127,16 @@ public class RouteManagerStage extends Stage {
         listView.setItems(routeItems);
         listView.setPrefHeight(200);
         VBox.setVgrow(listView, Priority.ALWAYS);
-        listView.setStyle("-fx-background-color: #252525; -fx-control-inner-background: #252525; -fx-background-insets: 0;");
+        listView.setStyle(
+                "-fx-background-color: -color-bg-inset; " +
+                        "-fx-control-inner-background: -color-bg-inset; " +
+                        "-fx-background-insets: 0;"
+        );
 
         // 右键菜单
         ContextMenu contextMenu = new ContextMenu();
         MenuItem deleteItem = new MenuItem("删除路线");
-        deleteItem.setStyle("-fx-text-fill: #ff4444;");
+        deleteItem.setStyle("-fx-text-fill: -color-danger-fg;");
         deleteItem.setOnAction(e -> handleDelete());
         contextMenu.getItems().add(deleteItem);
         listView.setContextMenu(contextMenu);
@@ -135,8 +151,7 @@ public class RouteManagerStage extends Stage {
                     setStyle("-fx-background-color: transparent;");
                 } else {
                     setText(item.getName());
-                    setTextFill(Color.WHITE);
-                    setStyle("-fx-background-color: transparent; -fx-padding: 5 10;");
+                    setStyle("-fx-text-fill: -color-fg-default; -fx-background-color: transparent; -fx-padding: 5 10;");
                 }
             }
         });
@@ -156,16 +171,16 @@ public class RouteManagerStage extends Stage {
         btnGrid.setHgap(10);
         btnGrid.setVgap(10);
 
-        Button drawBtn = createActionBtn("绘制路线", "#4CAF50");
+        Button drawBtn = createActionBtn("绘制路线", Styles.SUCCESS);
         drawBtn.setOnAction(e -> PathContext.getInstance().startNewRoute());
 
-        Button saveBtn = createActionBtn("保存当前", "#2196F3");
-        saveBtn.setOnAction(e -> handleSave()); // 传入外部容器
+        Button saveBtn = createActionBtn("保存当前", Styles.ACCENT);
+        saveBtn.setOnAction(e -> handleSave());
 
-        Button importBtn = createActionBtn("导入路线", "#555555");
+        Button importBtn = createActionBtn("导入路线", null);
         importBtn.setOnAction(e -> handleImport());
 
-        Button exportBtn = createActionBtn("导出路线", "#555555");
+        Button exportBtn = createActionBtn("导出路线", null);
         exportBtn.setOnAction(e -> handleExport());
 
         btnGrid.add(drawBtn, 0, 0);
@@ -177,18 +192,20 @@ public class RouteManagerStage extends Stage {
         cc.setPercentWidth(50);
         btnGrid.getColumnConstraints().addAll(cc, cc);
 
-        mainLayout.getChildren().addAll(titleBar, new Label("路线列表 (单机选中，双击修改，右键删除):"), listView, btnGrid);
+        mainLayout.getChildren().addAll(titleBar, hintLabel, listView, btnGrid);
 
-        // 管理窗口本身的布局（不需要再包一层 StackPane，因为 Dialog 现在要去 rootContainer 弹）
         Scene scene = new Scene(mainLayout, 340, 480);
         scene.setFill(Color.TRANSPARENT);
         setScene(scene);
     }
 
-    private Button createActionBtn(String text, String color) {
+    private Button createActionBtn(String text, String styleClass) {
         Button btn = new Button(text);
         btn.setMaxWidth(Double.MAX_VALUE);
-        btn.setStyle(String.format("-fx-background-color: %s; -fx-text-fill: white; -fx-background-radius: 4; -fx-padding: 8; -fx-cursor: hand;", color));
+        btn.getStyleClass().add(Styles.BUTTON_OUTLINED);
+        if (styleClass != null) {
+            btn.getStyleClass().add(styleClass);
+        }
         return btn;
     }
 
@@ -208,11 +225,11 @@ public class RouteManagerStage extends Stage {
         content.setStyle("-fx-padding: 20;");
 
         Label label = new Label("请输入路线名称：");
-        label.setStyle("-fx-text-fill: white; -fx-font-size: 14px;");
+        label.setStyle("-fx-text-fill: -color-fg-default; -fx-font-size: 14px;");
 
         TextField nameField = new TextField(active.getName() != null ? active.getName() : "新建路线");
         nameField.setPrefWidth(300);
-        nameField.setStyle("-fx-background-color: #252525; -fx-text-fill: white; -fx-border-color: #333; -fx-border-radius: 4;");
+        nameField.setStyle("-fx-background-color: -color-bg-inset; -fx-text-fill: -color-fg-default; -fx-border-color: -color-border-muted; -fx-border-radius: 4;");
 
         content.getChildren().addAll(label, nameField);
 
@@ -278,21 +295,23 @@ public class RouteManagerStage extends Stage {
         content.setStyle("-fx-padding: 10;");
 
         Label tipLabel = new Label(String.format("解析成功，发现 %d 条路线：", importedPaths.size()));
-        tipLabel.setStyle("-fx-text-fill: #BBBBBB; -fx-font-size: 13px;");
+        tipLabel.setStyle("-fx-text-fill: -color-fg-muted; -fx-font-size: 13px;");
 
         VBox listContainer = new VBox(5);
         for (RoutePath path : importedPaths) {
             Label nameLabel = new Label(" • " + (path.getName() != null ? path.getName() : "未命名路线"));
-            nameLabel.setStyle("-fx-text-fill: white;");
+            nameLabel.setStyle("-fx-text-fill: -color-fg-default;");
             listContainer.getChildren().add(nameLabel);
         }
 
         ScrollPane scrollPane = new ScrollPane(listContainer);
         scrollPane.setPrefHeight(150);
         scrollPane.setFitToWidth(true);
-        scrollPane.setStyle("-fx-background: transparent; -fx-background-color: transparent; -fx-border-color: #333;");
+        scrollPane.setStyle("-fx-background: transparent; -fx-background-color: transparent; -fx-border-color: -color-border-muted;");
 
-        content.getChildren().addAll(tipLabel, scrollPane, new Label("确定要导入这些路线吗？"));
+        Label confirmLabel = new Label("确定要导入这些路线吗？");
+        confirmLabel.setStyle("-fx-text-fill: -color-fg-muted;");
+        content.getChildren().addAll(tipLabel, scrollPane, confirmLabel);
 
         DialogUtils.showConfirmDialog(
                 rootContainer, // 在画布上弹

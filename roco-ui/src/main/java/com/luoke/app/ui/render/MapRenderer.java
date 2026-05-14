@@ -537,7 +537,9 @@ public class MapRenderer {
             Point pos = rp.getScreenPosition();
             double dx = pos.getX() - playerX;
             double dy = pos.getY() - playerY;
-            if (dx * dx + dy * dy < r2) {
+            String name = rp.getConfig().getMarkTypeName();
+            //在半径，且能被收集的误判才可以置灰
+            if (dx * dx + dy * dy < r2 && ResourcePointContext.getInstance().isCollect(name)) {
                 rp.setGrayed(true);
                 grayedSet.add(rp);
                 result.add(rp);
