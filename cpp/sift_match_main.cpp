@@ -52,6 +52,7 @@
 #include <thread>
 #include <vector>
 #include <cmath>
+#include <exception>
 #include <fstream>
 
 #pragma comment(lib, "ws2_32.lib")
@@ -542,19 +543,39 @@ private:
 static void apply_circle_mask(uint8_t* data, int w, int h,
                                double center_x, double center_y, int radius) {
     double r2 = (double)radius * radius;
-    for (int y = 0; y < h; y++) {
-        int offset = y * w;
+
+    // 计算圆覆盖的 y 范围，超出范围的整行直接批量清零
+    int min_y = std::max(0, (int)std::ceil(center_y - radius));
+    int max_y = std::min(h - 1, (int)std::floor(center_y + radius));
+
+    // 圆上方全部清零
+    if (min_y > 0) {
+        memset(data, 0, (size_t)min_y * w);
+    }
+
+    // LUT: 预计算每个 |dy| 对应的水平跨度，避免逐行 sqrt
+    // radius 最大 ~100px，LUT 开销可忽略
+    int lut_size = std::max(0, max_y - min_y + 1);
+    std::vector<double> dx_lut(lut_size);
+    for (int i = 0; i < lut_size; i++) {
+        int y = min_y + i;
         double dy = y - center_y;
         double dy2 = dy * dy;
+        dx_lut[i] = (dy2 < r2) ? std::sqrt(r2 - dy2) : 0.0;
+    }
 
-        if (dy2 >= r2) {
+    for (int i = 0; i < lut_size; i++) {
+        int y = min_y + i;
+        int offset = y * w;
+        double dx_span = dx_lut[i];
+
+        if (dx_span <= 0.0) {
             memset(data + offset, 0, w);
             continue;
         }
 
-        double dx_span = sqrt(r2 - dy2);
-        int left = (int)ceil(center_x - dx_span);
-        int right = (int)floor(center_x + dx_span);
+        int left = (int)std::ceil(center_x - dx_span);
+        int right = (int)std::floor(center_x + dx_span);
         int safe_left = std::max(0, left);
         int safe_right = std::min(w - 1, right);
 
@@ -564,6 +585,11 @@ static void apply_circle_mask(uint8_t* data, int w, int h,
         if (safe_right < w - 1) {
             memset(data + offset + safe_right + 1, 0, w - safe_right - 1);
         }
+    }
+
+    // 圆下方全部清零
+    if (max_y < h - 1) {
+        memset(data + (size_t)(max_y + 1) * w, 0, (size_t)(h - 1 - max_y) * w);
     }
 }
 
@@ -581,6 +607,13 @@ public:
     std::vector<cv::Point2f> map_keypoint_pts;
 
     cv::Mat train_descriptors; // CV_32F
+
+    // 复用容器，避免每帧堆分配
+    std::vector<std::vector<cv::DMatch>> knn_matches;
+    std::vector<cv::DMatch> good_matches;
+    std::vector<cv::DMatch> filtered_matches;
+    std::vector<cv::Point2f> src_pts;
+    std::vector<cv::Point2f> dst_pts;
 
     // Algorithm params
     float match_ratio_threshold = 0.6f;
@@ -651,6 +684,9 @@ public:
         flann_matcher->add(train_vec);
         flann_matcher->train();
 
+        // FLANN 已深拷贝数据到 KD-tree 索引，原始描述符不再需要
+        train_descriptors = cv::Mat();
+
         LOG("SIFT trained: %zu features", map_keypoints.size());
         return true;
     }
@@ -670,6 +706,11 @@ public:
         flann_matcher->add(train_vec);
         flann_matcher->train();
 
+        // FLANN 已深拷贝数据到 KD-tree 索引，原始描述符不再需要
+        train_descriptors = cv::Mat();
+        // 缓存命中: 描述符已从文件加载完毕，persistent_mat 也可释放
+        transform->persistent_mat = cv::Mat();
+
         // Build keypoint coords from stored keypoints
         map_keypoint_pts.reserve(map_keypoints.size());
         for (auto& kp : map_keypoints) {
@@ -686,12 +727,14 @@ public:
         double y = 0;
     };
 
-    // Match a frame (gray8 pixels), optionally with spatial hint
+    // Match a frame (gray8 pixels), optionally with spatial hint.
+    // 注意: scene_img 不拷贝 data，仅别名外部 buffer。
+    // 调用方必须保证 data 在 match() 返回前有效（当前为同步调用，满足此约束）。
     MatchResult match(uint8_t* data, int w, int h, double hint_x, double hint_y) {
         MatchResult res{};
         if (!flann_matcher) return res;
 
-        cv::Mat scene_img(h, w, CV_8UC1, data);
+        cv::Mat scene_img(h, w, CV_8UC1, data);  // 非拷贝，别名 data
 
         // SIFT detect + compute on scene
         std::vector<cv::KeyPoint> scene_kps;
@@ -709,11 +752,11 @@ public:
         cv::Mat query_desc = transform->process(scene_descriptors);
 
         // FLANN knnMatch
-        std::vector<std::vector<cv::DMatch>> knn_matches;
+        knn_matches.clear();
         flann_matcher->knnMatch(query_desc, knn_matches, 2);
 
         // Ratio test (Lowe)
-        std::vector<cv::DMatch> good_matches;
+        good_matches.clear();
         for (auto& knn : knn_matches) {
             if (knn.size() >= 2 && knn[0].distance < match_ratio_threshold * knn[1].distance) {
                 good_matches.push_back(knn[0]);
@@ -723,7 +766,7 @@ public:
         // Spatial filter: if hint available, exclude matches far from predicted position
         bool has_hint = !std::isnan(hint_x) && !std::isnan(hint_y)
                      && hint_x >= -1e9 && hint_y >= -1e9;
-        std::vector<cv::DMatch> filtered_matches;
+        filtered_matches.clear();
         if (has_hint) {
             for (auto& dm : good_matches) {
                 if (dm.trainIdx >= 0 && dm.trainIdx < (int)map_keypoint_pts.size()) {
@@ -744,7 +787,8 @@ public:
         if (filtered_matches.size() < (size_t)match_min_count) return res;
 
         // Build point sets for RANSAC homography
-        std::vector<cv::Point2f> src_pts, dst_pts;
+        src_pts.clear();
+        dst_pts.clear();
         for (auto& dm : filtered_matches) {
             if (dm.queryIdx >= 0 && dm.queryIdx < (int)scene_kps.size()
                 && dm.trainIdx >= 0 && dm.trainIdx < (int)map_keypoint_pts.size()) {
@@ -828,9 +872,12 @@ static constexpr uint32_t CACHE_MAGIC = 0x53494654; // "SIFT"
 static constexpr int32_t CACHE_VERSION = 1;
 
 static bool save_cache_file(const std::string& path, SiftMatcher& matcher) {
-    FILE* f = fopen(path.c_str(), "wb");
+    // 原子写入: 先写临时文件，成功后再 rename，防止写入中途崩溃产生损坏文件
+    std::string tmpPath = path + ".tmp";
+
+    FILE* f = fopen(tmpPath.c_str(), "wb");
     if (!f) {
-        LOGERR("Failed to create cache file: %s", path.c_str());
+        LOGERR("Failed to create cache temp file: %s", tmpPath.c_str());
         return false;
     }
 
@@ -855,7 +902,20 @@ static bool save_cache_file(const std::string& path, SiftMatcher& matcher) {
         fwrite(&y, 4, 1, f);
     }
 
-    fclose(f);
+    if (fclose(f) != 0) {
+        LOGERR("Failed to close cache temp file: %s", tmpPath.c_str());
+        DeleteFileA(tmpPath.c_str());
+        return false;
+    }
+
+    // Windows rename 不覆盖已有文件，先删除再改名
+    DeleteFileA(path.c_str());
+    if (rename(tmpPath.c_str(), path.c_str()) != 0) {
+        LOGERR("Failed to rename cache file: %s -> %s", tmpPath.c_str(), path.c_str());
+        DeleteFileA(tmpPath.c_str());
+        return false;
+    }
+
     LOG("Cache saved: %s (%d features)", path.c_str(), kpCount);
     return true;
 }
@@ -1098,6 +1158,8 @@ int main(int argc, char* argv[]) {
                 CreateDirectoryA(dir.c_str(), nullptr);
             }
             save_cache_file(params.cacheFilePath, matcher);
+            // 缓存已写入磁盘，持久化描述符可释放 (~42MB CV_8U)
+            matcher.transform->persistent_mat = cv::Mat();
         }
     }
 
@@ -1170,38 +1232,52 @@ int main(int argc, char* argv[]) {
         uint8_t* pixels = recv_body.data() + 28;
 
         // ---- Process frame ----
-        SiftMatcher::MatchResult match_res;
+        try {
+            SiftMatcher::MatchResult match_res;
 
-        // 1. Minimap detection
-        auto detection = minimap.detect(pixels, fw, fh);
-        if (!detection.success) {
-            // Send failure quickly, minimap not found
-            auto result_buf = serialize_result(false, 0, 0,
+            // 1. Minimap detection
+            auto detection = minimap.detect(pixels, fw, fh);
+            if (!detection.success) {
+                // Send failure quickly, minimap not found
+                auto result_buf = serialize_result(false, 0, 0,
+                    std::numeric_limits<double>::quiet_NaN());
+                if (!send_message(sock, MATCH_RESULT, result_buf.data(), (uint32_t)result_buf.size())) {
+                    LOG("Socket send failed (RESULT)");
+                    break;
+                }
+                if (frame_count % 100 == 0) {
+                    LOG("frames=%lld (minimap detection failures)", (long long)frame_count);
+                }
+                continue;
+            }
+
+            // 2. Apply circle mask
+            apply_circle_mask(pixels, fw, fh, detection.center_x, detection.center_y, detection.radius);
+
+            // 3. SIFT matching (arrow angle detached to separate process, always NaN)
+            match_res = matcher.match(pixels, fw, fh, hint_x, hint_y);
+
+            if (match_res.success) success_count++;
+
+            // 4. Send result (angle always NaN for now)
+            auto result_buf = serialize_result(match_res.success, match_res.x, match_res.y,
                 std::numeric_limits<double>::quiet_NaN());
             if (!send_message(sock, MATCH_RESULT, result_buf.data(), (uint32_t)result_buf.size())) {
                 LOG("Socket send failed (RESULT)");
                 break;
             }
-            if (frame_count % 100 == 0) {
-                LOG("frames=%lld (minimap detection failures)", (long long)frame_count);
-            }
-            continue;
-        }
-
-        // 2. Apply circle mask
-        apply_circle_mask(pixels, fw, fh, detection.center_x, detection.center_y, detection.radius);
-
-        // 3. SIFT matching (arrow angle detached to separate process, always NaN)
-        match_res = matcher.match(pixels, fw, fh, hint_x, hint_y);
-
-        if (match_res.success) success_count++;
-
-        // 4. Send result (angle always NaN for now)
-        auto result_buf = serialize_result(match_res.success, match_res.x, match_res.y,
-            std::numeric_limits<double>::quiet_NaN());
-        if (!send_message(sock, MATCH_RESULT, result_buf.data(), (uint32_t)result_buf.size())) {
-            LOG("Socket send failed (RESULT)");
-            break;
+        } catch (const cv::Exception& e) {
+            LOGERR("OpenCV exception in frame %lld: %s (code=%d)",
+                (long long)frame_count, e.what(), e.code);
+            // 发送失败结果，不中断匹配循环
+            auto result_buf = serialize_result(false, 0, 0,
+                std::numeric_limits<double>::quiet_NaN());
+            send_message(sock, MATCH_RESULT, result_buf.data(), (uint32_t)result_buf.size());
+        } catch (const std::exception& e) {
+            LOGERR("Unexpected exception in frame %lld: %s", (long long)frame_count, e.what());
+            auto result_buf = serialize_result(false, 0, 0,
+                std::numeric_limits<double>::quiet_NaN());
+            send_message(sock, MATCH_RESULT, result_buf.data(), (uint32_t)result_buf.size());
         }
 
         // Diagnostic

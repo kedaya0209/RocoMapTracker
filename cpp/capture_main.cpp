@@ -28,6 +28,7 @@
 #include <winstring.h>
 #include <winsock2.h>
 #include <ws2tcpip.h>
+#include <timeapi.h>
 
 #include <windows.graphics.capture.h>
 #include <Windows.Graphics.Capture.Interop.h>
@@ -52,6 +53,7 @@
 #pragma comment(lib, "runtimeobject.lib")
 #pragma comment(lib, "user32.lib")
 #pragma comment(lib, "ws2_32.lib")
+#pragma comment(lib, "winmm.lib")
 
 using Microsoft::WRL::ComPtr;
 
@@ -225,8 +227,17 @@ static void serialize_frame_body(
     size_t roi_count,
     std::vector<uint8_t>& out)
 {
-    out.clear();
     if (roi_count > 65535) roi_count = 65535;
+
+    // 预计算总大小，避免多次扩容
+    size_t total = 2; // roi_count header
+    for (size_t i = 0; i < roi_count; i++) {
+        if (!roi_data[i].empty()) {
+            total += 11 + roi_data[i].size(); // per-ROI header + pixel data
+        }
+    }
+    out.clear();
+    out.reserve(total);
 
     // roi_count
     {
@@ -272,9 +283,13 @@ public:
     ComPtr<WGC::IDirect3D11CaptureFramePool> frame_pool;
     ComPtr<WGC::IGraphicsCaptureSession> session;
 
-    // Staging texture (GPU->CPU readback, reused across frames)
-    ComPtr<ID3D11Texture2D> staging_tex;
-    UINT staging_w = 0, staging_h = 0;
+    // Per-ROI small staging textures (GPU->CPU readback)
+    // 只拷贝 ROI 区域，避免全帧 8MB+ 的回读瓶颈
+    struct RoiStaging {
+        ComPtr<ID3D11Texture2D> tex;
+        UINT w = 0, h = 0;
+    };
+    std::vector<RoiStaging> roi_stagings;
     UINT frame_w = 0, frame_h = 0;
     HWND m_hwnd = nullptr;
     std::atomic<bool> need_recreate{false};
@@ -295,6 +310,7 @@ public:
     int64_t frame_count = 0;
     int64_t close_success = 0;
     int64_t close_fail = 0;
+    int64_t frame_drop = 0;  // send thread 消费不及时导致的丢帧
 
     // FPS limiting
     std::chrono::steady_clock::time_point last_frame_time;
@@ -417,7 +433,7 @@ public:
         session.Reset();
         frame_pool.Reset();
         capture_item.Reset();
-        staging_tex.Reset();
+        roi_stagings.clear();
         d3d_context.Reset();
         d3d_device.Reset();
     }
@@ -440,10 +456,8 @@ public:
             frame_pool.Reset();
         }
 
-        // 2. Reset staging (will be recreated with new size)
-        staging_tex.Reset();
-        staging_w = 0;
-        staging_h = 0;
+        // 2. Reset per-ROI staging textures (will be recreated with new size)
+        roi_stagings.clear();
 
         // 3. Get WinRT device from existing D3D device
         ComPtr<IDXGIDevice> dxgi_dev;
@@ -515,8 +529,18 @@ public:
             // 帧尺寸变化 → 安全时机重建 Frame Pool
             if (need_recreate.load(std::memory_order_acquire)) {
                 recreate_count++;
-                if (!RecreatePool(new_pool_w, new_pool_h)) {
-                    LOGERR("RecreatePool failed, stopping capture");
+                // 重试最多 3 次，间隔 500ms
+                bool ok = false;
+                for (int retry = 0; retry < 3; retry++) {
+                    if (RecreatePool(new_pool_w, new_pool_h)) {
+                        ok = true;
+                        break;
+                    }
+                    LOGERR("RecreatePool attempt %d/3 failed, retrying...", retry + 1);
+                    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+                }
+                if (!ok) {
+                    LOGERR("RecreatePool failed after 3 retries, stopping capture");
                     g_running.store(false, std::memory_order_release);
                     break;
                 }
@@ -605,6 +629,9 @@ public:
             // Swap into cache (overwrite if send thread hasn't consumed previous)
             {
                 std::lock_guard lk(cache.mtx);
+                if (cache.ready) {
+                    frame_drop++;  // send thread 未及时消费上一帧
+                }
                 cache.data = std::move(body);
                 cache.ready = true;
             }
@@ -613,25 +640,29 @@ public:
             // Diagnostic log every 500 frames
             if (frame_count % 500 == 0) {
                 SIZE_T ws_mb = get_process_ws() / (1024 * 1024);
-                LOG("frames=%lld mem=%zuMB close_ok=%lld",
-                    (long long)frame_count, ws_mb, (long long)close_success);
+                LOG("frames=%lld mem=%zuMB close_ok=%lld drop=%lld",
+                    (long long)frame_count, ws_mb, (long long)close_success, (long long)frame_drop);
             }
         }
 
         SIZE_T ws_mb = get_process_ws() / (1024 * 1024);
-        LOG("capture_loop exit: frames=%lld ws=%zuMB",
-            (long long)frame_count, ws_mb);
+        LOG("capture_loop exit: frames=%lld ws=%zuMB drop=%lld",
+            (long long)frame_count, ws_mb, (long long)frame_drop);
 
         g_running.store(false, std::memory_order_release);
         cache.cv.notify_all();
     }
 
 private:
-    // ---- Ensure staging texture matches frame size ----
-    HRESULT EnsureStaging(UINT w, UINT h) {
-        if (staging_tex && staging_w == w && staging_h == h) return S_OK;
-        staging_tex.Reset();
-        staging_w = staging_h = 0;
+    // ---- Ensure a small staging texture for a specific ROI ----
+    HRESULT EnsureRoiStaging(size_t index, UINT w, UINT h) {
+        if (index >= roi_stagings.size()) {
+            roi_stagings.resize(index + 1);
+        }
+        auto& rs = roi_stagings[index];
+        if (rs.tex && rs.w == w && rs.h == h) return S_OK;
+        rs.tex.Reset();
+        rs.w = rs.h = 0;
         D3D11_TEXTURE2D_DESC desc = {};
         desc.Width = w;
         desc.Height = h;
@@ -641,12 +672,13 @@ private:
         desc.SampleDesc.Count = 1;
         desc.Usage = D3D11_USAGE_STAGING;
         desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
-        HRESULT hr = d3d_device->CreateTexture2D(&desc, nullptr, &staging_tex);
-        if (SUCCEEDED(hr)) { staging_w = w; staging_h = h; }
+        HRESULT hr = d3d_device->CreateTexture2D(&desc, nullptr, &rs.tex);
+        if (SUCCEEDED(hr)) { rs.w = w; rs.h = h; }
         return hr;
     }
 
     // ---- Extract ROIs from a D3D11 frame texture ----
+    // 只拷贝 ROI 区域到小 staging 纹理，避免全帧 GPU→CPU 回读瓶颈
     bool ProcessFrame(ID3D11Texture2D* frame_texture) {
         D3D11_TEXTURE2D_DESC desc;
         frame_texture->GetDesc(&desc);
@@ -670,14 +702,6 @@ private:
         UINT content_h = fh;
         if ((UINT)caption_px < fh) content_h = fh - (UINT)caption_px;
 
-        if (FAILED(EnsureStaging(fw, fh))) return false;
-
-        d3d_context->CopyResource(staging_tex.Get(), frame_texture);
-
-        D3D11_MAPPED_SUBRESOURCE mapped = {};
-        HRESULT hr = d3d_context->Map(staging_tex.Get(), 0, D3D11_MAP_READ, 0, &mapped);
-        if (FAILED(hr)) return false;
-
         // Snapshot ROI list (shared lock)
         std::vector<ROI> roi_snap;
         {
@@ -690,11 +714,6 @@ private:
         roi_buf_w.resize(nrois);
         roi_buf_h.resize(nrois);
 
-        const uint8_t* src = static_cast<const uint8_t*>(mapped.pData)
-                             + (size_t)caption_px * mapped.RowPitch;
-        UINT pitch = mapped.RowPitch;
-        const size_t total_bytes = (size_t)pitch * fh;
-
         for (size_t i = 0; i < nrois; i++) {
             const ROI& r = roi_snap[i];
 
@@ -702,9 +721,8 @@ private:
             int ry = (int)((int64_t)r.y * content_h / 10000);
             int rw = (int)((int64_t)r.w * fw / 10000);
             int rh = (r.h == 0) ? rw : (int)((int64_t)r.h * content_h / 10000);
-            // h==0: 自动正方形, 适应任意窗口宽高比
 
-            // Clamp to content bounds (标题栏已裁剪)
+            // Clamp to content bounds
             if (rx < 0) { rw += rx; rx = 0; }
             if (ry < 0) { rh += ry; ry = 0; }
             if (rx >= (int)fw || ry >= (int)content_h) continue;
@@ -712,28 +730,51 @@ private:
             if (ry + rh > (int)content_h) rh = (int)content_h - ry;
             if (rw <= 0 || rh <= 0) continue;
 
-            // Verify row fits within pitch
-            if ((size_t)rx * 4 + (size_t)rw * 4 > (size_t)pitch) {
-                rw = ((int)pitch - rx * 4) / 4;
-                if (rw <= 0) continue;
-            }
+            // 源区域 Y 偏移标题栏高度 (frame texture 包含标题栏)
+            int src_y = ry + caption_px;
+            if (src_y + rh > (int)fh) rh = (int)fh - src_y;
+            if (rh <= 0) continue;
+
+            // 只拷贝 ROI 区域到小 staging 纹理 (避免全帧 8MB+ 回读)
+            if (FAILED(EnsureRoiStaging(i, (UINT)rw, (UINT)rh))) continue;
+
+            D3D11_BOX src_box = {
+                (UINT)rx, (UINT)src_y, 0,
+                (UINT)(rx + rw), (UINT)(src_y + rh), 1
+            };
+            d3d_context->CopySubresourceRegion(
+                roi_stagings[i].tex.Get(), 0, 0, 0, 0,
+                frame_texture, 0, &src_box);
+
+            D3D11_MAPPED_SUBRESOURCE mapped = {};
+            HRESULT hr = d3d_context->Map(roi_stagings[i].tex.Get(), 0,
+                                          D3D11_MAP_READ, 0, &mapped);
+            if (FAILED(hr)) continue;
 
             size_t buf_size = (size_t)rw * rh * 4;
             auto& buf = roi_buffers[i];
             buf.resize(buf_size);
 
-            uint8_t* dst = buf.data();
-            for (int y = 0; y < rh; y++) {
-                size_t src_off = (size_t)(ry + y) * pitch + (size_t)rx * 4;
-                if (src_off + (size_t)rw * 4 > total_bytes) break;
-                memcpy(dst + (size_t)y * rw * 4, src + src_off, (size_t)rw * 4);
+            // 小纹理 RowPitch 通常等于行宽，直接一次 memcpy
+            if (mapped.RowPitch == (UINT)rw * 4) {
+                memcpy(buf.data(), mapped.pData, buf_size);
+            } else {
+                // RowPitch 对齐时逐行拷贝
+                uint8_t* dst = buf.data();
+                const uint8_t* src = static_cast<const uint8_t*>(mapped.pData);
+                for (int y = 0; y < rh; y++) {
+                    memcpy(dst + (size_t)y * rw * 4,
+                           src + (size_t)y * mapped.RowPitch,
+                           (size_t)rw * 4);
+                }
             }
+
+            d3d_context->Unmap(roi_stagings[i].tex.Get(), 0);
 
             roi_buf_w[i] = rw;
             roi_buf_h[i] = rh;
         }
 
-        d3d_context->Unmap(staging_tex.Get(), 0);
         return true;
     }
 
@@ -944,6 +985,9 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
+    // 提升 Windows 定时器精度至 1ms (影响 sleep_until / condition_variable)
+    timeBeginPeriod(1);
+
     // ---- WinSock init ----
     WSADATA wsa;
     if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0) {
@@ -962,6 +1006,11 @@ int main(int argc, char* argv[]) {
     // TCP_NODELAY for low latency
     int nodelay = 1;
     setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (const char*)&nodelay, sizeof(nodelay));
+
+    // Socket timeout: 5 seconds to prevent permanent blocking on network stall
+    DWORD sock_timeout = 5000;
+    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&sock_timeout, sizeof(sock_timeout));
+    setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, (const char*)&sock_timeout, sizeof(sock_timeout));
 
     sockaddr_in addr = {};
     addr.sin_family = AF_INET;
@@ -1094,6 +1143,7 @@ int main(int argc, char* argv[]) {
     closesocket(sock);
     WSACleanup();
 
+    timeEndPeriod(1);
     LOG("Process exiting normally");
     return 0;
 }

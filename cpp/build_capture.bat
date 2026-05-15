@@ -20,7 +20,7 @@ echo Compiling capture_main.cpp ...
 echo Output: %OUTPUT%
 echo.
 
-cl /std:c++17 /O2 /EHsc ^
+cl /std:c++17 /O2 /EHsc /arch:AVX2 ^
    /Fe:"%OUTPUT%" ^
    capture_main.cpp ^
    d3d11.lib dxgi.lib windowsapp.lib runtimeobject.lib user32.lib ws2_32.lib

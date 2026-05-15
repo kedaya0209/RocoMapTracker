@@ -136,6 +136,7 @@ public final class AppConfig {
             sb.append("# --- 算法核心 ---\n");
             sb.append("map.matcher=").append(MAP_MATCHAER).append("\n");
             sb.append("scale.factor=").append(SCALE_FACTOR).append("\n");
+            sb.append("sift.n.features=").append(SIFT_N_FEATURES).append("\n");
             sb.append("match.ratio.threshold=").append(MATCH_RATIO_THRESHOLD).append("\n");
             sb.append("ransac.max.iters=").append(RANSAC_MAX_ITERS).append("\n\n");
 
@@ -191,6 +192,7 @@ public final class AppConfig {
         GRAY_DISTANCE = getDouble(prop, "gray.distance", GRAY_DISTANCE);
         MAP_MATCHAER = getStr(prop, "map.matcher", MAP_MATCHAER);
         SCALE_FACTOR = getDouble(prop, "scale.factor", SCALE_FACTOR);
+        SIFT_N_FEATURES = getInt(prop, "sift.n.features", SIFT_N_FEATURES);
         MATCH_RATIO_THRESHOLD = (float) getDouble(prop, "match.ratio.threshold", MATCH_RATIO_THRESHOLD);
         RANSAC_MAX_ITERS = getInt(prop, "ransac.max.iters", RANSAC_MAX_ITERS);
         SHOW_STATS_FPS = getBool(prop, "show.stats.fps", SHOW_STATS_FPS);

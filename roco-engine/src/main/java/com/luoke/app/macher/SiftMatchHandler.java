@@ -18,7 +18,6 @@ import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * SIFT 匹配客户端 — 管理 sift_match.exe 子进程，通过 Socket 通信.
@@ -79,8 +78,9 @@ public class SiftMatchHandler implements SocketHandler {
     private volatile boolean pendingInitialized;
     private volatile boolean switching;
 
-    // 匹配结果同步: 每帧一个请求-响应周期
-    private final AtomicReference<MatchResult> pendingResult = new AtomicReference<>();
+    // 匹配结果同步: 每帧一个请求-响应周期, wait/notify 替代忙等
+    private final Object resultLock = new Object();
+    private MatchResult pendingResult;
     private volatile StateCallback stateCallback;
     private volatile int currentVariant = -1;
 
@@ -401,7 +401,10 @@ public class SiftMatchHandler implements SocketHandler {
         boolean success = buf.get() == 1;
         double x = buf.getDouble();
         double y = buf.getDouble();
-        pendingResult.set(new MatchResult(success, x, y));
+        synchronized (resultLock) {
+            pendingResult = new MatchResult(success, x, y);
+            resultLock.notify();
+        }
     }
 
     // ---- 进程管理 ----
@@ -523,19 +526,22 @@ public class SiftMatchHandler implements SocketHandler {
         buf.putInt(grayData.length);
         buf.put(grayData);
 
-        pendingResult.set(null);
-
         if (!s.send(MSG_FRAME_DATA, buf.array())) {
             return MatchResult.FAIL;
         }
 
-        long deadline = System.currentTimeMillis() + timeoutMs;
-        while (System.currentTimeMillis() < deadline) {
-            MatchResult result = pendingResult.getAndSet(null);
-            if (result != null) {
-                return result;
+        synchronized (resultLock) {
+            pendingResult = null;
+
+            long deadline = System.currentTimeMillis() + timeoutMs;
+            long remaining;
+            while (pendingResult == null && (remaining = deadline - System.currentTimeMillis()) > 0) {
+                resultLock.wait(remaining);
             }
-            Thread.onSpinWait();
+
+            if (pendingResult != null) {
+                return pendingResult;
+            }
         }
 
         log.warn("Match result timeout after {}ms", timeoutMs);

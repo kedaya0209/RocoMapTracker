@@ -23,7 +23,7 @@ echo OpenCV: %OPENCV_ROOT%
 echo Output: %OUTPUT%
 echo.
 
-cl /std:c++17 /utf-8 /O2 /EHsc ^
+cl /std:c++17 /utf-8 /O2 /EHsc /arch:AVX2 ^
    /I"%OPENCV_ROOT%\include\opencv4" ^
    /I"%ZLIB_ROOT%\include" ^
    /Fe:"%OUTPUT%" ^

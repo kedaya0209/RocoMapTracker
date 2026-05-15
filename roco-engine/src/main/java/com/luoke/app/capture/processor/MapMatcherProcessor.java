@@ -9,6 +9,8 @@ import com.luoke.app.macher.player.ArrowDetector;
 import com.luoke.app.macher.player.PlayerStateTracker;
 import lombok.extern.slf4j.Slf4j;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+
 /**
  * 地图匹配处理器 — 通过独立 C++ 进程 (sift_match.exe) 执行 SIFT 匹配。
  *
@@ -44,6 +46,9 @@ public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
     // 统计
     private final StatsContext stats = StatsContext.getInstance();
 
+    // 门控：上一帧匹配未完成时跳过当前帧，防止并发调用超时
+    private final AtomicBoolean matching = new AtomicBoolean(false);
+
     public MapMatcherProcessor(int targetRoiIndex, SiftMatchHandler matchClient) {
         this.targetRoiIndex = targetRoiIndex;
         this.matchClient = matchClient;
@@ -75,34 +80,42 @@ public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
     }
 
     private void executeMatching(byte[] data, int width, int height) {
-        long tStart = System.currentTimeMillis();
-        stats.onFrameProcessed();
-
-        // 获取预测位置 (首帧/地图丢失时为 NaN)
-        Double hintX = stateTracker.getPredictedX();
-        Double hintY = stateTracker.getPredictedY();
-
+        // 门控：上一帧匹配未完成时跳过，防止多帧并发导致超时
+        if (!matching.compareAndSet(false, true)) {
+            return;
+        }
         try {
-            SiftMatchHandler.MatchResult result = matchClient.sendFrameAndWait(
-                    data, width, height,
-                    hintX != null ? hintX : Double.NaN,
-                    hintY != null ? hintY : Double.NaN,
-                    MATCH_TIMEOUT_MS);
+            long tStart = System.currentTimeMillis();
+            stats.onFrameProcessed();
 
-            long elapsed = System.currentTimeMillis() - tStart;
-            stats.recordMatch(elapsed);
+            // 获取预测位置 (首帧/地图丢失时为 NaN)
+            Double hintX = stateTracker.getPredictedX();
+            Double hintY = stateTracker.getPredictedY();
 
-            if (result.success()) {
-                stateTracker.onMatchSuccess(result.x(), result.y(), lastDetectedAngle);
-            } else {
-                stateTracker.onMatchFailure("C++ match failed");
+            try {
+                SiftMatchHandler.MatchResult result = matchClient.sendFrameAndWait(
+                        data, width, height,
+                        hintX != null ? hintX : Double.NaN,
+                        hintY != null ? hintY : Double.NaN,
+                        MATCH_TIMEOUT_MS);
+
+                long elapsed = System.currentTimeMillis() - tStart;
+                stats.recordMatch(elapsed);
+
+                if (result.success()) {
+                    stateTracker.onMatchSuccess(result.x(), result.y(), lastDetectedAngle);
+                } else {
+                    stateTracker.onMatchFailure("C++ match failed");
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                stateTracker.onMatchFailure("interrupted");
+            } catch (Exception e) {
+                log.error("匹配异常", e);
+                stateTracker.onMatchFailure("exception: " + e.getMessage());
             }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            stateTracker.onMatchFailure("interrupted");
-        } catch (Exception e) {
-            log.error("匹配异常", e);
-            stateTracker.onMatchFailure("exception: " + e.getMessage());
+        } finally {
+            matching.set(false);
         }
     }
 
