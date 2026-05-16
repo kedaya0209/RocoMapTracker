@@ -20,7 +20,6 @@ public final class StatsContext {
     private long lastMatchMs;
 
     // 上次圆形遮罩应用的耗时（毫秒）
-    // 记录对图像应用圆形遮罩操作的执行时间
     private long lastCircleMaskMs;
 
     // 上次方向计算操作的耗时（毫秒）

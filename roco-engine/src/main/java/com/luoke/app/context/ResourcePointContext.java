@@ -143,4 +143,8 @@ public class ResourcePointContext {
     public List<ResourcePoint> getNearbyResources(double x, double y) {
         return gridIndex.queryNear(x, y);
     }
+
+    public List<ResourcePoint> getPointsInRect(double minX, double minY, double maxX, double maxY) {
+        return gridIndex.queryRect(minX, minY, maxX, maxY);
+    }
 }

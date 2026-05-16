@@ -24,22 +24,8 @@ public class RestartUtils {
                     .getLocation()
                     .getPath())
                     .getName();
-            
-            if (nativeImage != null) {
-                command.add(nativeImage);
-            } else {
-                // JVM 环境
-                String javaExe = System.getProperty("java.home") + File.separator + "bin" + File.separator + "java";
-                command.add(javaExe);
-                command.addAll(ManagementFactory.getRuntimeMXBean().getInputArguments());
-                command.add("-cp");
-                command.add(System.getProperty("java.class.path"));
-                
-                // 获取启动类
-                StackTraceElement[] stack = Thread.currentThread().getStackTrace();
-                String mainClass = stack[stack.length - 1].getClassName();
-                command.add(mainClass);
-            }
+
+            command.add(nativeImage);
 
             ProcessBuilder pb = new ProcessBuilder(command);
             pb.start();

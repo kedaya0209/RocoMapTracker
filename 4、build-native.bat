@@ -1,26 +1,42 @@
 @echo off
-chcp 65001
-cls
+chcp 65001 >nul 2>&1
 
-set GRAALVM_HOME=D:\Documents\environment\java\graalvm-win\graalvm-jdk-25.0.2+10.1
-set JAVA_HOME=%GRAALVM_HOME%
-set PATH=%GRAALVM_HOME%\bin;%PATH%
+echo ============================================
+echo  RocoMapTracker Native Image 构建脚本
+echo ============================================
 
-set VCVARS_PATH="C:\Program Files\Microsoft Visual Studio\18\Insiders\VC\Auxiliary\Build\vcvarsall.bat"
-call %VCVARS_PATH% x64
+:: 设置 Visual Studio 环境
+set "VS_DIR=C:\Program Files\Microsoft Visual Studio\18\Insiders"
+set "VCVARSALL=%VS_DIR%\VC\Auxiliary\Build\vcvarsall.bat"
 
-set MAVEN_BIN=D:\Documents\environment\apache\apache-maven-3.9.4\bin\mvn.cmd
+if not exist "%VCVARSALL%" (
+    echo [错误] 找不到 vcvarsall.bat: %VCVARSALL%
+    echo 请检查 Visual Studio 安装路径
+    pause
+    exit /b 1
+)
 
-echo ==============================
-echo Step 4: Build Native EXE
-echo ==============================
+echo [1/2] 初始化 Visual Studio 环境...
+call "%VCVARSALL%" x64
+if %ERRORLEVEL% neq 0 (
+    echo [错误] VS 环境初始化失败
+    pause
+    exit /b 1
+)
+echo [OK] VS 环境已就绪
 
-%MAVEN_BIN% clean package -Pnative -pl roco-ui -am -DskipTests
+:: 执行 Native Image 构建（含 rcedit 后处理嵌入图标）
+echo [2/2] 开始 Native Image 构建...
+mvn -Pnative clean install -pl roco-ui -am
 
-echo.
-echo ======================================
-echo EXE Build Completed!
-echo File: roco-ui\target\RocoMapTracker.exe
-echo ======================================
+if %ERRORLEVEL% equ 0 (
+    echo ============================================
+    echo  构建成功！
+    echo  产物: roco-ui\target\RocoMapTracker.exe
+    echo  图标已通过 rcedit 嵌入
+    echo ============================================
+) else (
+    echo [错误] 构建失败，请检查日志
+)
 
 pause

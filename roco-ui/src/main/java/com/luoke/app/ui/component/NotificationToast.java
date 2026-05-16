@@ -65,7 +65,7 @@ public class NotificationToast extends HBox {
     public static void show(StackPane root, String message, NotificationType type) {
         NotificationToast toast = new NotificationToast(message, type);
         StackPane.setAlignment(toast, Pos.TOP_CENTER);
-        StackPane.setMargin(toast, new Insets(20, 0, 0, 0));
+        StackPane.setMargin(toast, new Insets(55, 0, 0, 0));
 
         toast.setTranslateY(-100); // 初始在屏幕上方可见区域外
         root.getChildren().add(toast);

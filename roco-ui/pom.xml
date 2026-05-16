@@ -7,7 +7,7 @@
     <parent>
         <groupId>com.luoke</groupId>
         <artifactId>roco-map-tracker</artifactId>
-        <version>1.1.0</version>
+        <version>1.1.1</version>
     </parent>
 
     <artifactId>roco-ui</artifactId>
@@ -76,6 +76,16 @@
                 <version>0.0.8</version>
                 <configuration>
                     <mainClass>com.luoke.app.Main</mainClass>
+                    <options>
+                        <option>-Xmx384m</option>
+                        <option>-Xms64m</option>
+                        <option>-XX:MaxMetaspaceSize=96m</option>
+                        <option>-XX:ReservedCodeCacheSize=96m</option>
+                        <option>-XX:+UseSerialGC</option>
+                        <option>-XX:MaxHeapFreeRatio=25</option>
+                        <option>-XX:MinHeapFreeRatio=10</option>
+                        <option>-Dprism.maxvram=134217728</option>
+                    </options>
                 </configuration>
             </plugin>
 
@@ -177,7 +187,7 @@
                                 <buildArg>--initialize-at-run-time=com.sun.glass.ui.**</buildArg>
                                 <buildArg>--initialize-at-run-time=javafx.**</buildArg>
                                 <buildArg>
-                                    -H:IncludeResources=(META-INF/services/.*|model/.*|com/sun/prism/.*|com/sun/javafx/.*|.*\.(png|properties|json|fxml|xml|dll|txt|css|ttf|woff2|sh|ps|hlsl|cso))$
+                                    -H:IncludeResources=(META-INF/services/.*|model/.*|com/sun/prism/.*|com/sun/javafx/.*|.*\.(png|properties|json|fxml|xml|dll|txt|css|ttf|woff2|sh|ps|hlsl|cso|svg|ico))$
                                 </buildArg>
                                 <buildArg>-H:IncludeResourceBundles=ch.qos.logback.*</buildArg>
                                 <buildArg>
@@ -189,9 +199,30 @@
                                 <buildArg>-H:+ReportExceptionStackTraces</buildArg>
                                 <buildArg>--enable-url-protocols=http,https</buildArg>
                                 <buildArg>-H:+JNI</buildArg>
-
                             </buildArgs>
                         </configuration>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <version>3.3.0</version>
+                        <executions>
+                            <execution>
+                                <id>embed-icon</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <executable>${session.executionRootDirectory}/tools/rcedit-x64.exe</executable>
+                                    <arguments>
+                                        <argument>${project.build.directory}/RocoMapTracker.exe</argument>
+                                        <argument>--set-icon</argument>
+                                        <argument>${project.basedir}/src/main/resources/icon/rmt.ico</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                        </executions>
                     </plugin>
                 </plugins>
             </build>
@@ -247,7 +278,7 @@
                                 <buildArg>--initialize-at-run-time=com.sun.glass.ui.**</buildArg>
                                 <buildArg>--initialize-at-run-time=javafx.**</buildArg>
                                 <buildArg>
-                                    -H:IncludeResources=(META-INF/services/.*|model/.*|com/sun/prism/.*|com/sun/javafx/.*|.*\.(png|properties|json|fxml|xml|dll|txt|css|ttf|woff2|sh|ps|hlsl|cso))$
+                                    -H:IncludeResources=(META-INF/services/.*|model/.*|com/sun/prism/.*|com/sun/javafx/.*|.*\.(png|properties|json|fxml|xml|dll|txt|css|ttf|woff2|sh|ps|hlsl|cso|svg|ico))$
                                 </buildArg>
                                 <buildArg>-H:IncludeResourceBundles=ch.qos.logback.*</buildArg>
                                 <buildArg>
@@ -324,7 +355,7 @@
                                 <buildArg>--initialize-at-run-time=com.sun.glass.ui.**</buildArg>
                                 <buildArg>--initialize-at-run-time=javafx.**</buildArg>
                                 <buildArg>
-                                    -H:IncludeResources=(META-INF/services/.*|model/.*|com/sun/prism/.*|com/sun/javafx/.*|.*\.(png|properties|json|fxml|xml|dll|txt|css|ttf|woff2|sh|ps|hlsl|cso))$
+                                    -H:IncludeResources=(META-INF/services/.*|model/.*|com/sun/prism/.*|com/sun/javafx/.*|.*\.(png|properties|json|fxml|xml|dll|txt|css|ttf|woff2|sh|ps|hlsl|cso|svg|ico))$
                                 </buildArg>
                                 <buildArg>-H:IncludeResourceBundles=ch.qos.logback.*</buildArg>
                                 <buildArg>
@@ -335,6 +366,28 @@
                                 <buildArg>--add-exports=javafx.graphics/com.sun.prism.d3d=ALL-UNNAMED</buildArg>
                             </buildArgs>
                         </configuration>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <version>3.3.0</version>
+                        <executions>
+                            <execution>
+                                <id>embed-icon</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <executable>${session.executionRootDirectory}/tools/rcedit-x64.exe</executable>
+                                    <arguments>
+                                        <argument>${project.build.directory}/RocoMapTracker.exe</argument>
+                                        <argument>--set-icon</argument>
+                                        <argument>${project.basedir}/src/main/resources/icon/rmt.ico</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                        </executions>
                     </plugin>
                 </plugins>
             </build>

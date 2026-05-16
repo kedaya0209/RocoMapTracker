@@ -1,13 +1,14 @@
 package com.luoke.app.ui;
 
-import atlantafx.base.theme.*;
 import com.luoke.app.capture.CaptureService;
 import com.luoke.app.capture.ROIData;
 import com.luoke.app.capture.processor.MapMatcherProcessor;
 import com.luoke.app.capture.processor.OcrProcessor;
-import com.luoke.app.capture.processor.SaveImageProcessor;
 import com.luoke.app.config.AppConfig;
-import com.luoke.app.context.*;
+import com.luoke.app.context.MapContext;
+import com.luoke.app.context.OcrAsyncManager;
+import com.luoke.app.context.ResourceConfigContext;
+import com.luoke.app.context.ResourcePointContext;
 import com.luoke.app.hook.AbstractGenericHook;
 import com.luoke.app.hook.HookEventType;
 import com.luoke.app.hook.event.NotificationType;
@@ -16,30 +17,34 @@ import com.luoke.app.hook.event.StatusEvent;
 import com.luoke.app.hook.impl.UiResponseHook;
 import com.luoke.app.hook.multicast.HookRegistry;
 import com.luoke.app.macher.SiftMatchHandler;
+import com.luoke.app.macher.SiftVariant;
 import com.luoke.app.macher.map.SwitchMapMatcher;
 import com.luoke.app.map.MapResourceUpdater;
 import com.luoke.app.map.core.DownloadProgressContext;
 import com.luoke.app.map.core.IconDownloader;
 import com.luoke.app.map.core.MapDownloader;
+import com.luoke.app.map.model.ResourcePoint;
 import com.luoke.app.process.JobObjectManager;
 import com.luoke.app.socket.SocketServer;
 import com.luoke.app.ui.component.*;
+import com.luoke.app.ui.render.IconCache;
 import com.luoke.app.ui.render.MapRenderer;
+import com.luoke.app.ui.render.TileGeneratorService;
 import com.luoke.app.ui.util.DialogUtils;
+import com.luoke.app.ui.util.ThemeManager;
 import com.luoke.app.ui.util.WindowManager;
-import com.luoke.app.utils.FileUtil;
 import com.luoke.app.utils.ResourceUtils;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
+import javafx.scene.Group;
 import javafx.scene.Scene;
+import javafx.scene.SnapshotParameters;
 import javafx.scene.control.Button;
+import javafx.scene.effect.DropShadow;
 import javafx.scene.image.Image;
-import javafx.scene.layout.AnchorPane;
-import javafx.scene.layout.Background;
-import javafx.scene.layout.Pane;
-import javafx.scene.layout.StackPane;
-import javafx.scene.layout.VBox;
+import javafx.scene.image.WritableImage;
+import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
 import javafx.scene.shape.SVGPath;
@@ -47,20 +52,17 @@ import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.NodeList;
 
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
 import javax.imageio.stream.ImageInputStream;
-import java.awt.image.BufferedImage;
+import javax.xml.parsers.DocumentBuilderFactory;
 import java.io.File;
-import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
@@ -69,6 +71,8 @@ public class ModernCanvasApp extends Application {
 
     private static final int RESIZE_MARGIN = 8;
     private static final String UNIFIED_BLUE = "#00BFFF";
+
+    private final TileGeneratorService tileGeneratorService = new TileGeneratorService();
 
     private static StackPane rootStack;
     private final WindowManager windowManager = new WindowManager(RESIZE_MARGIN);
@@ -88,32 +92,6 @@ public class ModernCanvasApp extends Application {
         super.init();
     }
 
-    public static String[] getAvailableThemes() {
-        return new String[]{"PrimerDark", "PrimerLight", "NordDark", "NordLight",
-                "CupertinoDark", "CupertinoLight", "Dracula"};
-    }
-
-    // ==================== 主题管理 ====================
-
-    public static void applyTheme(String name) {
-        Theme theme = switch (name) {
-            case "PrimerLight" -> new PrimerLight();
-            case "NordDark" -> new NordDark();
-            case "NordLight" -> new NordLight();
-            case "CupertinoDark" -> new CupertinoDark();
-            case "CupertinoLight" -> new CupertinoLight();
-            case "Dracula" -> new Dracula();
-            default -> new PrimerDark();
-        };
-        Application.setUserAgentStylesheet(theme.getUserAgentStylesheet());
-    }
-
-    public static void switchTheme(String name) {
-        AppConfig.THEME = name;
-        AppConfig.save();
-        applyTheme(name);
-    }
-
     @Override
     public void start(Stage primaryStage) {
 
@@ -131,11 +109,11 @@ public class ModernCanvasApp extends Application {
         SwitchMapMatcher.getInstance().setSwitchCallback(newVariant -> {
             log.info("算法变体切换: {}", newVariant);
             if (siftMatchClient != null) {
-                siftMatchClient.restart(SiftMatchHandler.variantOrdinal(newVariant));
+                siftMatchClient.restart(SiftVariant.variantOrdinal(newVariant));
             }
         });
 
-        applyTheme(AppConfig.THEME);
+        ThemeManager.applyTheme(AppConfig.THEME);
 
         StackPane wrapper = new StackPane();
         wrapper.setBackground(Background.EMPTY);
@@ -164,6 +142,17 @@ public class ModernCanvasApp extends Application {
 
         primaryStage.initStyle(StageStyle.TRANSPARENT);
         primaryStage.setScene(scene);
+
+        // 设置程序图标
+        try {
+            Image icon = loadSvgIcon(AppConfig.ICON, 256);
+            if (icon != null) {
+                primaryStage.getIcons().add(icon);
+            }
+        } catch (Exception e) {
+            log.warn("程序图标加载失败", e);
+        }
+
         primaryStage.show();
 
     }
@@ -198,11 +187,14 @@ public class ModernCanvasApp extends Application {
                 publishInitStep(0.5, "正在验证地图瓦片...");
                 if (ResourceConfigContext.getCurrentProfile() != ResourceConfigContext.ResourceProfile.INTERNAL) {
                     //使用内置资源，不生成
-                    validateAndGenerateTiles();
+                    tileGeneratorService.validateAndGenerateTiles();
                 }
 
                 publishInitStep(0.7, "构建坐标索引系统...");
                 ResourcePointContext.getInstance().loadAndInit();
+
+                publishInitStep(0.85, "合并图标纹理图集...");
+                buildIconAtlas();
 
                 publishInitStep(1.0, "核心引擎已就绪");
                 Platform.runLater(() -> buildMainUI(primaryStage));
@@ -220,10 +212,34 @@ public class ModernCanvasApp extends Application {
         Platform.runLater(() -> {
             globalLoading.dispose();
             rootStack.getChildren().remove(globalLoading);
-            DialogUtils.showSimpleDialog(rootStack, "初始化配置",
-                    "检测到本地资源不完整，是否立即从 WIKI 同步最新地图数据？", "立即同步", false,
-                    () -> startResourceDownloadAsync(primaryStage, initFile));
+            DialogUtils.showFirstRunDialog(rootStack, "初始化配置",
+                    "检测到本地资源不完整，请选择启动方式：",
+                    () -> startResourceDownloadAsync(primaryStage, initFile),
+                    () -> startWithBuiltInResources(primaryStage, initFile),
+                    () -> Platform.exit());
         });
+    }
+
+    private void startWithBuiltInResources(Stage primaryStage, File initFile) {
+        try {
+            if (initFile.createNewFile()) {
+                log.info("选择内置资源模式，标记初始化完成");
+            }
+            // 后台静默下载 WIKI 资源
+            Thread.ofVirtual().start(() -> {
+                try {
+                    log.info("后台开始下载 WIKI 资源...");
+                    MapResourceUpdater.updateAllResources();
+                    log.info("后台资源下载完成");
+                } catch (Exception e) {
+                    log.warn("后台资源下载异常（可忽略，下次启动会重试）", e);
+                }
+            });
+            // 使用内置资源直接进入主界面
+            checkAndInitResourcesAsync(primaryStage);
+        } catch (Exception e) {
+            log.error("内置资源模式启动失败", e);
+        }
     }
 
     private void startResourceDownloadAsync(Stage primaryStage, File initFile) {
@@ -296,7 +312,7 @@ public class ModernCanvasApp extends Application {
             interactiveCanvas.heightProperty().bind(canvasContainer.heightProperty());
             canvasContainer.getChildren().add(interactiveCanvas);
 
-            // 视口大小变化 → 标记脏
+            // 视口大小变化 → 标记脏（重绘 + 瓦片更新即可，不需 autoFitViewport 改缩放）
             canvasContainer.widthProperty().addListener(e -> renderer.markDirty());
             canvasContainer.heightProperty().addListener(e -> renderer.markDirty());
 
@@ -450,144 +466,22 @@ public class ModernCanvasApp extends Application {
         MapContext.getInstance().init("G", imgW, imgH);
     }
 
-    /** 瓦片层级元数据 */
-    private record LevelInfo(int level, int cols, int rows, int total) {}
-
-    /**
-     * 检查各层级瓦片完整性，缺失的从源 PNG 多线程生成。
-     * 通过 tiles_meta.json 元数据快速校验，避免逐层 list 文件。
-     */
-    private void validateAndGenerateTiles() throws IOException {
-        String externalPath = ResourceUtils.getExternalPath(ResourceConfigContext.getShowMap(), false);
-        File sourceFile = new File(externalPath);
-
-        int mapW = (int) MapContext.getInstance().getMapWidth();
-        int mapH = (int) MapContext.getInstance().getMapHeight();
-        int tileSize = 256;
-
-        List<LevelInfo> levels = new ArrayList<>();
-        for (int lv = 0; lv < 5; lv++) {
-            int cols = (int) Math.ceil((double) mapW / (tileSize * (1 << lv)));
-            int rows = (int) Math.ceil((double) mapH / (tileSize * (1 << lv)));
-            levels.add(new LevelInfo(lv, cols, rows, cols * rows));
-        }
-        File metaFile = ResourceUtils.getExternalFile(ResourceConfigContext.getTilesDir() + "/tiles_meta.json");
-        if (metaFile.exists() && quickValidate(levels)) {
-            log.info("瓦片元数据校验通过，跳过生成");
-            return;
-        }
-        if (!sourceFile.exists()) {
-            log.error("源 PNG 不存在: {}", sourceFile.getAbsolutePath());
-            return;
-        }
-
-        log.info("开始生成瓦片金字塔...");
-
-        // 1. 加载源图一次
-        BufferedImage sourceImage = ImageIO.read(sourceFile);
-        int srcW = sourceImage.getWidth();
-        int srcH = sourceImage.getHeight();
-
-        int threads = Runtime.getRuntime().availableProcessors();
-        try (ExecutorService executor = Executors.newFixedThreadPool(threads)) {
-            List<java.util.concurrent.Future<?>> futures = new ArrayList<>();
-
-            for (LevelInfo li : levels) {
-                // 2. 对该级别缩放一次
-                double factor = 1.0 / (1 << li.level);
-                BufferedImage levelImage;
-                if (li.level == 0) {
-                    levelImage = sourceImage;
-                } else {
-                    int lw = (int) Math.ceil(srcW * factor);
-                    int lh = (int) Math.ceil(srcH * factor);
-                    levelImage = new BufferedImage(lw, lh, BufferedImage.TYPE_INT_ARGB);
-                    java.awt.Graphics2D g = levelImage.createGraphics();
-                    g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION,
-                            java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-                    g.drawImage(sourceImage, 0, 0, lw, lh, null);
-                    g.dispose();
-                }
-
-                File levelDir = ResourceUtils.getExternalFile(
-                        ResourceConfigContext.getTilesDir() + "/" + li.level);
-                levelDir.mkdirs();
-
-                // 3. 从缩放图裁剪子图，多线程保存
-                int tileWorldSize = tileSize * (1 << li.level);
-                for (int row = 0; row < li.rows; row++) {
-                    for (int col = 0; col < li.cols; col++) {
-                        File tileFile = new File(levelDir, row + "_" + col + ".png");
-                        if (tileFile.exists()) continue;
-
-                        int x = col * tileSize;
-                        int y = row * tileSize;
-                        int w = Math.min(tileSize, levelImage.getWidth() - x);
-                        int h = Math.min(tileSize, levelImage.getHeight() - y);
-                        if (w <= 0 || h <= 0) continue;
-
-                        BufferedImage tile = levelImage.getSubimage(x, y, w, h);
-                        futures.add(executor.submit(() -> {
-                            try {
-                                ImageIO.write(tile, "png", tileFile);
-                            } catch (IOException e) {
-                                log.warn("瓦片保存失败: {}", tileFile, e);
-                            }
-                        }));
-                    }
-                }
-
-                // 每层处理完确保目录存在
-                if (li.level > 0) {
-                    levelImage.flush();
-                }
-            }
-
-            for (java.util.concurrent.Future<?> f : futures) {
-                try { f.get(); } catch (Exception ignored) {}
+    /** 收集所有资源点图标路径，构建纹理图集 */
+    private void buildIconAtlas() {
+        Set<String> iconPaths = new HashSet<>();
+        for (ResourcePoint rp : ResourcePointContext.getInstance().getAllPoints()) {
+            String iconFile = rp.getConfig().getIcon();
+            if (iconFile != null && !iconFile.isEmpty()) {
+                iconPaths.add(AppConfig.ICON_DIR + iconFile);
             }
         }
-
-        log.info("瓦片生成完成");
-        writeMetaFile(metaFile, mapW, mapH, tileSize, levels);
-    }
-
-    /** 快速校验：比对元数据中各级别瓦片数与实际文件数 */
-    private boolean quickValidate(List<LevelInfo> levels) {
-        for (LevelInfo li : levels) {
-            File levelDir = ResourceUtils.getExternalFile(Path.of(ResourceConfigContext.getTilesDir(), String.valueOf(li.level)).toString());
-            if (!levelDir.isDirectory()) return false;
-            int actual = levelDir.list((d, n) -> n.endsWith(".png")).length;
-            if (actual < li.total) {
-                log.warn("瓦片 Level {} 不完整: {}/{}", li.level, actual, li.total);
-                return false;
-            }
+        if (!iconPaths.isEmpty()) {
+            IconCache.getInstance().buildAtlas(iconPaths);
+            // 图集就绪后释放单图标缓存和原始字节缓存
+            IconCache.getInstance().clearIndividualCaches();
+            com.luoke.app.map.loader.ImageLoader.getInstance().clearCache();
+            log.info("图标纹理图集已构建: {} 个图标, 已释放单图标缓存", iconPaths.size());
         }
-        return true;
-    }
-
-    /** 写入瓦片元数据 JSON */
-    private void writeMetaFile(File metaFile, int mapW, int mapH, int tileSize,
-                               List<LevelInfo> levels) throws IOException {
-        StringBuilder sb = new StringBuilder();
-        sb.append("{\n");
-        sb.append("  \"mapWidth\": ").append(mapW).append(",\n");
-        sb.append("  \"mapHeight\": ").append(mapH).append(",\n");
-        sb.append("  \"tileSize\": ").append(tileSize).append(",\n");
-        sb.append("  \"levels\": [\n");
-        for (int i = 0; i < levels.size(); i++) {
-            LevelInfo li = levels.get(i);
-            sb.append("    {\"level\": ").append(li.level)
-              .append(", \"cols\": ").append(li.cols)
-              .append(", \"rows\": ").append(li.rows)
-              .append(", \"total\": ").append(li.total).append("}");
-            if (i < levels.size() - 1) sb.append(",");
-            sb.append("\n");
-        }
-        sb.append("  ]\n");
-        sb.append("}\n");
-        java.nio.file.Files.writeString(metaFile.toPath(), sb.toString());
-        log.info("瓦片元数据已写入: {}", metaFile);
     }
 
     private void publishInitStep(double progress, String message) {
@@ -596,12 +490,111 @@ public class ModernCanvasApp extends Application {
 
     private Button createMenuButton() {
         Button btn = new Button();
-        SVGPath icon = new SVGPath();
-        icon.setContent("M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z");
-        icon.setStyle("-fx-fill: -color-fg-default;");
-        btn.setGraphic(icon);
-        btn.getStyleClass().addAll(Styles.BUTTON_CIRCLE, Styles.FLAT);
+        try {
+            Group svgGroup = loadSvgGroup("/icon/rmt.svg", 20);
+            StackPane graphic = new StackPane(svgGroup);
+            graphic.setPrefSize(20, 20);
+            graphic.setMinSize(20, 20);
+            graphic.setMaxSize(20, 20);
+            btn.setGraphic(graphic);
+            btn.setEffect(new DropShadow(3, 1, 1, Color.web("#000000", 0.25)));
+        } catch (Exception e) {
+            log.warn("菜单按钮 SVG 加载失败", e);
+            SVGPath fallback = new SVGPath();
+            fallback.setContent("M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z");
+            fallback.setStyle("-fx-fill: -color-fg-default;");
+            btn.setGraphic(fallback);
+        }
+        String baseStyle =
+                "-fx-background-color: transparent;" +
+                "-fx-border-color: transparent;" +
+                "-fx-padding: 6px;" +
+                "-fx-cursor: hand;";
+        btn.setStyle(baseStyle);
+        btn.setOnMouseEntered(e -> btn.setStyle(
+                baseStyle +
+                "-fx-background-color: -color-bg-subtle;" +
+                "-fx-background-radius: 6px;"
+        ));
+        btn.setOnMouseExited(e -> btn.setStyle(baseStyle));
         return btn;
+    }
+
+    /**
+     * 将 SVG 文件解析为 JavaFX Image（用于程序图标）。
+     * SVG 路径数据由 javafx.scene.shape.SVGPath 解析，Group.snapshot() 渲染。
+     */
+    private static Image loadSvgIcon(String resourcePath, double size) {
+        try {
+            Group group = loadSvgGroup(resourcePath, size);
+            SnapshotParameters sp = new SnapshotParameters();
+            sp.setFill(Color.TRANSPARENT);
+            WritableImage img = new WritableImage((int) size, (int) size);
+            return group.snapshot(sp, img);
+        } catch (Exception e) {
+            log.warn("SVG 图标加载失败: {}", resourcePath, e);
+            return null;
+        }
+    }
+
+    /**
+     * 将 SVG 文件解析为 SVGPath 节点组（矢量，适合直接用作按钮图形）。
+     * 返回的 Group 已经过缩放居中变换，尺寸为 size × size。
+     */
+    public static Group loadSvgGroup(String resourcePath, double size) throws Exception {
+        try (InputStream in = ResourceUtils.getResourceStream(resourcePath)) {
+
+            DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+            dbf.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+            dbf.setFeature("http://xml.org/sax/features/external-general-entities", false);
+            dbf.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+            Document doc = dbf.newDocumentBuilder().parse(in);
+            Element svgRoot = doc.getDocumentElement();
+
+            NodeList pathNodes = svgRoot.getElementsByTagName("path");
+            if (pathNodes.getLength() == 0) throw new IllegalArgumentException("SVG 中没有 <path> 元素");
+
+            // 创建 SVGPath 节点，提取路径数据
+            int n = pathNodes.getLength();
+            SVGPath[] paths = new javafx.scene.shape.SVGPath[n];
+            double minX = Double.MAX_VALUE, minY = Double.MAX_VALUE;
+            double maxX = Double.MIN_VALUE, maxY = Double.MIN_VALUE;
+            for (int i = 0; i < n; i++) {
+                Element el = (Element) pathNodes.item(i);
+                javafx.scene.shape.SVGPath sp = new javafx.scene.shape.SVGPath();
+                sp.setContent(el.getAttribute("d"));
+                String fill = el.getAttribute("fill");
+                if (!fill.isEmpty() && !"none".equals(fill)) {
+                    String fillOpacityStr = el.getAttribute("fill-opacity");
+                    double fillOpacity = 1.0;
+                    if (!fillOpacityStr.isEmpty()) {
+                        fillOpacity = Double.parseDouble(fillOpacityStr);
+                    }
+                    sp.setFill(Color.web(fill, fillOpacity));
+                }
+                paths[i] = sp;
+                javafx.geometry.Bounds b = sp.getBoundsInLocal();
+                minX = Math.min(minX, b.getMinX());
+                minY = Math.min(minY, b.getMinY());
+                maxX = Math.max(maxX, b.getMaxX());
+                maxY = Math.max(maxY, b.getMaxY());
+            }
+
+            // 居中并缩放到目标尺寸
+            double pw = maxX - minX;
+            double ph = maxY - minY;
+            double scale = size / Math.max(pw, ph);
+
+            Group group = new Group();
+            double tx = -minX * scale + (size - pw * scale) / 2;
+            double ty = -minY * scale + (size - ph * scale) / 2;
+            for (SVGPath path : paths) {
+                path.getTransforms().add(new javafx.scene.transform.Scale(scale, scale));
+                path.getTransforms().add(new javafx.scene.transform.Translate(tx, ty));
+            }
+            group.getChildren().addAll(paths);
+            return group;
+        }
     }
 
     @Override

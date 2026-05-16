@@ -38,6 +38,23 @@ public class ResourcePointGridIndex {
         return result;
     }
 
+    /** 查询矩形范围内的所有点位（世界坐标） */
+    public List<ResourcePoint> queryRect(double minX, double minY, double maxX, double maxY) {
+        List<ResourcePoint> result = new ArrayList<>();
+        long minCellX = (long) (minX / CELL_SIZE);
+        long minCellY = (long) (minY / CELL_SIZE);
+        long maxCellX = (long) (maxX / CELL_SIZE);
+        long maxCellY = (long) (maxY / CELL_SIZE);
+
+        for (long cx = minCellX; cx <= maxCellX; cx++) {
+            for (long cy = minCellY; cy <= maxCellY; cy++) {
+                List<ResourcePoint> cell = grid.get(combine(cx, cy));
+                if (cell != null) result.addAll(cell);
+            }
+        }
+        return result;
+    }
+
     private long calculateKey(double x, double y) {
         return combine((long) (x / CELL_SIZE), (long) (y / CELL_SIZE));
     }

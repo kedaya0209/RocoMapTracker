@@ -20,10 +20,6 @@ public class UiAnimator {
         this.sidebarNode = sidebar;
         this.floatNode = floatContainer;
 
-        // 创建动画对象
-        TranslateTransition st = new TranslateTransition(Duration.millis(250), sidebar);
-        TranslateTransition ft = new TranslateTransition(Duration.millis(250), floatContainer);
-
         // 核心修正：确保在界面渲染后，动态计算宽度并初始化位置
         Platform.runLater(() -> {
             // 获取侧边栏渲染后的真实宽度

@@ -42,6 +42,8 @@ public final class AppConfig {
     public static final String ARROW_MODEL_NAME = "arrow_fp32.onnx";
     public static final String PATHS = "/source/map_paths.json";
     public static final String INTERNAL_PATHS = "/source/internal_map_paths.json";
+    public static final String ICON = "/icon/rmt.svg";
+    public static final String GHOST = "/icon/ghost.svg";
 
     private static final String CONFIG_FILE_NAME = "app_config.properties";
 

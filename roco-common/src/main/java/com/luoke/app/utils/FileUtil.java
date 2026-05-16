@@ -207,20 +207,6 @@ public class FileUtil {
         return externalFile.getAbsolutePath();
     }
 
-    /**
-     * 单个文件释放（从 classpath 到外部物理路径），带 MD5 校验。
-     */
-    public static void extractSingleFile(String internalPath) {
-        extractSingleFile(internalPath, getExternalFile(internalPath));
-    }
-
-    /**
-     * 单个文件释放（带 baseDir），带 MD5 校验。
-     */
-    public static void extractSingleFile(String baseDir, String internalPath) {
-        extractSingleFile(internalPath, getExternalFile(baseDir, internalPath));
-    }
-
     private static void ensureExternalFile(String internalPath, File externalFile, boolean isExtract) {
         if (!externalFile.exists() && isExtract) {
             log.info("外部路径不存在，尝试从内置资源释放：{}", internalPath);

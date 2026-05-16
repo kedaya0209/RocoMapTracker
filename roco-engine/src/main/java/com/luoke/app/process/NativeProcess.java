@@ -34,6 +34,7 @@ public class NativeProcess {
     private static final MethodHandle GET_LAST_ERROR;
     private static final MethodHandle READ_FILE;
     private static final MethodHandle OPEN_PROCESS;
+    private static final MethodHandle SET_PRIORITY_CLASS;
 
     // ---- 常量 ----
     /** PROC_THREAD_ATTRIBUTE_JOB_LIST: 将子进程在创建时归入 JobObject，使任务管理器"进程"页签下归组 */
@@ -43,6 +44,7 @@ public class NativeProcess {
     private static final int CREATE_NO_WINDOW = 0x08000000;
     private static final int STARTF_USESTDHANDLES = 0x00000100;
     private static final int STILL_ACTIVE = 259;
+    private static final int HIGH_PRIORITY_CLASS = 0x00000080;
 
     // STARTUPINFOEXW layout (x64, 自然对齐)
     private static final int STARTUPINFOEX_SIZE = 112;
@@ -119,6 +121,11 @@ public class NativeProcess {
                     KERNEL32.find("OpenProcess").orElseThrow(),
                     FunctionDescriptor.of(ValueLayout.JAVA_LONG,
                             ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT));
+
+            SET_PRIORITY_CLASS = LINKER.downcallHandle(
+                    KERNEL32.find("SetPriorityClass").orElseThrow(),
+                    FunctionDescriptor.of(ValueLayout.JAVA_INT,
+                            ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT));
 
             READ_FILE = LINKER.downcallHandle(
                     KERNEL32.find("ReadFile").orElseThrow(),
@@ -281,6 +288,18 @@ public class NativeProcess {
             if (hJob != 0) {
                 JobObjectManager.attachPid(pid);   // 兜底: 确保子进程一定在 Job 中
                 JobObjectManager.attachSelf();     // 首次调用将 Java 加入 JobObject (幂等)
+            }
+
+            // 9. 提升子进程优先级，防止浏览器等应用抢占 CPU 时间片导致匹配变慢
+            try {
+                int priOk = (int) SET_PRIORITY_CLASS.invoke(hProc, HIGH_PRIORITY_CLASS);
+                if (priOk == 0) {
+                    log.warn("SetPriorityClass(HIGH) 失败 pid={} err={}", pid, lastError());
+                } else {
+                    log.info("子进程 pid={} 优先级已提升至 HIGH_PRIORITY_CLASS", pid);
+                }
+            } catch (Throwable e) {
+                log.warn("SetPriorityClass 调用异常 pid={}: {}", pid, e.toString());
             }
 
             log.info("NativeProcess created: pid={}", pid);

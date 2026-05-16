@@ -1,10 +1,6 @@
 package com.luoke.app.context;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.luoke.app.map.model.RoutePath;
-import com.luoke.app.utils.FileUtil;
-import com.luoke.app.utils.JsonUtils;
-import com.luoke.app.utils.ResourceUtils;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -18,6 +14,7 @@ import java.util.function.Consumer;
 @Slf4j
 public class PathContext {
     private static final PathContext INSTANCE = new PathContext();
+    private final RoutePersistenceService persistence = new RoutePersistenceService();
 
     @Getter
     private final ArrayList<RoutePath> savedRoutes = new ArrayList<>();
@@ -33,7 +30,7 @@ public class PathContext {
     private double mouseLogicY;
 
     private PathContext() {
-        loadFromLocal();
+        savedRoutes.addAll(persistence.loadDefault());
     }
 
     public static PathContext getInstance() {
@@ -80,50 +77,21 @@ public class PathContext {
         notifyChanged();
     }
 
+    /** 持久化路线列表到本地文件，委托给 RoutePersistenceService */
     public boolean saveToLocal() {
-        try {
-            File file = ResourceUtils.getExternalFile(ResourceConfigContext.getPaths());
-            JsonUtils.getMapper().writerWithDefaultPrettyPrinter().writeValue(file, savedRoutes);
-            this.currentMode = Mode.VIEW;
-            log.info("路线已持久化");
-            return true;
-        } catch (Exception e) {
-            log.error("保存失败", e);
-            return false;
-        }
+        boolean ok = persistence.save(savedRoutes);
+        if (ok) this.currentMode = Mode.VIEW;
+        return ok;
     }
 
+    /** 从文件解析路线列表，委托给 RoutePersistenceService */
     public List<RoutePath> resolve(File file) {
-        try {
-            return JsonUtils.getMapper().readValue(file,
-                    new TypeReference<List<RoutePath>>() {});
-        } catch (Exception e) {
-            log.error("解析失败，e:", e);
-            return null;
-        }
+        return persistence.load(file);
     }
 
+    /** 导出单条路线到文件，委托给 RoutePersistenceService */
     public boolean exportPaths(RoutePath selected, File file) {
-        try {
-            JsonUtils.getMapper().writeValue(file, List.of(selected));
-            return true;
-        } catch (Exception e) {
-            log.error("导出失败", e);
-            return false;
-        }
-    }
-
-    private void loadFromLocal() {
-        try {
-            File file = ResourceUtils.getExternalFile(ResourceConfigContext.getPaths());
-            if (file.exists()) {
-                List<RoutePath> loaded = JsonUtils.getMapper().readValue(file,
-                        new TypeReference<List<RoutePath>>() {});
-                savedRoutes.addAll(loaded);
-            }
-        } catch (Exception e) {
-            log.warn("初始加载路线失败");
-        }
+        return persistence.export(selected, file);
     }
 
     public enum Mode {VIEW, DRAWING, EDITING}

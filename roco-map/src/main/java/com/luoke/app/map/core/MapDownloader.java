@@ -84,7 +84,6 @@ public class MapDownloader {
 
                 // 加载历史数据（断点续传支持）
                 loadMeta(tag);
-                loadFailed(tag);
 
                 // 确定 BFS 起点
                 if (validTiles.isEmpty() && taskQueue.isEmpty()) {
@@ -286,12 +285,5 @@ public class MapDownloader {
             Thread.sleep(ms);
         } catch (InterruptedException ignored) {
         }
-    }
-
-    // 未实现 loadFailed 暂时留空，不影响主逻辑
-    private static void loadFailed(String tag) {
-    }
-
-    private static void loadChunks() {
     }
 }

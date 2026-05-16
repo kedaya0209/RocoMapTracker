@@ -2,9 +2,11 @@ package com.luoke.app.ui.component;
 
 import atlantafx.base.theme.Styles;
 import com.luoke.app.config.AppConfig;
+import com.luoke.app.ui.ModernCanvasApp;
 import com.luoke.app.ui.util.DialogUtils;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Group;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
@@ -48,24 +50,44 @@ public class TitleBar extends HBox {
 
         // --- 2. 幽灵模式锚点图标 ---
         Button ghostBtn = new Button();
-        ghostBtn.getStyleClass().addAll(Styles.BUTTON_CIRCLE, Styles.FLAT);
+        ghostBtn.setStyle(
+                "-fx-background-color: transparent;" +
+                        "-fx-border-color: transparent;" +
+                        "-fx-padding: 6px;" +
+                        "-fx-cursor: hand;"
+        );
 
-        SVGPath ghostIcon = new SVGPath();
-        ghostIcon.setContent("M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.17-3.77-7.48-7.94-7.94V1h-2v2.06C6.83 3.52 3.52 6.83 3.06 11H1v2h2.06c.46 4.17 3.77 7.48 7.94 7.94V23h2v-2.06c4.17-.46 7.48-3.77 7.94-7.94H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z");
-        ghostIcon.setStyle("-fx-fill: -color-fg-muted;");
-        ghostBtn.setGraphic(ghostIcon);
+        Group ghostIcon = createGhostIcon();
+        setSvgFill(ghostIcon, "-color-fg-muted");
+        StackPane ghostGraphic = new StackPane(ghostIcon);
+        ghostGraphic.setPrefSize(20, 20);
+        ghostGraphic.setMinSize(20, 20);
+        ghostGraphic.setMaxSize(20, 20);
+        ghostBtn.setGraphic(ghostGraphic);
+        ghostBtn.setPrefSize(32, 32);
+        ghostBtn.setMinSize(32, 32);
+        ghostBtn.setMaxSize(32, 32);
+
+        // Hover 背景高亮（baseStyle 重建避免累积）
+        String ghostBaseStyle = ghostBtn.getStyle();
+        ghostBtn.setOnMouseEntered(e -> ghostBtn.setStyle(
+                ghostBaseStyle + "-fx-background-color: -color-bg-subtle;" +
+                        "-fx-background-radius: 6px;"
+        ));
+        ghostBtn.setOnMouseExited(e -> ghostBtn.setStyle(ghostBaseStyle));
 
         ghostBtn.setOnAction(e -> {
             ghostMode = !ghostMode;
 
             // 切换状态显示：激活态使用 accent，非激活恢复 fg-muted
-            ghostIcon.setStyle(ghostMode ? "-fx-fill: -color-accent-emphasis;" : "-fx-fill: -color-fg-muted;");
+            setSvgFill(ghostIcon, ghostMode ? "-color-accent-emphasis" : "-color-fg-muted");
 
             // --- 核心改动：滑块透明度切换 ---
             opacitySlider.setOpacity(ghostMode ? 1.0 : 0.0);
             opacitySlider.setDisable(!ghostMode);
 
             stage.setAlwaysOnTop(ghostMode);
+            menuBtn.setMouseTransparent(ghostMode);
             for (Node node : overlayNodes) node.setMouseTransparent(ghostMode);
 
             if (!ghostMode) {
@@ -99,32 +121,38 @@ public class TitleBar extends HBox {
     }
 
     private Button getCloseButton(Stage stage) {
-        Button closeBtn = new Button("✕");
+        // SVG X 图标（与路线管理器一致）
+        SVGPath closeIcon = new SVGPath();
+        closeIcon.setContent("M1 1 L9 9 M9 1 L1 9");
+        closeIcon.setStyle("-fx-stroke: -color-fg-muted; -fx-stroke-width: 2; -fx-stroke-line-cap: round;");
+        StackPane closeGraphic = new StackPane(closeIcon);
+        closeGraphic.setPrefSize(20, 20);
+        closeGraphic.setMinSize(20, 20);
+        closeGraphic.setMaxSize(20, 20);
+
+        Button closeBtn = new Button();
+        closeBtn.setGraphic(closeGraphic);
 
         // 初始样式：无边框，透明背景
         closeBtn.setStyle(
                 "-fx-background-color: transparent;" +
                         "-fx-border-color: transparent;" +
-                        "-fx-text-fill: -color-fg-muted;" +
-                        "-fx-font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;" +
-                        "-fx-font-size: 16px;" +
-                        "-fx-font-weight: normal;" +
-                        "-fx-padding: 6px 12px;" +
+                        "-fx-padding: 6px;" +
                         "-fx-cursor: hand;"
         );
 
-        // Hover 逻辑
-        closeBtn.setOnMouseEntered(e -> closeBtn.setStyle(
-                closeBtn.getStyle()
-                        .replace("-fx-text-fill: -color-fg-muted;", "-fx-text-fill: -color-danger-emphasis;") +
-                        "-fx-background-color: -color-bg-subtle;"
-        ));
+        // Hover 逻辑（baseStyle 重建避免累积）
+        String closeBaseStyle = closeBtn.getStyle();
+        closeBtn.setOnMouseEntered(e -> {
+            closeIcon.setStyle("-fx-stroke: -color-danger-emphasis; -fx-stroke-width: 2; -fx-stroke-line-cap: round;");
+            closeBtn.setStyle(closeBaseStyle + "-fx-background-color: -color-bg-subtle;" +
+                            "-fx-background-radius: 6px;");
+        });
 
-        closeBtn.setOnMouseExited(e -> closeBtn.setStyle(
-                closeBtn.getStyle()
-                        .replace("-fx-background-color: -color-bg-subtle;", "-fx-background-color: transparent;")
-                        .replace("-fx-text-fill: -color-danger-emphasis;", "-fx-text-fill: -color-fg-muted;")
-        ));
+        closeBtn.setOnMouseExited(e -> {
+            closeIcon.setStyle("-fx-stroke: -color-fg-muted; -fx-stroke-width: 2; -fx-stroke-line-cap: round;");
+            closeBtn.setStyle(closeBaseStyle);
+        });
 
         // ===================== 【核心：添加关闭确认弹窗】 =====================
         closeBtn.setOnAction(e -> {
@@ -149,6 +177,26 @@ public class TitleBar extends HBox {
 
     public static TitleBar getInstance() {
         return Holder.getINSTANCE();
+    }
+
+    /** 为 Group 内所有 SVGPath 节点设置 CSS fill 颜色 */
+    private static void setSvgFill(Group group, String cssColor) {
+        String style = "-fx-fill: " + cssColor + ";";
+        for (Node child : group.getChildren()) {
+            child.setStyle(style);
+        }
+    }
+
+    private static Group createGhostIcon() {
+        try {
+            return ModernCanvasApp.loadSvgGroup(AppConfig.GHOST, 20);
+        } catch (Exception ex) {
+            // fallback: 圆环图标
+            SVGPath fallback = new SVGPath();
+            fallback.setContent("M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.17-3.77-7.48-7.94-7.94V1h-2v2.06C6.83 3.52 3.52 6.83 3.06 11H1v2h2.06c.46 4.17 3.77 7.48 7.94 7.94V23h2v-2.06c4.17-.46 7.48-3.77 7.94-7.94H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z");
+            fallback.setStyle("-fx-fill: -color-fg-muted;");
+            return new Group(fallback);
+        }
     }
 
     private static class Holder {

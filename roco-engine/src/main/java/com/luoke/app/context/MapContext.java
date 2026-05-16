@@ -1,9 +1,6 @@
 package com.luoke.app.context;
 
 import com.luoke.app.config.AppConfig;
-import com.luoke.app.hook.HookEventType;
-import com.luoke.app.hook.event.PlayerPositionEvent;
-import com.luoke.app.hook.multicast.HookRegistry;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -11,7 +8,6 @@ import lombok.Setter;
 /**
  * 地图上下文管理：负责视口状态（缩放/偏移）及玩家位置的维护与转换。
  * 瓦片金字塔模式下不再持有全图，仅管理元数据与运行时状态。
- * 采用单例模式（Holder）及观察者模式（HookRegistry）分发位置更新。
  */
 @Getter
 @Setter
@@ -51,16 +47,12 @@ public class MapContext {
         );
     }
 
-    /** 更新玩家状态并发布 PLAYER_UPDATE 事件 */
+    /** 更新玩家状态 */
     public void updatePlayerState(double x, double y, Double visualAngle) {
         this.playerX = x;
         this.playerY = y;
         if (visualAngle != null) { this.playerAngle = visualAngle; this.hasAngle = true; }
         this.playerInitialized = true;
-        HookRegistry.INSTANCE.publish(
-                HookEventType.PLAYER_UPDATE,
-                new PlayerPositionEvent(x, y)
-        );
     }
 
     /** 世界坐标转屏幕 X：offsetX + playerX * scale */

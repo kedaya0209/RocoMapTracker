@@ -1,6 +1,17 @@
 {
   "reflection": [
     {
+      "type": "ch.qos.logback.core.rolling.SizeAndTimeBasedFileNamingAndTriggeringPolicy",
+      "methods": [
+        {
+          "name": "setMaxFileSize",
+          "parameterTypes": [
+            "ch.qos.logback.core.util.FileSize"
+          ]
+        }
+      ]
+    },
+    {
       "type": "ai.djl.onnxruntime.engine.OrtEngineProvider"
     },
     {
@@ -8713,6 +8724,15 @@
       "glob": "dll/lcms.dll"
     },
     {
+      "glob": "icon/rmt.ico"
+    },
+    {
+      "glob": "icon/rmt.svg"
+    },
+    {
+      "glob": "icon/ghost.svg"
+    },
+    {
       "glob": "source/icon/player.png"
     },
     {
@@ -9577,6 +9597,12 @@
     },
     {
       "bundle": "sun.util.logging.resources.logging"
+    },
+    {
+      "glob": "com/sun/prism/d3d/hlsl/*.obj"
+    },
+    {
+      "glob": "com/sun/scenario/effect/impl/hw/d3d/hlsl/*.obj"
     }
   ],
   "foreign": {
