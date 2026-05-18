@@ -55,11 +55,7 @@
 #include <fstream>
 
 #pragma comment(lib, "ws2_32.lib")
-#pragma comment(lib, "opencv_core4.lib")
-#pragma comment(lib, "opencv_imgproc4.lib")
-#pragma comment(lib, "opencv_features2d4.lib")
-#pragma comment(lib, "opencv_calib3d4.lib")
-#pragma comment(lib, "opencv_flann4.lib")
+// opencv libraries provided by build system (opencv_world4100.lib etc.)
 #pragma comment(lib, "zlib.lib")
 
 // ============================================================================
