@@ -33,7 +33,6 @@
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/features2d.hpp>
-#include <opencv2/xfeatures2d.hpp>
 #include <opencv2/calib3d.hpp>
 #include <opencv2/flann.hpp>
 
@@ -59,7 +58,6 @@
 #pragma comment(lib, "opencv_core4.lib")
 #pragma comment(lib, "opencv_imgproc4.lib")
 #pragma comment(lib, "opencv_features2d4.lib")
-#pragma comment(lib, "opencv_xfeatures2d4.lib")
 #pragma comment(lib, "opencv_calib3d4.lib")
 #pragma comment(lib, "opencv_flann4.lib")
 #pragma comment(lib, "zlib.lib")

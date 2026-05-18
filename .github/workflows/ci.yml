@@ -15,6 +15,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  OPENCV_VERSION: 4.10.0
+
 jobs:
 
   # ================================================================
@@ -48,7 +51,7 @@ jobs:
         run: mvn test -pl roco-ui -am --no-transfer-progress
 
   # ================================================================
-  # C++ 子进程编译
+  # C++ 子进程编译（预编译 OpenCV + 快速 zlib）
   # ================================================================
   build-cpp:
     name: Build C++ Subprocesses
@@ -59,17 +62,23 @@ jobs:
       - name: Setup Visual Studio (MSVC)
         uses: ilammy/msvc-dev-cmd@v1
 
-      - name: Cache vcpkg installed
-        id: cache-vcpkg
+      - name: Cache OpenCV
+        id: cache-opencv
         uses: actions/cache@v4
         with:
-          path: C:\vcpkg\installed
-          key: ${{ runner.os }}-vcpkg-${{ hashFiles('cpp/sift_match_main.cpp') }}
+          path: D:\a\opencv
+          key: ${{ runner.os }}-opencv-${{ env.OPENCV_VERSION }}
 
-      - name: Install OpenCV (vcpkg, with contrib)
-        if: steps.cache-vcpkg.outputs.cache-hit != 'true'
+      - name: Download and extract pre-built OpenCV
+        if: steps.cache-opencv.outputs.cache-hit != 'true'
         run: |
-          vcpkg install opencv4[contrib]:x64-windows --recurse
+          curl -L -o opencv.exe "https://github.com/opencv/opencv/releases/download/${{ env.OPENCV_VERSION }}/opencv-${{ env.OPENCV_VERSION }}-windows.exe"
+          7z x opencv.exe -oD:\a\opencv -y > nul
+        shell: cmd
+
+      - name: Install zlib (vcpkg, builds in seconds)
+        run: |
+          vcpkg install zlib:x64-windows
         shell: cmd
 
       - name: Build capture.exe (DirectX only, no OpenCV)
@@ -77,10 +86,10 @@ jobs:
           cl /std:c++17 /O2 /EHsc /arch:AVX2 /Fe:capture.exe capture_main.cpp d3d11.lib dxgi.lib windowsapp.lib runtimeobject.lib user32.lib ws2_32.lib winmm.lib
         working-directory: cpp
 
-      - name: Build sift_match.exe (requires OpenCV)
+      - name: Build sift_match.exe (with pre-built OpenCV)
         run: |
-          set "INCLUDE=C:\vcpkg\installed\x64-windows\include;%INCLUDE%"
-          set "LIB=C:\vcpkg\installed\x64-windows\lib;%LIB%"
+          set "INCLUDE=D:\a\opencv\opencv\build\include;%INCLUDE%"
+          set "LIB=D:\a\opencv\opencv\build\x64\vc16\lib;C:\vcpkg\installed\x64-windows\lib;%LIB%"
           cl /std:c++17 /O2 /EHsc /arch:AVX2 /Fe:sift_match.exe sift_match_main.cpp ws2_32.lib
         working-directory: cpp
         shell: cmd
