@@ -2,9 +2,9 @@ package com.luoke.app.test;
 
 import com.luoke.app.capture.CaptureService;
 import com.luoke.app.capture.ROIData;
-import com.luoke.app.socket.SocketServer;
 import com.luoke.app.capture.RoiProcessor;
 import com.luoke.app.config.AppConfig;
+import com.luoke.app.socket.SocketServer;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;

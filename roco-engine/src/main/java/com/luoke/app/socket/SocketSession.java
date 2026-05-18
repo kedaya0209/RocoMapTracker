@@ -19,7 +19,12 @@ public class SocketSession implements AutoCloseable {
     private final Socket socket;
     private final DataInputStream in;
     private final DataOutputStream out;
+    /**
+     * 消息体缓冲池（3 槽轮转），避免每帧 ~9MB humongous 分配
+     */
+    private final byte[][] bodyPool = new byte[3][];
     private volatile boolean closed;
+    private int poolIndex;
 
     SocketSession(Socket socket) throws IOException {
         this.id = ID_GEN.incrementAndGet();
@@ -29,21 +34,34 @@ public class SocketSession implements AutoCloseable {
         this.out = new DataOutputStream(new BufferedOutputStream(socket.getOutputStream()));
     }
 
-    public long id() { return id; }
+    public long id() {
+        return id;
+    }
 
-    /** 同步读取一条消息 (由 SocketServer 的 recv 线程调用) */
+    /**
+     * 同步读取一条消息 (由 SocketServer 的 recv 线程调用)
+     */
     public Message recv() throws IOException {
         int type = in.readInt();
-        int len  = in.readInt();
+        int len = in.readInt();
         byte[] body = null;
         if (len > 0) {
-            body = new byte[len];
-            in.readFully(body);
+            byte[] buf = bodyPool[poolIndex];
+            // 仅当 size 变化时重新分配（帧数据 size 通常恒定）
+            if (buf == null || buf.length != len) {
+                buf = new byte[len];
+                bodyPool[poolIndex] = buf;
+            }
+            body = buf;
+            in.readFully(body, 0, len);
+            poolIndex = (poolIndex + 1) % bodyPool.length;
         }
         return new Message(type, body);
     }
 
-    /** 线程安全发送 */
+    /**
+     * 线程安全发送
+     */
     public synchronized boolean send(int msgType, byte[] body) {
         if (closed) return false;
         try {
@@ -59,15 +77,23 @@ public class SocketSession implements AutoCloseable {
         }
     }
 
-    public boolean isClosed() { return closed || socket.isClosed(); }
+    public boolean isClosed() {
+        return closed || socket.isClosed();
+    }
 
     @Override
     public void close() {
         if (closed) return;
         closed = true;
-        try { socket.close(); } catch (IOException ignored) {}
+        try {
+            socket.close();
+        } catch (IOException ignored) {
+        }
     }
 
-    /** 一条消息 */
-    public record Message(int type, byte[] body) {}
+    /**
+     * 一条消息
+     */
+    public record Message(int type, byte[] body) {
+    }
 }

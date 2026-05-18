@@ -123,12 +123,12 @@ public class FileUtil {
                         return;
                     }
                     extractSingleFile(sourcePath, destFile);
-            });
+                });
 
-        } catch (Exception e) {
-            //资源释放失败
-            log.error("释放资源失败，e:", e);
-        }
+            } catch (Exception e) {
+                //资源释放失败
+                log.error("释放资源失败，e:", e);
+            }
         } catch (Exception e) {
             log.error("释放资源失败，e:", e);
         }
@@ -205,20 +205,6 @@ public class FileUtil {
         File externalFile = getExternalFile(baseDir, internalPath);
         ensureExternalFile(internalPath, externalFile, isExtract);
         return externalFile.getAbsolutePath();
-    }
-
-    /**
-     * 单个文件释放（从 classpath 到外部物理路径），带 MD5 校验。
-     */
-    public static void extractSingleFile(String internalPath) {
-        extractSingleFile(internalPath, getExternalFile(internalPath));
-    }
-
-    /**
-     * 单个文件释放（带 baseDir），带 MD5 校验。
-     */
-    public static void extractSingleFile(String baseDir, String internalPath) {
-        extractSingleFile(internalPath, getExternalFile(baseDir, internalPath));
     }
 
     private static void ensureExternalFile(String internalPath, File externalFile, boolean isExtract) {

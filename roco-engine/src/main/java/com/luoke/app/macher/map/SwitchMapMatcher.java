@@ -1,9 +1,10 @@
 package com.luoke.app.macher.map;
 
 import com.luoke.app.config.AppConfig;
+import com.luoke.app.macher.SiftVariant;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 
-import java.util.LinkedHashSet;
 import java.util.Objects;
 import java.util.Set;
 
@@ -18,23 +19,16 @@ import java.util.Set;
  *   <li>通过回调通知上层重启 C++ 进程</li>
  * </ul>
  */
+@Setter
 @Slf4j
 public class SwitchMapMatcher {
 
-    public static final String SIFT = "SIFT";
-    public static final String SIFT_PCA = "SIFT-PCA";
-    public static final String SIFT_PCA_ULTRA = "SIFT-PCA-ULTRA";
-    public static final String SIFT_ULTRA = "SIFT-ULTRA";
-    private static final Set<String> set = new LinkedHashSet<>();
     private static volatile SwitchMapMatcher instance;
 
-    static {
-        set.add(SIFT);
-        set.add(SIFT_PCA);
-        set.add(SIFT_ULTRA);
-        set.add(SIFT_PCA_ULTRA);
-    }
-
+    /**
+     * -- SETTER --
+     * 设置变体切换回调 (由 roco-ui 注入)
+     */
     private volatile SwitchCallback switchCallback;
 
     private SwitchMapMatcher() {
@@ -51,15 +45,8 @@ public class SwitchMapMatcher {
         return instance;
     }
 
-    /**
-     * 设置变体切换回调 (由 roco-ui 注入)
-     */
-    public void setSwitchCallback(SwitchCallback cb) {
-        this.switchCallback = cb;
-    }
-
     public Set<String> getMatchers() {
-        return set;
+        return SiftVariant.getDisplayNames();
     }
 
     /**

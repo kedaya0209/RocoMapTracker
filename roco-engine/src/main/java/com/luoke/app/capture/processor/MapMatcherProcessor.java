@@ -1,5 +1,6 @@
 package com.luoke.app.capture.processor;
 
+import com.luoke.app.capture.CaptureFrameBuffer;
 import com.luoke.app.capture.ROIData;
 import com.luoke.app.capture.RoiProcessor;
 import com.luoke.app.config.AppConfig;
@@ -27,10 +28,7 @@ public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
 
     private final int targetRoiIndex;
     //roi h为0, 自动截取正方形
-    private final ROIData cachedRoi = new ROIData(8900, 300, 1000, 0);
-
-    // 超时配置
-    private static final long MATCH_TIMEOUT_MS = 500;
+    private final ROIData cachedRoi = new ROIData(AppConfig.ROI_MAP_X, AppConfig.ROI_MAP_Y, AppConfig.ROI_MAP_W, AppConfig.ROI_MAP_H);
     // 独立进程匹配客户端
     private final SiftMatchHandler matchClient;
     // 状态追踪 (纯 Java, 无 native 依赖)
@@ -38,16 +36,13 @@ public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
 
     // 频率限制
     private final long delay = 1000L / AppConfig.TARGET_CAPTURE_FPS;
-    private long prevTime = 0L;
-
-    private boolean arrowInit = false;
-    private volatile Double lastDetectedAngle = null;
-
     // 统计
     private final StatsContext stats = StatsContext.getInstance();
-
     // 门控：上一帧匹配未完成时跳过当前帧，防止并发调用超时
     private final AtomicBoolean matching = new AtomicBoolean(false);
+    private long prevTime = 0L;
+    private boolean arrowInit = false;
+    private volatile Double lastDetectedAngle = null;
 
     public MapMatcherProcessor(int targetRoiIndex, SiftMatchHandler matchClient) {
         this.targetRoiIndex = targetRoiIndex;
@@ -61,6 +56,7 @@ public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
 
     @Override
     public void onProcess(byte[] data, int width, int height) {
+        CaptureFrameBuffer.getInstance().putFrame(targetRoiIndex, data, width, height);
         long now = System.currentTimeMillis();
         if (now - prevTime < delay) return;
         prevTime = now;
@@ -69,14 +65,18 @@ public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
     }
 
     private void executeArrowDect(byte[] data, int width, int height) {
-        // 截取中心64*64区域
-        byte[] dest = new byte[64 * 64];
-        int offsetX = width / 2 - 32;
-        int offsetY = height / 2 - 32;
-        for (int i = 0; i < 64; i++) {
-            System.arraycopy(data, (offsetY + i) * width + offsetX, dest, i * 64, 64);
+        // 截取中心区域用于箭头 CNN 检测
+        long start = System.currentTimeMillis();
+        int cs = AppConfig.ARROW_CROP_SIZE;
+        byte[] dest = new byte[cs * cs];
+        int half = cs / 2;
+        int offsetX = width / 2 - half;
+        int offsetY = height / 2 - half;
+        for (int i = 0; i < cs; i++) {
+            System.arraycopy(data, (offsetY + i) * width + offsetX, dest, i * cs, cs);
         }
-        lastDetectedAngle = ArrowDetector.getInstance().detectPlayer(dest, 64, 64);
+        lastDetectedAngle = ArrowDetector.getInstance().detectPlayer(dest, cs, cs);
+        stats.recordDirection(System.currentTimeMillis() - start);
     }
 
     private void executeMatching(byte[] data, int width, int height) {
@@ -97,7 +97,7 @@ public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
                         data, width, height,
                         hintX != null ? hintX : Double.NaN,
                         hintY != null ? hintY : Double.NaN,
-                        MATCH_TIMEOUT_MS);
+                        AppConfig.MATCH_TIMEOUT_MS);
 
                 long elapsed = System.currentTimeMillis() - tStart;
                 stats.recordMatch(elapsed);
@@ -131,7 +131,6 @@ public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
 
     @Override
     public void close() {
-        stateTracker.reset();
         log.info("MapMatcherProcessor closed");
     }
 }

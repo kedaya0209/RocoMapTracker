@@ -16,6 +16,10 @@ public class RoutePath {
     public RoutePath() {
     } // 序列化需要
 
+    public RoutePath(String name) {
+        this.name = name;
+    }
+
     public void remove(int index) {
         nodes.remove(index);
     }
@@ -26,10 +30,6 @@ public class RoutePath {
 
     public void addNode(int index, Point point) {
         nodes.add(index, point);
-    }
-
-    public RoutePath(String name) {
-        this.name = name;
     }
 
     public void setNode(int draggedNodeIndex, Point point) {

@@ -2,15 +2,18 @@ package com.luoke.app.ui.component;
 
 import com.luoke.app.config.AppConfig;
 import com.luoke.app.context.CameraContext;
+import com.luoke.app.ui.service.SvgManager;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Cursor;
+import javafx.scene.Group;
 import javafx.scene.control.Tooltip;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.SVGPath;
+import javafx.scene.transform.Scale;
 import javafx.util.Duration;
 
 public class FloatToolbox extends VBox {
@@ -23,12 +26,8 @@ public class FloatToolbox extends VBox {
         setPickOnBounds(false);
         setStyle("-fx-background-color: transparent;");
 
-        // 按钮 1：自动跟随
-        StackPane followBtn = createVectorIconButton(
-                "自动跟随模式 (Space)",
-                "M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z",
-                true, null, unifiedBlueColor
-        );
+        // 按钮 1：自动跟随（从 follow.svg 加载，1024 规格，需 Group 包裹修正布局尺寸）
+        StackPane followBtn = createFollowButton(unifiedBlueColor);
 
         // 按钮 2：资源计数切换
         StackPane collectBtn = createVectorIconButton(
@@ -38,6 +37,42 @@ public class FloatToolbox extends VBox {
         );
 
         getChildren().addAll(followBtn, collectBtn);
+    }
+
+    /**
+     * 创建跟随模式按钮（从 follow.svg 加载，自动 Group 包裹处理 1024 规格）
+     */
+    private StackPane createFollowButton(String unifiedBlueColor) {
+        StackPane btn = new StackPane();
+        btn.setCursor(Cursor.HAND);
+        btn.setPadding(new Insets(10));
+
+        SVGPath icon = new SVGPath();
+        icon.setContent(SvgManager.getPath("/icon/follow.svg"));
+        icon.setFill(Color.WHITE);
+        icon.setStroke(Color.BLACK);
+        icon.setStrokeWidth(0.2);
+        // follow.svg viewBox=1024，缩放到与原图钉图标相同视觉尺寸（~31px）
+        double scale = 31.0 / 1024.0;
+        icon.getTransforms().add(new Scale(scale, scale));
+
+        // Group 包裹使 layoutBounds = 变换后尺寸，StackPane 按钮不会撑大
+        Group wrapper = new Group(icon);
+
+        btn.setOnMouseEntered(_ -> btn.setStyle("-fx-background-color: rgba(255,255,255,0.15); -fx-background-radius: 8;"));
+        btn.setOnMouseExited(_ -> btn.setStyle("-fx-background-color: transparent;"));
+
+        Tooltip tooltip = new Tooltip("自动跟随模式 (Space)");
+        tooltip.setShowDelay(Duration.millis(150));
+        Tooltip.install(btn, tooltip);
+        btn.getChildren().add(wrapper);
+
+        CameraContext cameraCtx = CameraContext.getInstance();
+        btn.setOnMouseClicked(_ -> cameraCtx.setFollowMode(!cameraCtx.isFollowMode()));
+        cameraCtx.onFollowModeChange(() ->
+                Platform.runLater(() -> icon.setFill(cameraCtx.isFollowMode() ? Color.web(unifiedBlueColor) : Color.WHITE)));
+
+        return btn;
     }
 
     private StackPane createVectorIconButton(String hint, String svgPath, boolean isFollowLogic, ResourceCounterPanel panel, String unifiedBlueColor) {
@@ -53,8 +88,8 @@ public class FloatToolbox extends VBox {
         icon.setScaleX(1.3);
         icon.setScaleY(1.3);
 
-        btn.setOnMouseEntered(e -> btn.setStyle("-fx-background-color: rgba(255,255,255,0.15); -fx-background-radius: 8;"));
-        btn.setOnMouseExited(e -> btn.setStyle("-fx-background-color: transparent;"));
+        btn.setOnMouseEntered(_ -> btn.setStyle("-fx-background-color: rgba(255,255,255,0.15); -fx-background-radius: 8;"));
+        btn.setOnMouseExited(_ -> btn.setStyle("-fx-background-color: transparent;"));
 
         Tooltip tooltip = new Tooltip(hint);
         tooltip.setShowDelay(Duration.millis(150));
@@ -63,13 +98,11 @@ public class FloatToolbox extends VBox {
 
         if (isFollowLogic) {
             CameraContext cameraCtx = CameraContext.getInstance();
-            btn.setOnMouseClicked(e -> cameraCtx.setFollowMode(!cameraCtx.isFollowMode()));
-            cameraCtx.onFollowModeChange(() -> {
-                Platform.runLater(() -> icon.setFill(cameraCtx.isFollowMode() ? Color.web(unifiedBlueColor) : Color.WHITE));
-            });
+            btn.setOnMouseClicked(_ -> cameraCtx.setFollowMode(!cameraCtx.isFollowMode()));
+            cameraCtx.onFollowModeChange(() -> Platform.runLater(() -> icon.setFill(cameraCtx.isFollowMode() ? Color.web(unifiedBlueColor) : Color.WHITE)));
         } else if (panel != null) {
             // 切换面板显示的逻辑
-            btn.setOnMouseClicked(e -> {
+            btn.setOnMouseClicked(_ -> {
                 resourcePanelVisible = !resourcePanelVisible;
                 panel.toggle(resourcePanelVisible);
                 icon.setFill(resourcePanelVisible ? Color.web(unifiedBlueColor) : Color.WHITE);

@@ -17,6 +17,7 @@ public class ResourceUtils {
 
     /**
      * 获取资源输入流，优先使用外部资源
+     *
      * @param internalPath 内部资源路径
      * @return 资源的输入流
      * @throws RuntimeException 如果资源读取失败
@@ -43,6 +44,7 @@ public class ResourceUtils {
 
     /**
      * 获取外部资源的文件路径（相对于 appRoot/resources）
+     *
      * @see FileUtil#getExternalFile(String, String)
      */
     public static File getExternalFile(String internalPath) {
@@ -51,6 +53,7 @@ public class ResourceUtils {
 
     /**
      * 获取资源路径（优先物理路径，相对于 appRoot/resources）
+     *
      * @see FileUtil#getExternalPath(String, String, boolean)
      */
     public static String getExternalPath(String internalPath, boolean isExtract) {
@@ -59,6 +62,7 @@ public class ResourceUtils {
 
     /**
      * 读取资源文件的每一行（优先外部物理文件）
+     *
      * @param internalPath 内部资源路径
      * @return 包含所有非空行的列表
      * @throws IOException 如果资源读取失败

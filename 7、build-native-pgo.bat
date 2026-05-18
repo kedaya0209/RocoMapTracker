@@ -3,14 +3,8 @@ chcp 65001 >nul
 setlocal enabledelayedexpansion
 cls
 
-set GRAALVM_HOME=D:\Documents\environment\java\graalvm-win\graalvm-jdk-25.0.2+10.1
-set JAVA_HOME=%GRAALVM_HOME%
-set PATH=%GRAALVM_HOME%\bin;%PATH%
-
 set VCVARS_PATH="C:\Program Files\Microsoft Visual Studio\18\Insiders\VC\Auxiliary\Build\vcvarsall.bat"
 call %VCVARS_PATH% x64
-
-set MAVEN_BIN=D:\Documents\environment\apache\apache-maven-3.9.4\bin\mvn.cmd
 
 echo ==============================
 echo Step 7: Build PGO Optimized EXE
@@ -57,7 +51,7 @@ echo   !PGO_LIST!
 echo.
 
 echo Building optimized native image...
-%MAVEN_BIN% clean package -Pnative-pgo -pl roco-ui -am -DskipTests "-Dpgo.file=!PGO_LIST!"
+mvn clean package -Pnative-pgo -pl roco-ui -am -DskipTests "-Dpgo.file=!PGO_LIST!"
 
 echo.
 echo ======================================

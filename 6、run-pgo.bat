@@ -93,20 +93,14 @@ echo ==============================================
 echo Merging !RUN_COUNT! profiles into default.iprof...
 echo ==============================================
 
-set "GRAALVM_HOME=D:\Documents\environment\java\graalvm-win\graalvm-jdk-25.0.2+10.1"
-
-echo 尝试用 native-image-configure 合并（GraalVM 工具）
-set "MERGE_TOOL=%GRAALVM_HOME%\bin\native-image-configure.cmd"
 set "INPUT_ARGS="
 for %%f in ("%PROFILE_DIR%\run_*.iprof") do (
     set "INPUT_ARGS=!INPUT_ARGS! --input-file=%%f"
     echo   %%~nxf
 )
 
-if exist "%MERGE_TOOL%" (
-    echo.
-    echo Using native-image-configure merge...
-    "%MERGE_TOOL%" merge !INPUT_ARGS! --output-file="%~dp0default.iprof" 2>&1
+echo Using native-image-configure merge...
+    native-image-configure merge !INPUT_ARGS! --output-file="%~dp0default.iprof" 2>&1
     if !ERRORLEVEL! EQU 0 (
         if exist "%~dp0default.iprof" (
             echo [OK] Merged to: default.iprof
@@ -115,7 +109,6 @@ if exist "%MERGE_TOOL%" (
         )
     )
     echo [WARN] merge tool failed, profiles will be passed individually to build.
-)
 
 echo 回退：保留独立文件，build 脚本会合并传参
 echo.

@@ -12,10 +12,14 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * 负责管理摄像机视角和跟随模式，实现地图视口的自动跟随玩家功能
  */
 public class CameraContext {
-    /** 跟随模式开关 */
+    /**
+     * 跟随模式开关
+     */
     private final AtomicBoolean followMode = new AtomicBoolean(AppConfig.DEFAULT_FOLLOW_MODE);
 
-    /** 跟随模式变化监听器 */
+    /**
+     * 跟随模式变化监听器
+     */
     private final CopyOnWriteArrayList<Runnable> followModeListeners = new CopyOnWriteArrayList<>();
 
     @Getter
@@ -29,7 +33,9 @@ public class CameraContext {
         return Holder.INSTANCE;
     }
 
-    /** 注册跟随模式变化回调 */
+    /**
+     * 注册跟随模式变化回调
+     */
     public void onFollowModeChange(Runnable listener) {
         followModeListeners.add(listener);
     }

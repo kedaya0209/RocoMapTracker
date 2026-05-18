@@ -1,5 +1,6 @@
 package com.luoke.app.socket;
 
+import com.luoke.app.config.AppConfig;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
@@ -8,7 +9,10 @@ import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -16,49 +20,45 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /**
  * Socket Server — 全局单例, 程序启动时开启, 常驻后台
  * 职责:
- *   1. 监听端口, accept 客户端连接
- *   2. 每连接启动一条 recv 线程, 读取消息 → 按 type 分发到注册的 SocketHandler
- *   3. 管理 SocketHandler 注册/移除
+ * 1. 监听端口, accept 客户端连接
+ * 2. 每连接启动一条 recv 线程, 读取消息 → 按 type 分发到注册的 SocketHandler
+ * 3. 管理 SocketHandler 注册/移除
  * 用法:
- *   SocketServer server = SocketServer.instance();
- *   int port = server.start();           // 程序启动时
- *   server.register(captureHandler);     // 注册处理器
- *   server.stop();                       // 程序退出时
+ * SocketServer server = SocketServer.instance();
+ * int port = server.start();           // 程序启动时
+ * server.register(captureHandler);     // 注册处理器
+ * server.stop();                       // 程序退出时
  */
 @Slf4j
 public class SocketServer {
 
+    /**
+     * 握手消息: C++ 连接后第一条消息，body 为 UTF-8 客户端类型 ("capture"/"sift")
+     */
+    static final int MSG_HELLO = 1;
     private static final SocketServer INSTANCE = new SocketServer();
 
-    public static SocketServer instance() { return INSTANCE; }
-
     // ---- 常量 ----
-
-    /** 握手消息: C++ 连接后第一条消息，body 为 UTF-8 客户端类型 ("capture"/"sift") */
-    static final int MSG_HELLO = 1;
-
+    private final AtomicBoolean running = new AtomicBoolean(false);
+    // sessionId → session
+    private final Map<Long, SocketSession> sessions = new ConcurrentHashMap<>();
+    // msgType → handlers (CopyOnWrite 保证 dispatch 线程安全)
+    private final Map<Integer, CopyOnWriteArrayList<SocketHandler>> dispatch = new ConcurrentHashMap<>();
+    // 所有注册过的 handler 合集 (用于 register/unregister/stop)
+    private final Set<SocketHandler> allHandlers = ConcurrentHashMap.newKeySet();
+    // sessionId → 该连接绑定的 handler 集合 (由 HELLO 消息决定)
+    private final Map<Long, Set<SocketHandler>> sessionHandlers = new ConcurrentHashMap<>();
+    // clientType → handler (HELLO 握手路由)
+    private final Map<String, SocketHandler> clientHandlers = new ConcurrentHashMap<>();
+    // sessionId → 该连接支持的消息类型 (HELLO 中自报，供转发逻辑使用)
+    private final Map<Long, Set<Integer>> sessionMsgTypes = new ConcurrentHashMap<>();
     // ---- 状态 ----
     private ServerSocket serverSocket;
     private Thread acceptThread;
-    private final AtomicBoolean running = new AtomicBoolean(false);
 
-    // sessionId → session
-    private final Map<Long, SocketSession> sessions = new ConcurrentHashMap<>();
-
-    // msgType → handlers (CopyOnWrite 保证 dispatch 线程安全)
-    private final Map<Integer, CopyOnWriteArrayList<SocketHandler>> dispatch = new ConcurrentHashMap<>();
-
-    // 所有注册过的 handler 合集 (用于 register/unregister/stop)
-    private final Set<SocketHandler> allHandlers = ConcurrentHashMap.newKeySet();
-
-    // sessionId → 该连接绑定的 handler 集合 (由 HELLO 消息决定)
-    private final Map<Long, Set<SocketHandler>> sessionHandlers = new ConcurrentHashMap<>();
-
-    // clientType → handler (HELLO 握手路由)
-    private final Map<String, SocketHandler> clientHandlers = new ConcurrentHashMap<>();
-
-    // sessionId → 该连接支持的消息类型 (HELLO 中自报，供转发逻辑使用)
-    private final Map<Long, Set<Integer>> sessionMsgTypes = new ConcurrentHashMap<>();
+    public static SocketServer instance() {
+        return INSTANCE;
+    }
 
     // ---- 启动 / 停止 ----
 
@@ -68,7 +68,7 @@ public class SocketServer {
     public int start() throws IOException {
         if (running.get()) return serverSocket.getLocalPort();
 
-        serverSocket = new ServerSocket(0, 1); // port=0 → OS 随机分配
+        serverSocket = new ServerSocket(0, AppConfig.SOCKET_BACKLOG); // port=0 → OS 随机分配
         running.set(true);
 
         acceptThread = new Thread(this::acceptLoop, "socket-accept");
@@ -87,11 +87,17 @@ public class SocketServer {
         if (!running.compareAndSet(true, false)) return;
 
         // 关闭 ServerSocket (中断 accept)
-        try { serverSocket.close(); } catch (IOException ignored) {}
+        try {
+            serverSocket.close();
+        } catch (IOException ignored) {
+        }
 
         // 等待 accept 线程结束
         if (acceptThread != null) {
-            try { acceptThread.join(2000); } catch (InterruptedException ignored) {}
+            try {
+                acceptThread.join(2000);
+            } catch (InterruptedException ignored) {
+            }
         }
 
         // 关闭所有 session (各 recv 线程会自然退出)
@@ -111,7 +117,9 @@ public class SocketServer {
         return serverSocket != null ? serverSocket.getLocalPort() : -1;
     }
 
-    public boolean isRunning() { return running.get(); }
+    public boolean isRunning() {
+        return running.get();
+    }
 
     /**
      * 返回指定 session 支持的消息类型集合 (由 HELLO 握手上报)，供转发逻辑使用。
@@ -241,7 +249,9 @@ public class SocketServer {
                     bound.add(handler);
                     sessionHandlers.put(session.id(), bound);
 
-                    try { handler.onConnect(session); } catch (Exception e) {
+                    try {
+                        handler.onConnect(session);
+                    } catch (Exception e) {
                         log.error("onConnect error in {}", handler.getClass().getSimpleName(), e);
                     }
 
@@ -282,7 +292,9 @@ public class SocketServer {
         Set<SocketHandler> bound = sessionHandlers.remove(session.id());
         if (bound != null) {
             for (SocketHandler h : bound) {
-                try { h.onDisconnect(session, "Connection closed"); } catch (Exception e) {
+                try {
+                    h.onDisconnect(session, "Connection closed");
+                } catch (Exception e) {
                     log.error("onDisconnect error in {}", h.getClass().getSimpleName(), e);
                 }
             }

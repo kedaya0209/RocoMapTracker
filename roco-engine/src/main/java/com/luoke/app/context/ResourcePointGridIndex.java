@@ -1,5 +1,6 @@
 package com.luoke.app.context;
 
+import com.luoke.app.config.AppConfig;
 import com.luoke.app.map.model.Point;
 import com.luoke.app.map.model.ResourcePoint;
 
@@ -12,7 +13,6 @@ import java.util.Map;
  * 资源点控件索引
  */
 public class ResourcePointGridIndex {
-    private static final int CELL_SIZE = 120;
     private final Map<Long, List<ResourcePoint>> grid = new HashMap<>();
 
     public void buildIndex(List<ResourcePoint> points) {
@@ -26,8 +26,8 @@ public class ResourcePointGridIndex {
 
     public List<ResourcePoint> queryNear(double x, double y) {
         List<ResourcePoint> result = new ArrayList<>();
-        long cellX = (long) (x / CELL_SIZE);
-        long cellY = (long) (y / CELL_SIZE);
+        long cellX = (long) (x / AppConfig.GRID_CELL_SIZE);
+        long cellY = (long) (y / AppConfig.GRID_CELL_SIZE);
 
         for (long dx = -1; dx <= 1; dx++) {
             for (long dy = -1; dy <= 1; dy++) {
@@ -38,8 +38,27 @@ public class ResourcePointGridIndex {
         return result;
     }
 
+    /**
+     * 查询矩形范围内的所有点位（世界坐标）
+     */
+    public List<ResourcePoint> queryRect(double minX, double minY, double maxX, double maxY) {
+        List<ResourcePoint> result = new ArrayList<>();
+        long minCellX = (long) (minX / AppConfig.GRID_CELL_SIZE);
+        long minCellY = (long) (minY / AppConfig.GRID_CELL_SIZE);
+        long maxCellX = (long) (maxX / AppConfig.GRID_CELL_SIZE);
+        long maxCellY = (long) (maxY / AppConfig.GRID_CELL_SIZE);
+
+        for (long cx = minCellX; cx <= maxCellX; cx++) {
+            for (long cy = minCellY; cy <= maxCellY; cy++) {
+                List<ResourcePoint> cell = grid.get(combine(cx, cy));
+                if (cell != null) result.addAll(cell);
+            }
+        }
+        return result;
+    }
+
     private long calculateKey(double x, double y) {
-        return combine((long) (x / CELL_SIZE), (long) (y / CELL_SIZE));
+        return combine((long) (x / AppConfig.GRID_CELL_SIZE), (long) (y / AppConfig.GRID_CELL_SIZE));
     }
 
     private long combine(long cx, long cy) {

@@ -13,14 +13,16 @@ import javafx.scene.text.Font;
 public class StatsOverlay extends StackPane {
 
     private final Label statsLabel;
-    private final Rectangle background;
+    // 缓存可见状态，避免每帧调用 isVisible()/setVisible()/setManaged()
+    // 这些 JavaFX Node 方法在高频热路径上累积原生资源导致 5GB 泄漏
+    private boolean shown;
 
     private StatsOverlay() {
         statsLabel = new Label();
-        statsLabel.setFont(Font.font("Microsoft YaHei", 13));
+        statsLabel.setFont(Font.font(AppConfig.STATS_FONT_NAME, AppConfig.STATS_FONT_SIZE));
         statsLabel.setTextFill(Color.WHITE);
 
-        background = new Rectangle();
+        Rectangle background = new Rectangle();
         background.setFill(Color.rgb(0, 0, 0, 0));
         background.setArcWidth(10);
         background.setArcHeight(10);
@@ -31,7 +33,7 @@ public class StatsOverlay extends StackPane {
         this.getChildren().addAll(background, statsLabel);
         this.setAlignment(Pos.CENTER);
         this.setPickOnBounds(false);
-        this.setPadding(new Insets(5));
+        this.setPadding(new Insets(AppConfig.STATS_PADDING));
         this.setVisible(false);
         this.setManaged(true);
     }
@@ -40,13 +42,8 @@ public class StatsOverlay extends StackPane {
         return Holder.INSTANCE;
     }
 
-    // 缓存可见状态，避免每帧调用 isVisible()/setVisible()/setManaged()
-    // 这些 JavaFX Node 方法在高频热路径上累积原生资源导致 5GB 泄漏
-    private boolean shown;
-
     public void update() {
-        boolean active = AppConfig.SHOW_STATS_MAP_TIME || AppConfig.SHOW_STATS_CIRCLE_MASK
-                || AppConfig.SHOW_STATS_MATCH_TIME || AppConfig.SHOW_STATS_DIR_TIME
+        boolean active = AppConfig.SHOW_STATS_MATCH_TIME || AppConfig.SHOW_STATS_DIR_TIME
                 || AppConfig.SHOW_STATS_FPS;
 
         if (active != shown) {
@@ -66,8 +63,6 @@ public class StatsOverlay extends StackPane {
 
         StatsContext stats = StatsContext.getInstance();
         StringBuilder sb = new StringBuilder(64);
-        if (AppConfig.SHOW_STATS_MAP_TIME) sb.append("小地图:").append(stats.getLastMapDetectMs()).append("ms  ");
-        if (AppConfig.SHOW_STATS_CIRCLE_MASK) sb.append("遮罩:").append(stats.getLastCircleMaskMs()).append("ms  ");
         if (AppConfig.SHOW_STATS_MATCH_TIME) sb.append("匹配:").append(stats.getLastMatchMs()).append("ms  ");
         if (AppConfig.SHOW_STATS_DIR_TIME) sb.append("朝向:").append(stats.getLastDirectionMs()).append("ms  ");
         if (AppConfig.SHOW_STATS_FPS) sb.append("FPS:").append(stats.getFrequency());

@@ -5,6 +5,7 @@ import com.luoke.app.hook.AbstractGenericHook;
 import com.luoke.app.hook.HookEventType;
 import com.luoke.app.hook.event.ProgressEvent;
 import com.luoke.app.hook.multicast.HookRegistry;
+import com.luoke.app.ui.util.FxRippleUtil;
 import javafx.application.Platform;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
@@ -32,12 +33,13 @@ public class LoadingOverlay extends VBox {
         progressBar.setPrefWidth(450);
         progressBar.getStyleClass().add(Styles.MEDIUM);
 
+        FxRippleUtil.install(cancelBtn);
         if (onCancel == null) {
             cancelBtn.setVisible(false);
             cancelBtn.setManaged(false);
         } else {
             cancelBtn.getStyleClass().add(Styles.DANGER);
-            cancelBtn.setOnAction(e -> {
+            cancelBtn.setOnAction(_ -> {
                 cancelBtn.setDisable(true);
                 statusLabel.setText("正在取消并清理中...");
                 onCancel.run();

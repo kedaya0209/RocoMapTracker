@@ -2,12 +2,12 @@
 
 ## 环境要求
 
-| 组件 | 版本 |
-|------|------|
-| GraalVM | 25.0.2+10.1 (企业版) |
-| Maven | 3.8+ |
+| 组件            | 版本                             |
+|---------------|--------------------------------|
+| GraalVM       | 25.0.2+10.1 (企业版)              |
+| Maven         | 3.8+                           |
 | Visual Studio | 18 (Insiders) + Windows 11 SDK |
-| JDK | 25 |
+| JDK           | 25                             |
 
 ## 构建管线总览
 
@@ -61,15 +61,15 @@
 
 **构建参数说明：**
 
-| 参数 | 说明 |
-|------|------|
-| `--gc=Z` | ZGC 低延迟并发 GC |
-| `-R:MaxHeapSize=1G` | 堆上限 1GB |
-| `-R:MinHeapSize=256M` | 启动预分配 256MB |
-| `-R:MaxDirectMemorySize=512M` | 堆外内存上限 |
-| `-H:+UseStringDeduplication` | String 去重（企业版） |
-| `-H:+RemoveUnusedSymbols` | 移除未使用符号 |
-| `-O3 -march=x86-64-v3` | 最高优化 + AVX2 |
+| 参数                            | 说明             |
+|-------------------------------|----------------|
+| `--gc=Z`                      | ZGC 低延迟并发 GC   |
+| `-R:MaxHeapSize=1G`           | 堆上限 1GB        |
+| `-R:MinHeapSize=256M`         | 启动预分配 256MB    |
+| `-R:MaxDirectMemorySize=512M` | 堆外内存上限         |
+| `-H:+UseStringDeduplication`  | String 去重（企业版） |
+| `-H:+RemoveUnusedSymbols`     | 移除未使用符号        |
+| `-O3 -march=x86-64-v3`        | 最高优化 + AVX2    |
 
 ---
 
@@ -114,26 +114,26 @@ PGO（Profile-Guided Optimization）通过采集运行时数据指导编译器�
 
 ## 快速参考
 
-| 场景 | 命令 |
-|------|------|
-| 首次构建 | `1 → 2 → 3 → 4` |
-| 日常迭代 | `4` |
-| PGO 优化 | `5 → 6 → 7` |
-| 依赖变更 | `1 → 2 → 3 → 4` |
+| 场景     | 命令              |
+|--------|-----------------|
+| 首次构建   | `1 → 2 → 3 → 4` |
+| 日常迭代   | `4`             |
+| PGO 优化 | `5 → 6 → 7`     |
+| 依赖变更   | `1 → 2 → 3 → 4` |
 
 ## 内存配置
 
-| 参数 | 值 | 说明 |
-|------|------|------|
-| Java Heap | 256M - 1G | ZGC 自动管理 |
-| Direct Memory | 512M | DirectByteBuffer 上限 |
-| Total Process | ~1.2G | 含 OpenCV/ONNX Native 内存 |
+| 参数            | 值         | 说明                      |
+|---------------|-----------|-------------------------|
+| Java Heap     | 256M - 1G | ZGC 自动管理                |
+| Direct Memory | 512M      | DirectByteBuffer 上限     |
+| Total Process | ~1.2G     | 含 OpenCV/ONNX Native 内存 |
 
 ## 故障排查
 
-| 问题 | 解决 |
-|------|------|
-| `Unknown GC: Z` | 检查 GRAALVM_HOME 指向企业版 25.0.2 |
-| `default.iprof not found` | 确保插桩版正常关闭（不能杀进程） |
-| Native 内存持续增长 | 设置环境变量 `ORT_DISABLE_ARENA_ALLOCATOR=1` |
-| `link: fatal error LNK...` | 检查 VS 18 和 Windows SDK 安装 |
+| 问题                         | 解决                                     |
+|----------------------------|----------------------------------------|
+| `Unknown GC: Z`            | 检查 GRAALVM_HOME 指向企业版 25.0.2           |
+| `default.iprof not found`  | 确保插桩版正常关闭（不能杀进程）                       |
+| Native 内存持续增长              | 设置环境变量 `ORT_DISABLE_ARENA_ALLOCATOR=1` |
+| `link: fatal error LNK...` | 检查 VS 18 和 Windows SDK 安装              |

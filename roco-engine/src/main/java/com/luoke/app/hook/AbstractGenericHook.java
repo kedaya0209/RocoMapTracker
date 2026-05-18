@@ -29,8 +29,9 @@ public abstract class AbstractGenericHook<T> implements IHook<T> {
 
     /**
      * 泛型事件回调方法，子类必须实现
+     *
      * @param eventType 事件类型
-     * @param data 事件数据
+     * @param data      事件数据
      */
     public abstract void onEvent(HookEventType eventType, T data);
 

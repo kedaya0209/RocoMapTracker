@@ -12,40 +12,39 @@ import java.util.stream.Collectors;
  */
 public class ResourceConfigContext {
 
-    @Getter
-    private static ResourceProfile currentProfile = AppConfig.INTERNAL_RESOURCE
-            ? ResourceProfile.INTERNAL
-            : ResourceProfile.EXTERNAL;
-
     /**
-     * 切换资源套件（如：用于运行时切换皮肤或地图包）
+     * 获取当前资源 profile。
+     * 实时判断 AppConfig.INTERNAL_RESOURCE，而非类加载时快照。
      */
-    public static void switchProfile(ResourceProfile profile) {
-        currentProfile = profile;
+    public static ResourceProfile getCurrentProfile() {
+        return AppConfig.INTERNAL_RESOURCE
+                ? ResourceProfile.INTERNAL
+                : ResourceProfile.EXTERNAL;
     }
 
     public static String getSiftMap() {
-        return currentProfile.siftMap;
+        return getCurrentProfile().siftMap;
     }
 
     public static String getShowMap() {
-        return currentProfile.showMap;
+        return getCurrentProfile().showMap;
     }
 
     public static String getTilesDir() {
-        return currentProfile.showMap.substring(0, currentProfile.showMap.lastIndexOf('.')) + "_tiles";
+        ResourceProfile p = getCurrentProfile();
+        return p.showMap.substring(0, p.showMap.lastIndexOf('.')) + "_tiles";
     }
 
     public static String getPlayerIcon() {
-        return currentProfile.playerIcon;
+        return getCurrentProfile().playerIcon;
     }
 
     public static String getPointResource() {
-        return currentProfile.pointConfig;
+        return getCurrentProfile().pointConfig;
     }
 
     public static String getPaths() {
-        return currentProfile.paths;
+        return getCurrentProfile().paths;
     }
 
     public static Set<String> getTags() {

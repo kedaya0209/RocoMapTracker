@@ -20,7 +20,7 @@ public interface RoiProcessor {
      */
     void onProcess(byte[] data, int width, int height);
 
-    enum ImageType {GRAY, BGRA}
-
     ROIData getRoi();
+
+    enum ImageType {GRAY, BGRA}
 }

@@ -1,6 +1,17 @@
 {
   "reflection": [
     {
+      "type": "ch.qos.logback.core.rolling.SizeAndTimeBasedFileNamingAndTriggeringPolicy",
+      "methods": [
+        {
+          "name": "setMaxFileSize",
+          "parameterTypes": [
+            "ch.qos.logback.core.util.FileSize"
+          ]
+        }
+      ]
+    },
+    {
       "type": "ai.djl.onnxruntime.engine.OrtEngineProvider"
     },
     {
@@ -2889,6 +2900,9 @@
     },
     {
       "type": "javafx.scene.shape.LineTo"
+    },
+    {
+      "type": "javafx.scene.shape.Circle"
     },
     {
       "type": "javafx.scene.shape.MoveTo"
@@ -8713,6 +8727,63 @@
       "glob": "dll/lcms.dll"
     },
     {
+      "glob": "icon/rmt.ico"
+    },
+    {
+      "glob": "icon/capture.svg"
+    },
+    {
+      "glob": "icon/download.svg"
+    },
+    {
+      "glob": "icon/follow.svg"
+    },
+    {
+      "glob": "icon/ghost.svg"
+    },
+    {
+      "glob": "icon/match.svg"
+    },
+    {
+      "glob": "icon/minimap.svg"
+    },
+    {
+      "glob": "icon/motion.svg"
+    },
+    {
+      "glob": "icon/ocr.svg"
+    },
+    {
+      "glob": "icon/player.svg"
+    },
+    {
+      "glob": "icon/render.svg"
+    },
+    {
+      "glob": "icon/resources.svg"
+    },
+    {
+      "glob": "icon/rmt.ico"
+    },
+    {
+      "glob": "icon/rmt.svg"
+    },
+    {
+      "glob": "icon/route.svg"
+    },
+    {
+      "glob": "icon/settings.svg"
+    },
+    {
+      "glob": "icon/statistics.svg"
+    },
+    {
+      "glob": "icon/theme.svg"
+    },
+    {
+      "glob": "icon/processor.svg"
+    },
+    {
       "glob": "source/icon/player.png"
     },
     {
@@ -8830,7 +8901,235 @@
       "glob": "source/map/WorldMap_SIFT.png"
     },
     {
+      "glob": "source/map/WorldMap_Show_tiles/0/0_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/0_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/0_10.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/0_11.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/0_12.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/0_13.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/0_14.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/0_15.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/0_16.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/0_17.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/0_18.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/0_19.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/0_2.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/0_20.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/0_21.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/0_22.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/0_23.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/0_24.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/0_25.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/0_26.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/0_27.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/0_28.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/0_29.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/0_3.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/0_30.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/0_31.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/0_4.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/0_5.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/0_6.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/0_7.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/0_8.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/0_9.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/10_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/10_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/10_10.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/10_11.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/10_12.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/10_13.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/10_14.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/10_15.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/10_16.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/10_17.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/10_18.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/10_19.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/10_2.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/10_20.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/10_21.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/10_22.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/10_23.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/10_24.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/10_25.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/10_26.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/10_27.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/10_28.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/10_29.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/10_3.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/10_30.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/10_31.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/10_4.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/10_5.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/10_6.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/10_7.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/10_8.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/10_9.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/11_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/11_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/11_10.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/11_11.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/11_12.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/11_13.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/11_14.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/11_15.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/11_16.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/11_17.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/11_18.png"
+    },
+    {
       "glob": "source/map/WorldMap_Show_tiles/0/11_19.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/11_2.png"
     },
     {
       "glob": "source/map/WorldMap_Show_tiles/0/11_20.png"
@@ -8857,10 +9156,76 @@
       "glob": "source/map/WorldMap_Show_tiles/0/11_27.png"
     },
     {
+      "glob": "source/map/WorldMap_Show_tiles/0/11_28.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/11_29.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/11_3.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/11_30.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/11_31.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/11_4.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/11_5.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/11_6.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/11_7.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/11_8.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/11_9.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/12_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/12_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/12_10.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/12_11.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/12_12.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/12_13.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/12_14.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/12_15.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/12_16.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/12_17.png"
+    },
+    {
       "glob": "source/map/WorldMap_Show_tiles/0/12_18.png"
     },
     {
       "glob": "source/map/WorldMap_Show_tiles/0/12_19.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/12_2.png"
     },
     {
       "glob": "source/map/WorldMap_Show_tiles/0/12_20.png"
@@ -8887,6 +9252,54 @@
       "glob": "source/map/WorldMap_Show_tiles/0/12_27.png"
     },
     {
+      "glob": "source/map/WorldMap_Show_tiles/0/12_28.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/12_29.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/12_3.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/12_30.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/12_31.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/12_4.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/12_5.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/12_6.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/12_7.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/12_8.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/12_9.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/13_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/13_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/13_10.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/13_11.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/13_12.png"
+    },
+    {
       "glob": "source/map/WorldMap_Show_tiles/0/13_13.png"
     },
     {
@@ -8906,6 +9319,9 @@
     },
     {
       "glob": "source/map/WorldMap_Show_tiles/0/13_19.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/13_2.png"
     },
     {
       "glob": "source/map/WorldMap_Show_tiles/0/13_20.png"
@@ -8938,7 +9354,46 @@
       "glob": "source/map/WorldMap_Show_tiles/0/13_29.png"
     },
     {
+      "glob": "source/map/WorldMap_Show_tiles/0/13_3.png"
+    },
+    {
       "glob": "source/map/WorldMap_Show_tiles/0/13_30.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/13_31.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/13_4.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/13_5.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/13_6.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/13_7.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/13_8.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/13_9.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/14_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/14_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/14_10.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/14_11.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/14_12.png"
     },
     {
       "glob": "source/map/WorldMap_Show_tiles/0/14_13.png"
@@ -8960,6 +9415,9 @@
     },
     {
       "glob": "source/map/WorldMap_Show_tiles/0/14_19.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/14_2.png"
     },
     {
       "glob": "source/map/WorldMap_Show_tiles/0/14_20.png"
@@ -8992,7 +9450,46 @@
       "glob": "source/map/WorldMap_Show_tiles/0/14_29.png"
     },
     {
+      "glob": "source/map/WorldMap_Show_tiles/0/14_3.png"
+    },
+    {
       "glob": "source/map/WorldMap_Show_tiles/0/14_30.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/14_31.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/14_4.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/14_5.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/14_6.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/14_7.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/14_8.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/14_9.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/15_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/15_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/15_10.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/15_11.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/15_12.png"
     },
     {
       "glob": "source/map/WorldMap_Show_tiles/0/15_13.png"
@@ -9014,6 +9511,9 @@
     },
     {
       "glob": "source/map/WorldMap_Show_tiles/0/15_19.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/15_2.png"
     },
     {
       "glob": "source/map/WorldMap_Show_tiles/0/15_20.png"
@@ -9046,10 +9546,46 @@
       "glob": "source/map/WorldMap_Show_tiles/0/15_29.png"
     },
     {
+      "glob": "source/map/WorldMap_Show_tiles/0/15_3.png"
+    },
+    {
       "glob": "source/map/WorldMap_Show_tiles/0/15_30.png"
     },
     {
       "glob": "source/map/WorldMap_Show_tiles/0/15_31.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/15_4.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/15_5.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/15_6.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/15_7.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/15_8.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/15_9.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/16_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/16_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/16_10.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/16_11.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/16_12.png"
     },
     {
       "glob": "source/map/WorldMap_Show_tiles/0/16_13.png"
@@ -9071,6 +9607,9 @@
     },
     {
       "glob": "source/map/WorldMap_Show_tiles/0/16_19.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/16_2.png"
     },
     {
       "glob": "source/map/WorldMap_Show_tiles/0/16_20.png"
@@ -9103,10 +9642,46 @@
       "glob": "source/map/WorldMap_Show_tiles/0/16_29.png"
     },
     {
+      "glob": "source/map/WorldMap_Show_tiles/0/16_3.png"
+    },
+    {
       "glob": "source/map/WorldMap_Show_tiles/0/16_30.png"
     },
     {
       "glob": "source/map/WorldMap_Show_tiles/0/16_31.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/16_4.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/16_5.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/16_6.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/16_7.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/16_8.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/16_9.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/17_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/17_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/17_10.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/17_11.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/17_12.png"
     },
     {
       "glob": "source/map/WorldMap_Show_tiles/0/17_13.png"
@@ -9128,6 +9703,9 @@
     },
     {
       "glob": "source/map/WorldMap_Show_tiles/0/17_19.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/17_2.png"
     },
     {
       "glob": "source/map/WorldMap_Show_tiles/0/17_20.png"
@@ -9160,10 +9738,46 @@
       "glob": "source/map/WorldMap_Show_tiles/0/17_29.png"
     },
     {
+      "glob": "source/map/WorldMap_Show_tiles/0/17_3.png"
+    },
+    {
       "glob": "source/map/WorldMap_Show_tiles/0/17_30.png"
     },
     {
       "glob": "source/map/WorldMap_Show_tiles/0/17_31.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/17_4.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/17_5.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/17_6.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/17_7.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/17_8.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/17_9.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/18_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/18_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/18_10.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/18_11.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/18_12.png"
     },
     {
       "glob": "source/map/WorldMap_Show_tiles/0/18_13.png"
@@ -9185,6 +9799,9 @@
     },
     {
       "glob": "source/map/WorldMap_Show_tiles/0/18_19.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/18_2.png"
     },
     {
       "glob": "source/map/WorldMap_Show_tiles/0/18_20.png"
@@ -9217,10 +9834,46 @@
       "glob": "source/map/WorldMap_Show_tiles/0/18_29.png"
     },
     {
+      "glob": "source/map/WorldMap_Show_tiles/0/18_3.png"
+    },
+    {
       "glob": "source/map/WorldMap_Show_tiles/0/18_30.png"
     },
     {
       "glob": "source/map/WorldMap_Show_tiles/0/18_31.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/18_4.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/18_5.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/18_6.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/18_7.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/18_8.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/18_9.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/19_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/19_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/19_10.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/19_11.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/19_12.png"
     },
     {
       "glob": "source/map/WorldMap_Show_tiles/0/19_13.png"
@@ -9242,6 +9895,9 @@
     },
     {
       "glob": "source/map/WorldMap_Show_tiles/0/19_19.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/19_2.png"
     },
     {
       "glob": "source/map/WorldMap_Show_tiles/0/19_20.png"
@@ -9274,10 +9930,142 @@
       "glob": "source/map/WorldMap_Show_tiles/0/19_29.png"
     },
     {
+      "glob": "source/map/WorldMap_Show_tiles/0/19_3.png"
+    },
+    {
       "glob": "source/map/WorldMap_Show_tiles/0/19_30.png"
     },
     {
       "glob": "source/map/WorldMap_Show_tiles/0/19_31.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/19_4.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/19_5.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/19_6.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/19_7.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/19_8.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/19_9.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/1_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/1_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/1_10.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/1_11.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/1_12.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/1_13.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/1_14.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/1_15.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/1_16.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/1_17.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/1_18.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/1_19.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/1_2.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/1_20.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/1_21.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/1_22.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/1_23.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/1_24.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/1_25.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/1_26.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/1_27.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/1_28.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/1_29.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/1_3.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/1_30.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/1_31.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/1_4.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/1_5.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/1_6.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/1_7.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/1_8.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/1_9.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/20_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/20_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/20_10.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/20_11.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/20_12.png"
     },
     {
       "glob": "source/map/WorldMap_Show_tiles/0/20_13.png"
@@ -9299,6 +10087,9 @@
     },
     {
       "glob": "source/map/WorldMap_Show_tiles/0/20_19.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/20_2.png"
     },
     {
       "glob": "source/map/WorldMap_Show_tiles/0/20_20.png"
@@ -9331,16 +10122,70 @@
       "glob": "source/map/WorldMap_Show_tiles/0/20_29.png"
     },
     {
+      "glob": "source/map/WorldMap_Show_tiles/0/20_3.png"
+    },
+    {
       "glob": "source/map/WorldMap_Show_tiles/0/20_30.png"
     },
     {
       "glob": "source/map/WorldMap_Show_tiles/0/20_31.png"
     },
     {
+      "glob": "source/map/WorldMap_Show_tiles/0/20_4.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/20_5.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/20_6.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/20_7.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/20_8.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/20_9.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/21_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/21_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/21_10.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/21_11.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/21_12.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/21_13.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/21_14.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/21_15.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/21_16.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/21_17.png"
+    },
+    {
       "glob": "source/map/WorldMap_Show_tiles/0/21_18.png"
     },
     {
       "glob": "source/map/WorldMap_Show_tiles/0/21_19.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/21_2.png"
     },
     {
       "glob": "source/map/WorldMap_Show_tiles/0/21_20.png"
@@ -9373,13 +10218,70 @@
       "glob": "source/map/WorldMap_Show_tiles/0/21_29.png"
     },
     {
+      "glob": "source/map/WorldMap_Show_tiles/0/21_3.png"
+    },
+    {
       "glob": "source/map/WorldMap_Show_tiles/0/21_30.png"
     },
     {
       "glob": "source/map/WorldMap_Show_tiles/0/21_31.png"
     },
     {
+      "glob": "source/map/WorldMap_Show_tiles/0/21_4.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/21_5.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/21_6.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/21_7.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/21_8.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/21_9.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/22_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/22_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/22_10.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/22_11.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/22_12.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/22_13.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/22_14.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/22_15.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/22_16.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/22_17.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/22_18.png"
+    },
+    {
       "glob": "source/map/WorldMap_Show_tiles/0/22_19.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/22_2.png"
     },
     {
       "glob": "source/map/WorldMap_Show_tiles/0/22_20.png"
@@ -9412,10 +10314,73 @@
       "glob": "source/map/WorldMap_Show_tiles/0/22_29.png"
     },
     {
+      "glob": "source/map/WorldMap_Show_tiles/0/22_3.png"
+    },
+    {
       "glob": "source/map/WorldMap_Show_tiles/0/22_30.png"
     },
     {
       "glob": "source/map/WorldMap_Show_tiles/0/22_31.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/22_4.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/22_5.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/22_6.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/22_7.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/22_8.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/22_9.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/23_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/23_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/23_10.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/23_11.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/23_12.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/23_13.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/23_14.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/23_15.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/23_16.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/23_17.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/23_18.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/23_19.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/23_2.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/23_20.png"
     },
     {
       "glob": "source/map/WorldMap_Show_tiles/0/23_21.png"
@@ -9445,7 +10410,2527 @@
       "glob": "source/map/WorldMap_Show_tiles/0/23_29.png"
     },
     {
+      "glob": "source/map/WorldMap_Show_tiles/0/23_3.png"
+    },
+    {
       "glob": "source/map/WorldMap_Show_tiles/0/23_30.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/23_31.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/23_4.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/23_5.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/23_6.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/23_7.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/23_8.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/23_9.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/24_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/24_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/24_10.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/24_11.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/24_12.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/24_13.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/24_14.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/24_15.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/24_16.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/24_17.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/24_18.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/24_19.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/24_2.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/24_20.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/24_21.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/24_22.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/24_23.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/24_24.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/24_25.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/24_26.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/24_27.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/24_28.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/24_29.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/24_3.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/24_30.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/24_31.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/24_4.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/24_5.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/24_6.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/24_7.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/24_8.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/24_9.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/25_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/25_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/25_10.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/25_11.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/25_12.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/25_13.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/25_14.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/25_15.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/25_16.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/25_17.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/25_18.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/25_19.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/25_2.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/25_20.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/25_21.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/25_22.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/25_23.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/25_24.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/25_25.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/25_26.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/25_27.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/25_28.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/25_29.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/25_3.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/25_30.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/25_31.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/25_4.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/25_5.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/25_6.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/25_7.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/25_8.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/25_9.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/26_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/26_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/26_10.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/26_11.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/26_12.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/26_13.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/26_14.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/26_15.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/26_16.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/26_17.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/26_18.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/26_19.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/26_2.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/26_20.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/26_21.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/26_22.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/26_23.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/26_24.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/26_25.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/26_26.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/26_27.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/26_28.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/26_29.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/26_3.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/26_30.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/26_31.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/26_4.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/26_5.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/26_6.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/26_7.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/26_8.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/26_9.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/27_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/27_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/27_10.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/27_11.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/27_12.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/27_13.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/27_14.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/27_15.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/27_16.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/27_17.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/27_18.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/27_19.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/27_2.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/27_20.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/27_21.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/27_22.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/27_23.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/27_24.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/27_25.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/27_26.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/27_27.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/27_28.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/27_29.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/27_3.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/27_30.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/27_31.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/27_4.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/27_5.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/27_6.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/27_7.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/27_8.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/27_9.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/28_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/28_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/28_10.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/28_11.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/28_12.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/28_13.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/28_14.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/28_15.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/28_16.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/28_17.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/28_18.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/28_19.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/28_2.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/28_20.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/28_21.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/28_22.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/28_23.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/28_24.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/28_25.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/28_26.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/28_27.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/28_28.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/28_29.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/28_3.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/28_30.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/28_31.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/28_4.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/28_5.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/28_6.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/28_7.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/28_8.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/28_9.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/29_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/29_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/29_10.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/29_11.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/29_12.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/29_13.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/29_14.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/29_15.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/29_16.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/29_17.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/29_18.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/29_19.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/29_2.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/29_20.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/29_21.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/29_22.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/29_23.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/29_24.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/29_25.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/29_26.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/29_27.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/29_28.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/29_29.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/29_3.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/29_30.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/29_31.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/29_4.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/29_5.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/29_6.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/29_7.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/29_8.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/29_9.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/2_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/2_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/2_10.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/2_11.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/2_12.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/2_13.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/2_14.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/2_15.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/2_16.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/2_17.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/2_18.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/2_19.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/2_2.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/2_20.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/2_21.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/2_22.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/2_23.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/2_24.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/2_25.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/2_26.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/2_27.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/2_28.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/2_29.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/2_3.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/2_30.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/2_31.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/2_4.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/2_5.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/2_6.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/2_7.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/2_8.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/2_9.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/30_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/30_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/30_10.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/30_11.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/30_12.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/30_13.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/30_14.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/30_15.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/30_16.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/30_17.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/30_18.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/30_19.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/30_2.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/30_20.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/30_21.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/30_22.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/30_23.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/30_24.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/30_25.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/30_26.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/30_27.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/30_28.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/30_29.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/30_3.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/30_30.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/30_31.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/30_4.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/30_5.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/30_6.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/30_7.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/30_8.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/30_9.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/31_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/31_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/31_10.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/31_11.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/31_12.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/31_13.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/31_14.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/31_15.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/31_16.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/31_17.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/31_18.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/31_19.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/31_2.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/31_20.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/31_21.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/31_22.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/31_23.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/31_24.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/31_25.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/31_26.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/31_27.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/31_28.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/31_29.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/31_3.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/31_30.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/31_31.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/31_4.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/31_5.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/31_6.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/31_7.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/31_8.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/31_9.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/3_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/3_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/3_10.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/3_11.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/3_12.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/3_13.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/3_14.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/3_15.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/3_16.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/3_17.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/3_18.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/3_19.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/3_2.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/3_20.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/3_21.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/3_22.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/3_23.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/3_24.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/3_25.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/3_26.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/3_27.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/3_28.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/3_29.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/3_3.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/3_30.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/3_31.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/3_4.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/3_5.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/3_6.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/3_7.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/3_8.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/3_9.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/4_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/4_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/4_10.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/4_11.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/4_12.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/4_13.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/4_14.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/4_15.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/4_16.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/4_17.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/4_18.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/4_19.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/4_2.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/4_20.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/4_21.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/4_22.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/4_23.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/4_24.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/4_25.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/4_26.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/4_27.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/4_28.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/4_29.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/4_3.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/4_30.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/4_31.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/4_4.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/4_5.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/4_6.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/4_7.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/4_8.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/4_9.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/5_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/5_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/5_10.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/5_11.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/5_12.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/5_13.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/5_14.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/5_15.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/5_16.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/5_17.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/5_18.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/5_19.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/5_2.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/5_20.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/5_21.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/5_22.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/5_23.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/5_24.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/5_25.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/5_26.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/5_27.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/5_28.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/5_29.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/5_3.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/5_30.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/5_31.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/5_4.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/5_5.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/5_6.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/5_7.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/5_8.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/5_9.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/6_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/6_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/6_10.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/6_11.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/6_12.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/6_13.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/6_14.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/6_15.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/6_16.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/6_17.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/6_18.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/6_19.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/6_2.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/6_20.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/6_21.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/6_22.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/6_23.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/6_24.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/6_25.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/6_26.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/6_27.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/6_28.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/6_29.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/6_3.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/6_30.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/6_31.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/6_4.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/6_5.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/6_6.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/6_7.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/6_8.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/6_9.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/7_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/7_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/7_10.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/7_11.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/7_12.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/7_13.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/7_14.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/7_15.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/7_16.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/7_17.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/7_18.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/7_19.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/7_2.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/7_20.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/7_21.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/7_22.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/7_23.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/7_24.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/7_25.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/7_26.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/7_27.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/7_28.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/7_29.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/7_3.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/7_30.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/7_31.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/7_4.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/7_5.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/7_6.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/7_7.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/7_8.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/7_9.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/8_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/8_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/8_10.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/8_11.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/8_12.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/8_13.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/8_14.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/8_15.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/8_16.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/8_17.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/8_18.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/8_19.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/8_2.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/8_20.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/8_21.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/8_22.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/8_23.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/8_24.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/8_25.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/8_26.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/8_27.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/8_28.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/8_29.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/8_3.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/8_30.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/8_31.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/8_4.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/8_5.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/8_6.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/8_7.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/8_8.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/8_9.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/9_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/9_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/9_10.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/9_11.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/9_12.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/9_13.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/9_14.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/9_15.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/9_16.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/9_17.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/9_18.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/9_19.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/9_2.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/9_20.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/9_21.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/9_22.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/9_23.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/9_24.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/9_25.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/9_26.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/9_27.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/9_28.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/9_29.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/9_3.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/9_30.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/9_31.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/9_4.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/9_5.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/9_6.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/9_7.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/9_8.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/0/9_9.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/0_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/0_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/0_10.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/0_11.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/0_12.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/0_13.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/0_14.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/0_15.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/0_2.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/0_3.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/0_4.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/0_5.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/0_6.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/0_7.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/0_8.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/0_9.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/10_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/10_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/10_10.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/10_11.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/10_12.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/10_13.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/10_14.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/10_15.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/10_2.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/10_3.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/10_4.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/10_5.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/10_6.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/10_7.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/10_8.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/10_9.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/11_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/11_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/11_10.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/11_11.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/11_12.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/11_13.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/11_14.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/11_15.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/11_2.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/11_3.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/11_4.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/11_5.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/11_6.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/11_7.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/11_8.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/11_9.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/12_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/12_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/12_10.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/12_11.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/12_12.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/12_13.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/12_14.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/12_15.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/12_2.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/12_3.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/12_4.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/12_5.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/12_6.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/12_7.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/12_8.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/12_9.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/13_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/13_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/13_10.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/13_11.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/13_12.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/13_13.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/13_14.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/13_15.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/13_2.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/13_3.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/13_4.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/13_5.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/13_6.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/13_7.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/13_8.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/13_9.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/14_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/14_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/14_10.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/14_11.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/14_12.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/14_13.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/14_14.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/14_15.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/14_2.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/14_3.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/14_4.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/14_5.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/14_6.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/14_7.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/14_8.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/14_9.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/15_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/15_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/15_10.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/15_11.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/15_12.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/15_13.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/15_14.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/15_15.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/15_2.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/15_3.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/15_4.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/15_5.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/15_6.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/15_7.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/15_8.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/15_9.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/1_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/1_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/1_10.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/1_11.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/1_12.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/1_13.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/1_14.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/1_15.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/1_2.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/1_3.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/1_4.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/1_5.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/1_6.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/1_7.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/1_8.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/1_9.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/2_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/2_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/2_10.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/2_11.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/2_12.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/2_13.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/2_14.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/2_15.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/2_2.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/2_3.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/2_4.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/2_5.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/2_6.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/2_7.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/2_8.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/2_9.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/3_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/3_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/3_10.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/3_11.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/3_12.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/3_13.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/3_14.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/3_15.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/3_2.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/3_3.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/3_4.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/3_5.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/3_6.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/3_7.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/3_8.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/3_9.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/4_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/4_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/4_10.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/4_11.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/4_12.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/4_13.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/4_14.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/4_15.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/4_2.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/4_3.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/4_4.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/4_5.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/4_6.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/4_7.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/4_8.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/4_9.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/5_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/5_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/5_10.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/5_11.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/5_12.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/5_13.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/5_14.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/5_15.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/5_2.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/5_3.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/5_4.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/5_5.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/5_6.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/5_7.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/5_8.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/5_9.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/6_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/6_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/6_10.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/6_11.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/6_12.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/6_13.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/6_14.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/6_15.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/6_2.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/6_3.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/6_4.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/6_5.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/6_6.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/6_7.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/6_8.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/6_9.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/7_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/7_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/7_10.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/7_11.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/7_12.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/7_13.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/7_14.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/7_15.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/7_2.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/7_3.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/7_4.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/7_5.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/7_6.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/7_7.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/7_8.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/7_9.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/8_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/8_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/8_10.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/8_11.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/8_12.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/8_13.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/8_14.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/8_15.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/8_2.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/8_3.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/8_4.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/8_5.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/8_6.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/8_7.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/8_8.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/8_9.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/9_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/9_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/9_10.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/9_11.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/9_12.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/9_13.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/9_14.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/9_15.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/9_2.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/9_3.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/9_4.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/9_5.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/9_6.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/9_7.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/9_8.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/1/9_9.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/0_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/0_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/0_2.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/0_3.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/0_4.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/0_5.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/0_6.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/0_7.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/1_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/1_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/1_2.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/1_3.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/1_4.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/1_5.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/1_6.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/1_7.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/2_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/2_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/2_2.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/2_3.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/2_4.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/2_5.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/2_6.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/2_7.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/3_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/3_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/3_2.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/3_3.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/3_4.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/3_5.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/3_6.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/3_7.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/4_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/4_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/4_2.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/4_3.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/4_4.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/4_5.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/4_6.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/4_7.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/5_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/5_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/5_2.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/5_3.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/5_4.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/5_5.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/5_6.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/5_7.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/6_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/6_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/6_2.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/6_3.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/6_4.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/6_5.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/6_6.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/6_7.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/7_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/7_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/7_2.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/7_3.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/7_4.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/7_5.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/7_6.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/2/7_7.png"
     },
     {
       "glob": "source/map/WorldMap_Show_tiles/3/0_0.png"
@@ -9496,13 +12981,19 @@
       "glob": "source/map/WorldMap_Show_tiles/3/3_3.png"
     },
     {
+      "glob": "source/map/WorldMap_Show_tiles/4/0_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/4/0_1.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/4/1_0.png"
+    },
+    {
+      "glob": "source/map/WorldMap_Show_tiles/4/1_1.png"
+    },
+    {
       "glob": "source/map/WorldMap_Show_tiles/tiles_meta.json"
-    },
-    {
-      "glob": "source/map/map_G.png"
-    },
-    {
-      "glob": "source/map/map_G_tiles/tiles_meta.json"
     },
     {
       "glob": "source/point/collect_set.txt"
@@ -9577,6 +13068,12 @@
     },
     {
       "bundle": "sun.util.logging.resources.logging"
+    },
+    {
+      "glob": "com/sun/prism/d3d/hlsl/*.obj"
+    },
+    {
+      "glob": "com/sun/scenario/effect/impl/hw/d3d/hlsl/*.obj"
     }
   ],
   "foreign": {

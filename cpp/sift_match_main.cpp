@@ -594,6 +594,14 @@ static void apply_circle_mask(uint8_t* data, int w, int h,
 }
 
 // ============================================================================
+// 重叠分块训练常量 (Overlapping Tiling)
+// ============================================================================
+static constexpr int TILE_SIZE = 2000;                     // 瓦片尺寸
+static constexpr int TILE_OVERLAP = 200;                   // 重叠宽度
+static constexpr int64_t LARGE_MAP_THRESHOLD_PX = 9000000; // 9Mpx → 启用分块
+static constexpr float DEDUP_DISTANCE = 4.0f;              // 去重距离
+
+// ============================================================================
 // SIFT Matcher: exact Java SiftMapMatcher parameters
 // ============================================================================
 class SiftMatcher {
@@ -649,6 +657,19 @@ public:
             return false;
         }
 
+        int64_t total_pixels = (int64_t)w * h;
+        if (total_pixels >= LARGE_MAP_THRESHOLD_PX) {
+            LOG("Map is large (%dx%d=%lldpx), using overlapping tiling",
+                w, h, (long long)total_pixels);
+            return train_tiled(map_gray, w, h);
+        }
+
+        return train_direct(map_gray);
+    }
+
+private:
+    // ----- 小图直接训练 (≤9Mpx) -----
+    bool train_direct(cv::Mat& map_gray) {
         // SIFT detect + compute
         cv::Mat raw_descriptors;
         sift->detectAndCompute(map_gray, cv::noArray(), map_keypoints, raw_descriptors);
@@ -669,13 +690,159 @@ public:
             LOGERR("Descriptor transform failed");
             return false;
         }
-        train_descriptors = transform->persistent_mat;
+        build_flann_from_train_descs();
 
+        LOG("SIFT trained: %zu features", map_keypoints.size());
+        return true;
+    }
+
+    // ----- 大图重叠分块训练 (>9Mpx) -----
+    bool train_tiled(cv::Mat& map_gray, int map_w, int map_h) {
+        int stride = TILE_SIZE - TILE_OVERLAP;
+        int cols = (int)std::ceil((double)(map_w - TILE_OVERLAP) / stride);
+        int rows = (int)std::ceil((double)(map_h - TILE_OVERLAP) / stride);
+        LOG("Tile layout: %dx%d (%d tiles)", cols, rows, cols * rows);
+
+        // 收集所有瓦片的特征点
+        struct KpEntry {
+            float x, y;
+            std::vector<float> desc;
+        };
+        std::vector<KpEntry> all_kps;
+        int desc_dim = 128; // SIFT default
+
+        for (int r = 0; r < rows; r++) {
+            for (int c = 0; c < cols; c++) {
+                int tile_x = c * stride;
+                int tile_y = r * stride;
+                int tile_w = std::min(TILE_SIZE, map_w - tile_x);
+                int tile_h = std::min(TILE_SIZE, map_h - tile_y);
+
+                cv::Rect roi(tile_x, tile_y, tile_w, tile_h);
+                cv::Mat tile_gray = map_gray(roi);
+
+                std::vector<cv::KeyPoint> tile_kps;
+                cv::Mat tile_descs;
+                sift->detectAndCompute(tile_gray, cv::noArray(), tile_kps, tile_descs);
+
+                if (tile_descs.empty()) continue;
+
+                // 确保 CV_32F
+                cv::Mat desc_float;
+                if (tile_descs.type() != CV_32F) {
+                    tile_descs.convertTo(desc_float, CV_32F);
+                } else {
+                    desc_float = tile_descs;
+                }
+
+                desc_dim = desc_float.cols; // 128 for SIFT
+
+                for (size_t i = 0; i < tile_kps.size(); i++) {
+                    // ★ 坐标还原：加上瓦片偏移量得到全图坐标
+                    KpEntry entry;
+                    entry.x = tile_kps[i].pt.x + (float)tile_x;
+                    entry.y = tile_kps[i].pt.y + (float)tile_y;
+                    entry.desc.resize(desc_dim);
+                    memcpy(entry.desc.data(), desc_float.ptr<float>((int)i),
+                           desc_dim * sizeof(float));
+                    all_kps.push_back(std::move(entry));
+                }
+            }
+        }
+
+        if (all_kps.empty()) {
+            LOGERR("No keypoints detected in any tile");
+            return false;
+        }
+
+        // ========== 重叠区域去重 ==========
+        int total_count = (int)all_kps.size();
+
+        // 空间网格索引 O(1)：将 2D 坐标映射到 cellSize 网格
+        int cell_size = (int)std::ceil(DEDUP_DISTANCE);
+        int grid_cols = map_w / cell_size + 1;
+        int grid_rows = map_h / cell_size + 1;
+        std::vector<int> grid(grid_cols * grid_rows, -1);
+
+        std::vector<bool> keep(total_count, false);
+        int keep_count = 0;
+
+        // 先到先保留：首次遇到的特征加入网格，后续落入同格或邻格且距离 < DEDUP_DISTANCE 的视为重复跳过
+        for (int i = 0; i < total_count; i++) {
+            auto& kp = all_kps[i];
+            int cx = (int)(kp.x / cell_size);
+            int cy = (int)(kp.y / cell_size);
+
+            bool duplicate = false;
+            for (int dx = -1; dx <= 1 && !duplicate; dx++) {
+                for (int dy = -1; dy <= 1 && !duplicate; dy++) {
+                    int nx = cx + dx;
+                    int ny = cy + dy;
+                    if (nx >= 0 && nx < grid_cols && ny >= 0 && ny < grid_rows) {
+                        int existing = grid[ny * grid_cols + nx];
+                        if (existing >= 0) {
+                            auto& ekp = all_kps[existing];
+                            float dist = std::hypot(kp.x - ekp.x, kp.y - ekp.y);
+                            if (dist < DEDUP_DISTANCE) {
+                                duplicate = true;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (!duplicate) {
+                grid[cy * grid_cols + cx] = i;
+                keep[i] = true;
+                keep_count++;
+            }
+        }
+
+        LOG("Dedup: %d → %d (removed %d overlapping duplicates)",
+            total_count, keep_count, total_count - keep_count);
+
+        // ========== 构建合并的描述符矩阵 ==========
+        cv::Mat all_descs(keep_count, desc_dim, CV_32F);
+        int pos = 0;
+        for (int i = 0; i < total_count; i++) {
+            if (keep[i]) {
+                memcpy(all_descs.ptr<float>(pos), all_kps[i].desc.data(),
+                       desc_dim * sizeof(float));
+                pos++;
+            }
+        }
+
+        // 描述符变换 (PCA + 量化)
+        if (!transform->train(all_descs)) {
+            LOGERR("Descriptor transform failed");
+            return false;
+        }
+
+        // 构建关键点列表
+        map_keypoints.clear();
+        map_keypoints.reserve(keep_count);
+        map_keypoint_pts.clear();
+        map_keypoint_pts.reserve(keep_count);
+        for (int i = 0; i < total_count; i++) {
+            if (keep[i]) {
+                auto& kp = all_kps[i];
+                map_keypoints.push_back(cv::KeyPoint(kp.x, kp.y, 1.0f));
+                map_keypoint_pts.emplace_back(kp.x, kp.y);
+            }
+        }
+
+        build_flann_from_train_descs();
+
+        LOG("SIFT trained (tiled): %zu features", map_keypoints.size());
+        return true;
+    }
+
+    void build_flann_from_train_descs() {
+        train_descriptors = transform->persistent_mat;
         if (train_descriptors.type() != CV_32F) {
             train_descriptors.convertTo(train_descriptors, CV_32F);
         }
 
-        // Build FLANN KD-tree matcher
         flann_matcher = cv::makePtr<cv::FlannBasedMatcher>(
             cv::makePtr<cv::flann::KDTreeIndexParams>(1),
             cv::makePtr<cv::flann::SearchParams>(24, 0.0f, true)
@@ -686,10 +853,9 @@ public:
 
         // FLANN 已深拷贝数据到 KD-tree 索引，原始描述符不再需要
         train_descriptors = cv::Mat();
-
-        LOG("SIFT trained: %zu features", map_keypoints.size());
-        return true;
     }
+
+public:
 
     // Load from cache (all data already populated)
     bool load_from_cache() {

@@ -22,6 +22,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -34,7 +35,7 @@ import java.util.List;
  *   ULTRA     — 8-bit 量化 (无 PCA)
  *   PCA_ULTRA — PCA 降维 64维 + 8-bit 量化 (默认)
  * </pre>
- *
+ * <p>
  * nopointergc=true: 显式内存管理，零 GC 追踪开销。
  * KDTreeIndexParams(1): 单树 + checks=24，适配 33W 特征点。
  */
@@ -43,10 +44,44 @@ public class SiftMapMatcher implements MapMatcher {
 
     // ==================== 工厂方法 ====================
 
-    /** 默认单例 (PCA_ULTRA) */
+    /**
+     * 默认单例 (PCA_ULTRA)
+     */
     private static volatile SiftMapMatcher defaultInstance;
+    private final DescriptorTransform transform;
+    private final String logName;
 
-    /** 默认单例 (PCA_ULTRA)，兼容旧调用方 */
+    // ==================== 实例字段 ====================
+    private final SIFT sift = SIFT.create(
+            AppConfig.SIFT_N_FEATURES,
+            AppConfig.SIFT_N_OCTAVE_LAYERS,
+            AppConfig.SIFT_CONTRAST_THRESHOLD,
+            AppConfig.SIFT_EDGE_THRESHOLD,
+            AppConfig.SIFT_SIGMA,
+            false);
+    // --- 持久化 Mat (scope 外创建, destroy 时关闭) ---
+    private final Mat emptyMask = new Mat();
+    private volatile DescriptorMatcher activeMatcher;
+    private ByteBuffer mapKeyPointsDirectBuffer;
+    private int mapPointsCount;
+    private Mat sceneImg;
+    private int currentWidth = -1, currentHeight = -1;
+    private float[] srcBuf = new float[0];
+    private float[] dstBuf = new float[0];
+    private volatile boolean initialized;
+    private volatile boolean destroyed;
+    // RANSAC 内点率 (调试用)
+    private double lastInlierRatio;
+    private SiftMapMatcher(DescriptorTransform.Variant variant) {
+        this.transform = new DescriptorTransform(variant);
+        this.logName = variant.name();
+    }
+
+    // 空间过滤半径（参考图像素），用于剔除距离预测位置过远的匹配点
+
+    /**
+     * 默认单例 (PCA_ULTRA)，兼容旧调用方
+     */
     public static SiftMapMatcher getInstance() {
         if (defaultInstance == null) {
             synchronized (SiftMapMatcher.class) {
@@ -58,50 +93,11 @@ public class SiftMapMatcher implements MapMatcher {
         return defaultInstance;
     }
 
-    /** 创建指定变体的新实例（每次调用新建，用于热切换） */
+    /**
+     * 创建指定变体的新实例（每次调用新建，用于热切换）
+     */
     public static SiftMapMatcher create(DescriptorTransform.Variant variant) {
         return new SiftMapMatcher(variant);
-    }
-
-    // ==================== 实例字段 ====================
-
-    private final DescriptorTransform transform;
-    private final String logName;
-
-    private final SIFT sift = SIFT.create(
-            AppConfig.SIFT_N_FEATURES,
-            AppConfig.SIFT_N_OCTAVE_LAYERS,
-            AppConfig.SIFT_CONTRAST_THRESHOLD,
-            AppConfig.SIFT_EDGE_THRESHOLD,
-            AppConfig.SIFT_SIGMA,
-            false);
-
-    // --- 持久化 Mat (scope 外创建, destroy 时关闭) ---
-    private final Mat emptyMask = new Mat();
-
-    private volatile DescriptorMatcher activeMatcher;
-
-    private ByteBuffer mapKeyPointsDirectBuffer;
-    private int mapPointsCount;
-
-    private Mat sceneImg;
-    private int currentWidth = -1, currentHeight = -1;
-
-    private float[] srcBuf = new float[0];
-    private float[] dstBuf = new float[0];
-
-    private volatile boolean initialized;
-    private volatile boolean destroyed;
-
-    // 空间过滤半径（参考图像素），用于剔除距离预测位置过远的匹配点
-    private static final int SEARCH_RADIUS = 500;
-
-    // RANSAC 内点率 (调试用)
-    private double lastInlierRatio;
-
-    private SiftMapMatcher(DescriptorTransform.Variant variant) {
-        this.transform = new DescriptorTransform(variant);
-        this.logName = variant.name();
     }
 
     // ==================== MapMatcher 接口 ====================
@@ -205,7 +201,7 @@ public class SiftMapMatcher implements MapMatcher {
             float kx = fb.get(trainIdx * 2);
             float ky = fb.get(trainIdx * 2 + 1);
             double dist = Math.hypot(kx - hintX, ky - hintY);
-            if (dist <= SEARCH_RADIUS) {
+            if (dist <= AppConfig.SEARCH_RADIUS) {
                 kept.add(dm);
             }
         }
@@ -288,8 +284,8 @@ public class SiftMapMatcher implements MapMatcher {
 
     private void initMatcher() {
         FlannBasedMatcher newMatcher = new FlannBasedMatcher(
-                new KDTreeIndexParams(1),
-                new SearchParams(24, 0, true));
+                new KDTreeIndexParams(AppConfig.FLANN_KD_TREES),
+                new SearchParams(AppConfig.FLANN_SEARCH_CHECKS, 0, true));
 
         try (PointerScope scope = new PointerScope()) {
             Mat tempFloat = new Mat();
@@ -322,29 +318,15 @@ public class SiftMapMatcher implements MapMatcher {
             Mat mapGray = new Mat();
             opencv_imgproc.cvtColor(mapColor, mapGray, opencv_imgproc.COLOR_BGR2GRAY);
 
-            // SIFT 检测
-            KeyPointVector kps = new KeyPointVector();
-            Mat rawDescriptors = new Mat();
-            sift.detectAndCompute(mapGray, emptyMask, kps, rawDescriptors);
-            if (rawDescriptors.type() != opencv_core.CV_32F) {
-                Mat tmp = new Mat();
-                rawDescriptors.convertTo(tmp, opencv_core.CV_32F);
-                rawDescriptors = tmp;
-            }
+            int mapH = mapGray.rows();
+            int mapW = mapGray.cols();
+            long totalPixels = (long) mapW * mapH;
 
-            // 描述符变换 (PCA + 量化)
-            transform.train(rawDescriptors);
-
-            // 关键点坐标
-            long kpsCount = kps.size();
-            mapPointsCount = (int) kpsCount;
-            mapKeyPointsDirectBuffer = ByteBuffer.allocateDirect(mapPointsCount * 2 * 4)
-                    .order(ByteOrder.nativeOrder());
-            FloatBuffer fb = mapKeyPointsDirectBuffer.asFloatBuffer();
-            for (long i = 0; i < kpsCount; i++) {
-                KeyPoint kp = kps.get(i);
-                fb.put((int) i * 2, kp.pt().x());
-                fb.put((int) i * 2 + 1, kp.pt().y());
+            if (totalPixels >= AppConfig.SIFT_LARGE_MAP_THRESHOLD) {
+                log.info("{} 地图较大({}x{}={}px), 启用重叠分块特征提取", logName, mapW, mapH, totalPixels);
+                trainTiled(mapGray, mapW, mapH);
+            } else {
+                trainDirect(mapGray);
             }
 
             log.info("{} 训练完成: {} 地图特征点", logName, mapPointsCount);
@@ -360,6 +342,191 @@ public class SiftMapMatcher implements MapMatcher {
         initMatcher();
         initialized = true;
         return true;
+    }
+
+    /**
+     * 小图直接训练（≤9Mpx 走此路径，保持原有行为）。
+     */
+    private void trainDirect(Mat mapGray) {
+        try (PointerScope scope = new PointerScope()) {
+            KeyPointVector kps = new KeyPointVector();
+            Mat rawDescriptors = new Mat();
+            sift.detectAndCompute(mapGray, emptyMask, kps, rawDescriptors);
+            if (rawDescriptors.type() != opencv_core.CV_32F) {
+                Mat tmp = new Mat();
+                rawDescriptors.convertTo(tmp, opencv_core.CV_32F);
+                rawDescriptors = tmp;
+            }
+
+            transform.train(rawDescriptors);
+
+            long kpsCount = kps.size();
+            mapPointsCount = (int) kpsCount;
+            mapKeyPointsDirectBuffer = ByteBuffer.allocateDirect(mapPointsCount * 2 * 4)
+                    .order(ByteOrder.nativeOrder());
+            FloatBuffer fb = mapKeyPointsDirectBuffer.asFloatBuffer();
+            for (long i = 0; i < kpsCount; i++) {
+                KeyPoint kp = kps.get(i);
+                fb.put((int) i * 2, kp.pt().x());
+                fb.put((int) i * 2 + 1, kp.pt().y());
+            }
+        }
+    }
+
+    /**
+     * 大图重叠分块训练（Overlapping Tiling）。
+     *
+     * <p>将地图切分为 AppConfig.SIFT_TILE_SIZE×AppConfig.SIFT_TILE_SIZE 的瓦片，
+     * 相邻瓦片重叠 AppConfig.SIFT_TILE_OVERLAP 像素。每块独立执行 SIFT 检测，
+     * 然后通过空间网格去重合并结果。
+     */
+    private void trainTiled(Mat mapGray, int mapW, int mapH) {
+        int stride = AppConfig.SIFT_TILE_SIZE - AppConfig.SIFT_TILE_OVERLAP;
+        int cols = (int) Math.ceil((double) (mapW - AppConfig.SIFT_TILE_OVERLAP) / stride);
+        int rows = (int) Math.ceil((double) (mapH - AppConfig.SIFT_TILE_OVERLAP) / stride);
+        log.info("{} 瓦片布局: {}x{} ({} tiles)", logName, cols, rows, cols * rows);
+
+        // 收集所有瓦片的特征点
+        List<float[]> kpCoords = new ArrayList<>();
+        List<Float> kpResponses = new ArrayList<>();
+        List<float[]> kpDescs = new ArrayList<>();
+        int descDim = -1;
+
+        for (int r = 0; r < rows; r++) {
+            for (int c = 0; c < cols; c++) {
+                int tileX = c * stride;
+                int tileY = r * stride;
+                int tileW = Math.min(AppConfig.SIFT_TILE_SIZE, mapW - tileX);
+                int tileH = Math.min(AppConfig.SIFT_TILE_SIZE, mapH - tileY);
+
+                try (PointerScope scope = new PointerScope()) {
+                    Rect roi = new Rect(tileX, tileY, tileW, tileH);
+                    Mat tileGray = new Mat(mapGray, roi);
+
+                    KeyPointVector tileKps = new KeyPointVector();
+                    Mat tileDescs = new Mat();
+                    sift.detectAndCompute(tileGray, emptyMask, tileKps, tileDescs);
+
+                    long n = tileKps.size();
+                    if (n == 0 || tileDescs.empty()) continue;
+
+                    // 确保 CV_32F
+                    Mat descFloat;
+                    if (tileDescs.type() != opencv_core.CV_32F) {
+                        descFloat = new Mat();
+                        tileDescs.convertTo(descFloat, opencv_core.CV_32F);
+                    } else {
+                        descFloat = tileDescs;
+                    }
+
+                    descDim = descFloat.cols(); // 128 for SIFT
+                    long totalVals = descFloat.total() * descFloat.channels();
+                    float[] descData = new float[(int) totalVals];
+                    new FloatPointer(descFloat.data()).get(descData);
+
+                    for (long i = 0; i < n; i++) {
+                        KeyPoint kp = tileKps.get(i);
+                        // ★ 坐标还原：加上瓦片偏移量得到全图坐标
+                        kpCoords.add(new float[]{kp.pt().x() + tileX, kp.pt().y() + tileY});
+                        kpResponses.add(kp.response());
+
+                        float[] row = new float[descDim];
+                        System.arraycopy(descData, (int) i * descDim, row, 0, descDim);
+                        kpDescs.add(row);
+                    }
+                }
+            }
+        }
+
+        if (kpCoords.isEmpty()) {
+            log.warn("{} 未检测到任何特征点", logName);
+            mapPointsCount = 0;
+            return;
+        }
+
+        // ========== 重复特征去重 ==========
+        int totalCount = kpCoords.size();
+        boolean[] keep = new boolean[totalCount];
+        int keepCount = 0;
+
+        // 按 response 降序排序（响应越强的特征越优先保留）
+        Integer[] sortedIndices = new Integer[totalCount];
+        for (int i = 0; i < totalCount; i++) sortedIndices[i] = i;
+        Arrays.sort(sortedIndices, (a, b) -> Float.compare(kpResponses.get(b), kpResponses.get(a)));
+
+        // 空间网格索引，O(1) 近邻查询重复点
+        int cellSize = (int) Math.ceil(AppConfig.SIFT_DEDUP_DISTANCE);
+        int gridCols = mapW / cellSize + 1;
+        int gridRows = mapH / cellSize + 1;
+        int[] grid = new int[gridCols * gridRows];
+        Arrays.fill(grid, -1);
+
+        for (int idx : sortedIndices) {
+            float[] coord = kpCoords.get(idx);
+            int cx = (int) (coord[0] / cellSize);
+            int cy = (int) (coord[1] / cellSize);
+
+            // 检查 3×3 邻域是否已有保留的重复点
+            boolean duplicate = false;
+            outer:
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dy = -1; dy <= 1; dy++) {
+                    int nx = cx + dx;
+                    int ny = cy + dy;
+                    if (nx >= 0 && nx < gridCols && ny >= 0 && ny < gridRows) {
+                        int existing = grid[ny * gridCols + nx];
+                        if (existing >= 0) {
+                            float[] ekp = kpCoords.get(existing);
+                            float dist = (float) Math.hypot(coord[0] - ekp[0], coord[1] - ekp[1]);
+                            if (dist < AppConfig.SIFT_DEDUP_DISTANCE) {
+                                duplicate = true;
+                                break outer;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (!duplicate) {
+                grid[cy * gridCols + cx] = idx;
+                keep[idx] = true;
+                keepCount++;
+            }
+        }
+
+        log.info("{} 去重: {} → {} (移除 {} 个重叠重复点)",
+                logName, totalCount, keepCount, totalCount - keepCount);
+
+        // ========== 构建描述符矩阵 ==========
+        Mat allDescs = new Mat(keepCount, descDim, opencv_core.CV_32F);
+        float[] allDescData = new float[keepCount * descDim];
+        int pos = 0;
+        for (int i = 0; i < totalCount; i++) {
+            if (keep[i]) {
+                float[] row = kpDescs.get(i);
+                System.arraycopy(row, 0, allDescData, pos, descDim);
+                pos += descDim;
+            }
+        }
+        new FloatPointer(allDescs.data()).put(allDescData);
+
+        // 训练变换 (PCA + 量化)
+        transform.train(allDescs);
+
+        // ========== 构建关键点坐标缓冲区 ==========
+        mapPointsCount = keepCount;
+        mapKeyPointsDirectBuffer = ByteBuffer.allocateDirect(keepCount * 2 * 4)
+                .order(ByteOrder.nativeOrder());
+        FloatBuffer fb = mapKeyPointsDirectBuffer.asFloatBuffer();
+        pos = 0;
+        for (int i = 0; i < totalCount; i++) {
+            if (keep[i]) {
+                float[] coord = kpCoords.get(i);
+                fb.put(pos * 2, coord[0]);
+                fb.put(pos * 2 + 1, coord[1]);
+                pos++;
+            }
+        }
     }
 
     private void saveToCache(String path) {

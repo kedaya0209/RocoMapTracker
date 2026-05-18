@@ -1,5 +1,6 @@
 package com.luoke.app.context;
 
+import com.luoke.app.config.AppConfig;
 import com.luoke.app.model.ocr.OcrService;
 import lombok.extern.slf4j.Slf4j;
 
@@ -16,9 +17,10 @@ import java.util.function.Consumer;
 public class OcrAsyncManager implements AutoCloseable {
     private static volatile OcrAsyncManager INSTANCE;
 
-    private final ExecutorService executorService = new ThreadPoolExecutor(2, 2, 0,
+    private final ExecutorService executorService = new ThreadPoolExecutor(
+            AppConfig.OCR_THREAD_POOL_SIZE, AppConfig.OCR_THREAD_POOL_SIZE, 0,
             TimeUnit.MILLISECONDS,
-            new LinkedBlockingQueue<>(10), // 有界队列，积压 >10 丢弃最旧任务
+            new LinkedBlockingQueue<>(AppConfig.OCR_TASK_QUEUE_CAPACITY), // 有界队列，积压 >10 丢弃最旧任务
             new ThreadFactory() {
                 private final AtomicInteger index = new AtomicInteger(0);
 
@@ -38,6 +40,7 @@ public class OcrAsyncManager implements AutoCloseable {
 
     /**
      * 私有构造函数
+     *
      * @param poolSize 服务池大小
      * @throws Exception 当OcrService初始化失败时抛出异常
      */
@@ -53,6 +56,7 @@ public class OcrAsyncManager implements AutoCloseable {
 
     /**
      * 初始化OCR异步管理器（单例模式）
+     *
      * @param poolSize 服务池大小
      */
     public static void initialize(int poolSize) {
@@ -71,6 +75,7 @@ public class OcrAsyncManager implements AutoCloseable {
 
     /**
      * 获取单例实例
+     *
      * @return 单例实例，如果未初始化则返回null
      */
     public static OcrAsyncManager getInstance() {
@@ -79,9 +84,10 @@ public class OcrAsyncManager implements AutoCloseable {
 
     /**
      * 提交异步OCR任务
-     * @param bytes 图像字节数组
-     * @param width 图像宽度
-     * @param height 图像高度
+     *
+     * @param bytes    图像字节数组
+     * @param width    图像宽度
+     * @param height   图像高度
      * @param callback 回调函数，接收OCR识别结果
      */
     public void submitTask(byte[] bytes, int width, int height, Consumer<List<String>> callback) {
@@ -90,7 +96,7 @@ public class OcrAsyncManager implements AutoCloseable {
         executorService.submit(() -> {
             OcrService service = null;
             try {
-                if (System.currentTimeMillis() - submitTime > 500) {
+                if (System.currentTimeMillis() - submitTime > AppConfig.OCR_TASK_TIMEOUT_MS) {
                     return;
                 }
 

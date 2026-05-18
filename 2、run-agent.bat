@@ -2,12 +2,7 @@
 chcp 65001
 cls
 
-echo 1. 环境路径设置
-set "GRAALVM_HOME=D:\Documents\environment\java\graalvm-win\graalvm-jdk-25.0.2+10.1"
-set "JAVA_HOME=%GRAALVM_HOME%"
-set "PATH=%GRAALVM_HOME%\bin;%PATH%"
-
-echo 2. 确保输出目录存在
+echo 1. 确保输出目录存在
 set "CONFIG_DIR=roco-ui\target\native-agent"
 if not exist "%CONFIG_DIR%" mkdir "%CONFIG_DIR%"
 
@@ -16,7 +11,7 @@ echo  正在启动 RocoMapTracker 并收集反射配置
 echo  [已开启定时刷盘] 每 10 秒自动保存一次
 echo ==============================================
 
-echo 3. 查找 fat jar（支持版本号变更）
+echo 2. 查找 fat jar（支持版本号变更）
 for %%f in (roco-ui\target\roco-ui-*-jar-with-dependencies.jar) do set "JAR_FILE=%%f"
 
 if not defined JAR_FILE (

@@ -16,6 +16,7 @@ public class LayerOption {
 
     /**
      * 构造方法
+     *
      * @param tileUrl 瓦片URL模板，如 "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
      */
     public LayerOption(String tileUrl) {

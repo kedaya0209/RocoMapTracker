@@ -13,6 +13,7 @@ public class JsonUtils {
      * 全局唯一的ObjectMapper单例
      */
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
     static {
         OBJECT_MAPPER.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
     }
@@ -25,6 +26,7 @@ public class JsonUtils {
 
     /**
      * 获取全局唯一的ObjectMapper实例
+     *
      * @return 全局唯一的ObjectMapper实例，永远不为null
      */
     public static ObjectMapper getMapper() {

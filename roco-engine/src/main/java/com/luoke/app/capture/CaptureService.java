@@ -25,10 +25,13 @@ public class CaptureService {
 
     private final CopyOnWriteArrayList<RoiProcessor> processors = new CopyOnWriteArrayList<>();
     private final CaptureHandler handler = new CaptureHandler();
-    private ROIData[] cachedRois;
-
     private final CaptureHandler.FrameCallback frameCallback;
     private final CaptureHandler.StateCallback stateCallback;
+    private ROIData[] cachedRois;
+    /**
+     * 全帧模式下，全帧数据在帧数据中的索引位置 (= ROIs 数量)
+     */
+    private volatile int fullFrameIndex = -1;
 
     public CaptureService(String windowTitle) {
         this.windowTitle = windowTitle;
@@ -43,7 +46,7 @@ public class CaptureService {
             // 黑帧检测 (始终用灰度图)
             if (index == 0) {
                 gray = bgraToGray(data, w, h, stride);
-                if (isAllBlack(gray, 100)) {
+                if (isAllBlack(gray, AppConfig.CAPTURE_BLACK_SAMPLE_SIZE)) {
                     if (continuousBlackFrames.incrementAndGet() > AppConfig.MAX_BLACK_FRAMES) {
                         log.error("持续黑帧, 强制重置采集会话...");
                         this.stop();
@@ -69,6 +72,11 @@ public class CaptureService {
                 } catch (Exception ignore) {
                 }
             }
+
+            // 全帧模式：将全帧数据存入 CaptureFrameBuffer 供设置面板预览
+            if (index == fullFrameIndex) {
+                CaptureFrameBuffer.getInstance().putFullFrame(data, w, h);
+            }
         };
 
         stateCallback = (connected, detail) -> {
@@ -78,6 +86,22 @@ public class CaptureService {
                         new CaptureStateEvent(-1, false, windowTitle));
             }
         };
+    }
+
+    private static byte[] bgraToGray(byte[] bgra, int w, int h, int stride) {
+        byte[] gray = new byte[w * h];
+        for (int y = 0; y < h; y++) {
+            int rowStart = y * stride;
+            int grayRow = y * w;
+            for (int x = 0; x < w; x++) {
+                int pos = rowStart + x * 4;
+                int b = bgra[pos] & 0xFF;
+                int g = bgra[pos + 1] & 0xFF;
+                int r = bgra[pos + 2] & 0xFF;
+                gray[grayRow + x] = (byte) ((r * 77 + g * 150 + b * 29) >> 8);
+            }
+        }
+        return gray;
     }
 
     /**
@@ -110,24 +134,29 @@ public class CaptureService {
         return result == 0;
     }
 
-    private static byte[] bgraToGray(byte[] bgra, int w, int h, int stride) {
-        byte[] gray = new byte[w * h];
-        for (int y = 0; y < h; y++) {
-            int rowStart = y * stride;
-            int grayRow = y * w;
-            for (int x = 0; x < w; x++) {
-                int pos = rowStart + x * 4;
-                int b = bgra[pos] & 0xFF;
-                int g = bgra[pos + 1] & 0xFF;
-                int r = bgra[pos + 2] & 0xFF;
-                gray[grayRow + x] = (byte) ((r * 77 + g * 150 + b * 29) >> 8);
-            }
-        }
-        return gray;
-    }
-
     public void setRois(ROIData[] rois) {
         this.cachedRois = rois;
+    }
+
+    /**
+     * 切换全帧模式。开启后 C++ capture.exe 会在 ROI 帧后附加一帧完整画面，
+     * CaptureService 将其存入 CaptureFrameBuffer 供设置面板预览。
+     */
+    public void setFullFrameMode(boolean enabled) {
+        if (enabled && cachedRois != null && cachedRois.length > 0) {
+            // 全帧数据在帧消息中的索引 = ROI 数量
+            fullFrameIndex = cachedRois.length;
+            handler.setFullFrameRoiIndex(fullFrameIndex);
+            handler.sendSwitchMode(true);
+            log.info("Full-frame mode enabled, index={}", fullFrameIndex);
+        } else {
+            fullFrameIndex = -1;
+            handler.setFullFrameRoiIndex(-1);
+            handler.releaseFullFrameBuffer();
+            handler.sendSwitchMode(false);
+            CaptureFrameBuffer.getInstance().clear();
+            log.info("Full-frame mode disabled");
+        }
     }
 
     public void addProcessors(RoiProcessor... processors) {

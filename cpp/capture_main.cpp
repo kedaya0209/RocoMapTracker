@@ -14,6 +14,14 @@
 //   Java -> C++: msgType=106 (stop request)
 //   C++ -> Java: msgType=105 (window closed)
 //   C++ -> Java: msgType=107 (window minimized/restored)
+//   Java -> C++: msgType=108 (switch mode: [1] 0=ROI 1=full-frame)
+//
+// Full-frame mode (SWITCH_MODE=108):
+//   Java sends SWITCH_MODE with body=[1] (mode=1) to enable full-frame.
+//   In full-frame mode, FRAME_DATA includes an extra entry at index=roi_count
+//   containing the entire content area BGRA pixels. Processors still receive
+//   normal per-ROI data; full frame is only for preview (RoiPreview).
+//   Send SWITCH_MODE with body=[0] to disable and return to ROI-only mode.
 //
 // Build: build_capture.bat
 // Run:   capture.exe <hwnd_decimal> <port>
@@ -86,6 +94,7 @@ enum MsgType : int32_t {
     WINDOW_CLOSED    = 105,  // C++ -> Java
     STOP_REQUEST     = 106,  // Java -> C++
     WINDOW_STATE     = 107,  // C++ -> Java
+    SWITCH_MODE      = 108,  // Java -> C++: [1] 0=ROI模式 1=全帧模式
 };
 
 // ============================================================================
@@ -207,6 +216,7 @@ struct FrameCache {
 // ============================================================================
 static std::atomic<bool> g_running{true};
 static std::atomic<bool> g_paused{false};
+static std::atomic<bool> g_full_frame{false};
 
 // ============================================================================
 // Serialize one frame into msgType=4 body format
@@ -608,7 +618,8 @@ public:
             }
 
             // Process frame (extract ROIs from GPU)
-            bool ok = ProcessFrame(tex.Get());
+            bool ff_mode = g_full_frame.load(std::memory_order_acquire);
+            bool ok = ProcessFrame(tex.Get(), ff_mode);
 
             // Return frame to pool (CRITICAL to avoid D3D texture leak)
             CloseWgcFrame(wgc_frame.Get());
@@ -623,7 +634,7 @@ public:
             {
                 std::shared_lock lock(roi_mutex);
                 serialize_frame_body(rois, roi_buffers, roi_buf_w, roi_buf_h,
-                                     rois.size(), body);
+                                     roi_buffers.size(), body);
             }
 
             // Swap into cache (overwrite if send thread hasn't consumed previous)
@@ -679,7 +690,8 @@ private:
 
     // ---- Extract ROIs from a D3D11 frame texture ----
     // 只拷贝 ROI 区域到小 staging 纹理，避免全帧 GPU→CPU 回读瓶颈
-    bool ProcessFrame(ID3D11Texture2D* frame_texture) {
+    // 当 full_frame=true 时，额外将整个内容区作为虚拟 ROI 添加到末尾
+    bool ProcessFrame(ID3D11Texture2D* frame_texture, bool ff_mode = false) {
         D3D11_TEXTURE2D_DESC desc;
         frame_texture->GetDesc(&desc);
         UINT fw = desc.Width;
@@ -710,9 +722,10 @@ private:
         }
 
         size_t nrois = roi_snap.size();
-        roi_buffers.resize(nrois);
-        roi_buf_w.resize(nrois);
-        roi_buf_h.resize(nrois);
+        size_t total = nrois + (ff_mode ? 1 : 0);
+        roi_buffers.resize(total);
+        roi_buf_w.resize(total);
+        roi_buf_h.resize(total);
 
         for (size_t i = 0; i < nrois; i++) {
             const ROI& r = roi_snap[i];
@@ -773,6 +786,46 @@ private:
 
             roi_buf_w[i] = rw;
             roi_buf_h[i] = rh;
+        }
+
+        // 全帧模式：将整个内容区作为虚拟 ROI 附加到末尾
+        if (ff_mode) {
+            size_t ff_idx = nrois;
+            UINT ff_w = fw;
+            UINT ff_h = content_h;
+
+            if (SUCCEEDED(EnsureRoiStaging((UINT)ff_idx, ff_w, ff_h))) {
+                int ff_src_y = caption_px;
+                D3D11_BOX ff_box = {
+                    0, (UINT)ff_src_y, 0,
+                    ff_w, (UINT)(ff_src_y + ff_h), 1
+                };
+                d3d_context->CopySubresourceRegion(
+                    roi_stagings[ff_idx].tex.Get(), 0, 0, 0, 0,
+                    frame_texture, 0, &ff_box);
+
+                D3D11_MAPPED_SUBRESOURCE mapped_ff = {};
+                if (SUCCEEDED(d3d_context->Map(roi_stagings[ff_idx].tex.Get(), 0,
+                                                D3D11_MAP_READ, 0, &mapped_ff))) {
+                    size_t ff_buf_size = (size_t)ff_w * ff_h * 4;
+                    auto& ff_buf = roi_buffers[ff_idx];
+                    ff_buf.resize(ff_buf_size);
+
+                    // 全帧可能 RowPitch != width*4，逐行拷贝
+                    uint8_t* dst = ff_buf.data();
+                    const uint8_t* src = static_cast<const uint8_t*>(mapped_ff.pData);
+                    size_t row_bytes = (size_t)ff_w * 4;
+                    for (UINT y = 0; y < ff_h; y++) {
+                        memcpy(dst + y * row_bytes,
+                               src + (size_t)y * mapped_ff.RowPitch,
+                               row_bytes);
+                    }
+
+                    d3d_context->Unmap(roi_stagings[ff_idx].tex.Get(), 0);
+                    roi_buf_w[ff_idx] = (int)ff_w;
+                    roi_buf_h[ff_idx] = (int)ff_h;
+                }
+            }
         }
 
         return true;
@@ -872,6 +925,13 @@ static void send_loop(SOCKET sock, FrameCache& cache) {
             LOG("Received stop request");
             g_running.store(false, std::memory_order_release);
             break;
+        }
+
+        if (type == SWITCH_MODE) {
+            bool on = !recv_body.empty() && recv_body[0] != 0;
+            g_full_frame.store(on, std::memory_order_release);
+            LOG("Full-frame mode: %s", on ? "ON" : "OFF");
+            continue;
         }
 
         if (type != PROCESSING_DONE) {
@@ -1034,9 +1094,9 @@ int main(int argc, char* argv[]) {
 
     // ---- Handshake 1: HELLO (identify + declare supported msg types) ----
     {
-        const int32_t myTypes[] = { RETURN_ROI, PROCESSING_DONE, STOP_REQUEST };
-        auto hello = build_hello("capture", myTypes, 3);
-        LOG("Sending HELLO (capture, %d types)...", 3);
+        const int32_t myTypes[] = { RETURN_ROI, PROCESSING_DONE, STOP_REQUEST, SWITCH_MODE };
+        auto hello = build_hello("capture", myTypes, 4);
+        LOG("Sending HELLO (capture, %d types)...", 4);
         if (!send_message(sock, HELLO, hello.data(), (uint32_t)hello.size())) {
             LOGERR("Failed to send HELLO");
             closesocket(sock);

@@ -1,34 +1,29 @@
 package com.luoke.app.ui.component;
 
+import com.luoke.app.config.AppConfig;
 import com.luoke.app.context.CameraContext;
 import com.luoke.app.context.MapContext;
 import com.luoke.app.context.PathContext;
 import com.luoke.app.context.ResourcePointContext;
-import com.luoke.app.hook.HookEventType;
-import com.luoke.app.hook.multicast.HookRegistry;
 import com.luoke.app.map.model.Point;
 import com.luoke.app.map.model.ResourcePoint;
 import com.luoke.app.map.model.RoutePath;
 import com.luoke.app.ui.render.MapRenderer;
 import com.luoke.app.ui.util.DialogUtils;
 import javafx.application.Platform;
-import javafx.collections.FXCollections;
-import javafx.collections.ObservableList;
-import javafx.geometry.Pos;
 import javafx.scene.Cursor;
 import javafx.scene.canvas.Canvas;
-import javafx.scene.control.*;
+import javafx.scene.control.ContextMenu;
+import javafx.scene.control.MenuItem;
+import javafx.scene.control.SeparatorMenuItem;
+import javafx.scene.control.Tooltip;
 import javafx.scene.input.*;
 import javafx.scene.layout.StackPane;
-import javafx.scene.layout.VBox;
-import javafx.stage.Popup;
 import javafx.util.Duration;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
-import java.util.Set;
-import java.util.TreeSet;
 
 @Slf4j
 public class InteractiveCanvas extends Canvas {
@@ -39,8 +34,9 @@ public class InteractiveCanvas extends Canvas {
     private final PathContext pathContext = PathContext.getInstance();
 
     private final Tooltip hintTooltip = new Tooltip();
+    private final KeyCombination saveCombo = new KeyCodeCombination(KeyCode.S, KeyCombination.CONTROL_ANY);
+    private final KeyCombination undoCombo = new KeyCodeCombination(KeyCode.Z, KeyCombination.CONTROL_ANY);
     private double lastMouseX, lastMouseY;
-    private boolean firstResize = true;
     private ResourcePoint hoveredPoint = null;
     @Setter
     private MapRenderer mapRenderer;
@@ -48,12 +44,8 @@ public class InteractiveCanvas extends Canvas {
     private UiAnimator uiAnimator;
     private ContextMenu mapContextMenu;
     private ContextMenu imageContextMenu;
-
     private double clickSceneX;
     private double clickSceneY;
-
-    private final KeyCombination saveCombo = new KeyCodeCombination(KeyCode.S, KeyCombination.CONTROL_ANY);
-    private final KeyCombination undoCombo = new KeyCodeCombination(KeyCode.Z, KeyCombination.CONTROL_ANY);
     private int draggedNodeIndex = -1;
 
     public InteractiveCanvas() {
@@ -68,18 +60,10 @@ public class InteractiveCanvas extends Canvas {
 
     private void initListeners() {
         // 鼠标进入自动抓取焦点
-        setOnMouseEntered(e -> requestFocus());
+        setOnMouseEntered(_ -> requestFocus());
 
-        widthProperty().addListener(e -> {
-            mapManager.setViewWidth(getWidth());
-            handleInitialFit();
-            // noop: renderLoop removed
-        });
-        heightProperty().addListener(e -> {
-            mapManager.setViewHeight(getHeight());
-            handleInitialFit();
-            // noop: renderLoop removed
-        });
+        widthProperty().addListener(_ -> mapManager.setViewWidth(getWidth()));
+        heightProperty().addListener(_ -> mapManager.setViewHeight(getHeight()));
 
         // 拦截按键事件
         addEventFilter(KeyEvent.KEY_PRESSED, this::handleKeyEvents);
@@ -90,10 +74,9 @@ public class InteractiveCanvas extends Canvas {
             handlePointHover(e);
         });
 
-        setOnMouseExited(e -> {
+        setOnMouseExited(_ -> {
             hintTooltip.hide();
             if (hoveredPoint != null) {
-                hoveredPoint.setHovered(false);
                 hoveredPoint = null;
                 if (mapRenderer != null) mapRenderer.setHoveredPoint(null);
             }
@@ -187,7 +170,6 @@ public class InteractiveCanvas extends Canvas {
             if (cameraManager.isFollowMode()) cameraManager.setFollowMode(false);
             // 拖拽地图时清除 hover，避免残留
             if (hoveredPoint != null) {
-                hoveredPoint.setHovered(false);
                 hoveredPoint = null;
             }
             double dx = e.getX() - lastMouseX;
@@ -200,17 +182,20 @@ public class InteractiveCanvas extends Canvas {
             // noop: renderLoop removed
         });
 
-        setOnMouseReleased(e -> draggedNodeIndex = -1);
+        setOnMouseReleased(_ -> draggedNodeIndex = -1);
 
         setOnScroll(e -> {
-            double factor = e.getDeltaY() > 0 ? 1.1 : 0.9;
-            if (cameraManager.isFollowMode()) {
+            double factor = e.getDeltaY() > 0 ? AppConfig.INTERACTIVE_ZOOM_FACTOR : (2 - AppConfig.INTERACTIVE_ZOOM_FACTOR);
+            if (cameraManager.isFollowMode() && cameraManager.hasValidPlayerPosition()) {
                 double newScale = cameraManager.getFollowScale() * factor;
-                cameraManager.setFollowScale(Math.max(0.3, Math.min(5, newScale)));
+                cameraManager.setFollowScale(Math.clamp(newScale, AppConfig.INTERACTIVE_FOLLOW_MIN_SCALE, AppConfig.INTERACTIVE_FOLLOW_MAX_SCALE));
             } else {
+                if (cameraManager.isFollowMode()) {
+                    // 玩家未定位时走普通缩放，并同步 followScale 以便定位后无缝切换
+                    cameraManager.setFollowScale(mapManager.getScale());
+                }
                 mapManager.zoom(factor, e.getX(), e.getY());
             }
-            // noop: renderLoop removed
         });
     }
 
@@ -252,7 +237,7 @@ public class InteractiveCanvas extends Canvas {
         if (active == null) return -1;
         double lx = toLogicX(mx);
         double ly = toLogicY(my);
-        double threshold = 15.0 / mapManager.getScale();
+        double threshold = AppConfig.NODE_CLICK_THRESHOLD / mapManager.getScale();
         List<Point> nodes = active.getNodes();
         for (int i = 0; i < nodes.size(); i++) {
             if (nodes.get(i).distance(lx, ly) < threshold) return i;
@@ -265,7 +250,7 @@ public class InteractiveCanvas extends Canvas {
         if (active == null || active.getNodes().size() < 2) return -1;
         double lx = toLogicX(mx);
         double ly = toLogicY(my);
-        double threshold = 12.0 / mapManager.getScale();
+        double threshold = AppConfig.NODE_INSERT_THRESHOLD / mapManager.getScale();
         List<Point> nodes = active.getNodes();
         for (int i = 0; i < nodes.size() - 1; i++) {
             if (distancePointToSegment(lx, ly, nodes.get(i).getX(), nodes.get(i).getY(), nodes.get(i + 1).getX(), nodes.get(i + 1).getY()) < threshold)
@@ -284,11 +269,9 @@ public class InteractiveCanvas extends Canvas {
     private void handlePointHover(MouseEvent e) {
         ResourcePoint point = findPointAt(e.getX(), e.getY());
         if (point != hoveredPoint) {
-            if (hoveredPoint != null) hoveredPoint.setHovered(false);
             hoveredPoint = point;
             if (mapRenderer != null) mapRenderer.setHoveredPoint(hoveredPoint);
             if (hoveredPoint != null) {
-                hoveredPoint.setHovered(true);
                 setCursor(Cursor.HAND);
                 String prefix = (pathContext.getCurrentMode() == PathContext.Mode.DRAWING) ? "吸附: " : "";
                 hintTooltip.setText(prefix + hoveredPoint.getConfig().getMarkTypeName());
@@ -311,7 +294,7 @@ public class InteractiveCanvas extends Canvas {
         for (int i = nearbyPoints.size() - 1; i >= 0; i--) {
             ResourcePoint p = nearbyPoints.get(i);
             Point pos = p.getScreenPosition();
-            double r = 16.0;
+            double r = AppConfig.HOVER_DETECT_RADIUS;
             if (lx >= pos.getX() - r && lx <= pos.getX() + r && ly >= pos.getY() - r * 2 && ly <= pos.getY()) return p;
         }
         return null;
@@ -326,13 +309,13 @@ public class InteractiveCanvas extends Canvas {
             MenuItem toggle = new MenuItem(p.isGrayed() ? "恢复标记" : "标记为已采集");
             toggle.setOnAction(_ -> {
                 p.setGrayed(!p.isGrayed());
-                HookRegistry.INSTANCE.publish(HookEventType.RESOURCE_POINT_CHANGED, null);
+                if (mapRenderer != null) mapRenderer.markDirty();
             });
             imageContextMenu.getItems().add(toggle);
         }
         MenuItem del = new MenuItem("删除点位");
         del.setStyle("-fx-text-fill: #ff4444;");
-        del.setOnAction(e -> {
+        del.setOnAction(_ -> {
             if (this.getParent() != null && this.getParent().getParent() instanceof StackPane rootStack) {
                 DialogUtils.showConfirmDialog(rootStack, "删除标记", "确定要永久删除吗？", () -> pointContext.deletePoint(p), null);
             }
@@ -349,9 +332,15 @@ public class InteractiveCanvas extends Canvas {
     private void initMenus() {
         mapContextMenu = new ContextMenu();
         MenuItem addPoint = new MenuItem("在此处添加标记");
-        addPoint.setOnAction(e -> openAddPointDialog(clickSceneX, clickSceneY));
+        addPoint.setOnAction(_ -> {
+            if (InteractiveCanvas.this.getParent() != null
+                    && InteractiveCanvas.this.getParent().getParent() instanceof StackPane rootStack) {
+                AddPointDialog.open(rootStack,
+                        toLogicX(clickSceneX), toLogicY(clickSceneY));
+            }
+        });
         MenuItem resetCam = new MenuItem("重置视角");
-        resetCam.setOnAction(e -> {
+        resetCam.setOnAction(_ -> {
             if (mapRenderer != null) mapRenderer.resetViewport();
         });
         mapContextMenu.getItems().addAll(addPoint, new SeparatorMenuItem(), resetCam);
@@ -359,114 +348,9 @@ public class InteractiveCanvas extends Canvas {
     }
 
     private void openAddPointDialog(double canvasX, double canvasY) {
-        Set<String> markTypeSet = new TreeSet<>();
-        for (ResourcePoint point : pointContext.getAllPoints()) {
-            markTypeSet.add(point.getConfig().getMarkTypeName());
-        }
-        ObservableList<String> allItems = FXCollections.observableArrayList(markTypeSet);
-
-        TextField input = new TextField();
-        input.setPromptText("输入关键字筛选或直接输入新名称…");
-        input.setPrefWidth(280);
-
-        ListView<String> suggestionList = new ListView<>();
-        suggestionList.setPrefHeight(140);
-        suggestionList.setMinWidth(280);
-        suggestionList.setStyle("-fx-background-color: #2a2a2a; -fx-border-color: #555; -fx-border-radius: 4; -fx-background-radius: 4;");
-
-        Popup popup = new Popup();
-        popup.setAutoHide(true);
-        popup.getContent().add(suggestionList);
-
-        input.textProperty().addListener((obs, old, text) -> {
-            if (text == null || text.isBlank()) {
-                popup.hide();
-                return;
-            }
-            String lower = text.toLowerCase();
-            ObservableList<String> matches = FXCollections.observableArrayList();
-            for (String item : allItems) {
-                if (item.toLowerCase().contains(lower)) {
-                    matches.add(item);
-                }
-            }
-            if (matches.isEmpty()) {
-                popup.hide();
-            } else {
-                suggestionList.setItems(matches);
-                suggestionList.getSelectionModel().select(0);
-                if (!popup.isShowing()) {
-                    javafx.geometry.Point2D anchor = input.localToScreen(0, input.getHeight());
-                    popup.show(input, anchor.getX(), anchor.getY());
-                }
-                suggestionList.setPrefWidth(input.getWidth());
-            }
-        });
-
-        suggestionList.setOnMouseClicked(e -> {
-            String selected = suggestionList.getSelectionModel().getSelectedItem();
-            if (selected != null) {
-                input.setText(selected);
-                popup.hide();
-                input.requestFocus();
-                input.positionCaret(input.getLength());
-            }
-        });
-
-        input.setOnKeyPressed(e -> {
-            switch (e.getCode()) {
-                case ENTER -> {
-                    if (popup.isShowing()) {
-                        String sel = suggestionList.getSelectionModel().getSelectedItem();
-                        if (sel != null) {
-                            input.setText(sel);
-                            popup.hide();
-                            input.positionCaret(input.getLength());
-                        }
-                    }
-                }
-                case DOWN -> {
-                    if (popup.isShowing() && !suggestionList.getItems().isEmpty()) {
-                        suggestionList.requestFocus();
-                        suggestionList.getSelectionModel().select(0);
-                    }
-                }
-                case ESCAPE -> popup.hide();
-            }
-        });
-
-        suggestionList.setOnKeyPressed(e -> {
-            switch (e.getCode()) {
-                case ENTER -> {
-                    String sel = suggestionList.getSelectionModel().getSelectedItem();
-                    if (sel != null) {
-                        input.setText(sel);
-                        popup.hide();
-                        input.requestFocus();
-                        input.positionCaret(input.getLength());
-                    }
-                }
-                case ESCAPE -> {
-                    popup.hide();
-                    input.requestFocus();
-                }
-                case UP -> {
-                    if (suggestionList.getSelectionModel().getSelectedIndex() == 0) {
-                        input.requestFocus();
-                    }
-                }
-            }
-        });
-
-        VBox content = new VBox(10, new Label("选择或输入新的点位名称:"), input);
-        content.setAlignment(Pos.CENTER);
-        content.setStyle("-fx-padding: 20 10 10 10;");
         if (this.getParent() != null && this.getParent().getParent() instanceof StackPane rootStack) {
-            DialogUtils.showConfirmDialog(rootStack, "新增标记点", content, () -> {
-                String selected = input.getText();
-                if (selected != null && !selected.isBlank())
-                    pointContext.savePoint(selected, toLogicX(canvasX), toLogicY(canvasY));
-            }, () -> {});
+            AddPointDialog.open(rootStack,
+                    toLogicX(canvasX), toLogicY(canvasY));
         }
     }
 
@@ -474,14 +358,6 @@ public class InteractiveCanvas extends Canvas {
         hintTooltip.setShowDelay(Duration.ZERO);
         hintTooltip.setHideDelay(Duration.ZERO);
         hintTooltip.setStyle("-fx-background-color: rgba(35,35,35,0.9); -fx-text-fill: white; -fx-padding: 6px; -fx-border-color: #00BFFF; -fx-border-radius: 4; -fx-background-radius: 4;");
-    }
-
-    private void handleInitialFit() {
-        if (getWidth() > 0 && getHeight() > 0) {
-            if (firstResize) {
-                firstResize = false;
-            }
-        }
     }
 
 }

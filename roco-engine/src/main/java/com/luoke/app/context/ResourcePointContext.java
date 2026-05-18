@@ -7,11 +7,11 @@ import com.luoke.app.hook.HookEventType;
 import com.luoke.app.hook.event.NotificationType;
 import com.luoke.app.hook.event.StatusEvent;
 import com.luoke.app.hook.multicast.HookRegistry;
+import com.luoke.app.map.model.Point;
 import com.luoke.app.map.model.ResourceConfig;
 import com.luoke.app.map.model.ResourcePoint;
 import com.luoke.app.utils.JsonUtils;
 import com.luoke.app.utils.ResourceUtils;
-import com.luoke.app.map.model.Point;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.File;
@@ -29,11 +29,11 @@ public class ResourcePointContext {
     private final ResourcePointGridIndex gridIndex = new ResourcePointGridIndex();
     private final Set<String> collectSet = new LinkedHashSet<>();
 
-    public static ResourcePointContext getInstance() {
-        return INSTANCE;
+    private ResourcePointContext() {
     }
 
-    private ResourcePointContext() {
+    public static ResourcePointContext getInstance() {
+        return INSTANCE;
     }
 
     public void loadAndInit() {
@@ -142,5 +142,9 @@ public class ResourcePointContext {
 
     public List<ResourcePoint> getNearbyResources(double x, double y) {
         return gridIndex.queryNear(x, y);
+    }
+
+    public List<ResourcePoint> getPointsInRect(double minX, double minY, double maxX, double maxY) {
+        return gridIndex.queryRect(minX, minY, maxX, maxY);
     }
 }

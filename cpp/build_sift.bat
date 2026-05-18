@@ -23,11 +23,13 @@ echo OpenCV: %OPENCV_ROOT%
 echo Output: %OUTPUT%
 echo.
 
+rc /nologo /fo resource.res resource.rc
+
 cl /std:c++17 /utf-8 /O2 /EHsc /arch:AVX2 ^
    /I"%OPENCV_ROOT%\include\opencv4" ^
    /I"%ZLIB_ROOT%\include" ^
    /Fe:"%OUTPUT%" ^
-   sift_match_main.cpp ^
+   sift_match_main.cpp resource.res ^
    /link ^
    /LIBPATH:"%OPENCV_ROOT%\lib" ^
    /LIBPATH:"%ZLIB_ROOT%\lib" ^
@@ -35,7 +37,8 @@ cl /std:c++17 /utf-8 /O2 /EHsc /arch:AVX2 ^
    opencv_features2d4.lib opencv_xfeatures2d4.lib ^
    opencv_calib3d4.lib opencv_flann4.lib ^
    zlib.lib ^
-   ws2_32.lib
+   ws2_32.lib ^
+   /SUBSYSTEM:CONSOLE
 
 if %ERRORLEVEL% equ 0 (
     echo.

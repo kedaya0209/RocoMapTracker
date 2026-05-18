@@ -8,6 +8,7 @@ import com.luoke.app.hook.event.StatusEvent;
 import com.luoke.app.hook.multicast.HookRegistry;
 import com.luoke.app.map.model.RoutePath;
 import com.luoke.app.ui.util.DialogUtils;
+import com.luoke.app.ui.util.FxRippleUtil;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -17,6 +18,7 @@ import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
+import javafx.scene.shape.SVGPath;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
@@ -31,8 +33,36 @@ import java.util.List;
 @Slf4j
 public class RouteManagerStage extends Stage {
 
+    // 列表单元格样式 — 现代化卡片风格
+    private static final String NORMAL_STYLE =
+            "-fx-text-fill: -color-fg-default; " +
+                    "-fx-background-color: transparent; " +
+                    "-fx-padding: 8 10 8 12; " +
+                    "-fx-background-radius: 6; " +
+                    "-fx-background-insets: 2 8 2 8;";
+    private static final String HOVER_STYLE =
+            "-fx-text-fill: -color-fg-default; " +
+                    "-fx-background-color: -color-neutral-subtle; " +
+                    "-fx-padding: 8 10 8 12; " +
+                    "-fx-background-radius: 6; " +
+                    "-fx-background-insets: 2 8 2 8; " +
+                    "-fx-border-color: -color-neutral-emphasis; " +
+                    "-fx-border-width: 0 0 0 3; " +
+                    "-fx-border-radius: 6;";
+    private static final String SELECTED_STYLE =
+            "-fx-text-fill: -color-fg-emphasis; " +
+                    "-fx-background-color: -color-accent-subtle; " +
+                    "-fx-padding: 8 10 8 12; " +
+                    "-fx-background-radius: 6; " +
+                    "-fx-background-insets: 2 8 2 8; " +
+                    "-fx-border-color: -color-accent-emphasis; " +
+                    "-fx-border-width: 0 0 0 3; " +
+                    "-fx-border-radius: 6;";
+    private static final String DEL_BTN_STYLE =
+            "-fx-stroke: -color-fg-muted; -fx-stroke-width: 2;";
+    private static final String DEL_BTN_HOVER_STYLE =
+            "-fx-stroke: -color-danger-fg; -fx-stroke-width: 2;";
     private static volatile RouteManagerStage instance;
-
     private final ListView<RoutePath> listView = new ListView<>();
     private final StackPane rootContainer; // 从外部传入的主容器
     private double xOffset = 0;
@@ -46,7 +76,7 @@ public class RouteManagerStage extends Stage {
         initUI();
 
         // 窗口隐藏时清理状态
-        this.setOnHiding(e -> {
+        this.setOnHiding(_ -> {
             PathContext.getInstance().setCurrentMode(PathContext.Mode.VIEW);
             PathContext.getInstance().setActiveRoute(null);
         });
@@ -78,6 +108,20 @@ public class RouteManagerStage extends Stage {
         return instance;
     }
 
+    private static SVGPath getSvgPath() {
+        SVGPath closeIcon = new SVGPath();
+        closeIcon.setContent("M1 1 L9 9 M9 1 L1 9");
+        closeIcon.setStyle("-fx-stroke: -color-fg-default; -fx-stroke-width: 2;"); // 细线粗细
+        return closeIcon;
+    }
+
+    private static FileChooser createJsonFileChooser(String title) {
+        FileChooser fc = new FileChooser();
+        fc.setTitle(title);
+        fc.getExtensionFilters().add(new FileChooser.ExtensionFilter("JSON文件", "*.json"));
+        return fc;
+    }
+
     private void initUI() {
         VBox mainLayout = new VBox(15);
         mainLayout.setPadding(new Insets(15));
@@ -100,10 +144,12 @@ public class RouteManagerStage extends Stage {
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        Button closeBtn = new Button("×");
+        Button closeBtn = new Button();
         closeBtn.getStyleClass().addAll(Styles.BUTTON_CIRCLE, Styles.FLAT);
-        closeBtn.setStyle("-fx-font-size: 18px;");
-        closeBtn.setOnAction(e -> this.hide());
+        SVGPath closeIcon = getSvgPath();
+        closeBtn.setGraphic(closeIcon);
+        closeBtn.setStyle("-fx-cursor: hand; -fx-padding: 8;");
+        closeBtn.setOnAction(_ -> this.hide());
 
         titleBar.getChildren().addAll(titleLabel, spacer, closeBtn);
 
@@ -117,7 +163,7 @@ public class RouteManagerStage extends Stage {
         });
 
         // --- 说明文字 ---
-        Label hintLabel = new Label("路线列表 (单击选中，双击修改，右键删除):");
+        Label hintLabel = new Label("路线列表 (单击选中，双击修改):");
         hintLabel.setStyle("-fx-text-fill: -color-fg-muted; -fx-font-size: 12px;");
 
         // --- 路线列表 ---
@@ -128,30 +174,72 @@ public class RouteManagerStage extends Stage {
         listView.setPrefHeight(200);
         VBox.setVgrow(listView, Priority.ALWAYS);
         listView.setStyle(
-                "-fx-background-color: -color-bg-inset; " +
+                "-fx-background-color: transparent; " +
                         "-fx-control-inner-background: -color-bg-inset; " +
-                        "-fx-background-insets: 0;"
+                        "-fx-background-insets: 0; " +
+                        "-fx-background-radius: 8; " +
+                        "-fx-border-color: -color-border-muted; " +
+                        "-fx-border-radius: 8; " +
+                        "-fx-padding: 4;"
         );
+        listView.setFocusTraversable(false);
 
-        // 右键菜单
-        ContextMenu contextMenu = new ContextMenu();
-        MenuItem deleteItem = new MenuItem("删除路线");
-        deleteItem.setStyle("-fx-text-fill: -color-danger-fg;");
-        deleteItem.setOnAction(e -> handleDelete());
-        contextMenu.getItems().add(deleteItem);
-        listView.setContextMenu(contextMenu);
+        // 单元格渲染（行尾删除按钮）
+        listView.setCellFactory(_ -> new ListCell<>() {
+            private final HBox row = new HBox();
+            private final Label nameLabel = new Label();
+            private final StackPane delBtn = new StackPane();
+            private final SVGPath delIcon = new SVGPath();
 
-        // 单元格渲染
-        listView.setCellFactory(param -> new ListCell<>() {
+            {
+                delIcon.setContent("M1 1 L9 9 M9 1 L1 9");
+                delIcon.setStyle(DEL_BTN_STYLE);
+                delIcon.setMouseTransparent(true);
+                delBtn.getChildren().add(delIcon);
+                delBtn.setCursor(javafx.scene.Cursor.HAND);
+                delBtn.setPadding(new Insets(4, 10, 4, 6));
+                Region spacer = new Region();
+                HBox.setHgrow(spacer, Priority.ALWAYS);
+                row.getChildren().addAll(nameLabel, spacer, delBtn);
+                row.setAlignment(Pos.CENTER_LEFT);
+                // 选中状态变化时更新样式
+                selectedProperty().addListener((_, _, isSel) -> {
+                    if (isEmpty()) return;
+                    if (isSel) {
+                        setStyle(SELECTED_STYLE);
+                    } else {
+                        setStyle(NORMAL_STYLE);
+                    }
+                });
+            }
+
             @Override
             protected void updateItem(RoutePath item, boolean empty) {
                 super.updateItem(item, empty);
                 if (empty || item == null) {
-                    setText(null);
+                    setGraphic(null);
                     setStyle("-fx-background-color: transparent;");
                 } else {
-                    setText(item.getName());
-                    setStyle("-fx-text-fill: -color-fg-default; -fx-background-color: transparent; -fx-padding: 5 10;");
+                    nameLabel.setText(item.getName());
+                    nameLabel.setStyle("-fx-text-fill: -color-fg-default;");
+                    delBtn.setOnMouseEntered(_ -> delIcon.setStyle(DEL_BTN_HOVER_STYLE));
+                    delBtn.setOnMouseExited(_ -> delIcon.setStyle(DEL_BTN_STYLE));
+                    delBtn.setOnMouseClicked(e -> {
+                        e.consume();
+                        handleDelete(item);
+                    });
+                    setGraphic(row);
+                    if (isSelected()) {
+                        setStyle(SELECTED_STYLE);
+                    } else {
+                        setStyle(NORMAL_STYLE);
+                    }
+                    setOnMouseEntered(_ -> {
+                        if (!isSelected()) setStyle(HOVER_STYLE);
+                    });
+                    setOnMouseExited(_ -> {
+                        if (!isSelected()) setStyle(NORMAL_STYLE);
+                    });
                 }
             }
         });
@@ -172,16 +260,16 @@ public class RouteManagerStage extends Stage {
         btnGrid.setVgap(10);
 
         Button drawBtn = createActionBtn("绘制路线", Styles.SUCCESS);
-        drawBtn.setOnAction(e -> PathContext.getInstance().startNewRoute());
+        drawBtn.setOnAction(_ -> PathContext.getInstance().startNewRoute());
 
         Button saveBtn = createActionBtn("保存当前", Styles.ACCENT);
-        saveBtn.setOnAction(e -> handleSave());
+        saveBtn.setOnAction(_ -> handleSave());
 
         Button importBtn = createActionBtn("导入路线", null);
-        importBtn.setOnAction(e -> handleImport());
+        importBtn.setOnAction(_ -> handleImport());
 
         Button exportBtn = createActionBtn("导出路线", null);
-        exportBtn.setOnAction(e -> handleExport());
+        exportBtn.setOnAction(_ -> handleExport());
 
         btnGrid.add(drawBtn, 0, 0);
         btnGrid.add(saveBtn, 1, 0);
@@ -206,6 +294,7 @@ public class RouteManagerStage extends Stage {
         if (styleClass != null) {
             btn.getStyleClass().add(styleClass);
         }
+        FxRippleUtil.install(btn);
         return btn;
     }
 
@@ -255,17 +344,16 @@ public class RouteManagerStage extends Stage {
         );
     }
 
-    private void handleDelete() {
-        RoutePath selected = listView.getSelectionModel().getSelectedItem();
-        if (selected == null) return;
+    private void handleDelete(RoutePath target) {
+        if (target == null) return;
 
         DialogUtils.showConfirmDialog(
-                rootContainer, // 在画布上弹
+                rootContainer,
                 "确认删除",
-                "确定要永久删除路线 [" + selected.getName() + "] 吗？",
+                "确定要永久删除路线 [" + target.getName() + "] 吗？",
                 () -> {
-                    PathContext.getInstance().removeRoute(selected);
-                    if (PathContext.getInstance().getActiveRoute() == selected) {
+                    PathContext.getInstance().removeRoute(target);
+                    if (PathContext.getInstance().getActiveRoute() == target) {
                         PathContext.getInstance().setActiveRoute(null);
                         PathContext.getInstance().setCurrentMode(PathContext.Mode.VIEW);
                     }
@@ -273,14 +361,13 @@ public class RouteManagerStage extends Stage {
                         HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION, new StatusEvent("删除成功", NotificationType.SUCCESS));
                     }
                 },
-                null
+                () -> {
+                }
         );
     }
 
     private void handleImport() {
-        FileChooser fileChooser = new FileChooser();
-        fileChooser.setTitle("选择导入的路线文件");
-        fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("JSON文件", "*.json"));
+        FileChooser fileChooser = createJsonFileChooser("选择导入的路线文件");
         File selectedFile = fileChooser.showOpenDialog(this);
         if (selectedFile == null) return;
 
@@ -290,28 +377,48 @@ public class RouteManagerStage extends Stage {
             return;
         }
 
-        VBox content = new VBox(10);
+        VBox content = new VBox(12);
         content.setAlignment(Pos.CENTER_LEFT);
-        content.setStyle("-fx-padding: 10;");
+        content.setStyle("-fx-padding: 15;");
 
         Label tipLabel = new Label(String.format("解析成功，发现 %d 条路线：", importedPaths.size()));
-        tipLabel.setStyle("-fx-text-fill: -color-fg-muted; -fx-font-size: 13px;");
+        tipLabel.setStyle("-fx-text-fill: -color-fg-default; -fx-font-size: 14px; -fx-font-weight: bold;");
 
-        VBox listContainer = new VBox(5);
-        for (RoutePath path : importedPaths) {
-            Label nameLabel = new Label(" • " + (path.getName() != null ? path.getName() : "未命名路线"));
-            nameLabel.setStyle("-fx-text-fill: -color-fg-default;");
+        VBox listContainer = new VBox(0); // 无间距，边框线分隔
+        listContainer.setStyle(
+                "-fx-background-color: -color-bg-inset; " +
+                        "-fx-background-radius: 6; " +
+                        "-fx-border-color: -color-border-muted; " +
+                        "-fx-border-radius: 6;"
+        );
+        int count = importedPaths.size();
+        for (int i = 0; i < count; i++) {
+            RoutePath path = importedPaths.get(i);
+            Label nameLabel = new Label("  " + (i + 1) + ".  " + (path.getName() != null ? path.getName() : "未命名路线"));
+            nameLabel.setStyle(
+                    "-fx-text-fill: -color-fg-default; " +
+                            "-fx-padding: 8 12; " +
+                            "-fx-background-color: " + (i % 2 == 0 ? "transparent" : "-color-neutral-subtle") + "; " +
+                            "-fx-background-radius: " + (i == 0 ? "6 6 0 0" : i == count - 1 ? "0 0 6 6" : "0") + ";"
+            );
+            nameLabel.setMaxWidth(Double.MAX_VALUE);
             listContainer.getChildren().add(nameLabel);
         }
 
-        ScrollPane scrollPane = new ScrollPane(listContainer);
-        scrollPane.setPrefHeight(150);
-        scrollPane.setFitToWidth(true);
-        scrollPane.setStyle("-fx-background: transparent; -fx-background-color: transparent; -fx-border-color: -color-border-muted;");
+        // 少量路线直接展示，超过 10 条才启用滚动
+        if (count <= 10) {
+            content.getChildren().addAll(tipLabel, listContainer);
+        } else {
+            ScrollPane scrollPane = new ScrollPane(listContainer);
+            scrollPane.setMaxHeight(250);
+            scrollPane.setFitToWidth(true);
+            scrollPane.setStyle("-fx-background: transparent; -fx-background-color: transparent; -fx-padding: 0;");
+            content.getChildren().addAll(tipLabel, scrollPane);
+        }
 
         Label confirmLabel = new Label("确定要导入这些路线吗？");
-        confirmLabel.setStyle("-fx-text-fill: -color-fg-muted;");
-        content.getChildren().addAll(tipLabel, scrollPane, confirmLabel);
+        confirmLabel.setStyle("-fx-text-fill: -color-fg-muted; -fx-font-size: 13px;");
+        content.getChildren().add(confirmLabel);
 
         DialogUtils.showConfirmDialog(
                 rootContainer, // 在画布上弹
@@ -331,8 +438,7 @@ public class RouteManagerStage extends Stage {
     private void handleExport() {
         RoutePath selected = listView.getSelectionModel().getSelectedItem();
         if (selected == null) return;
-        FileChooser fileChooser = new FileChooser();
-        fileChooser.setTitle("导出路线");
+        FileChooser fileChooser = createJsonFileChooser("导出路线");
         fileChooser.setInitialFileName(selected.getName() + ".json");
         File saveFile = fileChooser.showSaveDialog(this);
         if (saveFile != null) {

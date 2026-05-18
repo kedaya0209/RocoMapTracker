@@ -34,15 +34,19 @@ public class NativeProcess {
     private static final MethodHandle GET_LAST_ERROR;
     private static final MethodHandle READ_FILE;
     private static final MethodHandle OPEN_PROCESS;
+    private static final MethodHandle SET_PRIORITY_CLASS;
 
     // ---- 常量 ----
     /** PROC_THREAD_ATTRIBUTE_JOB_LIST: 将子进程在创建时归入 JobObject，使任务管理器"进程"页签下归组 */
-    /** PROC_THREAD_ATTRIBUTE_JOB_LIST: ProcThreadAttributeValue(13, FALSE, TRUE, FALSE) = 0x0002000D */
+    /**
+     * PROC_THREAD_ATTRIBUTE_JOB_LIST: ProcThreadAttributeValue(13, FALSE, TRUE, FALSE) = 0x0002000D
+     */
     private static final int PROC_THREAD_ATTRIBUTE_JOB_LIST = 0x0002000D;
     private static final int EXTENDED_STARTUPINFO_PRESENT = 0x00080000;
     private static final int CREATE_NO_WINDOW = 0x08000000;
     private static final int STARTF_USESTDHANDLES = 0x00000100;
     private static final int STILL_ACTIVE = 259;
+    private static final int HIGH_PRIORITY_CLASS = 0x00000080;
 
     // STARTUPINFOEXW layout (x64, 自然对齐)
     private static final int STARTUPINFOEX_SIZE = 112;
@@ -119,6 +123,11 @@ public class NativeProcess {
                     KERNEL32.find("OpenProcess").orElseThrow(),
                     FunctionDescriptor.of(ValueLayout.JAVA_LONG,
                             ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT));
+
+            SET_PRIORITY_CLASS = LINKER.downcallHandle(
+                    KERNEL32.find("SetPriorityClass").orElseThrow(),
+                    FunctionDescriptor.of(ValueLayout.JAVA_INT,
+                            ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT));
 
             READ_FILE = LINKER.downcallHandle(
                     KERNEL32.find("ReadFile").orElseThrow(),
@@ -232,7 +241,9 @@ public class NativeProcess {
 
             // 6. 调用 CreateProcessW
             int createFlags = CREATE_NO_WINDOW;
-            if (attrList != null) { createFlags |= EXTENDED_STARTUPINFO_PRESENT; }
+            if (attrList != null) {
+                createFlags |= EXTENDED_STARTUPINFO_PRESENT;
+            }
 
             log.info("CreateProcessW: cmd={} flags=0x{}", commandLine, Integer.toHexString(createFlags));
 
@@ -257,7 +268,7 @@ public class NativeProcess {
             if (ok == 0) {
                 long hProcFail = procInfo.get(ValueLayout.JAVA_LONG, 0);
                 long hThrdFail = procInfo.get(ValueLayout.JAVA_LONG, 8);
-                int  pidFail   = procInfo.get(ValueLayout.JAVA_INT, 16);
+                int pidFail = procInfo.get(ValueLayout.JAVA_INT, 16);
                 log.error("CreateProcessW 失败 err={} (0x{}) cmd={} procInfo(h={} t={} pid={})",
                         savedError, Integer.toHexString(savedError), commandLine,
                         Long.toHexString(hProcFail), Long.toHexString(hThrdFail), pidFail);
@@ -283,6 +294,18 @@ public class NativeProcess {
                 JobObjectManager.attachSelf();     // 首次调用将 Java 加入 JobObject (幂等)
             }
 
+            // 9. 提升子进程优先级，防止浏览器等应用抢占 CPU 时间片导致匹配变慢
+            try {
+                int priOk = (int) SET_PRIORITY_CLASS.invoke(hProc, HIGH_PRIORITY_CLASS);
+                if (priOk == 0) {
+                    log.warn("SetPriorityClass(HIGH) 失败 pid={} err={}", pid, lastError());
+                } else {
+                    log.info("子进程 pid={} 优先级已提升至 HIGH_PRIORITY_CLASS", pid);
+                }
+            } catch (Throwable e) {
+                log.warn("SetPriorityClass 调用异常 pid={}: {}", pid, e.toString());
+            }
+
             log.info("NativeProcess created: pid={}", pid);
             return new NativeProcess(hProc, hThrd, pid, hRead);
         } catch (Throwable e) {
@@ -291,12 +314,32 @@ public class NativeProcess {
         }
     }
 
+    private static void closeHandle(long handle) {
+        try {
+            LINKER.downcallHandle(
+                            KERNEL32.find("CloseHandle").orElseThrow(),
+                            FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG))
+                    .invoke(handle);
+        } catch (Throwable ignored) {
+        }
+    }
+
+    private static int lastError() {
+        try {
+            return (int) GET_LAST_ERROR.invoke();
+        } catch (Throwable e) {
+            return -1;
+        }
+    }
+
     public InputStream getInputStream() {
         if (hStdoutRead == 0) return InputStream.nullInputStream();
         return new BufferedInputStream(new PipeInputStream(hStdoutRead));
     }
 
-    public int pid() { return pid; }
+    public int pid() {
+        return pid;
+    }
 
     public boolean isAlive() {
         if (destroyed) return false;
@@ -319,9 +362,15 @@ public class NativeProcess {
         }
     }
 
-    public void destroy() { terminate(1); }
+    public void destroy() {
+        terminate(1);
+    }
 
-    public void destroyForcibly() { terminate(1); }
+    public void destroyForcibly() {
+        terminate(1);
+    }
+
+    // ---- private helpers ----
 
     private void terminate(int exitCode) {
         if (destroyed) return;
@@ -344,26 +393,6 @@ public class NativeProcess {
         }
     }
 
-    // ---- private helpers ----
-
-    private static void closeHandle(long handle) {
-        try {
-            LINKER.downcallHandle(
-                    KERNEL32.find("CloseHandle").orElseThrow(),
-                    FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG))
-                    .invoke(handle);
-        } catch (Throwable ignored) {
-        }
-    }
-
-    private static int lastError() {
-        try {
-            return (int) GET_LAST_ERROR.invoke();
-        } catch (Throwable e) {
-            return -1;
-        }
-    }
-
     /**
      * 将 Windows pipe 读句柄包装为 InputStream.
      */
@@ -371,7 +400,9 @@ public class NativeProcess {
         private final long handle;
         private volatile boolean closed;
 
-        PipeInputStream(long handle) { this.handle = handle; }
+        PipeInputStream(long handle) {
+            this.handle = handle;
+        }
 
         @Override
         public int read() throws IOException {
@@ -387,9 +418,15 @@ public class NativeProcess {
                 MemorySegment buf = arena.allocate(len);
                 MemorySegment nRead = arena.allocate(4);
                 int ok = (int) READ_FILE.invoke(handle, buf, len, nRead, MemorySegment.NULL);
-                if (ok == 0) { closed = true; return -1; }
+                if (ok == 0) {
+                    closed = true;
+                    return -1;
+                }
                 int count = nRead.get(ValueLayout.JAVA_INT, 0);
-                if (count == 0) { closed = true; return -1; }
+                if (count == 0) {
+                    closed = true;
+                    return -1;
+                }
                 // 直接从 segment 读取到目标数组
                 for (int i = 0; i < count; i++) {
                     b[off + i] = buf.get(ValueLayout.JAVA_BYTE, i);

@@ -51,7 +51,6 @@ public class MatchOnlyTest {
         log.info("SocketServer 已启动, 端口: {}", port);
 
         // 2. 加载 SIFT 地图 (使用内置资源，保证 classpath 可加载)
-        ResourceConfigContext.switchProfile(ResourceConfigContext.ResourceProfile.INTERNAL);
         String siftMapPath = ResourceConfigContext.getSiftMap();
         log.info("加载 SIFT 地图: {}", siftMapPath);
         try (InputStream is = ResourceUtils.getResourceStream(siftMapPath)) {

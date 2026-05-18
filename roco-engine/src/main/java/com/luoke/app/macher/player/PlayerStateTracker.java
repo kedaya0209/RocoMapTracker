@@ -1,5 +1,6 @@
 package com.luoke.app.macher.player;
 
+import com.luoke.app.config.AppConfig;
 import com.luoke.app.context.MapContext;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
@@ -9,10 +10,6 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Slf4j
 public class PlayerStateTracker {
-
-    private static final double EMA_ALPHA = 0.35;
-    private static final double TELEPORT_THRESHOLD = 150.0;
-    private static final double VELOCITY_EMA_ALPHA = 0.5;
 
     private boolean hasSmoothedPosition = false;
     private double smoothedX, smoothedY;
@@ -30,8 +27,8 @@ public class PlayerStateTracker {
     /**
      * 更新匹配成功时的位置
      *
-     * @param x 匹配得到的 X 坐标
-     * @param y 匹配得到的 Y 坐标
+     * @param x     匹配得到的 X 坐标
+     * @param y     匹配得到的 Y 坐标
      * @param angle 箭头检测得到的朝向角度 (可为 null)
      */
     public void onMatchSuccess(double x, double y, Double angle) {
@@ -45,13 +42,15 @@ public class PlayerStateTracker {
         } else {
             double dx = x - smoothedX;
             double dy = y - smoothedY;
-            if (dx * dx + dy * dy > TELEPORT_THRESHOLD * TELEPORT_THRESHOLD) {
+            double threshold = AppConfig.PLAYER_TELEPORT_THRESHOLD;
+            if (dx * dx + dy * dy > threshold * threshold) {
                 // 瞬移，直接重置平滑值
                 smoothedX = x;
                 smoothedY = y;
             } else {
-                smoothedX = EMA_ALPHA * x + (1 - EMA_ALPHA) * smoothedX;
-                smoothedY = EMA_ALPHA * y + (1 - EMA_ALPHA) * smoothedY;
+                double alpha = AppConfig.PLAYER_EMA_ALPHA;
+                smoothedX = alpha * x + (1 - alpha) * smoothedX;
+                smoothedY = alpha * y + (1 - alpha) * smoothedY;
             }
         }
 
@@ -61,8 +60,9 @@ public class PlayerStateTracker {
         if (hasPreviousMatch && consecutiveFailureCount == 0) {
             double frameDx = x - prevRawX;
             double frameDy = y - prevRawY;
-            velocityX = VELOCITY_EMA_ALPHA * frameDx + (1 - VELOCITY_EMA_ALPHA) * velocityX;
-            velocityY = VELOCITY_EMA_ALPHA * frameDy + (1 - VELOCITY_EMA_ALPHA) * velocityY;
+            double vAlpha = AppConfig.PLAYER_VELOCITY_EMA_ALPHA;
+            velocityX = vAlpha * frameDx + (1 - vAlpha) * velocityX;
+            velocityY = vAlpha * frameDy + (1 - vAlpha) * velocityY;
             predictedX = smoothedX + velocityX;
             predictedY = smoothedY + velocityY;
         }
@@ -78,7 +78,7 @@ public class PlayerStateTracker {
      */
     public void onMatchFailure(String reason) {
         consecutiveFailureCount++;
-        if (consecutiveFailureCount > 5) {
+        if (consecutiveFailureCount > AppConfig.PLAYER_MAP_LOST_THRESHOLD) {
             isMapLost = true;
             hasSmoothedPosition = false;
             hasPreviousMatch = false;

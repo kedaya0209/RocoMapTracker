@@ -1,109 +1,118 @@
 package com.luoke.app.ui.render;
 
 import com.luoke.app.config.AppConfig;
-import com.luoke.app.context.*;
+import com.luoke.app.context.CameraContext;
+import com.luoke.app.context.MapContext;
+import com.luoke.app.context.PathContext;
+import com.luoke.app.context.ResourcePointContext;
 import com.luoke.app.map.model.Point;
 import com.luoke.app.map.model.ResourcePoint;
 import com.luoke.app.map.model.RoutePath;
 import com.luoke.app.ui.component.StatsOverlay;
-import com.luoke.app.utils.ResourceUtils;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
+import javafx.geometry.Rectangle2D;
 import javafx.scene.Group;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.Pane;
+import javafx.scene.paint.Color;
+import javafx.scene.shape.Circle;
 import javafx.scene.transform.Scale;
 import javafx.scene.transform.Translate;
 import javafx.util.Duration;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
-import java.io.InputStream;
-import java.util.*;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 地图渲染器 — 瓦片金字塔 + Canvas 图标层 + 玩家。
+ * 地图渲染器 — 瓦片金字塔 + ImageView 图标层（GPU 变换）+ 路线 + 玩家。
  * 瓦片层：
  * - 多分辨率金字塔 (100%/50%/25%/12.5%/6.25%)，256×256 瓦片
  * - 所有瓦片放入 worldGroup，统一 GPU translate/scale 变换
- * - 瓦片由 Python 预生成，运行时从磁盘按需加载
  * 图标层：
- * - displayCanvas 直接绘制图标，CLEAR 混合模式保持透明让瓦片层可见
- * - 视口变化时全量重绘，玩家移动时局部更新变灰图标
+ * - ImageView 节点直接放入 worldGroup，与瓦片共用 GPU 变换
+ * - 从纹理图集取源区域（setViewport），无任何 CPU 重绘
+ * - 变灰操作直接切换 ImageView 的 image 引用（colorAtlas ↔ grayAtlas）
+ * 路线层：
+ * - 独立 Canvas 屏幕坐标绘制，缩放时全量重绘，平移时 GPU 节点 translate
  * 玩家：
- * - ImageView 放入 worldGroup，世界坐标定位，自动跟随地图变换
+ * - ImageView 放入 playerGroup，世界坐标定位，自动跟随地图变换
  */
 @Slf4j
 public class MapRenderer {
 
-    private static final int TILE_SIZE = 256;
-    private static final double ICON_SIZE = 32;
-    private static final double GRAY_RADIUS = AppConfig.GRAY_DISTANCE; // 世界像素
-
     @Getter
     private final Pane parent;
     private final Group worldGroup;
-    private final Canvas routeCanvas;
-    private final Canvas displayCanvas;
+    private final Group iconGroup;       // ImageView 图标节点（worldGroup 子级，共用 GPU 变换）
+    private final Canvas routeCanvas;    // 路线 Canvas（独立层，屏幕坐标）
+    private final Canvas hoverCanvas;    // hover 光环层（屏幕坐标）
+    private final Circle pickupHalo;     // 拾取范围光环
     private final ImageView playerView;
     private final Timeline loop;
 
-    // worldGroup 变换：Scale 锚点 (0,0)，确保与 Canvas 图标公式一致
-    // screenX = offsetX + worldX * scale
+    // worldGroup 变换：Scale 锚点 (0,0)
     private final Scale worldScale;
     private final Translate worldTranslate;
     private final Scale playerScale;
     private final Translate playerTranslate;
 
     private final GraphicsContext routeGc;
-    private final GraphicsContext displayGc;
-
-    // 瓦片缓存
-    private final Map<String, ImageView> activeTiles = new HashMap<>();
-    private int mapW, mapH;
-
-    // 图标状态
-    private final Set<ResourcePoint> grayedSet = new HashSet<>();
-
+    private final GraphicsContext hoverGc;
+    // 图标 ImageView 查找表（资源点 → ImageView，供变灰切换）
+    private final Map<ResourcePoint, ImageView> iconViews = new ConcurrentHashMap<>();
+    // 潮汐波纹
+    private final double[] rippleProgress = initRippleProgress();
+    private final Circle[] ripples;
+    private TileManager tileManager;
     // hover 状态
     private ResourcePoint hoveredPoint;
     @Getter
     private ResourcePoint lastHoveredPoint;
-
     // 视口追踪
-    private double lastOx, lastOy, lastScale;
-    private int lastLevel = -1;
-    private boolean viewportDirty = true;
+    private double lastScale;
+    private boolean hoverDirty;
     private boolean firstFrame = true;
-
-    // 缩放稳定延迟：缩放期间保持当前层级瓦片（GPU 缩放），稳定后再切换精确层级
-    private int scaleStableFrames = 0;
-    private static final int SCALE_STABLE_THRESHOLD = 5; // ~165ms
-
-    // 跟随模式首次关闭标记
+    private int frameCount;
+    // 跟随模式
     private boolean followWasOn;
-
-    // 路线状态追踪：检测 activeRoute/mode 变化以触发重绘
+    // 路线状态
     private RoutePath lastActiveRoute;
     private PathContext.Mode lastMode;
+    private double routeDrawOx, routeDrawOy;
+    private boolean routeDirty = true;
+    // 跟踪玩家上一帧位置用于变灰检测（防止每帧重复检测已变灰点位）
+    private double lastGrayCheckX = Double.NaN;
+    private double lastGrayCheckY = Double.NaN;
+
+    // ==================== 构造与初始化 ====================
 
     public MapRenderer(Pane parent) {
         this.parent = parent;
 
         worldGroup = new Group();
+        tileManager = new TileManager(worldGroup, 0, 0);
         worldGroup.setPickOnBounds(false);
         // 变换链： Translate(ox,oy) × Scale(scale,scale,0,0)
-        // 必须先 Translate 后 Scale，确保 offset 不被缩放
         worldScale = new Scale(1, 1, 0, 0);
         worldTranslate = new Translate(0, 0);
         worldGroup.getTransforms().addAll(worldTranslate, worldScale);
 
+        // 图标组 — 放入 worldGroup，与瓦片共用 GPU 变换
+        iconGroup = new Group();
+        iconGroup.setPickOnBounds(false);
+        iconGroup.setMouseTransparent(true);
+        worldGroup.getChildren().add(iconGroup);
+
         playerView = new ImageView();
-        playerView.setFitWidth(72);
-        playerView.setFitHeight(72);
+        playerView.setFitWidth(AppConfig.PLAYER_VIEW_SIZE);
+        playerView.setFitHeight(AppConfig.PLAYER_VIEW_SIZE);
         playerView.setMouseTransparent(true);
         playerView.setVisible(false);
 
@@ -114,49 +123,139 @@ public class MapRenderer {
         playerScale = new Scale(1, 1, 0, 0);
         playerTranslate = new Translate(0, 0);
         playerGroup.getTransforms().addAll(playerTranslate, playerScale);
+        // 潮汐波纹（N 圈从中心扩散到 GRAY_DISTANCE，边扩散边淡出）
+        ripples = new Circle[AppConfig.RIPPLE_COUNT];
+        for (int i = 0; i < AppConfig.RIPPLE_COUNT; i++) {
+            Circle r = new Circle(0);
+            r.setFill(Color.TRANSPARENT);
+            r.setStroke(Color.rgb(255, 255, 200, AppConfig.RIPPLE_ALPHA));
+            r.setStrokeWidth(AppConfig.RIPPLE_STROKE_WIDTH);
+            r.setMouseTransparent(true);
+            playerGroup.getChildren().add(r);
+            ripples[i] = r;
+        }
+
+        // 拾取范围边界（静态浅圈，标示最大范围）
+        pickupHalo = new Circle(AppConfig.GRAY_DISTANCE);
+        pickupHalo.setFill(Color.TRANSPARENT);
+        pickupHalo.setStroke(Color.rgb(255, 255, 200, AppConfig.HALO_BREATHE_MIN_ALPHA));
+        pickupHalo.setStrokeWidth(AppConfig.HALO_STROKE_WIDTH);
+        pickupHalo.setMouseTransparent(true);
+        playerGroup.getChildren().add(pickupHalo);
+
         playerGroup.getChildren().add(playerView);
 
-        // 路线层 — Canvas，与 displayCanvas 相同坐标变换模式（gc.translate + gc.scale）
+        // 路线 Canvas — 屏幕坐标，视口大小，平移用 GPU translate 补偿
         routeCanvas = new Canvas();
         routeCanvas.setMouseTransparent(true);
         routeCanvas.setPickOnBounds(false);
-        routeCanvas.setStyle("-fx-background-color: transparent;");
-        routeCanvas.setOpacity(1.0);
-
-        displayCanvas = new Canvas();
-        displayCanvas.setMouseTransparent(true);
-        displayCanvas.setPickOnBounds(false);
-        displayCanvas.setStyle("-fx-background-color: transparent;");
-        displayCanvas.setOpacity(1.0);
-
-        // 层级：瓦片 → 路线 → 图标 → 玩家
-        parent.getChildren().addAll(worldGroup, routeCanvas, displayCanvas, playerGroup);
-
         routeCanvas.widthProperty().bind(parent.widthProperty());
         routeCanvas.heightProperty().bind(parent.heightProperty());
         routeGc = routeCanvas.getGraphicsContext2D();
 
-        displayCanvas.widthProperty().bind(parent.widthProperty());
-        displayCanvas.heightProperty().bind(parent.heightProperty());
-        displayGc = displayCanvas.getGraphicsContext2D();
+        // hover Canvas — 屏幕坐标，视口大小
+        hoverCanvas = new Canvas();
+        hoverCanvas.setMouseTransparent(true);
+        hoverCanvas.setPickOnBounds(false);
+        hoverCanvas.widthProperty().bind(parent.widthProperty());
+        hoverCanvas.heightProperty().bind(parent.heightProperty());
+        hoverGc = hoverCanvas.getGraphicsContext2D();
 
-        loop = new Timeline(new KeyFrame(Duration.millis(33), e -> onFrame()));
+        // 层级：瓦片 → 图标(都在worldGroup) → 路线 → hover → 玩家
+        parent.getChildren().addAll(worldGroup, routeCanvas, hoverCanvas, playerGroup);
+
+        loop = new Timeline(new KeyFrame(Duration.millis(AppConfig.RENDER_FRAME_INTERVAL_MS), _ -> onFrame()));
         loop.setCycleCount(Timeline.INDEFINITE);
     }
 
-    // ==================== 初始化 ====================
+    /**
+     * 根据 RIPPLE_COUNT 初始化波纹相位，均匀分布
+     */
+    private static double[] initRippleProgress() {
+        int n = AppConfig.RIPPLE_COUNT;
+        double[] arr = new double[n];
+        for (int i = 0; i < n; i++) {
+            arr[i] = (double) i / n;
+        }
+        return arr;
+    }
+
+    private static double distanceSq(double x1, double y1, double x2, double y2) {
+        if (Double.isNaN(x2) || Double.isNaN(y2)) return Double.MAX_VALUE;
+        double dx = x1 - x2;
+        double dy = y1 - y2;
+        return dx * dx + dy * dy;
+    }
 
     /**
-     * 设置瓦片目录和地图尺寸。瓦片验证/生成已在 ModernCanvasApp 初始化阶段完成。
+     * 以屏幕坐标绘制单条路径
+     */
+    private static void renderPathScreen(GraphicsContext gc, List<Point> nodes, double ox, double oy, double scale) {
+        if (nodes.size() < 2) return;
+        gc.beginPath();
+        gc.moveTo(nodes.getFirst().getX() * scale + ox, nodes.getFirst().getY() * scale + oy);
+        for (int i = 1; i < nodes.size(); i++) {
+            gc.lineTo(nodes.get(i).getX() * scale + ox, nodes.get(i).getY() * scale + oy);
+        }
+        gc.stroke();
+    }
+
+    /**
+     * 初始化地图尺寸并构建图标 ImageView 层。
      */
     public void init(int mapW, int mapH) {
-        this.mapW = mapW;
-        this.mapH = mapH;
+        this.tileManager = new TileManager(worldGroup, mapW, mapH);
+        buildIconLayer();
+    }
+
+    /**
+     * 为每个资源点创建 ImageView，放入 worldGroup 的 iconGroup
+     */
+    private void buildIconLayer() {
+        IconCache cache = IconCache.getInstance();
+        if (!cache.isAtlasReady()) {
+            log.warn("图集未就绪，跳过图标层构建");
+            return;
+        }
+
+        Image colorAtlas = cache.getColorAtlas();
+        Image grayAtlas = cache.getGrayAtlas();
+        int built = 0;
+
+        for (ResourcePoint rp : ResourcePointContext.getInstance().getAllPoints()) {
+            String iconFile = rp.getConfig().getIcon();
+            if (iconFile == null || iconFile.isEmpty()) continue;
+
+            String iconPath = AppConfig.ICON_DIR + iconFile;
+            IconCache.AtlasSlot slot = cache.getSlot(iconPath);
+            if (slot == null) continue;
+
+            ImageView iv = new ImageView();
+            iv.setImage(rp.isGrayed() ? grayAtlas : colorAtlas);
+            iv.setViewport(new Rectangle2D(slot.sx, slot.sy, AppConfig.ICON_SIZE, AppConfig.ICON_SIZE));
+            iv.setPreserveRatio(false);
+            iv.setSmooth(false);
+            iv.setMouseTransparent(true);
+            iv.setPickOnBounds(false);
+
+            Point pos = rp.getScreenPosition();
+            iv.setLayoutX(pos.getX() - AppConfig.ICON_SIZE / 2.0);
+            iv.setLayoutY(pos.getY() - AppConfig.ICON_SIZE / 2.0);
+            iv.setFitWidth(AppConfig.ICON_SIZE);
+            iv.setFitHeight(AppConfig.ICON_SIZE);
+
+            iconViews.put(rp, iv);
+            iconGroup.getChildren().add(iv);
+            built++;
+        }
+        log.info("图标 ImageView 层已构建: {} 个点位", built);
     }
 
     public void setPlayerImage(Image image) {
         playerView.setImage(image);
     }
+
+    // ==================== 帧循环 ====================
 
     public void start() {
         loop.play();
@@ -164,15 +263,15 @@ public class MapRenderer {
 
     public void dispose() {
         loop.stop();
-        activeTiles.clear();
+        tileManager.reset();
     }
 
-    /** 外部触发全量重绘（窗口大小变化等） */
+    /**
+     * 通知路线/资源点变化，触发路线层重绘
+     */
     public void markDirty() {
-        viewportDirty = true;
+        routeDirty = true;
     }
-
-    // ==================== 帧循环 ====================
 
     private void onFrame() {
         try {
@@ -182,22 +281,24 @@ public class MapRenderer {
         }
     }
 
+    // ==================== 视口适配 ====================
+
     private void onFrameInternal() {
+        frameCount++;
         StatsOverlay.getInstance().update();
 
         MapContext mm = MapContext.getInstance();
         CameraContext cam = CameraContext.getInstance();
 
-        // 跟随模式：根据玩家坐标自动调整视口
         cam.updateViewport();
 
         double ox = mm.getOffsetX();
         double oy = mm.getOffsetY();
         double scale = mm.getScale();
 
-        // 首次：自动适配地图到视口（displayCanvas 未布局时推迟）
+        // 首帧自动适配视口
         if (firstFrame) {
-            if (displayCanvas.getWidth() > 0 && displayCanvas.getHeight() > 0) {
+            if (parent.getWidth() > 0 && parent.getHeight() > 0) {
                 firstFrame = false;
                 autoFitViewport(mm);
                 ox = mm.getOffsetX();
@@ -205,389 +306,299 @@ public class MapRenderer {
                 scale = mm.getScale();
                 followWasOn = cam.isFollowMode();
                 log.info("首帧 view={}x{} scale={} ox={} oy={}",
-                        (int) displayCanvas.getWidth(), (int) displayCanvas.getHeight(),
+                        (int) parent.getWidth(), (int) parent.getHeight(),
                         String.format("%.4f", scale), (int) ox, (int) oy);
             }
         }
 
-        // 检测视口变化
-        boolean offsetChanged = Math.abs(ox - lastOx) > 0.01 || Math.abs(oy - lastOy) > 0.01;
         boolean scaleChanged = Math.abs(scale - lastScale) > 1e-9;
-        if (offsetChanged || scaleChanged) {
-            viewportDirty = true;
+
+        // 跟随模式切换 → 路线重绘
+        if (cam.isFollowMode() != followWasOn) {
+            followWasOn = cam.isFollowMode();
+            routeDirty = true;
         }
 
-        // 检测跟随模式切换
-        boolean followNow = cam.isFollowMode();
-        if (followNow != followWasOn) {
-            followWasOn = followNow;
-            viewportDirty = true;
-        }
+        // ====== GPU 变换（每帧，纯 GPU 操作） ======
 
-        // 更新 worldGroup 变换（每帧，纯 GPU 操作）
+        // worldGroup 变换 → 瓦片 + 图标同时生效
         worldScale.setX(scale);
         worldScale.setY(scale);
         worldTranslate.setX(ox);
         worldTranslate.setY(oy);
 
-        // 同步 playerGroup 变换（与 worldGroup 一致，置于图标层之上）
+        // playerGroup 变换
         playerScale.setX(scale);
         playerScale.setY(scale);
         playerTranslate.setX(ox);
         playerTranslate.setY(oy);
 
-        // 更新玩家位置（playerGroup 已应用 Scale，half 和 playerX 在同一坐标系中，无需除以 scale）
+        // 玩家位置
         if (mm.isPlayerInitialized() && playerView.getImage() != null) {
             playerView.setVisible(true);
             double half = playerView.getFitWidth() / 2.0;
             playerView.setLayoutX(mm.getPlayerX() - half);
             playerView.setLayoutY(mm.getPlayerY() - half);
             playerView.setRotate(mm.getPlayerAngle());
+            pickupHalo.setCenterX(mm.getPlayerX());
+            pickupHalo.setCenterY(mm.getPlayerY());
+            // 潮汐波纹：N 圈错峰扩散
+            double px = mm.getPlayerX();
+            double py = mm.getPlayerY();
+            for (int i = 0; i < AppConfig.RIPPLE_COUNT; i++) {
+                rippleProgress[i] += AppConfig.RIPPLE_STEP;
+                if (rippleProgress[i] > 1.0) rippleProgress[i] -= 1.0;
+                double p = rippleProgress[i];
+                ripples[i].setRadius(p * AppConfig.GRAY_DISTANCE);
+                ripples[i].setCenterX(px);
+                ripples[i].setCenterY(py);
+                ripples[i].setStroke(Color.rgb(255, 255, 200, (1 - p) * AppConfig.RIPPLE_ALPHA));
+            }
+            // 边界慢呼吸：周期约 7s，仅透明度变化，范围不变
+            double breath = Math.sin(frameCount * AppConfig.HALO_BREATHE_FREQ) * 0.5 + 0.5;
+            double base = AppConfig.HALO_BREATHE_MIN_ALPHA;
+            double range = AppConfig.HALO_BREATHE_MAX_ALPHA - base;
+            pickupHalo.setStroke(Color.rgb(255, 255, 200, base + breath * range));
         } else {
             playerView.setVisible(false);
         }
 
-        // 缩放稳定检测：缩放中保持当前层级（GPU 缩放），稳定后再切换精确层级
-        if (scaleChanged) {
-            scaleStableFrames = 0;
-        } else {
-            scaleStableFrames++;
-        }
-        boolean scaleStable = scaleStableFrames >= SCALE_STABLE_THRESHOLD || firstFrame;
+        // ====== 路线层（屏幕坐标 Canvas） ======
 
-        // 选择瓦片层级（缩放稳定后才允许切换）
-        int level = selectLevel(scale);
-        if (level != lastLevel && scaleStable) {
-            viewportDirty = true;
-            lastLevel = level;
-        }
-
-        // 检测路线状态变化（窗口关闭/选中/绘制时会变化，需要触发重绘）
+        // 路线状态变化检测
         PathContext pc = PathContext.getInstance();
         RoutePath activeRoute = pc.getActiveRoute();
         PathContext.Mode mode = pc.getCurrentMode();
         if (activeRoute != lastActiveRoute || mode != lastMode) {
-            viewportDirty = true;
             lastActiveRoute = activeRoute;
             lastMode = mode;
+            routeDirty = true;
         }
 
-        // 路线 + 图标重绘（视口变化时执行，与资源层行为一致：钉在地图上）
-        if (viewportDirty) {
-            drawRoutes(ox, oy, scale);
-            fullIconRedraw(ox, oy, scale);
+        // 缩放 → 路线全量重绘；平移 → GPU translate 补偿
+        if (scaleChanged) {
+            routeCanvas.setTranslateX(0);
+            routeCanvas.setTranslateY(0);
+            routeDirty = true;
+        } else {
+            routeCanvas.setTranslateX(ox - routeDrawOx);
+            routeCanvas.setTranslateY(oy - routeDrawOy);
         }
 
-        // 瓦片加载（缩放稳定后才执行，重量级操作：磁盘 IO + PNG 解码）
-        if (viewportDirty && scaleStable) {
-            updateTiles(ox, oy, scale, level);
-            viewportDirty = false;
+        if (routeDirty) {
+            redrawRoutes(ox, oy, scale);
+            routeDrawOx = ox;
+            routeDrawOy = oy;
+            routeCanvas.setTranslateX(0);
+            routeCanvas.setTranslateY(0);
+            routeDirty = false;
         }
 
-        // 检测新变灰的图标 → 局部更新
+        // ====== 瓦片加载（缩放稳定后执行） ======
+
+        if (scaleChanged) {
+            tileManager.onScaleChanged();
+        } else {
+            tileManager.onStableFrame();
+        }
+        boolean scaleStable = tileManager.isScaleStable() || firstFrame;
+
+        int level = tileManager.selectLevel(scale);
+        if (level != tileManager.getLastLevel() && scaleStable) {
+            tileManager.setLastLevel(level);
+        }
+        if (scaleStable) {
+            tileManager.updateTiles(ox, oy, scale, level, parent.getWidth(), parent.getHeight());
+        }
+
+        // ====== 变灰检测（ImageView 图集引用切换，零重绘开销） ======
+
         if (mm.isPlayerInitialized()) {
-            List<ResourcePoint> newlyGrayed = checkNewlyGrayed(mm.getPlayerX(), mm.getPlayerY());
-            if (!newlyGrayed.isEmpty()) {
-                partialIconUpdate(ox, oy, scale, newlyGrayed);
+            double px = mm.getPlayerX();
+            double py = mm.getPlayerY();
+            // 减少检测频率：玩家移动超过阈值才检测
+            if (distanceSq(px, py, lastGrayCheckX, lastGrayCheckY) > AppConfig.GRAY_CHECK_THRESHOLD * AppConfig.GRAY_CHECK_THRESHOLD) {
+                updateGrayStates(px, py);
+                lastGrayCheckX = px;
+                lastGrayCheckY = py;
             }
         }
 
-        lastOx = ox;
-        lastOy = oy;
+        // ====== hover 重绘 ======
+
+        if (hoverDirty) {
+            redrawHover(ox, oy, scale);
+            hoverDirty = false;
+        }
+
         lastScale = scale;
     }
 
-    // ==================== 视口适配 ====================
+    // ==================== 路线渲染（屏幕坐标 Canvas） ====================
 
     private void autoFitViewport(MapContext mm) {
-        double vw = displayCanvas.getWidth();
-        double vh = displayCanvas.getHeight();
-        if (vw <= 0 || vh <= 0 || mapW <= 0 || mapH <= 0) return;
+        double vw = parent.getWidth();
+        double vh = parent.getHeight();
+        if (vw <= 0 || vh <= 0) return;
 
-        double s = Math.max(vw / mapW, vh / mapH);
-        double tx = (vw - mapW * s) / 2;
-        double ty = (vh - mapH * s) / 2;
+        double mw = tileManager.getMapWidth(), mh = tileManager.getMapHeight();
+        if (mw <= 0 || mh <= 0) return;
+        double s = Math.max(vw / mw, vh / mh);
+        double tx = (vw - mw * s) / 2;
+        double ty = (vh - mh * s) / 2;
 
         mm.setScale(s);
         mm.setOffsetX(tx);
         mm.setOffsetY(ty);
     }
 
-    // ==================== 瓦片管理 ====================
-
-    private int selectLevel(double scale) {
-        // 选择最接近 1:1 屏幕像素比的层级
-        // 2^L * scale ≈ 1 → L ≈ -log2(scale)
-        int candidate;
-        if (scale >= 0.7) candidate = 0;
-        else if (scale >= 0.35) candidate = 1;
-        else if (scale >= 0.175) candidate = 2;
-        else if (scale >= 0.0875) candidate = 3;
-        else candidate = 4;
-
-        // 磁滞防止层级振荡
-        if (lastLevel >= 0 && candidate != lastLevel) {
-            // 进入某层级的阈值比退出略高，防止在边界反复切换
-            double[] enterThresholds = {0.75, 0.38, 0.19, 0.095}; // 进入该层需要大于此值
-            double[] exitThresholds  = {0.65, 0.32, 0.16, 0.08};   // 退出该层需要小于此值
-
-            if (candidate < lastLevel) {
-                // 放大（层级号变小）：scale 需高于进入阈值
-                if (scale < enterThresholds[candidate]) {
-                    return lastLevel;
-                }
-            } else {
-                // 缩小（层级号变大）：scale 需低于退出阈值
-                if (scale > exitThresholds[lastLevel]) {
-                    return lastLevel;
-                }
-            }
-        }
-        return candidate;
-    }
-
-    private void updateTiles(double ox, double oy, double scale, int level) {
-        double vw = displayCanvas.getWidth();
-        double vh = displayCanvas.getHeight();
-        if (vw <= 0 || vh <= 0) return;
-
-        // 可见世界范围（加 2 个瓦片的缓冲，防止瓦片提前移除导致图标"浮空"）
-        double worldTileSize = TILE_SIZE * (1 << level);
-        double buffer = 2 * worldTileSize;
-        double minWorldX = -ox / scale - buffer;
-        double minWorldY = -oy / scale - buffer;
-        double maxWorldX = (-ox + vw) / scale + buffer;
-        double maxWorldY = (-oy + vh) / scale + buffer;
-
-        int minCol = Math.max(0, (int) Math.floor(minWorldX / worldTileSize));
-        int minRow = Math.max(0, (int) Math.floor(minWorldY / worldTileSize));
-        int maxCol = Math.min(
-                (int) Math.ceil((double) mapW / worldTileSize) - 1,
-                (int) Math.ceil(maxWorldX / worldTileSize));
-        int maxRow = Math.min(
-                (int) Math.ceil((double) mapH / worldTileSize) - 1,
-                (int) Math.ceil(maxWorldY / worldTileSize));
-
-        // 计算需要的瓦片集合
-        Set<String> needed = new HashSet<>();
-        for (int row = minRow; row <= maxRow; row++) {
-            for (int col = minCol; col <= maxCol; col++) {
-                needed.add(key(level, row, col));
-            }
-        }
-
-        // 移除不可见的瓦片
-        Iterator<Map.Entry<String, ImageView>> it = activeTiles.entrySet().iterator();
-        while (it.hasNext()) {
-            Map.Entry<String, ImageView> entry = it.next();
-            if (!needed.contains(entry.getKey())) {
-                worldGroup.getChildren().remove(entry.getValue());
-                it.remove();
-            }
-        }
-
-        // 加载新瓦片
-        int loaded = 0, missed = 0;
-        for (String k : needed) {
-            if (!activeTiles.containsKey(k)) {
-                ImageView tileView = loadTileView(level, k);
-                if (tileView != null) {
-                    activeTiles.put(k, tileView);
-                    // 插入到最底层（playerView 在上层）
-                    worldGroup.getChildren().addFirst(tileView);
-                    loaded++;
-                } else {
-                    missed++;
-                }
-            }
-        }
-        if (loaded > 0 || missed > 0) {
-            log.debug("L{} tiles: loaded={} missed={} active={} needed={}",
-                    level, loaded, missed, activeTiles.size(), needed.size());
-        }
-    }
-
-    private ImageView loadTileView(int level, String key) {
-        Image tileImage = loadTile(level, key);
-        if (tileImage == null) return null;
-
-        // 从 key 解析 row, col
-        String[] parts = key.split("_", 3); // "level_row_col"
-        int row = Integer.parseInt(parts[1]);
-        int col = Integer.parseInt(parts[2]);
-
-        ImageView iv = new ImageView(tileImage);
-        iv.setPreserveRatio(false);
-        iv.setSmooth(false);
-        iv.setMouseTransparent(true);
-        iv.setPickOnBounds(false);
-
-        double worldTileSize = TILE_SIZE * (1 << level);
-        iv.setLayoutX(col * worldTileSize);
-        iv.setLayoutY(row * worldTileSize);
-        // 关键：ImageView 在世界空间中的尺寸 = 瓦片覆盖的世界范围
-        iv.setFitWidth(worldTileSize);
-        iv.setFitHeight(worldTileSize);
-
-        return iv;
-    }
-
-    private Image loadTile(int level, String key) {
-        String relativePath = level + "/" + key.substring(key.indexOf('_') + 1) + ".png";
-        String resourcePath = ResourceConfigContext.getTilesDir() + "/" + relativePath;
-        try (InputStream in = ResourceUtils.getResourceStream(resourcePath)) {
-            return new Image(in);
-        } catch (Exception e) {
-            log.warn("瓦片缺失: {}", resourcePath);
-            return null;
-        }
-    }
-
-    private static String key(int level, int row, int col) {
-        return level + "_" + row + "_" + col;
-    }
-
-    // ==================== 路线渲染 ====================
-
-    private void drawRoutes(double ox, double oy, double scale) {
+    /**
+     * 全量重绘路线层 — 世界坐标转屏幕坐标直接绘制
+     */
+    private void redrawRoutes(double ox, double oy, double scale) {
         double w = routeCanvas.getWidth();
         double h = routeCanvas.getHeight();
         if (w <= 0 || h <= 0) return;
 
         routeGc.clearRect(0, 0, w, h);
-        routeGc.save();
-        routeGc.translate(ox, oy);
-        routeGc.scale(scale, scale);
-        PathRenderer.draw(routeGc);
-        routeGc.restore();
-    }
 
-    // ==================== 图标渲染（Canvas translate/scale，与 worldGroup 同一套变换逻辑） ====================
+        PathContext pc = PathContext.getInstance();
+        RoutePath active = pc.getActiveRoute();
+        if (active == null) return;
 
-    /**
-     * 全量重绘：清空 displayCanvas → 用 Canvas transform 与世界坐标对齐 → 绘所有图标。
-     * Canvas: translate(ox, oy) × scale(scale, scale) — 与 worldGroup 完全一致
-     */
-    private void fullIconRedraw(double ox, double oy, double scale) {
-        double w = displayCanvas.getWidth();
-        double h = displayCanvas.getHeight();
-        if (w <= 0 || h <= 0) return;
+        // 1. 背景路线（置灰/半透明）
+        routeGc.setLineWidth(AppConfig.ROUTE_INACTIVE_WIDTH);
+        routeGc.setStroke(Color.web("#888888", 0.6));
+        for (RoutePath path : pc.getSavedRoutes()) {
+            if (path == pc.getActiveRoute()) continue;
+            renderPathScreen(routeGc, path.getNodes(), ox, oy, scale);
+        }
 
-        displayGc.clearRect(0, 0, w, h);
-        displayGc.save();
-        displayGc.translate(ox, oy);
-        displayGc.scale(scale, scale);
+        // 2. 活跃路线（绿色）
+        routeGc.setStroke(Color.CHARTREUSE);
+        routeGc.setLineWidth(AppConfig.ROUTE_ACTIVE_WIDTH);
+        renderPathScreen(routeGc, active.getNodes(), ox, oy, scale);
 
-        List<ResourcePoint> allPoints = ResourcePointContext.getInstance().getAllPoints();
-        for (ResourcePoint rp : allPoints) {
-            if (!grayedSet.contains(rp)) {
-                drawIconAtWorld(displayGc, rp, false);
+        // 3. UI 叠加（绘图/编辑模式）
+        if (pc.getCurrentMode() != PathContext.Mode.VIEW) {
+            // 预览虚线（橡皮筋）
+            if (pc.getCurrentMode() == PathContext.Mode.DRAWING && !active.getNodes().isEmpty()) {
+                Point lastNode = active.getNodes().getLast();
+                double x1 = lastNode.getX() * scale + ox;
+                double y1 = lastNode.getY() * scale + oy;
+                double x2 = pc.getMouseLogicX() * scale + ox;
+                double y2 = pc.getMouseLogicY() * scale + oy;
+                routeGc.setStroke(Color.web("#FFFFFF", 0.7));
+                routeGc.setLineDashes(AppConfig.ROUTE_DASH_LENGTH);
+                routeGc.strokeLine(x1, y1, x2, y2);
+                routeGc.setLineDashes(null);
+            }
+
+            // 节点锚点圆
+            routeGc.setFill(Color.WHITE);
+            routeGc.setStroke(Color.BLUE);
+            double r = AppConfig.ROUTE_NODE_RADIUS;
+            for (Point node : active.getNodes()) {
+                double nx = node.getX() * scale + ox;
+                double ny = node.getY() * scale + oy;
+                routeGc.fillOval(nx - r, ny - r, r * 2, r * 2);
+                routeGc.strokeOval(nx - r, ny - r, r * 2, r * 2);
             }
         }
-        for (ResourcePoint rp : grayedSet) {
-            drawIconAtWorld(displayGc, rp, true);
-        }
-
-        // hover 光环（紧跟图标重绘，只画一次，不累积）
-        if (hoveredPoint != null) {
-            drawHoverOverlay(displayGc, hoveredPoint, scale);
-        }
-
-        displayGc.restore();
     }
 
-    /** 局部更新：在 displayCanvas 上绘制新变灰的图标（灰度版覆盖彩色版） */
-    private void partialIconUpdate(double ox, double oy, double scale, List<ResourcePoint> newlyGrayed) {
-        displayGc.save();
-        displayGc.translate(ox, oy);
-        displayGc.scale(scale, scale);
-        for (ResourcePoint rp : newlyGrayed) {
-            drawIconAtWorld(displayGc, rp, true);
-        }
-        displayGc.restore();
-    }
-
-    /** 在世界坐标绘制图标（Canvas 已应用 translate+scale，直接传世界坐标） */
-    private void drawIconAtWorld(GraphicsContext gc, ResourcePoint rp, boolean gray) {
-        String iconFile = rp.getConfig().getIcon();
-        if (iconFile == null || iconFile.isEmpty()) return;
-
-        String iconPath = AppConfig.ICON_DIR + iconFile;
-        Image icon = gray ? IconCache.getInstance().getGrayIcon(iconPath)
-                          : IconCache.getInstance().getIcon(iconPath);
-        if (icon == null) return;
-
-        Point pos = rp.getScreenPosition();
-        gc.drawImage(icon, pos.getX() - ICON_SIZE / 2.0, pos.getY() - ICON_SIZE / 2.0, ICON_SIZE, ICON_SIZE);
-    }
-
-    // ==================== 变灰检测 ====================
+    // ==================== 变灰检测（ImageView 直接切换） ====================
 
     /**
-     * 检测玩家周围新增的变灰图标。
-     * 仅检查尚未变灰的图标，标记后移出未采集集合。
+     * 检测玩家附近新变灰的资源点，直接切换 ImageView 的图集引用。
+     * 无需任何 Canvas 重绘，零 CPU 开销。
      */
-    private List<ResourcePoint> checkNewlyGrayed(double playerX, double playerY) {
-        List<ResourcePoint> result = new java.util.ArrayList<>();
-        double r2 = GRAY_RADIUS * GRAY_RADIUS;
+    private void updateGrayStates(double playerX, double playerY) {
+        double r2 = AppConfig.GRAY_DISTANCE * AppConfig.GRAY_DISTANCE;
+        IconCache cache = IconCache.getInstance();
+        Image grayAtlas = cache.getGrayAtlas();
+        if (grayAtlas == null) {
+            log.warn("[gray] grayAtlas is null, skipping");
+            return;
+        }
 
-        // 通过空间网格索引只查玩家附近点位，不遍历全量
-        for (ResourcePoint rp : ResourcePointContext.getInstance().getNearbyResources(playerX, playerY)) {
-            if (grayedSet.contains(rp)) continue;
+        List<ResourcePoint> nearby = ResourcePointContext.getInstance().getNearbyResources(playerX, playerY);
+        for (ResourcePoint rp : nearby) {
+            if (rp.isGrayed()) continue;
             Point pos = rp.getScreenPosition();
             double dx = pos.getX() - playerX;
             double dy = pos.getY() - playerY;
-            String name = rp.getConfig().getMarkTypeName();
-            //在半径，且能被收集的误判才可以置灰
-            if (dx * dx + dy * dy < r2 && ResourcePointContext.getInstance().isCollect(name)) {
-                rp.setGrayed(true);
-                grayedSet.add(rp);
-                result.add(rp);
+            if (dx * dx + dy * dy > r2) continue;
+            if (!ResourcePointContext.getInstance().isCollect(rp.getConfig().getMarkTypeName())) continue;
+
+            // ⚠️ 必须先从 HashMap 获取 ImageView，再修改 grayed，
+            //    否则 grayed 改变 hashCode → get() 查不到
+            ImageView iv = iconViews.get(rp);
+            rp.setGrayed(true);
+            if (iv != null) {
+                iv.setImage(grayAtlas);
             }
         }
-        return result;
     }
 
-    // ==================== hover 高亮 ====================
+    // ==================== hover 高亮（屏幕坐标 Canvas） ====================
 
-    /** 调用前 GC 已设置 translate+scale，直接在世界坐标绘制 */
-    private void drawHoverOverlay(GraphicsContext gc, ResourcePoint rp, double scale) {
-        String iconFile = rp.getConfig().getIcon();
+    /**
+     * hover 光环绘制 — 世界坐标转屏幕坐标
+     */
+    private void redrawHover(double ox, double oy, double scale) {
+        double w = hoverCanvas.getWidth();
+        double h = hoverCanvas.getHeight();
+        if (w <= 0 || h <= 0) return;
+
+        hoverGc.clearRect(0, 0, w, h);
+        if (hoveredPoint == null) return;
+
+        Point pos = hoveredPoint.getScreenPosition();
+        double sx = pos.getX() * scale + ox;
+        double sy = pos.getY() * scale + oy;
+
+        // 光环
+        double hoverSize = AppConfig.HOVER_ICON_SIZE;
+        hoverGc.setFill(Color.web(AppConfig.HOVER_GLOW_COLOR, 0.2));
+        hoverGc.fillOval(sx - hoverSize / 2 - 4, sy - hoverSize / 2 - 4, hoverSize + 8, hoverSize + 8);
+        hoverGc.setStroke(Color.web(AppConfig.HOVER_GLOW_COLOR, 0.8));
+        hoverGc.setLineWidth(2);
+        hoverGc.strokeOval(sx - hoverSize / 2 - 2, sy - hoverSize / 2 - 2, hoverSize + 4, hoverSize + 4);
+
+        // 图标
+        String iconFile = hoveredPoint.getConfig().getIcon();
         if (iconFile == null || iconFile.isEmpty()) return;
-
-        Image icon = IconCache.getInstance().getIcon(AppConfig.ICON_DIR + iconFile);
-        if (icon == null) return;
-
-        Point pos = rp.getScreenPosition();
-
-        double hoverSize = 38;
-
-        gc.setFill(javafx.scene.paint.Color.web("#00BFFF", 0.2));
-        gc.fillOval(pos.getX() - hoverSize / 2 - 4 / scale, pos.getY() - hoverSize / 2 - 4 / scale,
-                     hoverSize + 8 / scale, hoverSize + 8 / scale);
-
-        gc.setStroke(javafx.scene.paint.Color.web("#00BFFF", 0.8));
-        gc.setLineWidth(2.0 / scale);
-        gc.strokeOval(pos.getX() - hoverSize / 2 - 2 / scale, pos.getY() - hoverSize / 2 - 2 / scale,
-                      hoverSize + 4 / scale, hoverSize + 4 / scale);
-
-        gc.drawImage(icon, pos.getX() - hoverSize / 2, pos.getY() - hoverSize / 2, hoverSize, hoverSize);
+        IconCache cache = IconCache.getInstance();
+        String iconPath = AppConfig.ICON_DIR + iconFile;
+        if (cache.isAtlasReady()) {
+            IconCache.AtlasSlot slot = cache.getSlot(iconPath);
+            if (slot != null) {
+                hoverGc.drawImage(cache.getColorAtlas(), slot.sx, slot.sy, AppConfig.ICON_SIZE, AppConfig.ICON_SIZE,
+                        sx - hoverSize / 2, sy - hoverSize / 2, hoverSize, hoverSize);
+                return;
+            }
+        }
+        Image icon = cache.getIcon(iconPath);
+        if (icon != null) {
+            hoverGc.drawImage(icon, sx - hoverSize / 2, sy - hoverSize / 2, hoverSize, hoverSize);
+        }
     }
 
     // ==================== 公开 API ====================
 
     public void setHoveredPoint(ResourcePoint p) {
-        if (this.hoveredPoint == p) return; // 没变化
+        if (this.hoveredPoint == p) return;
         this.lastHoveredPoint = this.hoveredPoint;
         this.hoveredPoint = p;
-        // 鼠标移入或移出：触发一次全量重绘，清除上一次的光环
-        markDirty();
+        hoverDirty = true;
     }
 
-    /** 触发重新自动适配视口（重置视角按钮回调） */
+    /**
+     * 重置视角到首帧适配状态
+     */
     public void resetViewport() {
         firstFrame = true;
-        viewportDirty = true;
+        routeDirty = true;
     }
-
 }

@@ -6,7 +6,6 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.io.File;
 import java.io.IOException;
-import java.lang.management.ManagementFactory;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -16,7 +15,7 @@ public class RestartUtils {
     public static void restart() {
         try {
             List<String> command = new ArrayList<>();
-            
+
             // 兼容 GraalVM Native Image
             // 获取当前运行的 exe 绝对路径
             String nativeImage = new File(Main.class.getProtectionDomain()
@@ -24,22 +23,8 @@ public class RestartUtils {
                     .getLocation()
                     .getPath())
                     .getName();
-            
-            if (nativeImage != null) {
-                command.add(nativeImage);
-            } else {
-                // JVM 环境
-                String javaExe = System.getProperty("java.home") + File.separator + "bin" + File.separator + "java";
-                command.add(javaExe);
-                command.addAll(ManagementFactory.getRuntimeMXBean().getInputArguments());
-                command.add("-cp");
-                command.add(System.getProperty("java.class.path"));
-                
-                // 获取启动类
-                StackTraceElement[] stack = Thread.currentThread().getStackTrace();
-                String mainClass = stack[stack.length - 1].getClassName();
-                command.add(mainClass);
-            }
+
+            command.add(nativeImage);
 
             ProcessBuilder pb = new ProcessBuilder(command);
             pb.start();

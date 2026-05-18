@@ -1,6 +1,7 @@
 package com.luoke.app.ui.component;
 
 import atlantafx.base.theme.Styles;
+import com.luoke.app.config.AppConfig;
 import com.luoke.app.hook.AbstractGenericHook;
 import com.luoke.app.hook.HookEventType;
 import com.luoke.app.hook.event.MaterialCollectionEvent;
@@ -21,20 +22,19 @@ import java.util.Set;
 public class ResourceCounterPanel extends VBox {
 
     private static volatile ResourceCounterPanel instance;
-    private final Label titleLabel;
 
     private ResourceCounterPanel() {
         super(10);
         setPadding(new Insets(15));
-        setPrefWidth(220);
+        setPrefWidth(AppConfig.RESOURCE_COUNTER_WIDTH);
 
         setStyle("-fx-background-color: -color-bg-default; " +
                 "-fx-background-radius: 10; " +
                 "-fx-border-color: -color-border-muted; " +
                 "-fx-border-radius: 10;");
-        setOpacity(0.88);
+        setOpacity(AppConfig.RESOURCE_COUNTER_OPACITY);
 
-        titleLabel = new Label("采集统计");
+        Label titleLabel = new Label("采集统计");
         titleLabel.getStyleClass().add(Styles.TEXT_BOLD);
         titleLabel.setStyle("-fx-text-fill: -color-fg-default;");
 
@@ -76,7 +76,7 @@ public class ResourceCounterPanel extends VBox {
         // 必须在 JavaFX UI 线程执行
         Platform.runLater(() -> {
             // 1. 保留标题，清理旧数据行
-            Node title = getChildren().get(0);
+            Node title = getChildren().getFirst();
             getChildren().clear();
             getChildren().add(title);
 
@@ -116,11 +116,11 @@ public class ResourceCounterPanel extends VBox {
         if (show) {
             setVisible(true);
             ft.setFromValue(getOpacity());
-            ft.setToValue(0.88);
+            ft.setToValue(AppConfig.RESOURCE_COUNTER_OPACITY);
         } else {
             ft.setFromValue(getOpacity());
             ft.setToValue(0.0);
-            ft.setOnFinished(e -> setVisible(false));
+            ft.setOnFinished(_ -> setVisible(false));
         }
         ft.play();
     }
