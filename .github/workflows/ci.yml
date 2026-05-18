@@ -48,7 +48,7 @@ jobs:
         run: mvn test -pl roco-ui -am --no-transfer-progress
 
   # ================================================================
-  # C++ 子进程编译（依赖 OpenCV + zlib）
+  # C++ 子进程编译
   # ================================================================
   build-cpp:
     name: Build C++ Subprocesses
@@ -127,6 +127,11 @@ jobs:
         with:
           name: cpp-binaries-${{ github.sha }}
           path: cpp
+
+      - name: Copy C++ binaries to resource directories
+        run: |
+          copy /Y cpp\capture.exe roco-ui\src\main\resources\capture\capture.exe
+          copy /Y cpp\sift_match.exe roco-ui\src\main\resources\sift\sift_match.exe
 
       - name: Setup Visual Studio (MSVC)
         uses: ilammy/msvc-dev-cmd@v1
