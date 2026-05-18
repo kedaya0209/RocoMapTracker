@@ -155,9 +155,18 @@ jobs:
           path: cpp
 
       - name: Copy C++ binaries to resource directories
+        shell: cmd
         run: |
           copy /Y cpp\capture.exe roco-ui\src\main\resources\capture\capture.exe
           copy /Y cpp\sift_match.exe roco-ui\src\main\resources\sift\sift_match.exe
+
+      - name: Download private assets
+        env:
+          PAT_TOKEN: ${{ secrets.GH_PRIVATE_ASSETS_TOKEN }}
+        run: |
+          git clone https://x-access-token:$env:PAT_TOKEN@github.com/tanghangliang/RocoMapTracker-resources.git private-assets
+          Copy-Item -Path private-assets\resources\* -Destination roco-map\src\main\resources\ -Recurse -Force
+        shell: powershell
 
       - name: Setup Visual Studio (MSVC)
         uses: ilammy/msvc-dev-cmd@v1
