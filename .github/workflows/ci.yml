@@ -155,6 +155,7 @@ jobs:
           path: cpp
 
       - name: Copy C++ binaries to resource directories
+        shell: cmd
         run: |
           copy /Y cpp\capture.exe roco-ui\src\main\resources\capture\capture.exe
           copy /Y cpp\sift_match.exe roco-ui\src\main\resources\sift\sift_match.exe
