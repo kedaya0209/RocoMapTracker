@@ -1,10 +1,12 @@
 package com.luoke.app.ui.render;
 
+import com.luoke.app.config.AppConfig;
 import com.luoke.app.map.loader.ImageLoader;
 import javafx.scene.image.Image;
 import javafx.scene.image.PixelReader;
 import javafx.scene.image.PixelWriter;
 import javafx.scene.image.WritableImage;
+import lombok.Getter;
 
 import java.io.ByteArrayInputStream;
 import java.util.Map;
@@ -20,19 +22,26 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class IconCache {
 
-    private static final int SIZE = 32;
-
-    // 图集
-    private volatile Image colorAtlas;
-    private volatile Image grayAtlas;
-    private volatile Map<String, AtlasSlot> slotMap;
-    private volatile boolean atlasBuilt;
-
+    private static final int SIZE = (int) AppConfig.ICON_SIZE;
+    private static final IconCache INSTANCE = new IconCache();
     // 兜底缓存
     private final Map<String, Image> colorCache = new ConcurrentHashMap<>();
     private final Map<String, Image> grayCache = new ConcurrentHashMap<>();
-
-    private static final IconCache INSTANCE = new IconCache();
+    /**
+     * -- GETTER --
+     * 获取彩色图集
+     */
+    // 图集
+    @Getter
+    private volatile Image colorAtlas;
+    /**
+     * -- GETTER --
+     * 获取灰度图集
+     */
+    @Getter
+    private volatile Image grayAtlas;
+    private volatile Map<String, AtlasSlot> slotMap;
+    private volatile boolean atlasBuilt;
 
     private IconCache() {
     }
@@ -41,18 +50,32 @@ public class IconCache {
         return INSTANCE;
     }
 
-    /** 图集中的图标坐标 */
-    public static class AtlasSlot {
-        public final int sx; // 源 X（在图集中的像素位置）
-        public final int sy; // 源 Y
-        AtlasSlot(int sx, int sy) {
-            this.sx = sx;
-            this.sy = sy;
+    /**
+     * PixelReader 逐像素转灰度
+     */
+    private static Image toGray(Image color) {
+        int w = (int) color.getWidth();
+        int h = (int) color.getHeight();
+        PixelReader reader = color.getPixelReader();
+        WritableImage gray = new WritableImage(w, h);
+        PixelWriter writer = gray.getPixelWriter();
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                int argb = reader.getArgb(x, y);
+                int a = (argb >> 24) & 0xFF;
+                int r = (argb >> 16) & 0xFF;
+                int g = (argb >> 8) & 0xFF;
+                int b = argb & 0xFF;
+                int lum = (int) (0.299 * r + 0.587 * g + 0.114 * b);
+                writer.setArgb(x, y, (a << 24) | (lum << 16) | (lum << 8) | lum);
+            }
         }
+        return gray;
     }
 
     /**
      * 构建纹理图集。在资源点位加载完成后调用。
+     *
      * @param iconPaths 所有图标路径的集合 (如 "/source/icon/ore_iron.png")
      */
     public void buildAtlas(Set<String> iconPaths) {
@@ -118,17 +141,9 @@ public class IconCache {
         return atlasBuilt;
     }
 
-    /** 获取彩色图集 */
-    public Image getColorAtlas() {
-        return colorAtlas;
-    }
-
-    /** 获取灰度图集 */
-    public Image getGrayAtlas() {
-        return grayAtlas;
-    }
-
-    /** 获取图标在图集中的坐标，未找到返回 null */
+    /**
+     * 获取图标在图集中的坐标，未找到返回 null
+     */
     public AtlasSlot getSlot(String path) {
         return slotMap != null ? slotMap.get(path) : null;
     }
@@ -149,45 +164,30 @@ public class IconCache {
      * 获取灰度图标（32x32），灰度转换只做一次并缓存
      */
     public Image getGrayIcon(String path) {
-        return grayCache.computeIfAbsent(path, k -> {
+        return grayCache.computeIfAbsent(path, _ -> {
             Image color = getIcon(path);
             if (color == null) return null;
             return toGray(color);
         });
     }
 
-    /** 灰度图标是否在缓存或图集中 */
+    /**
+     * 灰度图标是否在缓存或图集中
+     */
     public boolean hasGray(String path) {
         return grayCache.containsKey(path) || (slotMap != null && slotMap.containsKey(path));
     }
 
-    /** 彩色图标是否在缓存或图集中 */
+    /**
+     * 彩色图标是否在缓存或图集中
+     */
     public boolean hasIcon(String path) {
         return colorCache.containsKey(path) || (slotMap != null && slotMap.containsKey(path));
     }
 
-    /** PixelReader 逐像素转灰度 */
-    private static Image toGray(Image color) {
-        int w = (int) color.getWidth();
-        int h = (int) color.getHeight();
-        PixelReader reader = color.getPixelReader();
-        WritableImage gray = new WritableImage(w, h);
-        PixelWriter writer = gray.getPixelWriter();
-        for (int y = 0; y < h; y++) {
-            for (int x = 0; x < w; x++) {
-                int argb = reader.getArgb(x, y);
-                int a = (argb >> 24) & 0xFF;
-                int r = (argb >> 16) & 0xFF;
-                int g = (argb >> 8) & 0xFF;
-                int b = argb & 0xFF;
-                int lum = (int)(0.299 * r + 0.587 * g + 0.114 * b);
-                writer.setArgb(x, y, (a << 24) | (lum << 16) | (lum << 8) | lum);
-            }
-        }
-        return gray;
-    }
-
-    /** 图集就绪后清除单图标缓存，释放内存 */
+    /**
+     * 图集就绪后清除单图标缓存，释放内存
+     */
     public void clearIndividualCaches() {
         colorCache.clear();
         grayCache.clear();
@@ -200,5 +200,18 @@ public class IconCache {
         grayAtlas = null;
         slotMap = null;
         atlasBuilt = false;
+    }
+
+    /**
+     * 图集中的图标坐标
+     */
+    public static class AtlasSlot {
+        public final int sx; // 源 X（在图集中的像素位置）
+        public final int sy; // 源 Y
+
+        AtlasSlot(int sx, int sy) {
+            this.sx = sx;
+            this.sy = sy;
+        }
     }
 }

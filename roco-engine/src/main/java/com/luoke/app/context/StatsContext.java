@@ -1,5 +1,6 @@
 package com.luoke.app.context;
 
+import com.luoke.app.config.AppConfig;
 import lombok.Getter;
 
 @Getter
@@ -90,7 +91,7 @@ public final class StatsContext {
 
         // 检查是否经过1秒时间窗口
         // 使用 >= 确保即使时间略有偏差也能正确更新
-        if (now - lastSecondTime >= 1000) {
+        if (now - lastSecondTime >= AppConfig.STATS_FPS_WINDOW_MS) {
             // 更新帧率：将当前窗口的帧计数保存为帧率
             frequency = frameCounter;
 

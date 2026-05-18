@@ -18,6 +18,7 @@ public class OcrResultValidator {
 
     /**
      * 将原始OCR识别的文本行解析为结构化的物品结果对象
+     *
      * @param rawText OCR识别的原始文本行
      * @return 解析成功的ItemResult对象，失败返回null
      */

@@ -1,5 +1,6 @@
 package com.luoke.app.capture.processor;
 
+import com.luoke.app.capture.CaptureFrameBuffer;
 import com.luoke.app.capture.ROIData;
 import com.luoke.app.capture.RoiProcessor;
 import com.luoke.app.config.AppConfig;
@@ -21,15 +22,13 @@ import java.util.concurrent.Semaphore;
 @Slf4j
 public class OcrProcessor implements RoiProcessor {
 
-    private static final long SCAN_INTERVAL = 200;
     private final int targetRoiIndex;
     private final Semaphore parallel = new Semaphore(AppConfig.OCR_CORE_SIZE);
-
+    private final ROIData cachedRoi = new ROIData(AppConfig.ROI_OCR_X, AppConfig.ROI_OCR_Y, AppConfig.ROI_OCR_W, AppConfig.ROI_OCR_H);
     private long lastScanTime = 0;
     private List<ItemResult> lastConfirmedList = new ArrayList<>();
     private List<ItemResult> pendingList = new ArrayList<>();
     private int stabilityCount = 0;
-    private final ROIData cachedRoi = new ROIData(8750, 2070, 1100, 2100);
 
     public OcrProcessor(int targetRoiIndex) {
         this.targetRoiIndex = targetRoiIndex;
@@ -42,10 +41,11 @@ public class OcrProcessor implements RoiProcessor {
 
     @Override
     public void onProcess(byte[] data, int width, int height) {
+        CaptureFrameBuffer.getInstance().putFrame(targetRoiIndex, data, width, height);
         if (!AppConfig.MATERIAL_COLLECTION) return;
 
         long now = System.currentTimeMillis();
-        if ((now - lastScanTime) < SCAN_INTERVAL) return;
+        if ((now - lastScanTime) < AppConfig.OCR_SCAN_INTERVAL) return;
 
         // 既然 data 已经是堆内存副本，直接提交，无需 clone
         if (!parallel.tryAcquire()) return;
@@ -94,8 +94,8 @@ public class OcrProcessor implements RoiProcessor {
                 return;
             }
 
-            // 稳定性判定阈值，根据 SCAN_INTERVAL 调整，2次约等于 400ms-600ms 的稳定期
-            if (stabilityCount == 2) {
+            // 稳定性判定阈值，根据 AppConfig.OCR_SCAN_INTERVAL 调整，2次约等于 400ms-600ms 的稳定期
+            if (stabilityCount == AppConfig.OCR_STABILITY_THRESHOLD) {
                 handleIncrementalLogic(currentList);
             }
         }

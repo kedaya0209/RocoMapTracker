@@ -19,13 +19,6 @@ import java.util.List;
 @Slf4j
 public class OcrService implements AutoCloseable {
 
-    private static final int REC_STD_HEIGHT = 52;
-    private static final float TEXT_HEAT_THRESHOLD = 0.20f;
-    private static final int EXPAND_Y = 4;
-    private static final int DET_ALIGNMENT = 32;
-    private static final int REC_WIDTH_ALIGNMENT = 8;
-    private static final int BINARY_THRESHOLD = 150;
-
     private byte[] fullPixels;
     private int fullW = -1, fullH = -1;
 
@@ -39,6 +32,68 @@ public class OcrService implements AutoCloseable {
     private volatile boolean isClosed = false;
 
     public OcrService() {
+    }
+
+    /**
+     * 双线性插值缩放 (灰度图)
+     */
+    private static byte[] resize(byte[] src, int srcW, int srcH, int dstW, int dstH) {
+        byte[] dst = new byte[dstW * dstH];
+        double scaleX = (double) srcW / dstW;
+        double scaleY = (double) srcH / dstH;
+
+        for (int y = 0; y < dstH; y++) {
+            double srcY = y * scaleY;
+            int y0 = (int) srcY;
+            int y1 = Math.min(y0 + 1, srcH - 1);
+            double dy = srcY - y0;
+
+            for (int x = 0; x < dstW; x++) {
+                double srcX = x * scaleX;
+                int x0 = (int) srcX;
+                int x1 = Math.min(x0 + 1, srcW - 1);
+                double dx = srcX - x0;
+
+                double v00 = src[y0 * srcW + x0] & 0xFF;
+                double v01 = src[y0 * srcW + x1] & 0xFF;
+                double v10 = src[y1 * srcW + x0] & 0xFF;
+                double v11 = src[y1 * srcW + x1] & 0xFF;
+
+                dst[y * dstW + x] = (byte) Math.round(
+                        (1 - dy) * ((1 - dx) * v00 + dx * v01) +
+                                dy * ((1 - dx) * v10 + dx * v11));
+            }
+        }
+        return dst;
+    }
+
+    /**
+     * 四周填充 + 中心放置 (替代 copyMakeBorder)
+     */
+    private static byte[] copyMakeBorder(byte[] src, int srcW, int srcH,
+                                         int top, int bottom, int left, int right, byte fillValue) {
+        int dstW = srcW + left + right;
+        int dstH = srcH + top + bottom;
+        byte[] dst = new byte[dstW * dstH];
+        Arrays.fill(dst, fillValue);
+        for (int y = 0; y < srcH; y++) {
+            System.arraycopy(src, y * srcW, dst, (top + y) * dstW + left, srcW);
+        }
+        return dst;
+    }
+
+    /**
+     * 裁剪 ROI 区域 (替代 Mat.apply)
+     */
+    private static byte[] crop(byte[] src, int srcW, int srcH, int x, int y, int w, int h) {
+        if (x < 0 || y < 0 || x + w > srcW || y + h > srcH || w <= 0 || h <= 0) {
+            return new byte[0];
+        }
+        byte[] dst = new byte[w * h];
+        for (int row = 0; row < h; row++) {
+            System.arraycopy(src, (y + row) * srcW + x, dst, row * w, w);
+        }
+        return dst;
     }
 
     public void init() throws Exception {
@@ -55,6 +110,8 @@ public class OcrService implements AutoCloseable {
         log.info("OCR 服务纯 Java 版初始化完成");
     }
 
+    // ================== 纯 Java 图像原语 ==================
+
     public List<String> recognizeAll(byte[] grayData, int width, int height) {
         if (isClosed || grayData == null) return Collections.emptyList();
 
@@ -66,8 +123,8 @@ public class OcrService implements AutoCloseable {
         System.arraycopy(grayData, 0, fullPixels, 0, grayData.length);
 
         try {
-            int detW = alignTo(width, DET_ALIGNMENT);
-            int detH = alignTo(height, DET_ALIGNMENT);
+            int detW = alignTo(width, AppConfig.OCR_DET_ALIGNMENT);
+            int detH = alignTo(height, AppConfig.OCR_DET_ALIGNMENT);
 
             LetterboxInfo info = new LetterboxInfo();
             byte[] letterbox = createLetterbox(fullPixels, fullW, fullH, detW, detH, info);
@@ -83,9 +140,9 @@ public class OcrService implements AutoCloseable {
                 byte[] linePixels = crop(fullPixels, fullW, fullH, box.x, box.y, box.width, box.height);
                 if (linePixels.length == 0) continue;
 
-                int recW = alignTo((int) (box.width * (double) REC_STD_HEIGHT / box.height), REC_WIDTH_ALIGNMENT);
-                FloatBuffer recBuffer = fastBuildTensor(linePixels, box.width, box.height, recW, REC_STD_HEIGHT, false);
-                String text = recManager.recognize(recBuffer, REC_STD_HEIGHT, recW);
+                int recW = alignTo((int) (box.width * (double) AppConfig.OCR_REC_STD_HEIGHT / box.height), AppConfig.OCR_REC_WIDTH_ALIGNMENT);
+                FloatBuffer recBuffer = fastBuildTensor(linePixels, box.width, box.height, recW, AppConfig.OCR_REC_STD_HEIGHT, false);
+                String text = recManager.recognize(recBuffer, AppConfig.OCR_REC_STD_HEIGHT, recW);
 
                 text = text.replaceAll("[^\\u4e00-\\u9fa5xX×*0-9a-zA-Z]", "").trim();
                 if (!text.isEmpty()) resultList.add(text);
@@ -121,11 +178,12 @@ public class OcrService implements AutoCloseable {
 
     /**
      * 双线性插值缩放 + 二值化 → FloatBuffer (3通道 norm=[-1,1]).
-     * @param src  输入灰度像素
-     * @param srcW 输入宽度
-     * @param srcH 输入高度
-     * @param tw   目标宽度
-     * @param th   目标高度
+     *
+     * @param src   输入灰度像素
+     * @param srcW  输入宽度
+     * @param srcH  输入高度
+     * @param tw    目标宽度
+     * @param th    目标高度
      * @param isDet true=检测, false=识别 (决定用哪个 FloatBuffer)
      */
     private FloatBuffer fastBuildTensor(byte[] src, int srcW, int srcH, int tw, int th, boolean isDet) {
@@ -152,7 +210,7 @@ public class OcrService implements AutoCloseable {
             System.arraycopy(resized, y * tw, rowCache, 0, tw);
             for (int x = 0; x < tw; x++) {
                 int gray = rowCache[x] & 0xFF;
-                float val = (gray > BINARY_THRESHOLD) ? 0.0f : 1.0f;
+                float val = (gray > AppConfig.OCR_BINARY_THRESHOLD) ? 0.0f : 1.0f;
                 int idx = y * tw + x;
                 float norm = (val - 0.5f) / 0.5f;
                 dataCache[idx] = norm;
@@ -164,64 +222,6 @@ public class OcrService implements AutoCloseable {
         buffer.put(dataCache, 0, dataLen);
         buffer.flip();
         return buffer;
-    }
-
-    // ================== 纯 Java 图像原语 ==================
-
-    /** 双线性插值缩放 (灰度图) */
-    private static byte[] resize(byte[] src, int srcW, int srcH, int dstW, int dstH) {
-        byte[] dst = new byte[dstW * dstH];
-        double scaleX = (double) srcW / dstW;
-        double scaleY = (double) srcH / dstH;
-
-        for (int y = 0; y < dstH; y++) {
-            double srcY = y * scaleY;
-            int y0 = (int) srcY;
-            int y1 = Math.min(y0 + 1, srcH - 1);
-            double dy = srcY - y0;
-
-            for (int x = 0; x < dstW; x++) {
-                double srcX = x * scaleX;
-                int x0 = (int) srcX;
-                int x1 = Math.min(x0 + 1, srcW - 1);
-                double dx = srcX - x0;
-
-                double v00 = src[y0 * srcW + x0] & 0xFF;
-                double v01 = src[y0 * srcW + x1] & 0xFF;
-                double v10 = src[y1 * srcW + x0] & 0xFF;
-                double v11 = src[y1 * srcW + x1] & 0xFF;
-
-                dst[y * dstW + x] = (byte) Math.round(
-                        (1 - dy) * ((1 - dx) * v00 + dx * v01) +
-                                dy * ((1 - dx) * v10 + dx * v11));
-            }
-        }
-        return dst;
-    }
-
-    /** 四周填充 + 中心放置 (替代 copyMakeBorder) */
-    private static byte[] copyMakeBorder(byte[] src, int srcW, int srcH,
-                                         int top, int bottom, int left, int right, byte fillValue) {
-        int dstW = srcW + left + right;
-        int dstH = srcH + top + bottom;
-        byte[] dst = new byte[dstW * dstH];
-        Arrays.fill(dst, fillValue);
-        for (int y = 0; y < srcH; y++) {
-            System.arraycopy(src, y * srcW, dst, (top + y) * dstW + left, srcW);
-        }
-        return dst;
-    }
-
-    /** 裁剪 ROI 区域 (替代 Mat.apply) */
-    private static byte[] crop(byte[] src, int srcW, int srcH, int x, int y, int w, int h) {
-        if (x < 0 || y < 0 || x + w > srcW || y + h > srcH || w <= 0 || h <= 0) {
-            return new byte[0];
-        }
-        byte[] dst = new byte[w * h];
-        for (int row = 0; row < h; row++) {
-            System.arraycopy(src, (y + row) * srcW + x, dst, row * w, w);
-        }
-        return dst;
     }
 
     // ================== 文本行提取 (逻辑不变) ==================
@@ -236,7 +236,7 @@ public class OcrService implements AutoCloseable {
             boolean hasText = false;
             int rowOffset = y * w;
             for (int x = 0; x < w; x++) {
-                if (heatMap[rowOffset + x] >= TEXT_HEAT_THRESHOLD) {
+                if (heatMap[rowOffset + x] >= AppConfig.OCR_TEXT_HEAT_THRESHOLD) {
                     hasText = true;
                     break;
                 }
@@ -256,8 +256,8 @@ public class OcrService implements AutoCloseable {
                         float invScale, float ratioH, int srcW, int srcH) {
         float realY1 = (y1 * ratioH - info.padY) * invScale;
         float realY2 = (y2 * ratioH - info.padY) * invScale;
-        int rectY = Math.max(0, (int) realY1 - EXPAND_Y);
-        int rectBottom = Math.min(srcH, (int) realY2 + EXPAND_Y);
+        int rectY = Math.max(0, (int) realY1 - AppConfig.OCR_EXPAND_Y);
+        int rectBottom = Math.min(srcH, (int) realY2 + AppConfig.OCR_EXPAND_Y);
         int rectHeight = rectBottom - rectY;
         if (rectHeight > 5) boxes.add(new Rect(0, rectY, srcW, rectHeight));
     }
@@ -286,7 +286,8 @@ public class OcrService implements AutoCloseable {
 
     // ================== 内部类型 ==================
 
-    private record Rect(int x, int y, int width, int height) {}
+    private record Rect(int x, int y, int width, int height) {
+    }
 
     private static class LetterboxInfo {
         int srcNewW, srcNewH, padX, padY;

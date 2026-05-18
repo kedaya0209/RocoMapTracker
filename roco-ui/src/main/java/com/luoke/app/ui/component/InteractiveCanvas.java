@@ -1,5 +1,6 @@
 package com.luoke.app.ui.component;
 
+import com.luoke.app.config.AppConfig;
 import com.luoke.app.context.CameraContext;
 import com.luoke.app.context.MapContext;
 import com.luoke.app.context.PathContext;
@@ -12,11 +13,12 @@ import com.luoke.app.ui.util.DialogUtils;
 import javafx.application.Platform;
 import javafx.scene.Cursor;
 import javafx.scene.canvas.Canvas;
-import javafx.scene.control.*;
+import javafx.scene.control.ContextMenu;
+import javafx.scene.control.MenuItem;
+import javafx.scene.control.SeparatorMenuItem;
+import javafx.scene.control.Tooltip;
 import javafx.scene.input.*;
 import javafx.scene.layout.StackPane;
-import javafx.scene.layout.VBox;
-import javafx.stage.Popup;
 import javafx.util.Duration;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -32,6 +34,8 @@ public class InteractiveCanvas extends Canvas {
     private final PathContext pathContext = PathContext.getInstance();
 
     private final Tooltip hintTooltip = new Tooltip();
+    private final KeyCombination saveCombo = new KeyCodeCombination(KeyCode.S, KeyCombination.CONTROL_ANY);
+    private final KeyCombination undoCombo = new KeyCodeCombination(KeyCode.Z, KeyCombination.CONTROL_ANY);
     private double lastMouseX, lastMouseY;
     private ResourcePoint hoveredPoint = null;
     @Setter
@@ -40,12 +44,8 @@ public class InteractiveCanvas extends Canvas {
     private UiAnimator uiAnimator;
     private ContextMenu mapContextMenu;
     private ContextMenu imageContextMenu;
-
     private double clickSceneX;
     private double clickSceneY;
-
-    private final KeyCombination saveCombo = new KeyCodeCombination(KeyCode.S, KeyCombination.CONTROL_ANY);
-    private final KeyCombination undoCombo = new KeyCodeCombination(KeyCode.Z, KeyCombination.CONTROL_ANY);
     private int draggedNodeIndex = -1;
 
     public InteractiveCanvas() {
@@ -60,14 +60,10 @@ public class InteractiveCanvas extends Canvas {
 
     private void initListeners() {
         // 鼠标进入自动抓取焦点
-        setOnMouseEntered(e -> requestFocus());
+        setOnMouseEntered(_ -> requestFocus());
 
-        widthProperty().addListener(e -> {
-            mapManager.setViewWidth(getWidth());
-        });
-        heightProperty().addListener(e -> {
-            mapManager.setViewHeight(getHeight());
-        });
+        widthProperty().addListener(_ -> mapManager.setViewWidth(getWidth()));
+        heightProperty().addListener(_ -> mapManager.setViewHeight(getHeight()));
 
         // 拦截按键事件
         addEventFilter(KeyEvent.KEY_PRESSED, this::handleKeyEvents);
@@ -78,7 +74,7 @@ public class InteractiveCanvas extends Canvas {
             handlePointHover(e);
         });
 
-        setOnMouseExited(e -> {
+        setOnMouseExited(_ -> {
             hintTooltip.hide();
             if (hoveredPoint != null) {
                 hoveredPoint = null;
@@ -186,13 +182,13 @@ public class InteractiveCanvas extends Canvas {
             // noop: renderLoop removed
         });
 
-        setOnMouseReleased(e -> draggedNodeIndex = -1);
+        setOnMouseReleased(_ -> draggedNodeIndex = -1);
 
         setOnScroll(e -> {
-            double factor = e.getDeltaY() > 0 ? 1.1 : 0.9;
+            double factor = e.getDeltaY() > 0 ? AppConfig.INTERACTIVE_ZOOM_FACTOR : (2 - AppConfig.INTERACTIVE_ZOOM_FACTOR);
             if (cameraManager.isFollowMode() && cameraManager.hasValidPlayerPosition()) {
                 double newScale = cameraManager.getFollowScale() * factor;
-                cameraManager.setFollowScale(Math.max(0.3, Math.min(5, newScale)));
+                cameraManager.setFollowScale(Math.clamp(newScale, AppConfig.INTERACTIVE_FOLLOW_MIN_SCALE, AppConfig.INTERACTIVE_FOLLOW_MAX_SCALE));
             } else {
                 if (cameraManager.isFollowMode()) {
                     // 玩家未定位时走普通缩放，并同步 followScale 以便定位后无缝切换
@@ -241,7 +237,7 @@ public class InteractiveCanvas extends Canvas {
         if (active == null) return -1;
         double lx = toLogicX(mx);
         double ly = toLogicY(my);
-        double threshold = 15.0 / mapManager.getScale();
+        double threshold = AppConfig.NODE_CLICK_THRESHOLD / mapManager.getScale();
         List<Point> nodes = active.getNodes();
         for (int i = 0; i < nodes.size(); i++) {
             if (nodes.get(i).distance(lx, ly) < threshold) return i;
@@ -254,7 +250,7 @@ public class InteractiveCanvas extends Canvas {
         if (active == null || active.getNodes().size() < 2) return -1;
         double lx = toLogicX(mx);
         double ly = toLogicY(my);
-        double threshold = 12.0 / mapManager.getScale();
+        double threshold = AppConfig.NODE_INSERT_THRESHOLD / mapManager.getScale();
         List<Point> nodes = active.getNodes();
         for (int i = 0; i < nodes.size() - 1; i++) {
             if (distancePointToSegment(lx, ly, nodes.get(i).getX(), nodes.get(i).getY(), nodes.get(i + 1).getX(), nodes.get(i + 1).getY()) < threshold)
@@ -298,7 +294,7 @@ public class InteractiveCanvas extends Canvas {
         for (int i = nearbyPoints.size() - 1; i >= 0; i--) {
             ResourcePoint p = nearbyPoints.get(i);
             Point pos = p.getScreenPosition();
-            double r = 16.0;
+            double r = AppConfig.HOVER_DETECT_RADIUS;
             if (lx >= pos.getX() - r && lx <= pos.getX() + r && ly >= pos.getY() - r * 2 && ly <= pos.getY()) return p;
         }
         return null;
@@ -319,7 +315,7 @@ public class InteractiveCanvas extends Canvas {
         }
         MenuItem del = new MenuItem("删除点位");
         del.setStyle("-fx-text-fill: #ff4444;");
-        del.setOnAction(e -> {
+        del.setOnAction(_ -> {
             if (this.getParent() != null && this.getParent().getParent() instanceof StackPane rootStack) {
                 DialogUtils.showConfirmDialog(rootStack, "删除标记", "确定要永久删除吗？", () -> pointContext.deletePoint(p), null);
             }
@@ -336,15 +332,15 @@ public class InteractiveCanvas extends Canvas {
     private void initMenus() {
         mapContextMenu = new ContextMenu();
         MenuItem addPoint = new MenuItem("在此处添加标记");
-        addPoint.setOnAction(e -> {
+        addPoint.setOnAction(_ -> {
             if (InteractiveCanvas.this.getParent() != null
                     && InteractiveCanvas.this.getParent().getParent() instanceof StackPane rootStack) {
-                AddPointDialog.open(rootStack, clickSceneX, clickSceneY,
+                AddPointDialog.open(rootStack,
                         toLogicX(clickSceneX), toLogicY(clickSceneY));
             }
         });
         MenuItem resetCam = new MenuItem("重置视角");
-        resetCam.setOnAction(e -> {
+        resetCam.setOnAction(_ -> {
             if (mapRenderer != null) mapRenderer.resetViewport();
         });
         mapContextMenu.getItems().addAll(addPoint, new SeparatorMenuItem(), resetCam);
@@ -353,7 +349,7 @@ public class InteractiveCanvas extends Canvas {
 
     private void openAddPointDialog(double canvasX, double canvasY) {
         if (this.getParent() != null && this.getParent().getParent() instanceof StackPane rootStack) {
-            AddPointDialog.open(rootStack, canvasX, canvasY,
+            AddPointDialog.open(rootStack,
                     toLogicX(canvasX), toLogicY(canvasY));
         }
     }

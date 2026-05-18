@@ -21,6 +21,7 @@ public enum HookRegistry {
 
     /**
      * 注册单个钩子
+     *
      * @param hook 要注册的钩子实例，不能为null
      */
     public void register(AbstractGenericHook<?> hook) {
@@ -33,6 +34,7 @@ public enum HookRegistry {
 
     /**
      * 批量注册多个钩子
+     *
      * @param hooks 要注册的钩子实例数组，不能为null
      */
     public void registers(AbstractGenericHook<?>... hooks) {
@@ -47,8 +49,9 @@ public enum HookRegistry {
 
     /**
      * 发布事件到钩子系统
+     *
      * @param eventType 事件类型
-     * @param data 事件数据，可以是任意对象
+     * @param data      事件数据，可以是任意对象
      */
     public void publish(HookEventType eventType, Object data) {
         HookMulticast.getInstance().enqueue(eventType, data);

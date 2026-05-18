@@ -27,7 +27,7 @@ public class SwitchMapMatcher {
 
     /**
      * -- SETTER --
-     *  设置变体切换回调 (由 roco-ui 注入)
+     * 设置变体切换回调 (由 roco-ui 注入)
      */
     private volatile SwitchCallback switchCallback;
 

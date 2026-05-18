@@ -18,9 +18,12 @@ import java.util.List;
 public class RoutePersistenceService {
 
     private static final TypeReference<List<RoutePath>> ROUTE_LIST_TYPE =
-            new TypeReference<List<RoutePath>>() {};
+            new TypeReference<List<RoutePath>>() {
+            };
 
-    /** 将路线列表保存到默认路径 */
+    /**
+     * 将路线列表保存到默认路径
+     */
     public boolean save(List<RoutePath> routes) {
         try {
             File file = ResourceUtils.getExternalFile(ResourceConfigContext.getPaths());
@@ -33,7 +36,9 @@ public class RoutePersistenceService {
         }
     }
 
-    /** 从指定文件加载路线列表 */
+    /**
+     * 从指定文件加载路线列表
+     */
     public List<RoutePath> load(File file) {
         try {
             return JsonUtils.getMapper().readValue(file, ROUTE_LIST_TYPE);
@@ -43,7 +48,9 @@ public class RoutePersistenceService {
         }
     }
 
-    /** 导出单条路线到指定文件 */
+    /**
+     * 导出单条路线到指定文件
+     */
     public boolean export(RoutePath route, File file) {
         try {
             JsonUtils.getMapper().writeValue(file, List.of(route));
@@ -54,7 +61,9 @@ public class RoutePersistenceService {
         }
     }
 
-    /** 从默认路径加载已保存的路线 */
+    /**
+     * 从默认路径加载已保存的路线
+     */
     public List<RoutePath> loadDefault() {
         try {
             File file = ResourceUtils.getExternalFile(ResourceConfigContext.getPaths());

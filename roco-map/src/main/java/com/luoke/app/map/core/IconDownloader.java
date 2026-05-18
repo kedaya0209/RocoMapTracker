@@ -3,6 +3,7 @@ package com.luoke.app.map.core;
 import com.luoke.app.map.LoadInfo;
 import com.luoke.app.map.MapResourceUpdater;
 import com.luoke.app.map.dto.MapCategoryItem;
+import com.luoke.app.map.util.MapFileMover;
 import com.luoke.app.utils.FileUtil;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
@@ -11,7 +12,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
-import java.net.URL;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -91,7 +92,7 @@ public class IconDownloader {
                 return;
             }
 
-            HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
+            HttpURLConnection conn = (HttpURLConnection) new URI(url).toURL().openConnection();
             conn.setRequestMethod("GET");
             conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
             conn.setRequestProperty("Referer", "https://wiki.biligame.com/");
@@ -112,6 +113,7 @@ public class IconDownloader {
             }
 
             log.info("⬇️  {}", name);
+            MapFileMover.recordIconUrl(name, url);
 
             // 每完成一个图标，更新进度条
             progress.finishTask();

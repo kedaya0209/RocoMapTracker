@@ -17,10 +17,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.file.Files;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.Executors;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -36,12 +33,10 @@ public class MapDownloader {
     private static final List<byte[]> chunkBuffer = Collections.synchronizedList(new ArrayList<>());
     @Getter
     private static final AtomicBoolean isStopRequested = new AtomicBoolean(false);
-
+    private static final DownloadProgressContext progress = DownloadProgressContext.getInstance();
     private static int chunkIndex = 0;
     private static int tileW = -1;
     private static int tileH = -1;
-
-    private static final DownloadProgressContext progress = DownloadProgressContext.getInstance();
 
     public static void updateMap() {
         try {
@@ -92,7 +87,7 @@ public class MapDownloader {
                 }
 
                 log.info("启动虚拟线程下载池，并发数: {}", MapResourceUpdater.THREAD_COUNT);
-                try (var exec = Executors.newVirtualThreadPerTaskExecutor()) {
+                try (ExecutorService exec = Executors.newVirtualThreadPerTaskExecutor()) {
                     List<CompletableFuture<Void>> futures = new ArrayList<>();
                     for (int j = 0; j < MapResourceUpdater.THREAD_COUNT; j++) {
                         futures.add(CompletableFuture.runAsync(() -> worker(urlTpl, tag), exec));

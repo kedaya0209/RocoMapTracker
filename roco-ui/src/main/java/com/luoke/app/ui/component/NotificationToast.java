@@ -1,6 +1,7 @@
 package com.luoke.app.ui.component;
 
 import atlantafx.base.theme.Styles;
+import com.luoke.app.config.AppConfig;
 import com.luoke.app.hook.event.NotificationType;
 import javafx.animation.Interpolator;
 import javafx.animation.KeyFrame;
@@ -20,8 +21,8 @@ public class NotificationToast extends HBox {
         super(15);
         this.setAlignment(Pos.CENTER_LEFT);
         this.setPadding(new Insets(10, 20, 10, 20));
-        this.setMaxWidth(400);
-        this.setMaxHeight(50);
+        this.setMaxWidth(AppConfig.TOAST_MAX_WIDTH);
+        this.setMaxHeight(AppConfig.TOAST_MAX_HEIGHT);
 
         String color = colorOf(type);
         this.setStyle("-fx-background-color: -color-bg-default; " +
@@ -73,19 +74,19 @@ public class NotificationToast extends HBox {
         // 1. 滑入动画
         Timeline fadeIn = new Timeline(
                 new KeyFrame(Duration.ZERO, new KeyValue(toast.translateYProperty(), -100)),
-                new KeyFrame(Duration.millis(400), new KeyValue(toast.translateYProperty(), 0, Interpolator.EASE_OUT))
+                new KeyFrame(Duration.millis(AppConfig.TOAST_FADE_IN_MS), new KeyValue(toast.translateYProperty(), 0, Interpolator.EASE_OUT))
         );
 
         // 2. 自动滑出动画
         Timeline fadeOut = new Timeline(
                 new KeyFrame(Duration.ZERO, new KeyValue(toast.translateYProperty(), 0)),
-                new KeyFrame(Duration.millis(400), new KeyValue(toast.translateYProperty(), -100, Interpolator.EASE_IN))
+                new KeyFrame(Duration.millis(AppConfig.TOAST_FADE_OUT_MS), new KeyValue(toast.translateYProperty(), -100, Interpolator.EASE_IN))
         );
-        fadeOut.setDelay(Duration.seconds(3)); // 停顿 3 秒
-        fadeOut.setOnFinished(e -> root.getChildren().remove(toast));
+        fadeOut.setDelay(Duration.seconds(AppConfig.TOAST_DISPLAY_SEC)); // 停顿
+        fadeOut.setOnFinished(_ -> root.getChildren().remove(toast));
 
         fadeIn.play();
-        fadeIn.setOnFinished(e -> fadeOut.play());
+        fadeIn.setOnFinished(_ -> fadeOut.play());
     }
 
 }

@@ -106,6 +106,7 @@ public class DialogUtils {
         Button confirmBtn = new Button(confirmBtnText);
         confirmBtn.getStyleClass().addAll(Styles.BUTTON_OUTLINED, confirmBtnStyleClass);
         confirmBtn.setPrefWidth(120);
+        FxRippleUtil.install(confirmBtn);
         confirmBtn.setOnAction(e -> fadeOutAndRemove(rootStack, mask, onConfirm));
 
         btnBox.getChildren().add(confirmBtn);
@@ -114,6 +115,7 @@ public class DialogUtils {
             Button cancelBtn = new Button("取消");
             cancelBtn.setPrefWidth(120);
             cancelBtn.getStyleClass().addAll(Styles.BUTTON_OUTLINED); // 使用主题自带的样式减少冗余
+            FxRippleUtil.install(cancelBtn);
             cancelBtn.setOnAction(e -> fadeOutAndRemove(rootStack, mask, onCancel));
             btnBox.getChildren().add(cancelBtn);
         }
@@ -174,22 +176,25 @@ public class DialogUtils {
         btnBox.setAlignment(Pos.CENTER);
         btnBox.setFillWidth(true);
 
-        Button downloadBtn = new Button("立即同步");
+        Button downloadBtn = new Button("立即同步资源");
         downloadBtn.setMaxWidth(260);
         downloadBtn.setPrefHeight(38);
         downloadBtn.getStyleClass().addAll(Styles.BUTTON_OUTLINED, Styles.SUCCESS);
+        FxRippleUtil.install(downloadBtn);
         downloadBtn.setOnAction(e -> fadeOutAndRemove(rootStack, mask, onDownload));
 
-        Button builtInBtn = new Button("使用内置资源，后台下载 WIKI 资源");
+        Button builtInBtn = new Button("离线启动，后台更新");
         builtInBtn.setMaxWidth(260);
         builtInBtn.setPrefHeight(38);
-        builtInBtn.getStyleClass().addAll(Styles.BUTTON_OUTLINED);
+        builtInBtn.getStyleClass().addAll(Styles.BUTTON_OUTLINED, Styles.ACCENT);
+        FxRippleUtil.install(builtInBtn);
         builtInBtn.setOnAction(e -> fadeOutAndRemove(rootStack, mask, onUseBuiltIn));
 
         Button exitBtn = new Button("退出程序");
         exitBtn.setMaxWidth(260);
         exitBtn.setPrefHeight(38);
         exitBtn.getStyleClass().addAll(Styles.BUTTON_OUTLINED, Styles.DANGER);
+        FxRippleUtil.install(exitBtn);
         exitBtn.setOnAction(e -> fadeOutAndRemove(rootStack, mask, onExit));
 
         btnBox.getChildren().addAll(downloadBtn, builtInBtn, exitBtn);

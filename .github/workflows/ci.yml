@@ -1,0 +1,96 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+      - 'dev-*'
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+
+# 仅保留最新构建，取消队列中的旧任务
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+
+  # ================================================================
+  # JVM 编译 + 单元测试
+  # ================================================================
+  build-jvm:
+    name: JVM Build & Test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup GraalVM JDK 25
+        uses: graalvm/setup-graalvm@v1
+        with:
+          java-version: '25'
+          distribution: 'graalvm'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Cache Maven repository
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
+
+      - name: Compile all modules
+        run: mvn clean compile -pl roco-ui -am --no-transfer-progress
+
+      - name: Run tests
+        run: mvn test -pl roco-ui -am --no-transfer-progress
+
+  # ================================================================
+  # Native Image 构建（仅 master 分支和手动触发）
+  # ================================================================
+  native-image:
+    name: Native Image Build
+    if: github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch'
+    runs-on: windows-latest
+    needs: build-jvm
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup GraalVM JDK 25
+        uses: graalvm/setup-graalvm@v1
+        with:
+          java-version: '25'
+          distribution: 'graalvm'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Cache Maven repository
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
+
+      - name: Setup Visual Studio (MSVC)
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Build C++ subprocesses
+        run: |
+          cl /std:c++17 /O2 /EHsc /arch:AVX2 /Fe:capture.exe capture_main.cpp d3d11.lib dxgi.lib windowsapp.lib runtimeobject.lib user32.lib ws2_32.lib winmm.lib
+          cl /std:c++17 /O2 /EHsc /arch:AVX2 /Fe:sift_match.exe sift_match_main.cpp ws2_32.lib
+        working-directory: cpp
+
+      - name: Build Native Image
+        run: mvn -Pnative clean package -pl roco-ui -am --no-transfer-progress
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: RocoMapTracker-${{ github.sha }}
+          path: |
+            roco-ui/target/RocoMapTracker.exe
+            cpp/capture.exe
+            cpp/sift_match.exe
+          compression-level: 0

@@ -22,18 +22,17 @@ import java.util.TreeSet;
  */
 public class AddPointDialog {
 
-    private AddPointDialog() {}
+    private AddPointDialog() {
+    }
 
     /**
      * 打开新增标记点对话框。
      *
      * @param rootStack 父容器
-     * @param canvasX   画布点击 X (屏幕坐标)
-     * @param canvasY   画布点击 Y (屏幕坐标)
      * @param logicX    地图逻辑坐标 X
      * @param logicY    地图逻辑坐标 Y
      */
-    public static void open(StackPane rootStack, double canvasX, double canvasY,
+    public static void open(StackPane rootStack,
                             double logicX, double logicY) {
         Set<String> markTypeSet = new TreeSet<>();
         for (ResourcePoint point : ResourcePointContext.getInstance().getAllPoints()) {
@@ -54,7 +53,7 @@ public class AddPointDialog {
         popup.setAutoHide(true);
         popup.getContent().add(suggestionList);
 
-        input.textProperty().addListener((obs, old, text) -> {
+        input.textProperty().addListener((_, _, text) -> {
             if (text == null || text.isBlank()) {
                 popup.hide();
                 return;
@@ -79,7 +78,7 @@ public class AddPointDialog {
             }
         });
 
-        suggestionList.setOnMouseClicked(e -> {
+        suggestionList.setOnMouseClicked(_ -> {
             String selected = suggestionList.getSelectionModel().getSelectedItem();
             if (selected != null) {
                 input.setText(selected);
@@ -141,6 +140,7 @@ public class AddPointDialog {
             String selected = input.getText();
             if (selected != null && !selected.isBlank())
                 ResourcePointContext.getInstance().savePoint(selected, logicX, logicY);
-        }, () -> {});
+        }, () -> {
+        });
     }
 }

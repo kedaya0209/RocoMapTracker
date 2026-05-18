@@ -11,7 +11,8 @@ public class ROIData {
     public int w;
     public int h;
 
-    public ROIData() {}
+    public ROIData() {
+    }
 
     public ROIData(int x, int y, int w, int h) {
         this.x = x;

@@ -1,5 +1,6 @@
 package com.luoke.app.ui.component;
 
+import com.luoke.app.config.AppConfig;
 import javafx.animation.TranslateTransition;
 import javafx.application.Platform;
 import javafx.scene.Node;
@@ -34,15 +35,15 @@ public class UiAnimator {
             log.debug("侧边栏初始化完成，动态宽度: {}", width);
         });
 
-        menuBtn.setOnAction(e -> toggleSidebar());
+        menuBtn.setOnAction(_ -> toggleSidebar());
     }
 
     private void toggleSidebar() {
         if (sidebarNode == null) return;
         double currentWidth = sidebarNode.getLayoutBounds().getWidth();
 
-        TranslateTransition st = new TranslateTransition(Duration.millis(250), sidebarNode);
-        TranslateTransition ft = new TranslateTransition(Duration.millis(250), floatNode);
+        TranslateTransition st = new TranslateTransition(Duration.millis(AppConfig.SIDEBAR_ANIM_MS), sidebarNode);
+        TranslateTransition ft = new TranslateTransition(Duration.millis(AppConfig.SIDEBAR_ANIM_MS), floatNode);
 
         double targetX = sidebarVisible ? -currentWidth : 0;
         double floatTargetX = sidebarVisible ? 0 : currentWidth;
@@ -55,7 +56,9 @@ public class UiAnimator {
         sidebarVisible = !sidebarVisible;
     }
 
-    /** 画布点击时收起侧边栏 */
+    /**
+     * 画布点击时收起侧边栏
+     */
     public void closeSidebar() {
         if (sidebarVisible) {
             toggleSidebar();

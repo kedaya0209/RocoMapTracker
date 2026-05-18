@@ -48,25 +48,24 @@ public class SiftMatchHandler implements SocketHandler {
             MSG_REQUEST_MAP, MSG_REQUEST_CONFIG,
             MSG_INIT_COMPLETE, MSG_INIT_FAILED,
             MSG_READY, MSG_MATCH_RESULT);
-
+    // 匹配结果同步: 每帧一个请求-响应周期, wait/notify 替代忙等
+    private final Object resultLock = new Object();
     // ---- 当前服务中的进程 (active) ----
     private NativeProcess activeProcess;
     private volatile SocketSession activeSession;
     private volatile boolean activeInitialized;
     private volatile SiftVariant activeVariant;
-
     // ---- 正在初始化的新进程 (pending)，用于无感热切换 ----
     private NativeProcess pendingProcess;
     private volatile SocketSession pendingSession;
     private volatile boolean pendingInitialized;
     private volatile boolean switching;
-
-    // 匹配结果同步: 每帧一个请求-响应周期, wait/notify 替代忙等
-    private final Object resultLock = new Object();
     private MatchResult pendingResult;
     private volatile StateCallback stateCallback;
 
     // ---- SocketHandler 实现 ----
+    // 崩溃重启限速，防止子进程反复崩溃时无限快速重启
+    private volatile long lastRestartTime = 0;
 
     @Override
     public Set<Integer> messageTypes() {
@@ -74,7 +73,9 @@ public class SiftMatchHandler implements SocketHandler {
     }
 
     @Override
-    public String clientType() { return "sift"; }
+    public String clientType() {
+        return "sift";
+    }
 
     @Override
     public void onConnect(SocketSession session) {
@@ -142,22 +143,18 @@ public class SiftMatchHandler implements SocketHandler {
         }
     }
 
-    // 崩溃重启限速，防止子进程反复崩溃时无限快速重启
-    private volatile long lastRestartTime = 0;
-    private static final long MIN_RESTART_INTERVAL_MS = 5000;
-
     private void restartAfterCrash() {
         long now = System.currentTimeMillis();
-        if (now - lastRestartTime < MIN_RESTART_INTERVAL_MS) {
+        if (now - lastRestartTime < AppConfig.SIFT_RESTART_MIN_INTERVAL) {
             log.warn("Skipping sift_match.exe restart due to rate limit ({}ms < {}ms)",
-                    now - lastRestartTime, MIN_RESTART_INTERVAL_MS);
+                    now - lastRestartTime, AppConfig.SIFT_RESTART_MIN_INTERVAL);
             return;
         }
         lastRestartTime = now;
 
         Thread.ofVirtual().name("sift-restart").start(() -> {
             try {
-                Thread.sleep(1000); // 等待旧进程完全退出
+                Thread.sleep(AppConfig.SIFT_RESTART_DELAY); // 等待旧进程完全退出
 
                 int port = SocketServer.instance().getPort();
                 if (port <= 0) {
@@ -357,7 +354,7 @@ public class SiftMatchHandler implements SocketHandler {
         }
         if (process != null && process.isAlive()) {
             process.destroy();
-            if (!process.waitFor(3, TimeUnit.SECONDS)) {
+            if (!process.waitFor(AppConfig.SIFT_PROCESS_STOP_TIMEOUT, TimeUnit.SECONDS)) {
                 process.destroyForcibly();
             }
         }
@@ -366,8 +363,8 @@ public class SiftMatchHandler implements SocketHandler {
     // ---- 帧匹配 ----
 
     public MatchResult sendFrameAndWait(byte[] grayData, int width, int height,
-                                         double hintX, double hintY,
-                                         long timeoutMs) throws InterruptedException {
+                                        double hintX, double hintY,
+                                        long timeoutMs) throws InterruptedException {
         SocketSession s = activeSession;
         if (s == null || !activeInitialized) {
             return MatchResult.FAIL;

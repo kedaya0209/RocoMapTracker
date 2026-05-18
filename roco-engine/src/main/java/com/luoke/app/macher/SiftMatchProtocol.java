@@ -18,12 +18,10 @@ import java.nio.charset.StandardCharsets;
  */
 public class SiftMatchProtocol {
 
-    private SiftMatchProtocol() {}
-
-    // ==================== 消息类型 ====================
-
     public static final int MSG_REQUEST_MAP = 200;
     public static final int MSG_MAP_DATA = 201;
+
+    // ==================== 消息类型 ====================
     public static final int MSG_INIT_COMPLETE = 202;
     public static final int MSG_INIT_FAILED = 203;
     public static final int MSG_READY = 204;
@@ -32,6 +30,9 @@ public class SiftMatchProtocol {
     public static final int MSG_SHUTDOWN = 207;
     public static final int MSG_REQUEST_CONFIG = 208;
     public static final int MSG_CONFIG_DATA = 209;
+    private static final String cachePrefix = "cache/";
+    private SiftMatchProtocol() {
+    }
 
     // ==================== 编码 (Java → C++) ====================
 
@@ -48,7 +49,7 @@ public class SiftMatchProtocol {
      */
     public static byte[] encodeConfig(int variant, String cacheSuffix) {
         String siftMapPath = ResourceConfigContext.getSiftMap();
-        String cacheFilePath = FileUtil.getExternalFile(siftMapPath + cacheSuffix).getAbsolutePath();
+        String cacheFilePath = FileUtil.getExternalFile(cachePrefix + siftMapPath + cacheSuffix).getAbsolutePath();
         byte[] cachePathBytes = cacheFilePath.getBytes(StandardCharsets.UTF_8);
 
         int bodyLen = 4 + 4 + 4 + 8 + 8 + 8       // variant + SIFT
@@ -85,6 +86,7 @@ public class SiftMatchProtocol {
 
     /**
      * 编码地图灰度数据。
+     *
      * @return [w(4B)][h(4B)][pixelsLen(4B)][gray8]
      */
     public static byte[] encodeMapData(byte[] grayPixels, int w, int h) {
@@ -98,10 +100,11 @@ public class SiftMatchProtocol {
 
     /**
      * 编码匹配帧数据。
+     *
      * @return [w(4B)][h(4B)][hintX(8B)][hintY(8B)][pixelsLen(4B)][gray8]
      */
     public static byte[] encodeFrameData(byte[] grayData, int width, int height,
-                                          double hintX, double hintY) {
+                                         double hintX, double hintY) {
         ByteBuffer buf = ByteBuffer.allocate(28 + grayData.length).order(ByteOrder.BIG_ENDIAN);
         buf.putInt(width);
         buf.putInt(height);
@@ -114,19 +117,25 @@ public class SiftMatchProtocol {
 
     // ==================== 解码 (C++ → Java) ====================
 
-    /** 解析 INIT_COMPLETE 体，返回特征点数 */
+    /**
+     * 解析 INIT_COMPLETE 体，返回特征点数
+     */
     public static int decodeInitComplete(byte[] body) {
         if (body == null || body.length < 4) return 0;
         return ByteBuffer.wrap(body).order(ByteOrder.BIG_ENDIAN).getInt();
     }
 
-    /** 解析 INIT_FAILED 体，返回错误消息 */
+    /**
+     * 解析 INIT_FAILED 体，返回错误消息
+     */
     public static String decodeInitFailed(byte[] body) {
         if (body == null || body.length <= 4) return "unknown error";
         return new String(body, 4, body.length - 4, StandardCharsets.UTF_8);
     }
 
-    /** 解析 MATCH_RESULT 体，返回 MatchResult */
+    /**
+     * 解析 MATCH_RESULT 体，返回 MatchResult
+     */
     public static SiftMatchHandler.MatchResult decodeMatchResult(byte[] body) {
         if (body == null || body.length < 17) return SiftMatchHandler.MatchResult.FAIL;
         ByteBuffer buf = ByteBuffer.wrap(body).order(ByteOrder.BIG_ENDIAN);
@@ -138,7 +147,9 @@ public class SiftMatchProtocol {
 
     // ==================== 工具方法 ====================
 
-    /** 从资源加载地图并转换为灰度像素 */
+    /**
+     * 从资源加载地图并转换为灰度像素
+     */
     public static MapImageData loadMapGray() throws Exception {
         String mapPath = ResourceConfigContext.getSiftMap();
         java.awt.image.BufferedImage img;
@@ -164,6 +175,9 @@ public class SiftMatchProtocol {
         return new MapImageData(w, h, grayPixels);
     }
 
-    /** 地图灰度数据值对象 */
-    public record MapImageData(int width, int height, byte[] grayPixels) {}
+    /**
+     * 地图灰度数据值对象
+     */
+    public record MapImageData(int width, int height, byte[] grayPixels) {
+    }
 }

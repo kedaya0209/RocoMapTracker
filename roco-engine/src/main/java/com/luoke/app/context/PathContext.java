@@ -20,13 +20,17 @@ public class PathContext {
     private final ArrayList<RoutePath> savedRoutes = new ArrayList<>();
     private final CopyOnWriteArrayList<Consumer<List<RoutePath>>> changeListeners = new CopyOnWriteArrayList<>();
 
-    @Getter @Setter
+    @Getter
+    @Setter
     private Mode currentMode = Mode.VIEW;
-    @Getter @Setter
+    @Getter
+    @Setter
     private RoutePath activeRoute;
-    @Getter @Setter
+    @Getter
+    @Setter
     private double mouseLogicX;
-    @Getter @Setter
+    @Getter
+    @Setter
     private double mouseLogicY;
 
     private PathContext() {
@@ -37,7 +41,9 @@ public class PathContext {
         return INSTANCE;
     }
 
-    /** 注册列表变化回调 (用于 UI 层绑定) */
+    /**
+     * 注册列表变化回调 (用于 UI 层绑定)
+     */
     public void onChange(Consumer<List<RoutePath>> listener) {
         changeListeners.add(listener);
     }
@@ -77,19 +83,25 @@ public class PathContext {
         notifyChanged();
     }
 
-    /** 持久化路线列表到本地文件，委托给 RoutePersistenceService */
+    /**
+     * 持久化路线列表到本地文件，委托给 RoutePersistenceService
+     */
     public boolean saveToLocal() {
         boolean ok = persistence.save(savedRoutes);
         if (ok) this.currentMode = Mode.VIEW;
         return ok;
     }
 
-    /** 从文件解析路线列表，委托给 RoutePersistenceService */
+    /**
+     * 从文件解析路线列表，委托给 RoutePersistenceService
+     */
     public List<RoutePath> resolve(File file) {
         return persistence.load(file);
     }
 
-    /** 导出单条路线到文件，委托给 RoutePersistenceService */
+    /**
+     * 导出单条路线到文件，委托给 RoutePersistenceService
+     */
     public boolean exportPaths(RoutePath selected, File file) {
         return persistence.export(selected, file);
     }

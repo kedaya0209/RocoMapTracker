@@ -1,4 +1,4 @@
-package com.luoke.app.ui.util;
+package com.luoke.app.ui.service;
 
 import atlantafx.base.theme.*;
 import com.luoke.app.config.AppConfig;

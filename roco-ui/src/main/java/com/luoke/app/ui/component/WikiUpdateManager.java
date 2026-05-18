@@ -1,5 +1,6 @@
 package com.luoke.app.ui.component;
 
+import com.luoke.app.config.AppConfig;
 import com.luoke.app.hook.HookEventType;
 import com.luoke.app.hook.event.NotificationType;
 import com.luoke.app.hook.event.ProgressEvent;
@@ -7,12 +8,17 @@ import com.luoke.app.hook.event.StatusEvent;
 import com.luoke.app.hook.multicast.HookRegistry;
 import com.luoke.app.map.MapResourceUpdater;
 import com.luoke.app.map.core.DownloadProgressContext;
+import com.luoke.app.ui.service.SvgManager;
 import com.luoke.app.ui.util.DialogUtils;
+import com.luoke.app.ui.util.FxRippleUtil;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ProgressBar;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 
 /**
@@ -21,23 +27,37 @@ import javafx.scene.layout.StackPane;
  */
 public class WikiUpdateManager {
 
-    private static final double ITEM_HEIGHT = 38;
+    private static final double ITEM_HEIGHT = AppConfig.WIKI_ITEM_HEIGHT;
 
     private final StackPane btnContainer;
     private final Button updateBtn;
     private final ProgressBar progressBar;
     private final Label progressLabel;
+    private final Node downloadIcon;
 
     public WikiUpdateManager() {
         btnContainer = new StackPane();
         btnContainer.setPadding(new Insets(0, 0, 0, 0));
 
-        updateBtn = new Button("更新WIKI资源");
+        downloadIcon = SvgManager.createHoverDrawIcon("/icon/download.svg", 18, 1.5, 400);
+        Label btnText = new Label("更新WIKI资源");
+        btnText.setStyle("-fx-text-fill: -color-fg-default; -fx-font-size: 13px;");
+        HBox btnContent = new HBox(8, downloadIcon, btnText);
+        btnContent.setAlignment(Pos.CENTER_LEFT);
+
+        updateBtn = new Button();
+        updateBtn.setGraphic(btnContent);
         updateBtn.setMaxWidth(Double.MAX_VALUE);
         updateBtn.setPrefHeight(ITEM_HEIGHT);
-        updateBtn.setStyle("-fx-background-color: -color-bg-subtle; -fx-text-fill: -color-fg-default; -fx-background-radius: 6; -fx-font-size: 13px; -fx-cursor: hand;");
+        updateBtn.setAlignment(Pos.BASELINE_LEFT);
+        updateBtn.setStyle("-fx-background-color: -color-bg-subtle; -fx-text-fill: -color-fg-default; -fx-background-radius: 6; -fx-font-size: 13px; -fx-cursor: hand; -fx-padding: 0 12 0 12;");
+        FxRippleUtil.install(updateBtn);
 
-        updateBtn.setOnAction(e -> {
+        // 按钮 hover 触发图标画线动画
+        updateBtn.setOnMouseEntered(e -> SvgManager.animateHoverDrawIcon(downloadIcon, true, 400));
+        updateBtn.setOnMouseExited(e -> SvgManager.animateHoverDrawIcon(downloadIcon, false, 400));
+
+        updateBtn.setOnAction(_ -> {
             StackPane root = (StackPane) updateBtn.getScene().getRoot();
             DialogUtils.showConfirmDialog(
                     root,
@@ -47,7 +67,8 @@ public class WikiUpdateManager {
                         switchToLoadingState();
                         startDownloadTask();
                     },
-                    () -> {}
+                    () -> {
+                    }
             );
         });
 
@@ -65,12 +86,16 @@ public class WikiUpdateManager {
         btnContainer.getChildren().addAll(updateBtn, progressBar, progressLabel);
     }
 
-    /** 返回容器节点，供父布局添加 */
+    /**
+     * 返回容器节点，供父布局添加
+     */
     public StackPane getContainer() {
         return btnContainer;
     }
 
-    /** 检测是否有正在进行的后台下载，有则切换到进度显示 */
+    /**
+     * 检测是否有正在进行的后台下载，有则切换到进度显示
+     */
     public void checkAndShowProgress() {
         DownloadProgressContext ctx = DownloadProgressContext.getInstance();
         if (ctx.getTotalTasks().get() > 0 && ctx.getCompletedTasks().get() < ctx.getTotalTasks().get()) {
@@ -107,15 +132,13 @@ public class WikiUpdateManager {
         updateProgressLabel(ctx.getStatusText(), completed, total);
         progressBar.setProgress(total == 0 ? 0 : (double) completed / total);
 
-        ctx.setOnProgressUpdate((c, t) -> {
-            Platform.runLater(() -> {
-                progressBar.setProgress(t == 0 ? 0 : (double) c / t);
-                updateProgressLabel(ctx.getStatusText(), c, t);
+        ctx.setOnProgressUpdate((c, t) -> Platform.runLater(() -> {
+            progressBar.setProgress(t == 0 ? 0 : (double) c / t);
+            updateProgressLabel(ctx.getStatusText(), c, t);
 
-                HookRegistry.INSTANCE.publish(HookEventType.INIT_PROGRESS,
-                        new ProgressEvent(t == 0 ? 0 : (double) c / t, "WIKI同步: " + ctx.getStatusText()));
-            });
-        });
+            HookRegistry.INSTANCE.publish(HookEventType.INIT_PROGRESS,
+                    new ProgressEvent(t == 0 ? 0 : (double) c / t, "WIKI同步: " + ctx.getStatusText()));
+        }));
     }
 
     private void updateProgressLabel(String status, int completed, int total) {

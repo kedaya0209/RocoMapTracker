@@ -1,5 +1,6 @@
 package com.luoke.app.macher.miniMap;
 
+import com.luoke.app.config.AppConfig;
 import lombok.extern.slf4j.Slf4j;
 import org.bytedeco.javacpp.PointerScope;
 import org.bytedeco.opencv.global.opencv_core;
@@ -14,10 +15,6 @@ import org.bytedeco.opencv.opencv_imgproc.Vec3fVector;
  */
 @Slf4j
 public class MiniMapDetector implements AutoCloseable {
-
-    private static final int SMALL_WIDTH = 120;
-    private static final double BLACK_RATIO_THRESHOLD = 0.15;
-    private static final double CENTER_OFFSET_RATIO = 0.2;
 
     private double scale;
     private Mat grayMat;
@@ -41,7 +38,7 @@ public class MiniMapDetector implements AutoCloseable {
         // 缩放 + 中值滤波
         opencv_imgproc.resize(grayMat, smallGray, smallGray.size());
         smallGray.data().get(smallGrayData);
-        opencv_imgproc.medianBlur(smallGray, blurMat, 5);
+        opencv_imgproc.medianBlur(smallGray, blurMat, AppConfig.MM_MEDIAN_BLUR_KERNEL);
 
         int minSide = Math.min(smallGray.cols(), smallGray.rows());
 
@@ -49,7 +46,7 @@ public class MiniMapDetector implements AutoCloseable {
         try (PointerScope scope = new PointerScope()) {
             Vec3fVector circles = new Vec3fVector();
             opencv_imgproc.HoughCircles(blurMat, circles, opencv_imgproc.HOUGH_GRADIENT,
-                    1.2, minSide * 0.6, 50, 35,
+                    AppConfig.MM_HOUGH_DP, minSide * 0.6, AppConfig.MM_HOUGH_PARAM1, AppConfig.MM_HOUGH_PARAM2,
                     (int) (minSide * 0.4), (int) (minSide * 0.55));
 
             if (circles.empty() || circles.size() == 0) {
@@ -63,20 +60,20 @@ public class MiniMapDetector implements AutoCloseable {
 
             // 边缘黑边比例校验
             int blackCount = 0;
-            for (int i = 0; i < 120; i++) {
-                double theta = Math.toRadians(i * 3.0);
+            for (int i = 0; i < AppConfig.MM_EDGE_SAMPLE_COUNT; i++) {
+                double theta = Math.toRadians(i * AppConfig.MM_EDGE_SAMPLE_STEP);
                 int sx = (int) (detCx + detR * Math.cos(theta));
                 int sy = (int) (detCy + detR * Math.sin(theta));
-                if (sx >= 0 && sx < SMALL_WIDTH && sy >= 0 && sy < smallGray.rows()) {
-                    if ((smallGrayData[sy * SMALL_WIDTH + sx] & 0xFF) < 150) {
+                if (sx >= 0 && sx < AppConfig.MM_SMALL_WIDTH && sy >= 0 && sy < smallGray.rows()) {
+                    if ((smallGrayData[sy * AppConfig.MM_SMALL_WIDTH + sx] & 0xFF) < AppConfig.MM_BLACK_PIXEL_THRESHOLD) {
                         blackCount++;
                     }
                 }
             }
 
-            double distToCenter = Math.hypot(detCx - SMALL_WIDTH / 2.0, detCy - smallGray.rows() / 2.0);
-            double maxDist = minSide * CENTER_OFFSET_RATIO;
-            if ((double) blackCount / 120 > BLACK_RATIO_THRESHOLD && distToCenter < maxDist) {
+            double distToCenter = Math.hypot(detCx - AppConfig.MM_SMALL_WIDTH / 2.0, detCy - smallGray.rows() / 2.0);
+            double maxDist = minSide * AppConfig.MM_CENTER_OFFSET_RATIO;
+            if ((double) blackCount / AppConfig.MM_EDGE_SAMPLE_COUNT > AppConfig.MM_BLACK_RATIO_THRESHOLD && distToCenter < maxDist) {
                 // 转换回原始图像坐标
                 double origCX = detCx / scale;
                 double origCY = detCy / scale;
@@ -90,12 +87,12 @@ public class MiniMapDetector implements AutoCloseable {
     private void initMats(int w, int h) {
         if (grayMat == null || grayMat.cols() != w || grayMat.rows() != h) {
             releaseMats();
-            scale = (double) SMALL_WIDTH / w;
+            scale = (double) AppConfig.MM_SMALL_WIDTH / w;
             int sh = (int) (h * scale);
             grayMat = new Mat(h, w, opencv_core.CV_8UC1);
-            smallGray = new Mat(sh, SMALL_WIDTH, opencv_core.CV_8UC1);
-            smallGrayData = new byte[SMALL_WIDTH * sh];
-            blurMat = new Mat(sh, SMALL_WIDTH, opencv_core.CV_8UC1);
+            smallGray = new Mat(sh, AppConfig.MM_SMALL_WIDTH, opencv_core.CV_8UC1);
+            smallGrayData = new byte[AppConfig.MM_SMALL_WIDTH * sh];
+            blurMat = new Mat(sh, AppConfig.MM_SMALL_WIDTH, opencv_core.CV_8UC1);
         }
     }
 

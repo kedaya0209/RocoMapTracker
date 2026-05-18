@@ -16,6 +16,7 @@ import java.util.List;
 public class MapPointLoader {
 
     private static final ObjectMapper om = JsonUtils.getMapper();
+
     public static List<MapPointItem> load() {
         try {
             // 记录开始加载的日志，便于追踪加载过程

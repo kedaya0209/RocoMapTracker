@@ -8,9 +8,11 @@ import com.luoke.app.hook.event.NotificationType;
 import com.luoke.app.hook.event.StatusEvent;
 import com.luoke.app.hook.multicast.HookRegistry;
 import com.luoke.app.macher.map.SwitchMapMatcher;
+import com.luoke.app.ui.service.SvgManager;
+import com.luoke.app.ui.service.ThemeManager;
 import com.luoke.app.ui.util.DialogUtils;
+import com.luoke.app.ui.util.FxRippleUtil;
 import com.luoke.app.ui.util.RestartUtils;
-import com.luoke.app.ui.util.ThemeManager;
 import javafx.animation.FadeTransition;
 import javafx.animation.KeyFrame;
 import javafx.animation.KeyValue;
@@ -21,6 +23,7 @@ import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Cursor;
+import javafx.scene.Node;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.scene.shape.SVGPath;
@@ -30,18 +33,18 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class Sidebar extends VBox {
 
-    private RouteManagerStage routeManagerStage;
     private final WikiUpdateManager wikiUpdater;
     private final ListView<SidebarItem> listView;
     private final ObservableList<SidebarItem> items = FXCollections.observableArrayList();
-
+    private RouteManagerStage routeManagerStage;
     // 当前展开状态
     private SidebarItem.Category expandedCategory = null;
+    private volatile boolean isAlgorithmLoading = false;
 
     public Sidebar() {
         super(0);
         setPadding(new Insets(15, 15, 15, 15));
-        setPrefWidth(240);
+        setPrefWidth(270);
         setStyle("-fx-background-color: -color-bg-default; -fx-border-color: -color-border-muted; -fx-border-width: 0 1 0 0;");
 
         // 标题
@@ -52,8 +55,8 @@ public class Sidebar extends VBox {
 
         // ListView
         listView = new ListView<>();
-        listView.setPrefWidth(210);
-        listView.setStyle("-fx-background-color: transparent; -fx-border-color: transparent; -fx-selection-bar: transparent; -fx-selection-bar-non-focused: transparent;");
+        listView.setPrefWidth(240);
+        listView.setStyle("-fx-background-color: transparent; -fx-border-color: transparent; -fx-selection-bar: transparent; -fx-selection-bar-non-focused: transparent; -fx-hbar-policy: never;");
         listView.setFocusTraversable(false);
 
         wikiUpdater = new WikiUpdateManager();
@@ -76,21 +79,24 @@ public class Sidebar extends VBox {
     private void buildItems() {
         items.clear();
 
+        // 设置按钮（置顶）
+        items.add(new SidebarItem(SidebarItem.Type.ACTION, "设置", null, null, null, false, "/icon/settings.svg", this::openSettings));
+
         // 匹配算法选择
         items.add(new SidebarItem(SidebarItem.Type.HEADER, "匹配算法选择",
-                SidebarItem.Category.ALGORITHM, AppConfig.MAP_MATCHAER, null));
+                SidebarItem.Category.ALGORITHM, AppConfig.MAP_MATCHAER, null, false, "/icon/match.svg", null));
 
         // 资源模式切换
         items.add(new SidebarItem(SidebarItem.Type.HEADER, "资源模式切换",
                 SidebarItem.Category.RESOURCE,
-                AppConfig.INTERNAL_RESOURCE ? "内置资源" : "WIKI资源", null));
+                AppConfig.INTERNAL_RESOURCE ? "内置资源" : "WIKI资源", null, false, "/icon/resources.svg", null));
 
         // 主题切换
         items.add(new SidebarItem(SidebarItem.Type.HEADER, "主题切换",
-                SidebarItem.Category.THEME, AppConfig.THEME, null));
+                SidebarItem.Category.THEME, AppConfig.THEME, null, false, "/icon/theme.svg", null));
 
         // 路线管理
-        items.add(new SidebarItem(SidebarItem.Type.ACTION, "路线管理", null, null, null));
+        items.add(new SidebarItem(SidebarItem.Type.ACTION, "路线管理", null, null, null, false, "/icon/route.svg", this::openRouteManager));
 
         // WIKI 更新（特殊容器）
         items.add(new SidebarItem(SidebarItem.Type.WIKI, null, null, null, wikiUpdater));
@@ -189,8 +195,19 @@ public class Sidebar extends VBox {
         int idx = items.indexOf(header);
         if (idx >= 0) {
             items.set(idx, new SidebarItem(SidebarItem.Type.HEADER, header.title(),
-                    header.category(), newValue, null));
+                    header.category(), newValue, null, false, header.iconSvg(), null));
         }
+    }
+
+    private void openSettings() {
+        StackPane rootPane = findRootPane();
+        if (rootPane == null) return;
+
+        SettingsStage settingsStage = SettingsStage.getInstance();
+        if (settingsStage.getOwner() == null && rootPane.getScene() != null) {
+            settingsStage.initOwner(rootPane.getScene().getWindow());
+        }
+        settingsStage.showDialog(rootPane);
     }
 
     private void openRouteManager() {
@@ -241,6 +258,8 @@ public class Sidebar extends VBox {
         }
     }
 
+    // ========== Item Model ==========
+
     private StackPane findRootPane() {
         javafx.scene.Node node = this;
         while ((node = node.getParent()) != null) {
@@ -251,19 +270,20 @@ public class Sidebar extends VBox {
 
     // ========== Item Model ==========
 
-    private volatile boolean isAlgorithmLoading = false;
-
-    // ========== Item Model ==========
-
     public record SidebarItem(Type type, String title, Category category, String currentValue,
-                              WikiUpdateManager wikiUpdater, boolean selected) {
-
-        enum Type { HEADER, OPTION, ACTION, WIKI }
-        enum Category { ALGORITHM, RESOURCE, THEME }
+                              WikiUpdateManager wikiUpdater, boolean selected, String iconSvg, Runnable onAction) {
 
         public SidebarItem(Type type, String title, Category category, String currentValue, WikiUpdateManager wikiUpdater) {
-            this(type, title, category, currentValue, wikiUpdater, false);
+            this(type, title, category, currentValue, wikiUpdater, false, null, null);
         }
+
+        public SidebarItem(Type type, String title, Category category, String currentValue, WikiUpdateManager wikiUpdater, boolean selected) {
+            this(type, title, category, currentValue, wikiUpdater, selected, null, null);
+        }
+
+        enum Type {HEADER, OPTION, ACTION, WIKI}
+
+        enum Category {ALGORITHM, RESOURCE, THEME}
     }
 
     // ========== Cell ==========
@@ -298,6 +318,8 @@ public class Sidebar extends VBox {
         // ── Header ──────────────────────────────────────────
 
         private void renderHeader(SidebarItem item) {
+            Node icon = SvgManager.createHoverDrawIcon(item.iconSvg(), 18, 1.5, 400);
+
             Label title = new Label(item.title());
             title.setStyle("-fx-text-fill: -color-fg-default; -fx-font-size: 13px;");
 
@@ -313,16 +335,22 @@ public class Sidebar extends VBox {
             Region spacer = new Region();
             HBox.setHgrow(spacer, Priority.ALWAYS);
 
-            HBox row = new HBox(6, title, spacer, value, arrow);
+            HBox row = new HBox(6, icon, title, spacer, value, arrow);
             row.setAlignment(Pos.CENTER_LEFT);
             row.setPrefHeight(38);
             row.setPadding(new Insets(0, 12, 0, 12));
             row.setStyle(BG_STYLE);
             row.setMouseTransparent(true);  // 事件由 Cell 处理，row 只做显示
 
-            // hover: 在 cell 上监听
-            setOnMouseEntered(e -> row.setStyle(BG_HOVER));
-            setOnMouseExited(e -> row.setStyle(BG_STYLE));
+            // hover: 在 cell 上监听 (图标画线 + 行背景)
+            setOnMouseEntered(e -> {
+                row.setStyle(BG_HOVER);
+                SvgManager.animateHoverDrawIcon(icon, true, 400);
+            });
+            setOnMouseExited(e -> {
+                row.setStyle(BG_STYLE);
+                SvgManager.animateHoverDrawIcon(icon, false, 400);
+            });
             setCursor(Cursor.HAND);
 
             setOnMouseClicked(e -> {
@@ -381,15 +409,42 @@ public class Sidebar extends VBox {
             setOnMouseExited(null);
             setCursor(Cursor.DEFAULT);
 
-            Button btn = new Button(item.title());
+            Node icon = SvgManager.createHoverDrawIcon(item.iconSvg(), 18, 1.5, 400);
+
+            Label text = new Label(item.title());
+            text.setStyle("-fx-text-fill: -color-fg-default; -fx-font-size: 13px;");
+
+            HBox content = new HBox(8, icon, text);
+            content.setAlignment(Pos.CENTER_LEFT);
+
+            Button btn = new Button();
             btn.setMaxWidth(Double.MAX_VALUE);
             btn.setPrefHeight(36);
-            btn.setStyle("-fx-background-color: -color-bg-subtle; -fx-text-fill: -color-fg-default; -fx-background-radius: 6; -fx-font-size: 13px; -fx-cursor: hand;");
-            btn.setOnAction(e -> openRouteManager());
+            btn.setAlignment(Pos.BASELINE_LEFT);
+            btn.setStyle("-fx-background-color: -color-bg-subtle; -fx-text-fill: -color-fg-default; -fx-background-radius: 6; -fx-font-size: 13px; -fx-cursor: hand; -fx-padding: 0 12 0 12; -fx-effect: none; -fx-background-insets: 0;");
+            btn.setGraphic(content);
+            FxRippleUtil.install(btn);
 
-            StackPane wrapper = new StackPane(btn);
-            wrapper.setPadding(new Insets(2, 0, 2, 0));
-            setPadding(new Insets(0));
+            // 按钮 hover 触发图标画线动画
+            btn.setOnMouseEntered(e -> SvgManager.animateHoverDrawIcon(icon, true, 400));
+            btn.setOnMouseExited(e -> SvgManager.animateHoverDrawIcon(icon, false, 400));
+
+            if (item.onAction() != null) {
+                btn.setOnAction(e -> item.onAction().run());
+            }
+
+            Pane wrapper = new Pane() {
+                @Override
+                protected void layoutChildren() {
+                    double w = getWidth();
+                    double h = getHeight();
+                    if (w > 0 && h > 0) {
+                        btn.resizeRelocate(0, 0, w, h);
+                    }
+                }
+            };
+            wrapper.getChildren().add(btn);
+            setPadding(new Insets(2, 0, 2, 0));
             setGraphic(wrapper);
         }
 

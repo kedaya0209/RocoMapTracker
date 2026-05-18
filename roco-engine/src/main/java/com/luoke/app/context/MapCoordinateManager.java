@@ -30,7 +30,9 @@ public class MapCoordinateManager {
         mapConfigMap.put(key, new MapConfig(jsonZoom, img, w, h));
     }
 
-    /** 地图坐标 → 屏幕坐标 */
+    /**
+     * 地图坐标 → 屏幕坐标
+     */
     public Point toScreen(double x, double y) {
         MapContext mm = MapContext.getInstance();
         MapConfig cfg = mapConfigMap.get(mm.getCurrentMapKey());
@@ -43,7 +45,9 @@ public class MapCoordinateManager {
         return new Point(mx, my);
     }
 
-    /** 屏幕坐标 → 地图坐标 */
+    /**
+     * 屏幕坐标 → 地图坐标
+     */
     public Point fromScreen(double screenX, double screenY) {
         MapContext mm = MapContext.getInstance();
         MapConfig cfg = mapConfigMap.get(mm.getCurrentMapKey());

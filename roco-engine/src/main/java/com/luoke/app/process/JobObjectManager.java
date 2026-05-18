@@ -36,7 +36,9 @@ public class JobObjectManager {
     // ---- 常量 ----
     private static final int JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x2000;
     private static final int JOB_INFO_CLASS_EXTENDED_LIMIT = 9;
-    /** PROCESS_SET_QUOTA | PROCESS_TERMINATE | PROCESS_CREATE_PROCESS | PROCESS_QUERY_LIMITED_INFORMATION */
+    /**
+     * PROCESS_SET_QUOTA | PROCESS_TERMINATE | PROCESS_CREATE_PROCESS | PROCESS_QUERY_LIMITED_INFORMATION
+     */
     private static final int PROCESS_ACCESS = 0x0100 | 0x0001 | 0x0080 | 0x1000;
 
     // JOBOBJECT_EXTENDED_LIMIT_INFORMATION (x64, 自然对齐): 144 bytes
@@ -47,8 +49,6 @@ public class JobObjectManager {
     private static volatile long jobHandle;
     private static volatile boolean initialized;
     private static volatile boolean selfAssigned;
-
-    public static long getJobHandle() { return jobHandle; }
 
     static {
         try {
@@ -98,6 +98,10 @@ public class JobObjectManager {
         } catch (Exception e) {
             throw new RuntimeException("Failed to init kernel32 FFM handles for JobObject", e);
         }
+    }
+
+    public static long getJobHandle() {
+        return jobHandle;
     }
 
     /**

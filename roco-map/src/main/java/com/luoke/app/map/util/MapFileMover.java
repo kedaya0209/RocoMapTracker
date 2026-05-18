@@ -7,10 +7,28 @@ import com.luoke.app.utils.ResourceUtils;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.File;
+import java.io.PrintWriter;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 public class MapFileMover {
+
+    /**
+     * 相对路径 → 来源 URL/类型标记，用于生成 init 资源清单
+     */
+    private static final Map<String, String> urlMap = new ConcurrentHashMap<>();
+
+    /**
+     * IconDownloader 下载图标后调用此方法记录 URL，
+     * 供 writeInitManifest() 写入 init 清单。
+     */
+    public static void recordIconUrl(String fileName, String sourceUrl) {
+        urlMap.put(AppConfig.ICON_DIR + fileName, sourceUrl);
+    }
 
     public static void moveAllResources() {
         // 移动图标文件
@@ -20,6 +38,9 @@ public class MapFileMover {
         // 移动点位配置文件
         // 点位配置引用图标，需要图标先就绪
         movePoints();
+
+        // 全部移动完成后写 init 资源清单
+        writeInitManifest();
     }
 
     public static void moveIcons() {
@@ -67,15 +88,57 @@ public class MapFileMover {
         move(src, dst);
     }
 
+    /**
+     * 将当前已移动的资源写入 init 清单文件。
+     * 扫描 resources/source/ 下各目录，结合 urlMap 中记录的图标 URL，
+     * 生成 <classpath路径> | <URL/类型标记> 格式的清单。
+     */
+    public static void writeInitManifest() {
+        // 收集 map 文件（类型标记：MAP）
+        File mapDir = ResourceUtils.getExternalFile(AppConfig.MAP_RESOURCE_DIR);
+        File[] mapFiles = mapDir.listFiles();
+        if (mapFiles != null) {
+            for (File f : mapFiles) {
+                if (f.isFile()) {
+                    urlMap.putIfAbsent(AppConfig.MAP_RESOURCE_DIR + f.getName(), "MAP");
+                }
+            }
+        }
+        // 收集 point 文件（类型标记：CONFIG）
+        File pointDir = ResourceUtils.getExternalFile(AppConfig.RESOURCE_ICON_DIR);
+        File[] ptFiles = pointDir.listFiles();
+        if (ptFiles != null) {
+            for (File f : ptFiles) {
+                if (f.isFile()) {
+                    urlMap.putIfAbsent(AppConfig.RESOURCE_ICON_DIR + f.getName(), "CONFIG");
+                }
+            }
+        }
+
+        try {
+            File initFile = ResourceUtils.getExternalFile(AppConfig.SOURCE_INIT);
+            initFile.getParentFile().mkdirs();
+            try (PrintWriter w = new PrintWriter(initFile, StandardCharsets.UTF_8)) {
+                w.println("# RocoMapTracker Resource Manifest");
+                for (Map.Entry<String, String> entry : urlMap.entrySet()) {
+                    w.println(entry.getKey() + " | " + entry.getValue());
+                }
+            }
+            log.info("资源清单已写入: {} ({} 条目)", initFile.getAbsolutePath(), urlMap.size());
+        } catch (Exception e) {
+            log.error("写资源清单失败", e);
+        }
+    }
+
     // ====================== 通用移动 ======================
 
     private static void move(File srcDir, File dstDir) {
         // 检查源目录是否存在
-    // 同时检查是否为空，避免NPE
+        // 同时检查是否为空，避免NPE
         if (!srcDir.exists() || srcDir.listFiles() == null) return;
 
         // 遍历源目录所有文件
-        for (File f : srcDir.listFiles()) {
+        for (File f : Optional.ofNullable(srcDir.listFiles()).orElse(new File[0])) {
             try {
                 // 构建目标文件路径
                 // 保持原文件名不变

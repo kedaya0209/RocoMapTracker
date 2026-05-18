@@ -16,7 +16,8 @@ public class MapContext {
     private double mapWidth, mapHeight; // 原始地图尺寸
     private boolean initialized = false;
 
-    /** * 视口状态：scale(缩放), offsetX/Y(相对于地图左上角的屏幕偏移)
+    /**
+     * 视口状态：scale(缩放), offsetX/Y(相对于地图左上角的屏幕偏移)
      * 计算公式：CanvasX = offsetX + WorldX * scale
      */
     private double scale = 1.0, offsetX = 0, offsetY = 0;
@@ -30,13 +31,16 @@ public class MapContext {
 
     private String currentMapKey; // 当前地图唯一标识
 
-    private MapContext() {}
+    private MapContext() {
+    }
 
     public static MapContext getInstance() {
         return Holder.INSTANCE;
     }
 
-    /** 初始化地图元数据并注册到 MapCoordinateManager（不再需要全图） */
+    /**
+     * 初始化地图元数据并注册到 MapCoordinateManager（不再需要全图）
+     */
     public void init(String mapKey, int mapW, int mapH) {
         this.currentMapKey = mapKey;
         this.mapWidth = mapW;
@@ -47,30 +51,40 @@ public class MapContext {
         );
     }
 
-    /** 更新玩家状态 */
+    /**
+     * 更新玩家状态
+     */
     public void updatePlayerState(double x, double y, Double visualAngle) {
         this.playerX = x;
         this.playerY = y;
-        if (visualAngle != null) { this.playerAngle = visualAngle; this.hasAngle = true; }
+        if (visualAngle != null) {
+            this.playerAngle = visualAngle;
+            this.hasAngle = true;
+        }
         this.playerInitialized = true;
     }
 
-    /** 世界坐标转屏幕 X：offsetX + playerX * scale */
+    /**
+     * 世界坐标转屏幕 X：offsetX + playerX * scale
+     */
     public double getPlayerCanvasX() {
         return offsetX + playerX * scale;
     }
 
-    /** 世界坐标转屏幕 Y：offsetY + playerY * scale */
+    /**
+     * 世界坐标转屏幕 Y：offsetY + playerY * scale
+     */
     public double getPlayerCanvasY() {
         return offsetY + playerY * scale;
     }
 
-    /** * 以 (mx, my) 为中心进行缩放。
+    /**
+     * 以 (mx, my) 为中心进行缩放。
      * 算法：newOffset = mousePos - (mousePos - oldOffset) * (newScale / oldScale)
      */
     public void zoom(double factor, double mx, double my) {
         double minScale = Math.max(viewWidth / mapWidth, viewHeight / mapHeight);
-        double newScale = Math.clamp(scale * factor, minScale, 15);
+        double newScale = Math.clamp(scale * factor, minScale, AppConfig.MAP_VIEW_MAX_SCALE);
         double f = newScale / scale;
 
         offsetX = mx - (mx - offsetX) * f;
@@ -80,7 +94,9 @@ public class MapContext {
         ensureBounds();
     }
 
-    /** 边界限制：地图大于视口时防止越界，小于视口时自动居中 */
+    /**
+     * 边界限制：地图大于视口时防止越界，小于视口时自动居中
+     */
     public void ensureBounds() {
         if (!initialized) return;
         double w = mapWidth * scale;
@@ -90,7 +106,9 @@ public class MapContext {
         offsetY = (h >= viewHeight) ? Math.clamp(offsetY, viewHeight - h, 0) : (viewHeight - h) / 2;
     }
 
-    /** 线程安全的单例持有类 */
+    /**
+     * 线程安全的单例持有类
+     */
     private static class Holder {
         private static final MapContext INSTANCE = new MapContext();
     }

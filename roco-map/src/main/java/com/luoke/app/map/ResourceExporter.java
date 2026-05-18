@@ -90,7 +90,8 @@ public class ResourceExporter {
                     Files.copy(source, Path.of(iconDir.getAbsolutePath(), targetName), StandardCopyOption.REPLACE_EXISTING);
                     nameToIconMap.put(name, targetName);
                 }
-            } catch (Exception ignore) {}
+            } catch (Exception ignore) {
+            }
         });
 
         // --- 3. 生成 JSON 并执行坐标去重 ---
@@ -136,7 +137,8 @@ public class ResourceExporter {
                         root.add(node);
                     }
                 }
-            } catch (Exception ignore) {}
+            } catch (Exception ignore) {
+            }
         });
 
         // 4. 落地保存
@@ -180,7 +182,8 @@ public class ResourceExporter {
             mapper.readTree(f).get("RocoDataRows").fields().forEachRemaining(e -> {
                 try {
                     map.put(Integer.parseInt(e.getKey()), e.getValue());
-                } catch (Exception ignore) {}
+                } catch (Exception ignore) {
+                }
             });
         }
     }

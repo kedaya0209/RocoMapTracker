@@ -123,12 +123,12 @@ public class FileUtil {
                         return;
                     }
                     extractSingleFile(sourcePath, destFile);
-            });
+                });
 
-        } catch (Exception e) {
-            //资源释放失败
-            log.error("释放资源失败，e:", e);
-        }
+            } catch (Exception e) {
+                //资源释放失败
+                log.error("释放资源失败，e:", e);
+            }
         } catch (Exception e) {
             log.error("释放资源失败，e:", e);
         }

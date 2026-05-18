@@ -1,18 +1,19 @@
 # RocoMapTracker
 
-基于计算机视觉的游戏地图实时追踪工具。通过 Windows Graphics Capture (WGC) 截取游戏画面，利用 SIFT 特征匹配 + CNN 方向检测 + OCR 文字识别，实时计算玩家在大地图上的位置和朝向，并叠加显示资源点与路线。
+基于计算机视觉的游戏地图实时追踪工具。通过 Windows Graphics Capture (WGC) 截取游戏画面，利用 SIFT 特征匹配 + CNN
+方向检测 + OCR 文字识别，实时计算玩家在大地图上的位置和朝向，并叠加显示资源点与路线。
 
 ## 技术栈
 
-| 层 | 技术 | 版本 |
-|---|---|---|
-| 语言 | Java + C++ + Rust + C + Python | Java 25, C++17 |
-| UI 框架 | JavaFX (AtlantaFX 主题) | JavaFX 25, AtlantaFX 2.1.0 |
-| 视觉库 | JavaCPP OpenCV (nopointergc) | 4.13.0-1.5.13 |
-| 推理引擎 | DJL + ONNX Runtime | DJL 0.36.0 |
-| 截图引擎 | C++ WGC (D3D11) + Socket IO | 独立子进程 |
-| 编译目标 | GraalVM Native Image | GraalVM 25.0.2 |
-| 序列化 | Zstd + Jackson | Zstd 1.5.6-2 |
+| 层     | 技术                             | 版本                         |
+|-------|--------------------------------|----------------------------|
+| 语言    | Java + C++ + Rust + C + Python | Java 25, C++17             |
+| UI 框架 | JavaFX (AtlantaFX 主题)          | JavaFX 25, AtlantaFX 2.1.0 |
+| 视觉库   | JavaCPP OpenCV (nopointergc)   | 4.13.0-1.5.13              |
+| 推理引擎  | DJL + ONNX Runtime             | DJL 0.36.0                 |
+| 截图引擎  | C++ WGC (D3D11) + Socket IO    | 独立子进程                      |
+| 编译目标  | GraalVM Native Image           | GraalVM 25.0.2             |
+| 序列化   | Zstd + Jackson                 | Zstd 1.5.6-2               |
 
 ## 功能
 
@@ -138,11 +139,11 @@ MapRenderer (AnimationTimer)
 
 项目使用三层坐标系：
 
-| 层 | 原点 | 用途 |
-|---|---|---|
-| L1 屏幕像素 | Canvas 左上角 | 鼠标事件 |
-| L2 Canvas 逻辑像素 | 地图左上角 | 渲染/SIFT 结果 |
-| L3 地图逻辑坐标 | 地图中心 | 游戏世界坐标 |
+| 层              | 原点         | 用途         |
+|----------------|------------|------------|
+| L1 屏幕像素        | Canvas 左上角 | 鼠标事件       |
+| L2 Canvas 逻辑像素 | 地图左上角      | 渲染/SIFT 结果 |
+| L3 地图逻辑坐标      | 地图中心       | 游戏世界坐标     |
 
 坐标转换由 `MapCoordinateManager` 统一管理，公式详见 CLAUDE.md。
 

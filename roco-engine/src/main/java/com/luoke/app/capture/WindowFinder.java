@@ -82,7 +82,10 @@ public class WindowFinder {
             int kwLen = 0;
             for (int i = 0; i < 64; i++) {
                 byte b = ctx.get(ValueLayout.JAVA_BYTE, KW_OFFSET + i);
-                if (b == 0) { kwLen = i; break; }
+                if (b == 0) {
+                    kwLen = i;
+                    break;
+                }
                 kwBytes[i] = b;
             }
             if (kwLen == 0) return 0;

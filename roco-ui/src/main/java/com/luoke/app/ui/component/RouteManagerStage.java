@@ -8,6 +8,7 @@ import com.luoke.app.hook.event.StatusEvent;
 import com.luoke.app.hook.multicast.HookRegistry;
 import com.luoke.app.map.model.RoutePath;
 import com.luoke.app.ui.util.DialogUtils;
+import com.luoke.app.ui.util.FxRippleUtil;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -32,38 +33,36 @@ import java.util.List;
 @Slf4j
 public class RouteManagerStage extends Stage {
 
-    private static volatile RouteManagerStage instance;
-
     // 列表单元格样式 — 现代化卡片风格
     private static final String NORMAL_STYLE =
-        "-fx-text-fill: -color-fg-default; " +
-        "-fx-background-color: transparent; " +
-        "-fx-padding: 8 10 8 12; " +
-        "-fx-background-radius: 6; " +
-        "-fx-background-insets: 2 8 2 8;";
+            "-fx-text-fill: -color-fg-default; " +
+                    "-fx-background-color: transparent; " +
+                    "-fx-padding: 8 10 8 12; " +
+                    "-fx-background-radius: 6; " +
+                    "-fx-background-insets: 2 8 2 8;";
     private static final String HOVER_STYLE =
-        "-fx-text-fill: -color-fg-default; " +
-        "-fx-background-color: -color-neutral-subtle; " +
-        "-fx-padding: 8 10 8 12; " +
-        "-fx-background-radius: 6; " +
-        "-fx-background-insets: 2 8 2 8; " +
-        "-fx-border-color: -color-neutral-emphasis; " +
-        "-fx-border-width: 0 0 0 3; " +
-        "-fx-border-radius: 6;";
+            "-fx-text-fill: -color-fg-default; " +
+                    "-fx-background-color: -color-neutral-subtle; " +
+                    "-fx-padding: 8 10 8 12; " +
+                    "-fx-background-radius: 6; " +
+                    "-fx-background-insets: 2 8 2 8; " +
+                    "-fx-border-color: -color-neutral-emphasis; " +
+                    "-fx-border-width: 0 0 0 3; " +
+                    "-fx-border-radius: 6;";
     private static final String SELECTED_STYLE =
-        "-fx-text-fill: -color-fg-emphasis; " +
-        "-fx-background-color: -color-accent-subtle; " +
-        "-fx-padding: 8 10 8 12; " +
-        "-fx-background-radius: 6; " +
-        "-fx-background-insets: 2 8 2 8; " +
-        "-fx-border-color: -color-accent-emphasis; " +
-        "-fx-border-width: 0 0 0 3; " +
-        "-fx-border-radius: 6;";
+            "-fx-text-fill: -color-fg-emphasis; " +
+                    "-fx-background-color: -color-accent-subtle; " +
+                    "-fx-padding: 8 10 8 12; " +
+                    "-fx-background-radius: 6; " +
+                    "-fx-background-insets: 2 8 2 8; " +
+                    "-fx-border-color: -color-accent-emphasis; " +
+                    "-fx-border-width: 0 0 0 3; " +
+                    "-fx-border-radius: 6;";
     private static final String DEL_BTN_STYLE =
-        "-fx-stroke: -color-fg-muted; -fx-stroke-width: 2;";
+            "-fx-stroke: -color-fg-muted; -fx-stroke-width: 2;";
     private static final String DEL_BTN_HOVER_STYLE =
-        "-fx-stroke: -color-danger-fg; -fx-stroke-width: 2;";
-
+            "-fx-stroke: -color-danger-fg; -fx-stroke-width: 2;";
+    private static volatile RouteManagerStage instance;
     private final ListView<RoutePath> listView = new ListView<>();
     private final StackPane rootContainer; // 从外部传入的主容器
     private double xOffset = 0;
@@ -77,7 +76,7 @@ public class RouteManagerStage extends Stage {
         initUI();
 
         // 窗口隐藏时清理状态
-        this.setOnHiding(e -> {
+        this.setOnHiding(_ -> {
             PathContext.getInstance().setCurrentMode(PathContext.Mode.VIEW);
             PathContext.getInstance().setActiveRoute(null);
         });
@@ -109,6 +108,20 @@ public class RouteManagerStage extends Stage {
         return instance;
     }
 
+    private static SVGPath getSvgPath() {
+        SVGPath closeIcon = new SVGPath();
+        closeIcon.setContent("M1 1 L9 9 M9 1 L1 9");
+        closeIcon.setStyle("-fx-stroke: -color-fg-default; -fx-stroke-width: 2;"); // 细线粗细
+        return closeIcon;
+    }
+
+    private static FileChooser createJsonFileChooser(String title) {
+        FileChooser fc = new FileChooser();
+        fc.setTitle(title);
+        fc.getExtensionFilters().add(new FileChooser.ExtensionFilter("JSON文件", "*.json"));
+        return fc;
+    }
+
     private void initUI() {
         VBox mainLayout = new VBox(15);
         mainLayout.setPadding(new Insets(15));
@@ -136,7 +149,7 @@ public class RouteManagerStage extends Stage {
         SVGPath closeIcon = getSvgPath();
         closeBtn.setGraphic(closeIcon);
         closeBtn.setStyle("-fx-cursor: hand; -fx-padding: 8;");
-        closeBtn.setOnAction(e -> this.hide());
+        closeBtn.setOnAction(_ -> this.hide());
 
         titleBar.getChildren().addAll(titleLabel, spacer, closeBtn);
 
@@ -162,17 +175,17 @@ public class RouteManagerStage extends Stage {
         VBox.setVgrow(listView, Priority.ALWAYS);
         listView.setStyle(
                 "-fx-background-color: transparent; " +
-                "-fx-control-inner-background: -color-bg-inset; " +
-                "-fx-background-insets: 0; " +
-                "-fx-background-radius: 8; " +
-                "-fx-border-color: -color-border-muted; " +
-                "-fx-border-radius: 8; " +
-                "-fx-padding: 4;"
+                        "-fx-control-inner-background: -color-bg-inset; " +
+                        "-fx-background-insets: 0; " +
+                        "-fx-background-radius: 8; " +
+                        "-fx-border-color: -color-border-muted; " +
+                        "-fx-border-radius: 8; " +
+                        "-fx-padding: 4;"
         );
         listView.setFocusTraversable(false);
 
         // 单元格渲染（行尾删除按钮）
-        listView.setCellFactory(param -> new ListCell<>() {
+        listView.setCellFactory(_ -> new ListCell<>() {
             private final HBox row = new HBox();
             private final Label nameLabel = new Label();
             private final StackPane delBtn = new StackPane();
@@ -190,7 +203,7 @@ public class RouteManagerStage extends Stage {
                 row.getChildren().addAll(nameLabel, spacer, delBtn);
                 row.setAlignment(Pos.CENTER_LEFT);
                 // 选中状态变化时更新样式
-                selectedProperty().addListener((obs, wasSel, isSel) -> {
+                selectedProperty().addListener((_, _, isSel) -> {
                     if (isEmpty()) return;
                     if (isSel) {
                         setStyle(SELECTED_STYLE);
@@ -199,6 +212,7 @@ public class RouteManagerStage extends Stage {
                     }
                 });
             }
+
             @Override
             protected void updateItem(RoutePath item, boolean empty) {
                 super.updateItem(item, empty);
@@ -208,8 +222,8 @@ public class RouteManagerStage extends Stage {
                 } else {
                     nameLabel.setText(item.getName());
                     nameLabel.setStyle("-fx-text-fill: -color-fg-default;");
-                    delBtn.setOnMouseEntered(de -> delIcon.setStyle(DEL_BTN_HOVER_STYLE));
-                    delBtn.setOnMouseExited(de -> delIcon.setStyle(DEL_BTN_STYLE));
+                    delBtn.setOnMouseEntered(_ -> delIcon.setStyle(DEL_BTN_HOVER_STYLE));
+                    delBtn.setOnMouseExited(_ -> delIcon.setStyle(DEL_BTN_STYLE));
                     delBtn.setOnMouseClicked(e -> {
                         e.consume();
                         handleDelete(item);
@@ -220,10 +234,10 @@ public class RouteManagerStage extends Stage {
                     } else {
                         setStyle(NORMAL_STYLE);
                     }
-                    setOnMouseEntered(e -> {
+                    setOnMouseEntered(_ -> {
                         if (!isSelected()) setStyle(HOVER_STYLE);
                     });
-                    setOnMouseExited(e -> {
+                    setOnMouseExited(_ -> {
                         if (!isSelected()) setStyle(NORMAL_STYLE);
                     });
                 }
@@ -246,16 +260,16 @@ public class RouteManagerStage extends Stage {
         btnGrid.setVgap(10);
 
         Button drawBtn = createActionBtn("绘制路线", Styles.SUCCESS);
-        drawBtn.setOnAction(e -> PathContext.getInstance().startNewRoute());
+        drawBtn.setOnAction(_ -> PathContext.getInstance().startNewRoute());
 
         Button saveBtn = createActionBtn("保存当前", Styles.ACCENT);
-        saveBtn.setOnAction(e -> handleSave());
+        saveBtn.setOnAction(_ -> handleSave());
 
         Button importBtn = createActionBtn("导入路线", null);
-        importBtn.setOnAction(e -> handleImport());
+        importBtn.setOnAction(_ -> handleImport());
 
         Button exportBtn = createActionBtn("导出路线", null);
-        exportBtn.setOnAction(e -> handleExport());
+        exportBtn.setOnAction(_ -> handleExport());
 
         btnGrid.add(drawBtn, 0, 0);
         btnGrid.add(saveBtn, 1, 0);
@@ -273,13 +287,6 @@ public class RouteManagerStage extends Stage {
         setScene(scene);
     }
 
-    private static SVGPath getSvgPath() {
-        SVGPath closeIcon = new SVGPath();
-        closeIcon.setContent("M1 1 L9 9 M9 1 L1 9");
-        closeIcon.setStyle("-fx-stroke: -color-fg-default; -fx-stroke-width: 2;"); // 细线粗细
-        return closeIcon;
-    }
-
     private Button createActionBtn(String text, String styleClass) {
         Button btn = new Button(text);
         btn.setMaxWidth(Double.MAX_VALUE);
@@ -287,6 +294,7 @@ public class RouteManagerStage extends Stage {
         if (styleClass != null) {
             btn.getStyleClass().add(styleClass);
         }
+        FxRippleUtil.install(btn);
         return btn;
     }
 
@@ -353,15 +361,9 @@ public class RouteManagerStage extends Stage {
                         HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION, new StatusEvent("删除成功", NotificationType.SUCCESS));
                     }
                 },
-                () -> {}
+                () -> {
+                }
         );
-    }
-
-    private static FileChooser createJsonFileChooser(String title) {
-        FileChooser fc = new FileChooser();
-        fc.setTitle(title);
-        fc.getExtensionFilters().add(new FileChooser.ExtensionFilter("JSON文件", "*.json"));
-        return fc;
     }
 
     private void handleImport() {
@@ -384,20 +386,20 @@ public class RouteManagerStage extends Stage {
 
         VBox listContainer = new VBox(0); // 无间距，边框线分隔
         listContainer.setStyle(
-            "-fx-background-color: -color-bg-inset; " +
-            "-fx-background-radius: 6; " +
-            "-fx-border-color: -color-border-muted; " +
-            "-fx-border-radius: 6;"
+                "-fx-background-color: -color-bg-inset; " +
+                        "-fx-background-radius: 6; " +
+                        "-fx-border-color: -color-border-muted; " +
+                        "-fx-border-radius: 6;"
         );
         int count = importedPaths.size();
         for (int i = 0; i < count; i++) {
             RoutePath path = importedPaths.get(i);
             Label nameLabel = new Label("  " + (i + 1) + ".  " + (path.getName() != null ? path.getName() : "未命名路线"));
             nameLabel.setStyle(
-                "-fx-text-fill: -color-fg-default; " +
-                "-fx-padding: 8 12; " +
-                "-fx-background-color: " + (i % 2 == 0 ? "transparent" : "-color-neutral-subtle") + "; " +
-                "-fx-background-radius: " + (i == 0 ? "6 6 0 0" : i == count - 1 ? "0 0 6 6" : "0") + ";"
+                    "-fx-text-fill: -color-fg-default; " +
+                            "-fx-padding: 8 12; " +
+                            "-fx-background-color: " + (i % 2 == 0 ? "transparent" : "-color-neutral-subtle") + "; " +
+                            "-fx-background-radius: " + (i == 0 ? "6 6 0 0" : i == count - 1 ? "0 0 6 6" : "0") + ";"
             );
             nameLabel.setMaxWidth(Double.MAX_VALUE);
             listContainer.getChildren().add(nameLabel);

@@ -16,6 +16,7 @@ import java.util.List;
 public class MapCategoryLoader {
 
     private static final ObjectMapper om = JsonUtils.getMapper();
+
     public static List<MapCategoryItem> load() {
         try {
             // 记录开始加载的日志，便于追踪加载过程
@@ -44,10 +45,10 @@ public class MapCategoryLoader {
             log.info("✅ 分类拉取成功，开始解析");
 
             // 解析JSON文本为JsonNode对象
-            var root = om.readTree(pre.text());
+            com.fasterxml.jackson.databind.JsonNode root = om.readTree(pre.text());
 
             // 提取"data"字段，该字段包含了分类数据的数组
-            var dataArray = root.get("data");
+            com.fasterxml.jackson.databind.JsonNode dataArray = root.get("data");
 
             // 初始化结果列表，用于存储解析后的分类数据
             List<MapCategoryItem> list = new ArrayList<>();

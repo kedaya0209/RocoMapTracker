@@ -6,7 +6,6 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.io.File;
 import java.io.IOException;
-import java.lang.management.ManagementFactory;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -16,7 +15,7 @@ public class RestartUtils {
     public static void restart() {
         try {
             List<String> command = new ArrayList<>();
-            
+
             // 兼容 GraalVM Native Image
             // 获取当前运行的 exe 绝对路径
             String nativeImage = new File(Main.class.getProtectionDomain()

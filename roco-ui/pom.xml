@@ -178,7 +178,6 @@
                                 <buildArg>-Djava.awt.headless=false</buildArg>
                                 <buildArg>-H:+InstallExitHandlers</buildArg>
                                 <buildArg>-Djdk.nio.maxCachedBufferSize=262144</buildArg>
-                                <buildArg>-J-Xmx24g</buildArg>
                                 <buildArg>-O3</buildArg>
                                 <buildArg>-march=x86-64-v3</buildArg>
                                 <buildArg>-H:+StripDebugInfo</buildArg>

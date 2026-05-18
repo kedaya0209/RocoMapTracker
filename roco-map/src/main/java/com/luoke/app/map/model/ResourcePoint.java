@@ -11,6 +11,7 @@ public class ResourcePoint {
     private final ResourceConfig config;
     private final Point screenPosition;
     private boolean grayed;
+
     public ResourcePoint(ResourceConfig config, Point screenPosition) {
         this.config = config;
         this.screenPosition = screenPosition;

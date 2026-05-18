@@ -1,14 +1,16 @@
 package com.luoke.app.ui.render;
 
 import com.luoke.app.config.AppConfig;
-import com.luoke.app.context.*;
+import com.luoke.app.context.CameraContext;
+import com.luoke.app.context.MapContext;
+import com.luoke.app.context.PathContext;
+import com.luoke.app.context.ResourcePointContext;
 import com.luoke.app.map.model.Point;
 import com.luoke.app.map.model.ResourcePoint;
 import com.luoke.app.map.model.RoutePath;
 import com.luoke.app.ui.component.StatsOverlay;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
-import javafx.util.Duration;
 import javafx.geometry.Rectangle2D;
 import javafx.scene.Group;
 import javafx.scene.canvas.Canvas;
@@ -17,8 +19,10 @@ import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
+import javafx.scene.shape.Circle;
 import javafx.scene.transform.Scale;
 import javafx.scene.transform.Translate;
+import javafx.util.Duration;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
@@ -43,15 +47,13 @@ import java.util.concurrent.ConcurrentHashMap;
 @Slf4j
 public class MapRenderer {
 
-    private static final double ICON_SIZE = 32;
-    private static final double GRAY_RADIUS = AppConfig.GRAY_DISTANCE;
-
     @Getter
     private final Pane parent;
     private final Group worldGroup;
     private final Group iconGroup;       // ImageView 图标节点（worldGroup 子级，共用 GPU 变换）
     private final Canvas routeCanvas;    // 路线 Canvas（独立层，屏幕坐标）
     private final Canvas hoverCanvas;    // hover 光环层（屏幕坐标）
+    private final Circle pickupHalo;     // 拾取范围光环
     private final ImageView playerView;
     private final Timeline loop;
 
@@ -63,35 +65,31 @@ public class MapRenderer {
 
     private final GraphicsContext routeGc;
     private final GraphicsContext hoverGc;
-
-    private TileManager tileManager;
-
     // 图标 ImageView 查找表（资源点 → ImageView，供变灰切换）
     private final Map<ResourcePoint, ImageView> iconViews = new ConcurrentHashMap<>();
-
+    // 潮汐波纹
+    private final double[] rippleProgress = initRippleProgress();
+    private final Circle[] ripples;
+    private TileManager tileManager;
     // hover 状态
     private ResourcePoint hoveredPoint;
     @Getter
     private ResourcePoint lastHoveredPoint;
-
     // 视口追踪
     private double lastScale;
     private boolean hoverDirty;
     private boolean firstFrame = true;
-
+    private int frameCount;
     // 跟随模式
     private boolean followWasOn;
-
     // 路线状态
     private RoutePath lastActiveRoute;
     private PathContext.Mode lastMode;
     private double routeDrawOx, routeDrawOy;
     private boolean routeDirty = true;
-
     // 跟踪玩家上一帧位置用于变灰检测（防止每帧重复检测已变灰点位）
     private double lastGrayCheckX = Double.NaN;
     private double lastGrayCheckY = Double.NaN;
-    private static final double GRAY_CHECK_THRESHOLD = 10; // 世界像素，超出才重新检测
 
     // ==================== 构造与初始化 ====================
 
@@ -113,8 +111,8 @@ public class MapRenderer {
         worldGroup.getChildren().add(iconGroup);
 
         playerView = new ImageView();
-        playerView.setFitWidth(72);
-        playerView.setFitHeight(72);
+        playerView.setFitWidth(AppConfig.PLAYER_VIEW_SIZE);
+        playerView.setFitHeight(AppConfig.PLAYER_VIEW_SIZE);
         playerView.setMouseTransparent(true);
         playerView.setVisible(false);
 
@@ -125,6 +123,26 @@ public class MapRenderer {
         playerScale = new Scale(1, 1, 0, 0);
         playerTranslate = new Translate(0, 0);
         playerGroup.getTransforms().addAll(playerTranslate, playerScale);
+        // 潮汐波纹（N 圈从中心扩散到 GRAY_DISTANCE，边扩散边淡出）
+        ripples = new Circle[AppConfig.RIPPLE_COUNT];
+        for (int i = 0; i < AppConfig.RIPPLE_COUNT; i++) {
+            Circle r = new Circle(0);
+            r.setFill(Color.TRANSPARENT);
+            r.setStroke(Color.rgb(255, 255, 200, AppConfig.RIPPLE_ALPHA));
+            r.setStrokeWidth(AppConfig.RIPPLE_STROKE_WIDTH);
+            r.setMouseTransparent(true);
+            playerGroup.getChildren().add(r);
+            ripples[i] = r;
+        }
+
+        // 拾取范围边界（静态浅圈，标示最大范围）
+        pickupHalo = new Circle(AppConfig.GRAY_DISTANCE);
+        pickupHalo.setFill(Color.TRANSPARENT);
+        pickupHalo.setStroke(Color.rgb(255, 255, 200, AppConfig.HALO_BREATHE_MIN_ALPHA));
+        pickupHalo.setStrokeWidth(AppConfig.HALO_STROKE_WIDTH);
+        pickupHalo.setMouseTransparent(true);
+        playerGroup.getChildren().add(pickupHalo);
+
         playerGroup.getChildren().add(playerView);
 
         // 路线 Canvas — 屏幕坐标，视口大小，平移用 GPU translate 补偿
@@ -146,8 +164,40 @@ public class MapRenderer {
         // 层级：瓦片 → 图标(都在worldGroup) → 路线 → hover → 玩家
         parent.getChildren().addAll(worldGroup, routeCanvas, hoverCanvas, playerGroup);
 
-        loop = new Timeline(new KeyFrame(Duration.millis(33), e -> onFrame()));
+        loop = new Timeline(new KeyFrame(Duration.millis(AppConfig.RENDER_FRAME_INTERVAL_MS), _ -> onFrame()));
         loop.setCycleCount(Timeline.INDEFINITE);
+    }
+
+    /**
+     * 根据 RIPPLE_COUNT 初始化波纹相位，均匀分布
+     */
+    private static double[] initRippleProgress() {
+        int n = AppConfig.RIPPLE_COUNT;
+        double[] arr = new double[n];
+        for (int i = 0; i < n; i++) {
+            arr[i] = (double) i / n;
+        }
+        return arr;
+    }
+
+    private static double distanceSq(double x1, double y1, double x2, double y2) {
+        if (Double.isNaN(x2) || Double.isNaN(y2)) return Double.MAX_VALUE;
+        double dx = x1 - x2;
+        double dy = y1 - y2;
+        return dx * dx + dy * dy;
+    }
+
+    /**
+     * 以屏幕坐标绘制单条路径
+     */
+    private static void renderPathScreen(GraphicsContext gc, List<Point> nodes, double ox, double oy, double scale) {
+        if (nodes.size() < 2) return;
+        gc.beginPath();
+        gc.moveTo(nodes.getFirst().getX() * scale + ox, nodes.getFirst().getY() * scale + oy);
+        for (int i = 1; i < nodes.size(); i++) {
+            gc.lineTo(nodes.get(i).getX() * scale + ox, nodes.get(i).getY() * scale + oy);
+        }
+        gc.stroke();
     }
 
     /**
@@ -158,7 +208,9 @@ public class MapRenderer {
         buildIconLayer();
     }
 
-    /** 为每个资源点创建 ImageView，放入 worldGroup 的 iconGroup */
+    /**
+     * 为每个资源点创建 ImageView，放入 worldGroup 的 iconGroup
+     */
     private void buildIconLayer() {
         IconCache cache = IconCache.getInstance();
         if (!cache.isAtlasReady()) {
@@ -180,17 +232,17 @@ public class MapRenderer {
 
             ImageView iv = new ImageView();
             iv.setImage(rp.isGrayed() ? grayAtlas : colorAtlas);
-            iv.setViewport(new Rectangle2D(slot.sx, slot.sy, ICON_SIZE, ICON_SIZE));
+            iv.setViewport(new Rectangle2D(slot.sx, slot.sy, AppConfig.ICON_SIZE, AppConfig.ICON_SIZE));
             iv.setPreserveRatio(false);
             iv.setSmooth(false);
             iv.setMouseTransparent(true);
             iv.setPickOnBounds(false);
 
             Point pos = rp.getScreenPosition();
-            iv.setLayoutX(pos.getX() - ICON_SIZE / 2.0);
-            iv.setLayoutY(pos.getY() - ICON_SIZE / 2.0);
-            iv.setFitWidth(ICON_SIZE);
-            iv.setFitHeight(ICON_SIZE);
+            iv.setLayoutX(pos.getX() - AppConfig.ICON_SIZE / 2.0);
+            iv.setLayoutY(pos.getY() - AppConfig.ICON_SIZE / 2.0);
+            iv.setFitWidth(AppConfig.ICON_SIZE);
+            iv.setFitHeight(AppConfig.ICON_SIZE);
 
             iconViews.put(rp, iv);
             iconGroup.getChildren().add(iv);
@@ -203,6 +255,8 @@ public class MapRenderer {
         playerView.setImage(image);
     }
 
+    // ==================== 帧循环 ====================
+
     public void start() {
         loop.play();
     }
@@ -212,12 +266,12 @@ public class MapRenderer {
         tileManager.reset();
     }
 
-    /** 通知路线/资源点变化，触发路线层重绘 */
+    /**
+     * 通知路线/资源点变化，触发路线层重绘
+     */
     public void markDirty() {
         routeDirty = true;
     }
-
-    // ==================== 帧循环 ====================
 
     private void onFrame() {
         try {
@@ -227,7 +281,10 @@ public class MapRenderer {
         }
     }
 
+    // ==================== 视口适配 ====================
+
     private void onFrameInternal() {
+        frameCount++;
         StatsOverlay.getInstance().update();
 
         MapContext mm = MapContext.getInstance();
@@ -283,6 +340,25 @@ public class MapRenderer {
             playerView.setLayoutX(mm.getPlayerX() - half);
             playerView.setLayoutY(mm.getPlayerY() - half);
             playerView.setRotate(mm.getPlayerAngle());
+            pickupHalo.setCenterX(mm.getPlayerX());
+            pickupHalo.setCenterY(mm.getPlayerY());
+            // 潮汐波纹：N 圈错峰扩散
+            double px = mm.getPlayerX();
+            double py = mm.getPlayerY();
+            for (int i = 0; i < AppConfig.RIPPLE_COUNT; i++) {
+                rippleProgress[i] += AppConfig.RIPPLE_STEP;
+                if (rippleProgress[i] > 1.0) rippleProgress[i] -= 1.0;
+                double p = rippleProgress[i];
+                ripples[i].setRadius(p * AppConfig.GRAY_DISTANCE);
+                ripples[i].setCenterX(px);
+                ripples[i].setCenterY(py);
+                ripples[i].setStroke(Color.rgb(255, 255, 200, (1 - p) * AppConfig.RIPPLE_ALPHA));
+            }
+            // 边界慢呼吸：周期约 7s，仅透明度变化，范围不变
+            double breath = Math.sin(frameCount * AppConfig.HALO_BREATHE_FREQ) * 0.5 + 0.5;
+            double base = AppConfig.HALO_BREATHE_MIN_ALPHA;
+            double range = AppConfig.HALO_BREATHE_MAX_ALPHA - base;
+            pickupHalo.setStroke(Color.rgb(255, 255, 200, base + breath * range));
         } else {
             playerView.setVisible(false);
         }
@@ -341,7 +417,7 @@ public class MapRenderer {
             double px = mm.getPlayerX();
             double py = mm.getPlayerY();
             // 减少检测频率：玩家移动超过阈值才检测
-            if (distanceSq(px, py, lastGrayCheckX, lastGrayCheckY) > GRAY_CHECK_THRESHOLD * GRAY_CHECK_THRESHOLD) {
+            if (distanceSq(px, py, lastGrayCheckX, lastGrayCheckY) > AppConfig.GRAY_CHECK_THRESHOLD * AppConfig.GRAY_CHECK_THRESHOLD) {
                 updateGrayStates(px, py);
                 lastGrayCheckX = px;
                 lastGrayCheckY = py;
@@ -358,14 +434,7 @@ public class MapRenderer {
         lastScale = scale;
     }
 
-    private static double distanceSq(double x1, double y1, double x2, double y2) {
-        if (Double.isNaN(x2) || Double.isNaN(y2)) return Double.MAX_VALUE;
-        double dx = x1 - x2;
-        double dy = y1 - y2;
-        return dx * dx + dy * dy;
-    }
-
-    // ==================== 视口适配 ====================
+    // ==================== 路线渲染（屏幕坐标 Canvas） ====================
 
     private void autoFitViewport(MapContext mm) {
         double vw = parent.getWidth();
@@ -383,9 +452,9 @@ public class MapRenderer {
         mm.setOffsetY(ty);
     }
 
-    // ==================== 路线渲染（屏幕坐标 Canvas） ====================
-
-    /** 全量重绘路线层 — 世界坐标转屏幕坐标直接绘制 */
+    /**
+     * 全量重绘路线层 — 世界坐标转屏幕坐标直接绘制
+     */
     private void redrawRoutes(double ox, double oy, double scale) {
         double w = routeCanvas.getWidth();
         double h = routeCanvas.getHeight();
@@ -398,7 +467,7 @@ public class MapRenderer {
         if (active == null) return;
 
         // 1. 背景路线（置灰/半透明）
-        routeGc.setLineWidth(2);
+        routeGc.setLineWidth(AppConfig.ROUTE_INACTIVE_WIDTH);
         routeGc.setStroke(Color.web("#888888", 0.6));
         for (RoutePath path : pc.getSavedRoutes()) {
             if (path == pc.getActiveRoute()) continue;
@@ -407,20 +476,20 @@ public class MapRenderer {
 
         // 2. 活跃路线（绿色）
         routeGc.setStroke(Color.CHARTREUSE);
-        routeGc.setLineWidth(3);
+        routeGc.setLineWidth(AppConfig.ROUTE_ACTIVE_WIDTH);
         renderPathScreen(routeGc, active.getNodes(), ox, oy, scale);
 
         // 3. UI 叠加（绘图/编辑模式）
         if (pc.getCurrentMode() != PathContext.Mode.VIEW) {
             // 预览虚线（橡皮筋）
             if (pc.getCurrentMode() == PathContext.Mode.DRAWING && !active.getNodes().isEmpty()) {
-                Point lastNode = active.getNodes().get(active.getNodes().size() - 1);
+                Point lastNode = active.getNodes().getLast();
                 double x1 = lastNode.getX() * scale + ox;
                 double y1 = lastNode.getY() * scale + oy;
                 double x2 = pc.getMouseLogicX() * scale + ox;
                 double y2 = pc.getMouseLogicY() * scale + oy;
                 routeGc.setStroke(Color.web("#FFFFFF", 0.7));
-                routeGc.setLineDashes(5);
+                routeGc.setLineDashes(AppConfig.ROUTE_DASH_LENGTH);
                 routeGc.strokeLine(x1, y1, x2, y2);
                 routeGc.setLineDashes(null);
             }
@@ -428,7 +497,7 @@ public class MapRenderer {
             // 节点锚点圆
             routeGc.setFill(Color.WHITE);
             routeGc.setStroke(Color.BLUE);
-            double r = 4.5;
+            double r = AppConfig.ROUTE_NODE_RADIUS;
             for (Point node : active.getNodes()) {
                 double nx = node.getX() * scale + ox;
                 double ny = node.getY() * scale + oy;
@@ -438,17 +507,6 @@ public class MapRenderer {
         }
     }
 
-    /** 以屏幕坐标绘制单条路径 */
-    private static void renderPathScreen(GraphicsContext gc, List<Point> nodes, double ox, double oy, double scale) {
-        if (nodes.size() < 2) return;
-        gc.beginPath();
-        gc.moveTo(nodes.get(0).getX() * scale + ox, nodes.get(0).getY() * scale + oy);
-        for (int i = 1; i < nodes.size(); i++) {
-            gc.lineTo(nodes.get(i).getX() * scale + ox, nodes.get(i).getY() * scale + oy);
-        }
-        gc.stroke();
-    }
-
     // ==================== 变灰检测（ImageView 直接切换） ====================
 
     /**
@@ -456,31 +514,38 @@ public class MapRenderer {
      * 无需任何 Canvas 重绘，零 CPU 开销。
      */
     private void updateGrayStates(double playerX, double playerY) {
-        double r2 = GRAY_RADIUS * GRAY_RADIUS;
+        double r2 = AppConfig.GRAY_DISTANCE * AppConfig.GRAY_DISTANCE;
         IconCache cache = IconCache.getInstance();
         Image grayAtlas = cache.getGrayAtlas();
-        if (grayAtlas == null) return;
+        if (grayAtlas == null) {
+            log.warn("[gray] grayAtlas is null, skipping");
+            return;
+        }
 
-        for (ResourcePoint rp : ResourcePointContext.getInstance().getNearbyResources(playerX, playerY)) {
+        List<ResourcePoint> nearby = ResourcePointContext.getInstance().getNearbyResources(playerX, playerY);
+        for (ResourcePoint rp : nearby) {
             if (rp.isGrayed()) continue;
             Point pos = rp.getScreenPosition();
             double dx = pos.getX() - playerX;
             double dy = pos.getY() - playerY;
-            String name = rp.getConfig().getMarkTypeName();
-            if (dx * dx + dy * dy < r2 && ResourcePointContext.getInstance().isCollect(name)) {
-                rp.setGrayed(true);
-                // 直接切换 ImageView 图集引用，零重绘
-                ImageView iv = iconViews.get(rp);
-                if (iv != null) {
-                    iv.setImage(grayAtlas);
-                }
+            if (dx * dx + dy * dy > r2) continue;
+            if (!ResourcePointContext.getInstance().isCollect(rp.getConfig().getMarkTypeName())) continue;
+
+            // ⚠️ 必须先从 HashMap 获取 ImageView，再修改 grayed，
+            //    否则 grayed 改变 hashCode → get() 查不到
+            ImageView iv = iconViews.get(rp);
+            rp.setGrayed(true);
+            if (iv != null) {
+                iv.setImage(grayAtlas);
             }
         }
     }
 
     // ==================== hover 高亮（屏幕坐标 Canvas） ====================
 
-    /** hover 光环绘制 — 世界坐标转屏幕坐标 */
+    /**
+     * hover 光环绘制 — 世界坐标转屏幕坐标
+     */
     private void redrawHover(double ox, double oy, double scale) {
         double w = hoverCanvas.getWidth();
         double h = hoverCanvas.getHeight();
@@ -494,10 +559,10 @@ public class MapRenderer {
         double sy = pos.getY() * scale + oy;
 
         // 光环
-        double hoverSize = 38;
-        hoverGc.setFill(Color.web("#00BFFF", 0.2));
+        double hoverSize = AppConfig.HOVER_ICON_SIZE;
+        hoverGc.setFill(Color.web(AppConfig.HOVER_GLOW_COLOR, 0.2));
         hoverGc.fillOval(sx - hoverSize / 2 - 4, sy - hoverSize / 2 - 4, hoverSize + 8, hoverSize + 8);
-        hoverGc.setStroke(Color.web("#00BFFF", 0.8));
+        hoverGc.setStroke(Color.web(AppConfig.HOVER_GLOW_COLOR, 0.8));
         hoverGc.setLineWidth(2);
         hoverGc.strokeOval(sx - hoverSize / 2 - 2, sy - hoverSize / 2 - 2, hoverSize + 4, hoverSize + 4);
 
@@ -509,7 +574,7 @@ public class MapRenderer {
         if (cache.isAtlasReady()) {
             IconCache.AtlasSlot slot = cache.getSlot(iconPath);
             if (slot != null) {
-                hoverGc.drawImage(cache.getColorAtlas(), slot.sx, slot.sy, ICON_SIZE, ICON_SIZE,
+                hoverGc.drawImage(cache.getColorAtlas(), slot.sx, slot.sy, AppConfig.ICON_SIZE, AppConfig.ICON_SIZE,
                         sx - hoverSize / 2, sy - hoverSize / 2, hoverSize, hoverSize);
                 return;
             }
@@ -529,7 +594,9 @@ public class MapRenderer {
         hoverDirty = true;
     }
 
-    /** 重置视角到首帧适配状态 */
+    /**
+     * 重置视角到首帧适配状态
+     */
     public void resetViewport() {
         firstFrame = true;
         routeDirty = true;

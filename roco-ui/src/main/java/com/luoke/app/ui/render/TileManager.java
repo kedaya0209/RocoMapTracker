@@ -1,5 +1,6 @@
 package com.luoke.app.ui.render;
 
+import com.luoke.app.config.AppConfig;
 import com.luoke.app.context.ResourceConfigContext;
 import com.luoke.app.utils.ResourceUtils;
 import javafx.scene.Group;
@@ -13,6 +14,7 @@ import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
@@ -22,7 +24,7 @@ import java.util.concurrent.Executors;
 @Slf4j
 public class TileManager {
 
-    private static final int TILE_SIZE = 256;
+    private static final int TILE_SIZE = AppConfig.TILE_SIZE;
 
     private final Group worldGroup;
     private final int mapW, mapH;
@@ -34,7 +36,6 @@ public class TileManager {
 
     // 缩放稳定延迟：缩放期间保持当前层级瓦片（GPU 缩放），稳定后再切换精确层级
     private int scaleStableFrames = 0;
-    private static final int SCALE_STABLE_THRESHOLD = 5; // ~165ms
 
     public TileManager(Group worldGroup, int mapW, int mapH) {
         this.worldGroup = worldGroup;
@@ -42,9 +43,15 @@ public class TileManager {
         this.mapH = mapH;
     }
 
-    /** 当前是否缩放稳定（允许瓦片层级切换） */
+    private static String key(int level, int row, int col) {
+        return level + "_" + row + "_" + col;
+    }
+
+    /**
+     * 当前是否缩放稳定（允许瓦片层级切换）
+     */
     public boolean isScaleStable() {
-        return scaleStableFrames >= SCALE_STABLE_THRESHOLD;
+        return scaleStableFrames >= AppConfig.SCALE_STABLE_THRESHOLD;
     }
 
     public void onScaleChanged() {
@@ -63,17 +70,22 @@ public class TileManager {
         return mapH;
     }
 
-    /** 清空瓦片缓存，重置状态 */
+    // ==================== 层级选择 ====================
+
+    /**
+     * 清空瓦片缓存，重置状态
+     */
     public void reset() {
         activeTiles.clear();
         lastLevel = -1;
         scaleStableFrames = 0;
     }
 
-    // ==================== 层级选择 ====================
+    // ==================== 瓦片加载与回收 ====================
 
     /**
      * 选择最接近 1:1 屏幕像素比的层级，带磁滞防止振荡。
+     *
      * @param scale 当前缩放比
      * @return 瓦片层级 (0-4)
      */
@@ -103,8 +115,6 @@ public class TileManager {
         return candidate;
     }
 
-    // ==================== 瓦片加载与回收 ====================
-
     /**
      * 根据当前视口更新瓦片视图，加载新瓦片并移除不可见瓦片。
      */
@@ -112,7 +122,7 @@ public class TileManager {
         if (vw <= 0 || vh <= 0) return;
 
         double worldTileSize = TILE_SIZE * (1 << level);
-        double buffer = 3 * worldTileSize;
+        double buffer = AppConfig.TILE_BUFFER_MULTIPLIER * worldTileSize;
         double minWorldX = -ox / scale - buffer;
         double minWorldY = -oy / scale - buffer;
         double maxWorldX = (-ox + vw) / scale + buffer;
@@ -157,7 +167,7 @@ public class TileManager {
 
         if (!missingKeys.isEmpty()) {
             Map<String, byte[]> loadedBytes = new ConcurrentHashMap<>();
-            try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
                 for (String key : missingKeys) {
                     executor.submit(() -> {
                         byte[] data = loadTileBytes(level, key);
@@ -183,7 +193,9 @@ public class TileManager {
         }
     }
 
-    /** 并行 I/O：从磁盘读取瓦片 PNG 字节（在虚拟线程中执行，不接触 JavaFX 对象） */
+    /**
+     * 并行 I/O：从磁盘读取瓦片 PNG 字节（在虚拟线程中执行，不接触 JavaFX 对象）
+     */
     private byte[] loadTileBytes(int level, String key) {
         String relativePath = level + "/" + key.substring(key.indexOf('_') + 1) + ".png";
         String resourcePath = ResourceConfigContext.getTilesDir() + "/" + relativePath;
@@ -195,7 +207,9 @@ public class TileManager {
         }
     }
 
-    /** FX 线程：从字节数组解码 Image 并构造 ImageView */
+    /**
+     * FX 线程：从字节数组解码 Image 并构造 ImageView
+     */
     private ImageView buildImageView(int level, String key, byte[] data) {
         Image tileImage = new Image(new ByteArrayInputStream(data));
         String[] parts = key.split("_", 3);
@@ -215,9 +229,5 @@ public class TileManager {
         iv.setFitHeight(worldTileSize);
 
         return iv;
-    }
-
-    private static String key(int level, int row, int col) {
-        return level + "_" + row + "_" + col;
     }
 }

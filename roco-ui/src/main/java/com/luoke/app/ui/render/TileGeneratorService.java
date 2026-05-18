@@ -1,5 +1,6 @@
 package com.luoke.app.ui.render;
 
+import com.luoke.app.config.AppConfig;
 import com.luoke.app.context.MapContext;
 import com.luoke.app.context.ResourceConfigContext;
 import com.luoke.app.utils.ResourceUtils;
@@ -23,9 +24,6 @@ import java.util.concurrent.Executors;
 @Slf4j
 public class TileGeneratorService {
 
-    /** 瓦片层级元数据 */
-    private record LevelInfo(int level, int cols, int rows, int total) {}
-
     /**
      * 检查各层级瓦片完整性，缺失的从源 PNG 多线程生成。
      * 通过 tiles_meta.json 元数据快速校验，避免逐层 list 文件。
@@ -36,7 +34,7 @@ public class TileGeneratorService {
 
         int mapW = (int) MapContext.getInstance().getMapWidth();
         int mapH = (int) MapContext.getInstance().getMapHeight();
-        int tileSize = 256;
+        int tileSize = AppConfig.TILE_SIZE;
 
         List<LevelInfo> levels = new ArrayList<>();
         for (int lv = 0; lv < 5; lv++) {
@@ -116,7 +114,10 @@ public class TileGeneratorService {
             }
 
             for (java.util.concurrent.Future<?> f : futures) {
-                try { f.get(); } catch (Exception ignored) {}
+                try {
+                    f.get();
+                } catch (Exception ignored) {
+                }
             }
         }
 
@@ -124,13 +125,15 @@ public class TileGeneratorService {
         writeMetaFile(metaFile, mapW, mapH, tileSize, levels);
     }
 
-    /** 快速校验：比对元数据中各级别瓦片数与实际文件数 */
+    /**
+     * 快速校验：比对元数据中各级别瓦片数与实际文件数
+     */
     private boolean quickValidate(List<LevelInfo> levels) {
         for (LevelInfo li : levels) {
             File levelDir = ResourceUtils.getExternalFile(
                     Path.of(ResourceConfigContext.getTilesDir(), String.valueOf(li.level)).toString());
             if (!levelDir.isDirectory()) return false;
-            int actual = levelDir.list((d, n) -> n.endsWith(".png")).length;
+            int actual = levelDir.list((_, n) -> n.endsWith(".png")).length;
             if (actual < li.total) {
                 log.warn("瓦片 Level {} 不完整: {}/{}", li.level, actual, li.total);
                 return false;
@@ -139,7 +142,9 @@ public class TileGeneratorService {
         return true;
     }
 
-    /** 写入瓦片元数据 JSON */
+    /**
+     * 写入瓦片元数据 JSON
+     */
     private void writeMetaFile(File metaFile, int mapW, int mapH, int tileSize,
                                List<LevelInfo> levels) throws IOException {
         StringBuilder sb = new StringBuilder();
@@ -161,5 +166,11 @@ public class TileGeneratorService {
         sb.append("}\n");
         java.nio.file.Files.writeString(metaFile.toPath(), sb.toString());
         log.info("瓦片元数据已写入: {}", metaFile);
+    }
+
+    /**
+     * 瓦片层级元数据
+     */
+    private record LevelInfo(int level, int cols, int rows, int total) {
     }
 }
