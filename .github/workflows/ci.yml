@@ -67,12 +67,12 @@ jobs:
         uses: actions/cache@v4
         with:
           path: D:\a\opencv
-          key: ${{ runner.os }}-opencv-${{ env.OPENCV_VERSION }}
+          key: ${{ runner.os }}-opencv-${{ env.OPENCV_VERSION }}-v2
 
       - name: Download and extract pre-built OpenCV
         if: steps.cache-opencv.outputs.cache-hit != 'true'
         run: |
-          curl -L -o opencv.exe "https://github.com/opencv/opencv/releases/download/${{ env.OPENCV_VERSION }}/opencv-${{ env.OPENCV_VERSION }}-windows.exe"
+          curl.exe -L -o opencv.exe "https://github.com/opencv/opencv/releases/download/${{ env.OPENCV_VERSION }}/opencv-${{ env.OPENCV_VERSION }}-windows.exe"
           7z x opencv.exe -oD:\a\opencv -y > nul
         shell: cmd
 
@@ -103,10 +103,17 @@ jobs:
           cl /std:c++17 /O2 /EHsc /arch:AVX2 /Fe:capture.exe capture_main.cpp d3d11.lib dxgi.lib windowsapp.lib runtimeobject.lib user32.lib ws2_32.lib winmm.lib
         working-directory: cpp
 
+      - name: Locate OpenCV lib directory
+        run: |
+          dir D:\a\opencv\opencv\build\x64\ /b /ad
+          if exist D:\a\opencv\opencv\build\x64\vc16\lib dir D:\a\opencv\opencv\build\x64\vc16\lib\opencv_*.lib
+          if exist D:\a\opencv\opencv\build\x64\vc17\lib dir D:\a\opencv\opencv\build\x64\vc17\lib\opencv_*.lib
+        shell: cmd
+
       - name: Build sift_match.exe (with pre-built OpenCV)
         run: |
           set "INCLUDE=D:\a\opencv\opencv\build\include;D:\a\zlib\include;%INCLUDE%"
-          set "LIB=D:\a\opencv\opencv\build\x64\vc16\lib;D:\a\zlib\lib;%LIB%"
+          set "LIB=D:\a\opencv\opencv\build\x64\vc16\lib;D:\a\opencv\opencv\build\x64\vc17\lib;D:\a\zlib\lib;%LIB%"
           cl /std:c++17 /O2 /EHsc /arch:AVX2 /Fe:sift_match.exe sift_match_main.cpp ws2_32.lib
         working-directory: cpp
         shell: cmd
