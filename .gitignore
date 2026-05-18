@@ -97,3 +97,8 @@ coverage/
 !resource/source/**/*.png
 /.claude/
 /resources/model/
+
+# ==============================
+# 私有资源（从 RocoMapTracker-resources 仓库获取）
+# ==============================
+/roco-map/src/main/resources/source/
