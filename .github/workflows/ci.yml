@@ -164,7 +164,7 @@ jobs:
         env:
           PAT_TOKEN: ${{ secrets.GH_PRIVATE_ASSETS_TOKEN }}
         run: |
-          git clone https://x-access-token:$env:PAT_TOKEN@github.com/tanghangliang/RocoMapTracker-resources.git private-assets
+          git clone https://x-access-token:%PAT_TOKEN%@github.com/tanghangliang/RocoMapTracker-resources.git private-assets
           if not exist roco-map\src\main\resources mkdir roco-map\src\main\resources
           xcopy /E /Y /I private-assets\resources roco-map\src\main\resources
         shell: cmd
