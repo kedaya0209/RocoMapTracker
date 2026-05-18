@@ -160,6 +160,19 @@ jobs:
           copy /Y cpp\capture.exe roco-ui\src\main\resources\capture\capture.exe
           copy /Y cpp\sift_match.exe roco-ui\src\main\resources\sift\sift_match.exe
 
+      - name: Download private assets
+        env:
+          PAT_TOKEN: ${{ secrets.GH_PRIVATE_ASSETS_TOKEN }}
+        run: |
+          git clone https://x-access-token:$env:PAT_TOKEN@github.com/<你的账户>/roco-map-private-assets.git private-assets
+          if (Test-Path private-assets\source) {
+            Copy-Item -Path private-assets\source\* -Destination roco-map\src\main\resources\source\ -Recurse -Force
+          }
+          if (Test-Path private-assets\resources) {
+            Copy-Item -Path private-assets\resources\* -Destination roco-ui\src\main\resources\ -Recurse -Force
+          }
+        shell: powershell
+
       - name: Setup Visual Studio (MSVC)
         uses: ilammy/msvc-dev-cmd@v1
 
