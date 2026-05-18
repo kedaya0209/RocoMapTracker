@@ -48,13 +48,62 @@ jobs:
         run: mvn test -pl roco-ui -am --no-transfer-progress
 
   # ================================================================
+  # C++ 子进程编译（依赖 OpenCV + zlib）
+  # ================================================================
+  build-cpp:
+    name: Build C++ Subprocesses
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Visual Studio (MSVC)
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Cache vcpkg installed
+        id: cache-vcpkg
+        uses: actions/cache@v4
+        with:
+          path: C:\vcpkg\installed
+          key: ${{ runner.os }}-vcpkg-${{ hashFiles('cpp/sift_match_main.cpp') }}
+
+      - name: Install OpenCV (vcpkg, with contrib)
+        if: steps.cache-vcpkg.outputs.cache-hit != 'true'
+        run: |
+          vcpkg install opencv4[contrib]:x64-windows --recurse
+        shell: cmd
+
+      - name: Build capture.exe (DirectX only, no OpenCV)
+        run: |
+          cl /std:c++17 /O2 /EHsc /arch:AVX2 /Fe:capture.exe capture_main.cpp d3d11.lib dxgi.lib windowsapp.lib runtimeobject.lib user32.lib ws2_32.lib winmm.lib
+        working-directory: cpp
+
+      - name: Build sift_match.exe (requires OpenCV)
+        run: |
+          set "INCLUDE=C:\vcpkg\installed\x64-windows\include;%INCLUDE%"
+          set "LIB=C:\vcpkg\installed\x64-windows\lib;%LIB%"
+          cl /std:c++17 /O2 /EHsc /arch:AVX2 /Fe:sift_match.exe sift_match_main.cpp ws2_32.lib
+        working-directory: cpp
+        shell: cmd
+
+      - name: Upload C++ artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpp-binaries-${{ github.sha }}
+          path: |
+            cpp/capture.exe
+            cpp/sift_match.exe
+          compression-level: 0
+
+  # ================================================================
   # Native Image 构建（仅 master 分支和手动触发）
   # ================================================================
   native-image:
     name: Native Image Build
     if: github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch'
     runs-on: windows-latest
-    needs: build-jvm
+    needs:
+      - build-jvm
+      - build-cpp
     steps:
       - uses: actions/checkout@v4
 
@@ -73,14 +122,14 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-maven-
 
+      - name: Download C++ binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: cpp-binaries-${{ github.sha }}
+          path: cpp
+
       - name: Setup Visual Studio (MSVC)
         uses: ilammy/msvc-dev-cmd@v1
-
-      - name: Build C++ subprocesses
-        run: |
-          cl /std:c++17 /O2 /EHsc /arch:AVX2 /Fe:capture.exe capture_main.cpp d3d11.lib dxgi.lib windowsapp.lib runtimeobject.lib user32.lib ws2_32.lib winmm.lib
-          cl /std:c++17 /O2 /EHsc /arch:AVX2 /Fe:sift_match.exe sift_match_main.cpp ws2_32.lib
-        working-directory: cpp
 
       - name: Build Native Image
         run: mvn -Pnative clean package -pl roco-ui -am --no-transfer-progress
