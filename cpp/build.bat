@@ -14,7 +14,7 @@ if %_VC_ERR% neq 0 (
 )
 
 :: Output to source file directory
-set "OUTPUT=wgc_capture.dll"
+set "OUTPUT=RocoMapTracker-wgc_capture.dll"
 
 echo.
 echo Compiling wgc_capture.cpp ...

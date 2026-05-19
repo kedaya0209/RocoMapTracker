@@ -1,4 +1,4 @@
-package com.luoke.app.ui.component;
+package com.luoke.app.ui.component.setting;
 
 /**
  * 设置字段类型枚举。

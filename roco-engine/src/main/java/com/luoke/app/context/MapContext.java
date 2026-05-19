@@ -1,6 +1,7 @@
 package com.luoke.app.context;
 
-import com.luoke.app.config.AppConfig;
+import com.luoke.app.config.UiConfig;
+import com.luoke.app.config.ViewConfig;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -47,7 +48,7 @@ public class MapContext {
         this.mapHeight = mapH;
         this.initialized = true;
         MapCoordinateManager.getInstance().registerMap(
-                mapKey, mapW, mapH, AppConfig.JSON_ZOOM, AppConfig.MAP_ZOOM
+                mapKey, mapW, mapH, ViewConfig.JSON_ZOOM, ViewConfig.MAP_ZOOM
         );
     }
 
@@ -84,7 +85,7 @@ public class MapContext {
      */
     public void zoom(double factor, double mx, double my) {
         double minScale = Math.max(viewWidth / mapWidth, viewHeight / mapHeight);
-        double newScale = Math.clamp(scale * factor, minScale, AppConfig.MAP_VIEW_MAX_SCALE);
+        double newScale = Math.clamp(scale * factor, minScale, UiConfig.MAP_VIEW_MAX_SCALE);
         double f = newScale / scale;
 
         offsetX = mx - (mx - offsetX) * f;

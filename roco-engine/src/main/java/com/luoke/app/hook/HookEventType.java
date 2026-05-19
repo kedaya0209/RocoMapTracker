@@ -12,5 +12,9 @@ public enum HookEventType {
     /**
      * 物资采集统计更新，UI 层监听以刷新计数面板
      */
-    MATERIAL_COLLECTION_UPDATED
+    MATERIAL_COLLECTION_UPDATED,
+    /**
+     * 状态轮播消息 — 用于 StatusCarousel 底部状态栏展示系统运行状态
+     */
+    STATUS_CAROUSEL
 }

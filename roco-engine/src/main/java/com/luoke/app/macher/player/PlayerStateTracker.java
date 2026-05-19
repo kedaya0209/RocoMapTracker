@@ -1,6 +1,6 @@
 package com.luoke.app.macher.player;
 
-import com.luoke.app.config.AppConfig;
+import com.luoke.app.config.PlayerConfig;
 import com.luoke.app.context.MapContext;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
@@ -42,13 +42,13 @@ public class PlayerStateTracker {
         } else {
             double dx = x - smoothedX;
             double dy = y - smoothedY;
-            double threshold = AppConfig.PLAYER_TELEPORT_THRESHOLD;
+            double threshold = PlayerConfig.PLAYER_TELEPORT_THRESHOLD;
             if (dx * dx + dy * dy > threshold * threshold) {
                 // 瞬移，直接重置平滑值
                 smoothedX = x;
                 smoothedY = y;
             } else {
-                double alpha = AppConfig.PLAYER_EMA_ALPHA;
+                double alpha = PlayerConfig.PLAYER_EMA_ALPHA;
                 smoothedX = alpha * x + (1 - alpha) * smoothedX;
                 smoothedY = alpha * y + (1 - alpha) * smoothedY;
             }
@@ -60,7 +60,7 @@ public class PlayerStateTracker {
         if (hasPreviousMatch && consecutiveFailureCount == 0) {
             double frameDx = x - prevRawX;
             double frameDy = y - prevRawY;
-            double vAlpha = AppConfig.PLAYER_VELOCITY_EMA_ALPHA;
+            double vAlpha = PlayerConfig.PLAYER_VELOCITY_EMA_ALPHA;
             velocityX = vAlpha * frameDx + (1 - vAlpha) * velocityX;
             velocityY = vAlpha * frameDy + (1 - vAlpha) * velocityY;
             predictedX = smoothedX + velocityX;
@@ -78,7 +78,7 @@ public class PlayerStateTracker {
      */
     public void onMatchFailure(String reason) {
         consecutiveFailureCount++;
-        if (consecutiveFailureCount > AppConfig.PLAYER_MAP_LOST_THRESHOLD) {
+        if (consecutiveFailureCount > PlayerConfig.PLAYER_MAP_LOST_THRESHOLD) {
             isMapLost = true;
             hasSmoothedPosition = false;
             hasPreviousMatch = false;

@@ -1,7 +1,8 @@
 package com.luoke.app.ui.service;
 
 import atlantafx.base.theme.*;
-import com.luoke.app.config.AppConfig;
+import com.luoke.app.config.ConfigPersistence;
+import com.luoke.app.config.UiConfig;
 import javafx.application.Application;
 
 /**
@@ -30,8 +31,8 @@ public class ThemeManager {
     }
 
     public static void switchTheme(String name) {
-        AppConfig.THEME = name;
-        AppConfig.save();
+        UiConfig.THEME = name;
+        ConfigPersistence.save();
         applyTheme(name);
     }
 }

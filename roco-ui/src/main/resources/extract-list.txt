@@ -7,8 +7,8 @@
 /dll/jawt.dll:jawt.dll:native
 /dll/jvm.dll:jvm.dll:native
 /dll/lcms.dll:lcms.dll:native
-/capture/capture.exe:/capture/capture.exe
-/sift/sift_match.exe:/sift/sift_match.exe
+/capture/RocoMapTracker-capture.exe:/capture/RocoMapTracker-capture.exe
+/sift/RocoMapTracker-sift_match.exe:/sift/RocoMapTracker-sift_match.exe
 /sift/opencv_core4.dll:/sift/opencv_core4.dll
 /sift/opencv_imgproc4.dll:/sift/opencv_imgproc4.dll
 /sift/opencv_features2d4.dll:/sift/opencv_features2d4.dll

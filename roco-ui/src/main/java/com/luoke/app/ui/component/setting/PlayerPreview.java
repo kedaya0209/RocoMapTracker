@@ -1,6 +1,7 @@
-package com.luoke.app.ui.component;
+package com.luoke.app.ui.component.setting;
 
-import com.luoke.app.config.AppConfig;
+import com.luoke.app.config.RenderConfig;
+import com.luoke.app.config.ViewConfig;
 import com.luoke.app.context.ResourceConfigContext;
 import com.luoke.app.utils.ResourceUtils;
 import javafx.animation.AnimationTimer;
@@ -123,16 +124,16 @@ public class PlayerPreview {
         double cy = h / 2.0;
 
         // 每帧从控件读取实时值（Spinner▲▼立即生效；键盘输入需按 Enter 提交）
-        double grayDist = readDouble("GRAY_DISTANCE", AppConfig.GRAY_DISTANCE);
-        double rippleStep = readDouble("RIPPLE_STEP", AppConfig.RIPPLE_STEP);
-        double rippleAlpha = readDouble("RIPPLE_ALPHA", AppConfig.RIPPLE_ALPHA);
-        double rippleStroke = readDouble("RIPPLE_STROKE_WIDTH", AppConfig.RIPPLE_STROKE_WIDTH);
-        int rippleCount = Math.min(readInt("RIPPLE_COUNT", AppConfig.RIPPLE_COUNT), MAX_RIPPLES);
-        double haloFreq = readDouble("HALO_BREATHE_FREQ", AppConfig.HALO_BREATHE_FREQ);
-        double haloMinAlpha = readDouble("HALO_BREATHE_MIN_ALPHA", AppConfig.HALO_BREATHE_MIN_ALPHA);
-        double haloMaxAlpha = readDouble("HALO_BREATHE_MAX_ALPHA", AppConfig.HALO_BREATHE_MAX_ALPHA);
-        double haloStroke = readDouble("HALO_STROKE_WIDTH", AppConfig.HALO_STROKE_WIDTH);
-        double playerSize = readDouble("PLAYER_VIEW_SIZE", AppConfig.PLAYER_VIEW_SIZE);
+        double grayDist = readDouble("GRAY_DISTANCE", ViewConfig.GRAY_DISTANCE);
+        double rippleStep = readDouble("RIPPLE_STEP", RenderConfig.RIPPLE_STEP);
+        double rippleAlpha = readDouble("RIPPLE_ALPHA", RenderConfig.RIPPLE_ALPHA);
+        double rippleStroke = readDouble("RIPPLE_STROKE_WIDTH", RenderConfig.RIPPLE_STROKE_WIDTH);
+        int rippleCount = Math.min(readInt("RIPPLE_COUNT", RenderConfig.RIPPLE_COUNT), MAX_RIPPLES);
+        double haloFreq = readDouble("HALO_BREATHE_FREQ", RenderConfig.HALO_BREATHE_FREQ);
+        double haloMinAlpha = readDouble("HALO_BREATHE_MIN_ALPHA", RenderConfig.HALO_BREATHE_MIN_ALPHA);
+        double haloMaxAlpha = readDouble("HALO_BREATHE_MAX_ALPHA", RenderConfig.HALO_BREATHE_MAX_ALPHA);
+        double haloStroke = readDouble("HALO_STROKE_WIDTH", RenderConfig.HALO_STROKE_WIDTH);
+        double playerSize = readDouble("PLAYER_VIEW_SIZE", RenderConfig.PLAYER_VIEW_SIZE);
 
         // 等比缩放：确保光环不超出预览区域
         double maxR = Math.min(w, h) * 0.42;

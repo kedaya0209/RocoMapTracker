@@ -1,7 +1,7 @@
 package com.luoke.app.hook.container;
 
-import com.luoke.app.hook.AbstractGenericHook;
 import com.luoke.app.hook.HookEventType;
+import com.luoke.app.hook.IHook;
 
 import java.util.Collections;
 import java.util.List;
@@ -14,7 +14,7 @@ public class HookContainer {
     private static final HookContainer INSTANCE = new HookContainer();
 
     // 事件类型 -> 对应钩子列表
-    private final Map<HookEventType, List<AbstractGenericHook<?>>> eventHookMap;
+    private final Map<HookEventType, List<IHook<?>>> eventHookMap;
 
 
     private HookContainer() {
@@ -28,14 +28,14 @@ public class HookContainer {
         return INSTANCE;
     }
 
-    public void registerHook(HookEventType eventType, AbstractGenericHook<?> hook) {
+    public void registerHook(HookEventType eventType, IHook<?> hook) {
         // 使用computeIfAbsent()原子地获取或创建钩子列表
         // 如果Map中不存在该事件类型的列表，则创建新的CopyOnWriteArrayList
         // computeIfAbsent()是线程安全的，避免了"检查-创建"的竞态条件
         eventHookMap.computeIfAbsent(eventType, k -> new CopyOnWriteArrayList<>()).add(hook);
     }
 
-    public List<AbstractGenericHook<?>> getHookList(HookEventType eventType) {
+    public List<IHook<?>> getHookList(HookEventType eventType) {
         // 使用getOrDefault()获取钩子列表，如果不存在则返回不可变的空列表
         // Collections.EMPTY_LIST是一个共享的不可变空列表，避免创建多个空列表实例
         // 返回空列表而不是null，避免了调用方进行null检查
@@ -50,8 +50,8 @@ public class HookContainer {
         eventHookMap.clear();
     }
 
-    public void unregisterHook(AbstractGenericHook<?> hook) {
-        for (List<AbstractGenericHook<?>> value : eventHookMap.values()) {
+    public void unregisterHook(IHook<?> hook) {
+        for (List<IHook<?>> value : eventHookMap.values()) {
             value.remove(hook);
         }
     }

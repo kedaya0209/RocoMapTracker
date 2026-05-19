@@ -1,6 +1,6 @@
 package com.luoke.app.map.core;
 
-import com.luoke.app.config.AppConfig;
+import com.luoke.app.config.DownloadConfig;
 import com.luoke.app.map.LoadInfo;
 import com.luoke.app.map.MapResourceUpdater;
 import com.luoke.app.map.entity.DownloadResult;
@@ -58,14 +58,14 @@ public class MapDownloader {
             Files.createDirectories(FileUtil.getRelativeFile(MapResourceUpdater.DOWNLOAD_MAP_DIR).toPath());
             Files.createDirectories(FileUtil.getRelativeFile(MapResourceUpdater.CHUNK_DIR).toPath());
 
-            if (AppConfig.MAP_REMOTE_URLS == null || AppConfig.MAP_REMOTE_URLS.length == 0) {
+            if (DownloadConfig.MAP_REMOTE_URLS == null || DownloadConfig.MAP_REMOTE_URLS.length == 0) {
                 LoadInfo.remoteResolveConfig();
             }
 
             // 2. 遍历地图配置
-            for (int i = 0; i < AppConfig.MAP_REMOTE_URLS.length; i++) {
-                String tag = AppConfig.MAP_REMOTE_URL_NAME[i];
-                String urlTpl = AppConfig.MAP_REMOTE_URLS[i];
+            for (int i = 0; i < DownloadConfig.MAP_REMOTE_URLS.length; i++) {
+                String tag = DownloadConfig.MAP_REMOTE_URL_NAME[i];
+                String urlTpl = DownloadConfig.MAP_REMOTE_URLS[i];
                 File targetImg = FileUtil.getRelativeFile(String.format(MapResourceUpdater.OUTPUT_FILE, tag));
 
                 if (targetImg.exists()) {

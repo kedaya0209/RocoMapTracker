@@ -165,6 +165,19 @@ static inline double read_double(const uint8_t* buf) {
     return v;
 }
 
+// Float helpers for network serialization (big-endian, consistent with protocol)
+static inline void write_float_be(uint8_t* buf, float v) {
+    uint32_t u;
+    memcpy(&u, &v, sizeof(u));
+    write_be32(buf, u);
+}
+static inline float read_float_be(const uint8_t* buf) {
+    uint32_t u = read_be32(buf);
+    float v;
+    memcpy(&v, &u, sizeof(v));
+    return v;
+}
+
 // ============================================================================
 // Build HELLO body: [2B]clientTypeLen [NB]clientType [2B]msgTypeCount [N*4B]msgTypes
 // ============================================================================
@@ -401,6 +414,20 @@ public:
         return result; // Always CV_32F
     }
 
+    // Transform scene descriptors to CV_8U (for u8_index path, no redundant dequantize)
+    cv::Mat process_to_u8(cv::Mat& scene_descriptors) {
+        cv::Mat result = scene_descriptors;
+        if (variant == PCA || variant == PCA_ULTRA) {
+            result = pca_project(result);
+        }
+        if (variant == ULTRA || variant == PCA_ULTRA) {
+            cv::Mat quantized;
+            result.convertTo(quantized, CV_8U, q_scale, -q_min * q_scale);
+            result = quantized;
+        }
+        return result;
+    }
+
     // ---- Cache I/O ----
     void save_cache(FILE* f) {
         if (variant == PCA || variant == PCA_ULTRA) {
@@ -602,16 +629,18 @@ class SiftMatcher {
 public:
     cv::Ptr<cv::SIFT> sift;
     std::unique_ptr<DescriptorTransform> transform;
-    cv::Ptr<cv::FlannBasedMatcher> flann_matcher;
-
     // Map keypoints
     std::vector<cv::KeyPoint> map_keypoints;
     std::vector<cv::Point2f> map_keypoint_pts;
 
-    cv::Mat train_descriptors; // CV_32F
+    // CV_8U 数据存储 + FLANN 索引（直接 uint8，无 float 膨胀）
+    cv::Mat flann_data_storage;
+    std::unique_ptr<cvflann::KDTreeIndex<cvflann::L2<unsigned char>>> u8_index;
+    // CV_32F 数据存储 + FLANN 索引（避免 FlannBasedMatcher 的 add() clone）
+    cv::Mat flann_data_storage_32f;
+    std::unique_ptr<cvflann::KDTreeIndex<cvflann::L2<float>>> f32_index;
 
     // 复用容器，避免每帧堆分配
-    std::vector<std::vector<cv::DMatch>> knn_matches;
     std::vector<cv::DMatch> good_matches;
     std::vector<cv::DMatch> filtered_matches;
     std::vector<cv::Point2f> src_pts;
@@ -684,7 +713,7 @@ private:
             LOGERR("Descriptor transform failed");
             return false;
         }
-        build_flann_from_train_descs();
+        build_flann_index();
 
         LOG("SIFT trained: %zu features", map_keypoints.size());
         return true;
@@ -825,50 +854,50 @@ private:
             }
         }
 
-        build_flann_from_train_descs();
+        build_flann_index();
 
         LOG("SIFT trained (tiled): %zu features", map_keypoints.size());
         return true;
     }
 
-    void build_flann_from_train_descs() {
-        train_descriptors = transform->persistent_mat;
-        if (train_descriptors.type() != CV_32F) {
-            train_descriptors.convertTo(train_descriptors, CV_32F);
+    void build_flann_index() {
+        cv::Mat& descs = transform->persistent_mat;
+        if (descs.type() == CV_8U) {
+            // 直接建 CV_8U KD-tree，无 float 膨胀
+            flann_data_storage = descs;
+            int rows = descs.rows;
+            int cols = descs.cols;
+            cvflann::Matrix<unsigned char> data(flann_data_storage.ptr<unsigned char>(),
+                                                  (size_t)rows, (size_t)cols);
+            auto index = std::make_unique<cvflann::KDTreeIndex<cvflann::L2<unsigned char>>>(
+                data, cvflann::KDTreeIndexParams(1));
+            index->buildIndex();
+            u8_index = std::move(index);
+            LOG("FLANN CV_8U index built: %d features, %d dims", rows, cols);
+        } else {
+            // CV_32F 路径：直接 KDTreeIndex，避免 FlannBasedMatcher 的 add() clone
+            flann_data_storage_32f = descs;
+            int rows = descs.rows;
+            int cols = descs.cols;
+            cvflann::Matrix<float> data(flann_data_storage_32f.ptr<float>(),
+                                          (size_t)rows, (size_t)cols);
+            auto index = std::make_unique<cvflann::KDTreeIndex<cvflann::L2<float>>>(
+                data, cvflann::KDTreeIndexParams(1));
+            index->buildIndex();
+            f32_index = std::move(index);
+            LOG("FLANN CV_32F index built: %d features, %d dims", rows, cols);
         }
-
-        flann_matcher = cv::makePtr<cv::FlannBasedMatcher>(
-            cv::makePtr<cv::flann::KDTreeIndexParams>(1),
-            cv::makePtr<cv::flann::SearchParams>(24, 0.0f, true)
-        );
-        std::vector<cv::Mat> train_vec = { train_descriptors };
-        flann_matcher->add(train_vec);
-        flann_matcher->train();
-
-        // FLANN 已深拷贝数据到 KD-tree 索引，原始描述符不再需要
-        train_descriptors = cv::Mat();
+        // persistent_mat 的释放由调用方在保存缓存后处理
     }
 
 public:
 
     // Load from cache (all data already populated)
     bool load_from_cache() {
-        if (train_descriptors.empty()) return false;
-        if (train_descriptors.type() != CV_32F) {
-            train_descriptors.convertTo(train_descriptors, CV_32F);
-        }
+        // 从 persistent_mat 构建 FLANN 索引（build_flann_index 根据类型自动选择 CV_8U 或 CV_32F）
+        build_flann_index();
 
-        flann_matcher = cv::makePtr<cv::FlannBasedMatcher>(
-            cv::makePtr<cv::flann::KDTreeIndexParams>(1),
-            cv::makePtr<cv::flann::SearchParams>(24, 0.0f, true)
-        );
-        std::vector<cv::Mat> train_vec = { train_descriptors };
-        flann_matcher->add(train_vec);
-        flann_matcher->train();
-
-        // FLANN 已深拷贝数据到 KD-tree 索引，原始描述符不再需要
-        train_descriptors = cv::Mat();
-        // 缓存命中: 描述符已从文件加载完毕，persistent_mat 也可释放
+        // FLANN 索引已深拷贝数据，persistent_mat 可释放
         transform->persistent_mat = cv::Mat();
 
         // Build keypoint coords from stored keypoints
@@ -885,6 +914,9 @@ public:
         bool success = false;
         double x = 0;
         double y = 0;
+        float t_minimap_ms = 0;  // 小地图 HoughCircles 检测耗时
+        float t_extract_ms = 0;  // SIFT detectAndCompute 特征提取耗时
+        float t_flann_ms = 0;    // FLANN knnSearch + RANSAC 匹配耗时
     };
 
     // Match a frame (gray8 pixels), optionally with spatial hint.
@@ -892,14 +924,17 @@ public:
     // 调用方必须保证 data 在 match() 返回前有效（当前为同步调用，满足此约束）。
     MatchResult match(uint8_t* data, int w, int h, double hint_x, double hint_y) {
         MatchResult res{};
-        if (!flann_matcher) return res;
+        if (!f32_index && !u8_index) return res;
 
         cv::Mat scene_img(h, w, CV_8UC1, data);  // 非拷贝，别名 data
 
         // SIFT detect + compute on scene
+        auto t0 = std::chrono::steady_clock::now();
         std::vector<cv::KeyPoint> scene_kps;
         cv::Mat scene_descriptors;
         sift->detectAndCompute(scene_img, cv::noArray(), scene_kps, scene_descriptors);
+        auto t1 = std::chrono::steady_clock::now();
+        res.t_extract_ms = std::chrono::duration<float, std::milli>(t1 - t0).count();
 
         if (scene_descriptors.empty()) return res;
 
@@ -908,18 +943,40 @@ public:
             scene_descriptors.convertTo(scene_descriptors, CV_32F);
         }
 
-        // Transform scene descriptors
-        cv::Mat query_desc = transform->process(scene_descriptors);
-
-        // FLANN knnMatch
-        knn_matches.clear();
-        flann_matcher->knnMatch(query_desc, knn_matches, 2);
-
-        // Ratio test (Lowe)
+        // FLANN knnMatch — 根据索引类型选择路径
         good_matches.clear();
-        for (auto& knn : knn_matches) {
-            if (knn.size() >= 2 && knn[0].distance < match_ratio_threshold * knn[1].distance) {
-                good_matches.push_back(knn[0]);
+        if (u8_index) {
+            // CV_8U 路径：直接量化到 uint8，无冗余反量化
+            cv::Mat query_u8 = transform->process_to_u8(scene_descriptors);
+
+            int q_rows = query_u8.rows;
+            int q_cols = query_u8.cols;
+            for (int qi = 0; qi < q_rows; qi++) {
+                cvflann::Matrix<unsigned char> qmat(query_u8.ptr<unsigned char>(qi), 1, q_cols);
+                int idx[2];
+                float dists[2];
+                u8_index->knnSearch(qmat, cvflann::Matrix<int>(idx, 1, 2),
+                                    cvflann::Matrix<float>(dists, 1, 2), 2,
+                                    cvflann::SearchParams(24));
+                if (idx[1] >= 0 && dists[0] < match_ratio_threshold * dists[1]) {
+                    good_matches.push_back(cv::DMatch(qi, idx[0], dists[0]));
+                }
+            }
+        } else if (f32_index) {
+            // CV_32F 路径：直接 float KD-tree，无需 clone
+            cv::Mat query_desc = transform->process(scene_descriptors);
+            int q_rows = query_desc.rows;
+            int q_cols = query_desc.cols;
+            for (int qi = 0; qi < q_rows; qi++) {
+                cvflann::Matrix<float> qmat(query_desc.ptr<float>(qi), 1, q_cols);
+                int idx[2];
+                float dists[2];
+                f32_index->knnSearch(qmat, cvflann::Matrix<int>(idx, 1, 2),
+                                     cvflann::Matrix<float>(dists, 1, 2), 2,
+                                     cvflann::SearchParams(24));
+                if (idx[1] >= 0 && dists[0] < match_ratio_threshold * dists[1]) {
+                    good_matches.push_back(cv::DMatch(qi, idx[0], dists[0]));
+                }
             }
         }
 
@@ -957,7 +1014,10 @@ public:
             }
         }
 
-        if (src_pts.size() < (size_t)match_min_count) return res;
+        if (src_pts.size() < (size_t)match_min_count) {
+            res.t_flann_ms = std::chrono::duration<float, std::milli>(std::chrono::steady_clock::now() - t1).count();
+            return res;
+        }
 
         // RANSAC homography with Java params
         cv::Mat inlier_mask;
@@ -975,6 +1035,7 @@ public:
             res.y = dst_center[0].y;
         }
 
+        res.t_flann_ms = std::chrono::duration<float, std::milli>(std::chrono::steady_clock::now() - t1).count();
         return res;
     }
 };
@@ -1111,7 +1172,6 @@ static bool load_cache_file(const std::string& path, SiftMatcher& matcher) {
         fclose(f);
         return false;
     }
-    matcher.train_descriptors = matcher.transform->persistent_mat;
 
     // Keypoints
     int32_t kpCount;
@@ -1147,12 +1207,16 @@ static bool load_cache_file(const std::string& path, SiftMatcher& matcher) {
 // ============================================================================
 // Serialize MATCH_RESULT body: [1]success [8]x [8]y [8]angle
 // ============================================================================
-static std::vector<uint8_t> serialize_result(bool success, double x, double y, double angle) {
-    std::vector<uint8_t> buf(25);
+static std::vector<uint8_t> serialize_result(bool success, double x, double y, double angle,
+                                              float t_minimap_ms = 0, float t_extract_ms = 0, float t_flann_ms = 0) {
+    std::vector<uint8_t> buf(37);  // 1 + 8 + 8 + 8 + 4 + 4 + 4
     buf[0] = success ? 1 : 0;
     write_double(buf.data() + 1, x);
     write_double(buf.data() + 9, y);
     write_double(buf.data() + 17, angle);
+    write_float_be(buf.data() + 25, t_minimap_ms);
+    write_float_be(buf.data() + 29, t_extract_ms);
+    write_float_be(buf.data() + 33, t_flann_ms);
     return buf;
 }
 
@@ -1318,9 +1382,9 @@ int main(int argc, char* argv[]) {
                 CreateDirectoryA(dir.c_str(), nullptr);
             }
             save_cache_file(params.cacheFilePath, matcher);
-            // 缓存已写入磁盘，持久化描述符可释放 (~42MB CV_8U)
-            matcher.transform->persistent_mat = cv::Mat();
         }
+        // 持久化描述符(CV_8U)已不再需要：FLANN 索引已深拷贝数据到 KD-tree
+        matcher.transform->persistent_mat = cv::Mat();
     }
 
     // ---- Send INIT_COMPLETE ----
@@ -1395,12 +1459,16 @@ int main(int argc, char* argv[]) {
         try {
             SiftMatcher::MatchResult match_res;
 
-            // 1. Minimap detection
+            // 1. Minimap detection (with timing)
+            auto t_minimap_start = std::chrono::steady_clock::now();
             auto detection = minimap.detect(pixels, fw, fh);
+            float t_minimap = std::chrono::duration<float, std::milli>(
+                std::chrono::steady_clock::now() - t_minimap_start).count();
+
             if (!detection.success) {
                 // Send failure quickly, minimap not found
                 auto result_buf = serialize_result(false, 0, 0,
-                    std::numeric_limits<double>::quiet_NaN());
+                    std::numeric_limits<double>::quiet_NaN(), t_minimap, 0, 0);
                 if (!send_message(sock, MATCH_RESULT, result_buf.data(), (uint32_t)result_buf.size())) {
                     LOG("Socket send failed (RESULT)");
                     break;
@@ -1416,12 +1484,14 @@ int main(int argc, char* argv[]) {
 
             // 3. SIFT matching (arrow angle detached to separate process, always NaN)
             match_res = matcher.match(pixels, fw, fh, hint_x, hint_y);
+            match_res.t_minimap_ms = t_minimap;
 
             if (match_res.success) success_count++;
 
-            // 4. Send result (angle always NaN for now)
+            // 4. Send result with timing (angle always NaN for now)
             auto result_buf = serialize_result(match_res.success, match_res.x, match_res.y,
-                std::numeric_limits<double>::quiet_NaN());
+                std::numeric_limits<double>::quiet_NaN(),
+                match_res.t_minimap_ms, match_res.t_extract_ms, match_res.t_flann_ms);
             if (!send_message(sock, MATCH_RESULT, result_buf.data(), (uint32_t)result_buf.size())) {
                 LOG("Socket send failed (RESULT)");
                 break;

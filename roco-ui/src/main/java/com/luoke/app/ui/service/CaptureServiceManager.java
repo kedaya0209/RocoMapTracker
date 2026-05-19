@@ -4,9 +4,9 @@ import com.luoke.app.capture.CaptureService;
 import com.luoke.app.capture.ROIData;
 import com.luoke.app.capture.processor.MapMatcherProcessor;
 import com.luoke.app.capture.processor.OcrProcessor;
-import com.luoke.app.config.AppConfig;
+import com.luoke.app.config.CaptureConfig;
 import com.luoke.app.macher.SiftMatchHandler;
-import com.luoke.app.ui.component.SettingsStage;
+import com.luoke.app.ui.component.setting.SettingsStage;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
@@ -30,7 +30,7 @@ public class CaptureServiceManager {
      */
     public void init(SiftMatchHandler siftClient) {
         this.siftMatchClient = siftClient;
-        captureService = new CaptureService(AppConfig.TARGET_WINDOW_NAME);
+        captureService = new CaptureService(CaptureConfig.TARGET_WINDOW_NAME);
         setupCaptureProcessors();
         SettingsStage.setCaptureService(captureService);
         startWatchdog();

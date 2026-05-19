@@ -1,6 +1,7 @@
 package com.luoke.app.context;
 
-import com.luoke.app.config.AppConfig;
+import com.luoke.app.config.PathConfig;
+import com.luoke.app.config.DownloadConfig;
 import lombok.Getter;
 
 import java.util.Arrays;
@@ -14,10 +15,10 @@ public class ResourceConfigContext {
 
     /**
      * 获取当前资源 profile。
-     * 实时判断 AppConfig.INTERNAL_RESOURCE，而非类加载时快照。
+     * 实时判断 DownloadConfig.INTERNAL_RESOURCE，而非类加载时快照。
      */
     public static ResourceProfile getCurrentProfile() {
-        return AppConfig.INTERNAL_RESOURCE
+        return DownloadConfig.INTERNAL_RESOURCE
                 ? ResourceProfile.INTERNAL
                 : ResourceProfile.EXTERNAL;
     }
@@ -58,19 +59,19 @@ public class ResourceConfigContext {
     public enum ResourceProfile {
         INTERNAL(
                 "内置资源",
-                AppConfig.SIFT_MAP,
-                AppConfig.SHOW_MAP,
-                AppConfig.PLAYER_ICON_PATH,
-                AppConfig.INTERNAL_RESOURCE_POINT_CONFIG_PATH,
-                AppConfig.INTERNAL_PATHS
+                PathConfig.SIFT_MAP,
+                PathConfig.SHOW_MAP,
+                PathConfig.PLAYER_ICON_PATH,
+                PathConfig.INTERNAL_RESOURCE_POINT_CONFIG_PATH,
+                PathConfig.INTERNAL_PATHS
         ),
         EXTERNAL(
                 "WIKI资源",
-                AppConfig.MAP_RESOURCE_PATH,
-                AppConfig.MAP_RESOURCE_PATH,
-                AppConfig.PLAYER_ICON_PATH,
-                AppConfig.RESOURCE_POINT_CONFIG_PATH,
-                AppConfig.PATHS
+                PathConfig.MAP_RESOURCE_PATH,
+                PathConfig.MAP_RESOURCE_PATH,
+                PathConfig.PLAYER_ICON_PATH,
+                PathConfig.RESOURCE_POINT_CONFIG_PATH,
+                PathConfig.PATHS
         );
 
         final String tag;

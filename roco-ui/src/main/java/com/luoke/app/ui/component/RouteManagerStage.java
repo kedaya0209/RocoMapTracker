@@ -14,6 +14,7 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Cursor;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
@@ -136,7 +137,7 @@ public class RouteManagerStage extends Stage {
         // --- 标题栏 ---
         HBox titleBar = new HBox();
         titleBar.setAlignment(Pos.CENTER_LEFT);
-        titleBar.setCursor(javafx.scene.Cursor.MOVE);
+        titleBar.setCursor(Cursor.MOVE);
 
         Label titleLabel = new Label("路线管理工具");
         titleLabel.setStyle("-fx-text-fill: -color-fg-default; -fx-font-weight: bold; -fx-font-size: 14px;");
@@ -196,7 +197,7 @@ public class RouteManagerStage extends Stage {
                 delIcon.setStyle(DEL_BTN_STYLE);
                 delIcon.setMouseTransparent(true);
                 delBtn.getChildren().add(delIcon);
-                delBtn.setCursor(javafx.scene.Cursor.HAND);
+                delBtn.setCursor(Cursor.HAND);
                 delBtn.setPadding(new Insets(4, 10, 4, 6));
                 Region spacer = new Region();
                 HBox.setHgrow(spacer, Priority.ALWAYS);

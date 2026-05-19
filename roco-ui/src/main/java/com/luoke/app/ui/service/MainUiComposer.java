@@ -1,16 +1,12 @@
 package com.luoke.app.ui.service;
 
-import com.luoke.app.config.AppConfig;
+import com.luoke.app.config.RenderConfig;
 import com.luoke.app.context.MapContext;
 import com.luoke.app.context.ResourceConfigContext;
-import com.luoke.app.hook.AbstractGenericHook;
-import com.luoke.app.hook.HookEventType;
-import com.luoke.app.hook.multicast.HookRegistry;
 import com.luoke.app.ui.component.*;
 import com.luoke.app.ui.render.MapRenderer;
 import com.luoke.app.ui.util.FxRippleUtil;
 import com.luoke.app.utils.ResourceUtils;
-import javafx.application.Platform;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.effect.DropShadow;
@@ -23,8 +19,6 @@ import javafx.scene.paint.Color;
 import javafx.scene.shape.SVGPath;
 import javafx.stage.Stage;
 import lombok.extern.slf4j.Slf4j;
-
-import java.util.Set;
 
 /**
  * 主界面 UI 组装器。
@@ -60,7 +54,7 @@ public final class MainUiComposer {
         try {
             Image playerIcon = new Image(ResourceUtils.getResourceStream(
                     ResourceConfigContext.getPlayerIcon()),
-                    AppConfig.PLAYER_IMG_SIZE, AppConfig.PLAYER_IMG_SIZE, true, false);
+                    RenderConfig.PLAYER_IMG_SIZE, RenderConfig.PLAYER_IMG_SIZE, true, false);
             if (!playerIcon.isError()) {
                 renderer.setPlayerImage(playerIcon);
             }
@@ -79,19 +73,6 @@ public final class MainUiComposer {
         // 视口大小变化 → 标记脏
         canvasContainer.widthProperty().addListener(e -> renderer.markDirty());
         canvasContainer.heightProperty().addListener(e -> renderer.markDirty());
-
-        // 资源点变化 → 标记脏
-        HookRegistry.INSTANCE.register(new AbstractGenericHook<>() {
-            @Override
-            public Set<HookEventType> supportedEvents() {
-                return Set.of(HookEventType.RESOURCE_POINT_CHANGED);
-            }
-
-            @Override
-            public void onEvent(HookEventType eventType, Object data) {
-                Platform.runLater(renderer::markDirty);
-            }
-        });
 
         // 覆盖层组件
         StatsOverlay statsOverlay = StatsOverlay.getInstance();

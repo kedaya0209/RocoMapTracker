@@ -3,7 +3,7 @@ package com.luoke.app.test;
 import com.luoke.app.capture.CaptureService;
 import com.luoke.app.capture.ROIData;
 import com.luoke.app.capture.RoiProcessor;
-import com.luoke.app.config.AppConfig;
+import com.luoke.app.config.CaptureConfig;
 import com.luoke.app.socket.SocketServer;
 import lombok.extern.slf4j.Slf4j;
 
@@ -60,7 +60,7 @@ public class CaptureOnlyTest {
         }
 
         // 创建采集服务
-        captureService = new CaptureService(AppConfig.TARGET_WINDOW_NAME);
+        captureService = new CaptureService(CaptureConfig.TARGET_WINDOW_NAME);
 
         // 附加最小处理器：仅计数，不做任何匹配
         captureService.addProcessors(new CountingProcessor(0), new CountingProcessor(1));
@@ -71,7 +71,7 @@ public class CaptureOnlyTest {
         rois.add(new ROIData(8750, 2870, 1100, 1700)); // 物品栏
         captureService.setRois(ROIData.createContiguousArray(rois));
 
-        log.info("目标窗口: {}", AppConfig.TARGET_WINDOW_NAME);
+        log.info("目标窗口: {}", CaptureConfig.TARGET_WINDOW_NAME);
         log.info("开始尝试连接...");
 
         // 连接 + 心跳循环
@@ -81,7 +81,7 @@ public class CaptureOnlyTest {
                     if (captureService.tryConnect()) {
                         log.info("连接成功!");
                     } else {
-                        log.info("未找到游戏窗口 [{}]，5秒后重试...", AppConfig.TARGET_WINDOW_NAME);
+                        log.info("未找到游戏窗口 [{}]，5秒后重试...", CaptureConfig.TARGET_WINDOW_NAME);
                     }
                 }
 

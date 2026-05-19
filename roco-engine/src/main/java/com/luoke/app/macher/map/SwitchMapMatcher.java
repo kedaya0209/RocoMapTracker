@@ -1,6 +1,7 @@
 package com.luoke.app.macher.map;
 
-import com.luoke.app.config.AppConfig;
+import com.luoke.app.config.ConfigPersistence;
+import com.luoke.app.config.SiftConfig;
 import com.luoke.app.macher.SiftVariant;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -54,14 +55,14 @@ public class SwitchMapMatcher {
      * 保存配置到磁盘并通知上层重启 C++ 进程。
      */
     public void switchMapMatcher(String type) {
-        if (Objects.equals(type, AppConfig.MAP_MATCHAER)) {
+        if (Objects.equals(type, SiftConfig.MAP_MATCHAER)) {
             return;
         }
 
-        log.info("Switching MapMatcher variant from {} to {}", AppConfig.MAP_MATCHAER, type);
+        log.info("Switching MapMatcher variant from {} to {}", SiftConfig.MAP_MATCHAER, type);
 
-        AppConfig.MAP_MATCHAER = type;
-        AppConfig.save();
+        SiftConfig.MAP_MATCHAER = type;
+        ConfigPersistence.save();
 
         SwitchCallback cb = switchCallback;
         if (cb != null) {

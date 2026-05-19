@@ -3,7 +3,8 @@ package com.luoke.app.capture.processor;
 import com.luoke.app.capture.CaptureFrameBuffer;
 import com.luoke.app.capture.ROIData;
 import com.luoke.app.capture.RoiProcessor;
-import com.luoke.app.config.AppConfig;
+import com.luoke.app.config.ViewConfig;
+import com.luoke.app.config.OcrConfig;
 import com.luoke.app.context.MaterialCollectionContext;
 import com.luoke.app.context.OcrAsyncManager;
 import com.luoke.app.hook.HookEventType;
@@ -23,8 +24,8 @@ import java.util.concurrent.Semaphore;
 public class OcrProcessor implements RoiProcessor {
 
     private final int targetRoiIndex;
-    private final Semaphore parallel = new Semaphore(AppConfig.OCR_CORE_SIZE);
-    private final ROIData cachedRoi = new ROIData(AppConfig.ROI_OCR_X, AppConfig.ROI_OCR_Y, AppConfig.ROI_OCR_W, AppConfig.ROI_OCR_H);
+    private final Semaphore parallel = new Semaphore(OcrConfig.OCR_CORE_SIZE);
+    private final ROIData cachedRoi = new ROIData(OcrConfig.ROI_OCR_X, OcrConfig.ROI_OCR_Y, OcrConfig.ROI_OCR_W, OcrConfig.ROI_OCR_H);
     private long lastScanTime = 0;
     private List<ItemResult> lastConfirmedList = new ArrayList<>();
     private List<ItemResult> pendingList = new ArrayList<>();
@@ -42,10 +43,10 @@ public class OcrProcessor implements RoiProcessor {
     @Override
     public void onProcess(byte[] data, int width, int height) {
         CaptureFrameBuffer.getInstance().putFrame(targetRoiIndex, data, width, height);
-        if (!AppConfig.MATERIAL_COLLECTION) return;
+        if (!ViewConfig.MATERIAL_COLLECTION) return;
 
         long now = System.currentTimeMillis();
-        if ((now - lastScanTime) < AppConfig.OCR_SCAN_INTERVAL) return;
+        if ((now - lastScanTime) < OcrConfig.OCR_SCAN_INTERVAL) return;
 
         // 既然 data 已经是堆内存副本，直接提交，无需 clone
         if (!parallel.tryAcquire()) return;
@@ -94,8 +95,8 @@ public class OcrProcessor implements RoiProcessor {
                 return;
             }
 
-            // 稳定性判定阈值，根据 AppConfig.OCR_SCAN_INTERVAL 调整，2次约等于 400ms-600ms 的稳定期
-            if (stabilityCount == AppConfig.OCR_STABILITY_THRESHOLD) {
+            // 稳定性判定阈值，根据 OcrConfig.OCR_SCAN_INTERVAL 调整，2次约等于 400ms-600ms 的稳定期
+            if (stabilityCount == OcrConfig.OCR_STABILITY_THRESHOLD) {
                 handleIncrementalLogic(currentList);
             }
         }

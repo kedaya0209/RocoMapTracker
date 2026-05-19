@@ -1,6 +1,6 @@
 package com.luoke.app.context;
 
-import com.luoke.app.config.AppConfig;
+import com.luoke.app.config.OcrConfig;
 import com.luoke.app.model.ocr.OcrService;
 import lombok.extern.slf4j.Slf4j;
 
@@ -18,9 +18,9 @@ public class OcrAsyncManager implements AutoCloseable {
     private static volatile OcrAsyncManager INSTANCE;
 
     private final ExecutorService executorService = new ThreadPoolExecutor(
-            AppConfig.OCR_THREAD_POOL_SIZE, AppConfig.OCR_THREAD_POOL_SIZE, 0,
+            OcrConfig.OCR_THREAD_POOL_SIZE, OcrConfig.OCR_THREAD_POOL_SIZE, 0,
             TimeUnit.MILLISECONDS,
-            new LinkedBlockingQueue<>(AppConfig.OCR_TASK_QUEUE_CAPACITY), // 有界队列，积压 >10 丢弃最旧任务
+            new LinkedBlockingQueue<>(OcrConfig.OCR_TASK_QUEUE_CAPACITY), // 有界队列，积压 >10 丢弃最旧任务
             new ThreadFactory() {
                 private final AtomicInteger index = new AtomicInteger(0);
 
@@ -96,7 +96,7 @@ public class OcrAsyncManager implements AutoCloseable {
         executorService.submit(() -> {
             OcrService service = null;
             try {
-                if (System.currentTimeMillis() - submitTime > AppConfig.OCR_TASK_TIMEOUT_MS) {
+                if (System.currentTimeMillis() - submitTime > OcrConfig.OCR_TASK_TIMEOUT_MS) {
                     return;
                 }
 

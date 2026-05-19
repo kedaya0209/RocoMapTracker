@@ -1,6 +1,6 @@
 package com.luoke.app.hook.multicast;
 
-import com.luoke.app.hook.AbstractGenericHook;
+import com.luoke.app.hook.IHook;
 import com.luoke.app.hook.HookEventType;
 import com.luoke.app.hook.container.HookContainer;
 import lombok.extern.slf4j.Slf4j;
@@ -84,7 +84,7 @@ class HookMulticast {
     private void dispatch(HookEventType eventType, Object data) {
         // 从容器中获取订阅该事件类型的钩子列表
         // getHookList()返回的是线程安全的CopyOnWriteArrayList
-        List<AbstractGenericHook<?>> hookList = container.getHookList(eventType);
+        List<IHook<?>> hookList = container.getHookList(eventType);
         // 如果没有订阅的钩子，直接返回，避免不必要的操作
         if (hookList.isEmpty()) {
             return;
@@ -92,12 +92,12 @@ class HookMulticast {
 
         // 遍历所有订阅的钩子，逐个调用回调方法
         // 使用增强for循环遍历CopyOnWriteArrayList，是线程安全的
-        for (AbstractGenericHook<?> hook : hookList) {
+        for (IHook<?> hook : hookList) {
             try {
                 // 调用钩子的onEvent方法，传递事件类型和数据
                 // 由于泛型擦除，需要强制转换，使用@SuppressWarnings压制警告
                 // 运行时可能出现类型转换异常，但依赖钩子的泛型声明保证正确性
-                ((AbstractGenericHook) hook).onEvent(eventType, data);
+                ((IHook) hook).onEvent(eventType, data);
             } catch (Throwable t) {
                 // 捕获所有异常（包括Error），记录错误日志
                 // 异常隔离确保单个钩子的失败不影响其他钩子

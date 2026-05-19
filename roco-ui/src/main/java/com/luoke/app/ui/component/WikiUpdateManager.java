@@ -1,6 +1,6 @@
 package com.luoke.app.ui.component;
 
-import com.luoke.app.config.AppConfig;
+import com.luoke.app.config.UiConfig;
 import com.luoke.app.hook.HookEventType;
 import com.luoke.app.hook.event.NotificationType;
 import com.luoke.app.hook.event.ProgressEvent;
@@ -27,7 +27,7 @@ import javafx.scene.layout.StackPane;
  */
 public class WikiUpdateManager {
 
-    private static final double ITEM_HEIGHT = AppConfig.WIKI_ITEM_HEIGHT;
+    private static final double ITEM_HEIGHT = UiConfig.WIKI_ITEM_HEIGHT;
 
     private final StackPane btnContainer;
     private final Button updateBtn;

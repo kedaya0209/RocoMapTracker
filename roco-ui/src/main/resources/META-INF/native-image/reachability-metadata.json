@@ -8739,6 +8739,12 @@
       "glob": "icon/follow.svg"
     },
     {
+      "glob": "icon/fullscreen.svg"
+    },
+    {
+      "glob": "icon/fullscreen-exit.svg"
+    },
+    {
       "glob": "icon/ghost.svg"
     },
     {

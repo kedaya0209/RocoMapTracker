@@ -99,6 +99,25 @@ coverage/
 /resources/model/
 
 # ==============================
+# 运行时资源（生成/复制的资源，不纳入版本控制）
+# ==============================
+/resources/
+
+# ==============================
+# 构建产物 / 运行时缓存目录
+# ==============================
+/cache/
+/capture/
+/cpp/
+/downloads/
+/sift/
+/source/
+/tools/
+/build_native.bat
+/roco-ui/classpath.txt
+/roco-ui/cp.txt
+
+# ==============================
 # 私有资源（从 RocoMapTracker-resources 仓库获取）
 # ==============================
 /roco-map/src/main/resources/source/

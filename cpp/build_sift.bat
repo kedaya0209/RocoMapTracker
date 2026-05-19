@@ -15,7 +15,7 @@ if %_VC_ERR% neq 0 (
 
 set "OPENCV_ROOT=D:\Documents\environment\vcpkg-2026.03.18\packages\opencv4_x64-windows"
 set "ZLIB_ROOT=D:\Documents\environment\vcpkg-2026.03.18\packages\zlib_x64-windows"
-set "OUTPUT=sift_match.exe"
+set "OUTPUT=RocoMapTracker-sift_match.exe"
 
 echo.
 echo Compiling sift_match_main.cpp ...
@@ -46,8 +46,7 @@ if %ERRORLEVEL% equ 0 (
     echo   BUILD SUCCESS
     echo ========================================
     echo Copying to resources...
-    copy /y "%OUTPUT%" "..\roco-ui\src\main\resources\dll\sift\%OUTPUT%" >nul
-    copy /y "%OUTPUT%" "..\resources\dll\sift\%OUTPUT%" >nul
+    copy /y "%OUTPUT%" "..\roco-ui\src\main\resources\sift\%OUTPUT%" >nul
     echo Done.
     echo ========================================
     exit /b 0

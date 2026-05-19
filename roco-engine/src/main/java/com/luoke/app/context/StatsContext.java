@@ -1,6 +1,6 @@
 package com.luoke.app.context;
 
-import com.luoke.app.config.AppConfig;
+import com.luoke.app.config.StatsConfig;
 import lombok.Getter;
 
 @Getter
@@ -27,6 +27,14 @@ public final class StatsContext {
     // 记录玩家移动方向、朝向计算等操作的执行时间
     // 用于导航和路径规划的性能监控
     private long lastDirectionMs;
+
+    // ====================== 【SIFT C++ 分段耗时】 ======================
+    // C++ sift_match.exe 内部的小地图检测耗时（毫秒）
+    private long lastSiftMinimapMs;
+    // C++ sift_match.exe 内部的 SIFT 特征提取耗时（毫秒）
+    private long lastSiftExtractMs;
+    // C++ sift_match.exe 内部的 FLANN 匹配+ RANSAC 耗时（毫秒）
+    private long lastSiftFlannMs;
 
     // ====================== 【帧率统计】 ======================
     // 当前帧率（每秒处理的帧数）
@@ -76,10 +84,19 @@ public final class StatsContext {
         this.lastDirectionMs = ms;
     }
 
+    public void recordSiftTimings(float minimapMs, float extractMs, float flannMs) {
+        this.lastSiftMinimapMs = (long) minimapMs;
+        this.lastSiftExtractMs = (long) extractMs;
+        this.lastSiftFlannMs = (long) flannMs;
+    }
+
     public void reset() {
         lastMapDetectMs = 0;
         lastMatchMs = 0;
         lastDirectionMs = 0;
+        lastSiftMinimapMs = 0;
+        lastSiftExtractMs = 0;
+        lastSiftFlannMs = 0;
     }
 
     public void onFrameProcessed() {
@@ -91,7 +108,7 @@ public final class StatsContext {
 
         // 检查是否经过1秒时间窗口
         // 使用 >= 确保即使时间略有偏差也能正确更新
-        if (now - lastSecondTime >= AppConfig.STATS_FPS_WINDOW_MS) {
+        if (now - lastSecondTime >= StatsConfig.STATS_FPS_WINDOW_MS) {
             // 更新帧率：将当前窗口的帧计数保存为帧率
             frequency = frameCounter;
 

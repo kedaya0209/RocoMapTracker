@@ -1,4 +1,4 @@
-package com.luoke.app.ui.component;
+package com.luoke.app.ui.component.setting;
 
 import java.util.List;
 
