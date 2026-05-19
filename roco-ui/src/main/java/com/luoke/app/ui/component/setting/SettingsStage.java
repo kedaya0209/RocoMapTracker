@@ -1,4 +1,4 @@
-package com.luoke.app.ui.component;
+package com.luoke.app.ui.component.setting;
 
 import atlantafx.base.theme.Styles;
 import com.luoke.app.capture.CaptureService;
@@ -7,6 +7,7 @@ import com.luoke.app.ui.util.FxRippleUtil;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Cursor;
+import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
@@ -213,7 +214,7 @@ public class SettingsStage extends Stage {
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
         Button closeBtn = new Button();
-        closeBtn.getStyleClass().addAll(Styles.BUTTON_CIRCLE, Styles.FLAT);
+        closeBtn.getStyleClass().addAll(Styles.BUTTON_OUTLINED, Styles.FLAT);
         SVGPath closeIcon = new SVGPath();
         closeIcon.setContent("M1 1 L9 9 M9 1 L1 9");
         closeIcon.setStyle("-fx-stroke: -color-fg-default; -fx-stroke-width: 2;");
@@ -304,8 +305,8 @@ public class SettingsStage extends Stage {
                     label.setStyle(label.getStyle() + " -fx-text-fill: -color-warning-fg;");
                 }
 
-                javafx.scene.Node control = fieldBuilder.buildControl(def);
-                if (control instanceof javafx.scene.control.Control c) {
+                Node control = fieldBuilder.buildControl(def);
+                if (control instanceof Control c) {
                     configManager.registerControl(def.key(), c);
                 }
 
@@ -373,7 +374,10 @@ public class SettingsStage extends Stage {
             String title = "预览";
 
             RoiPreview roiPreview = new RoiPreview(roiIdx, title, accent);
+            roiPreview.setOwnerStage(this);
             roiPreview.start();
+            // 拖拽调整 ROI 后同步刷新右侧 Spinner 控件
+            roiPreview.setOnRoiChanged(() -> configManager.syncRoiControls(prefix));
 
             // 全帧模式：显示完整窗口画面 + ROI 矩形叠加
             roiPreview.setFullFrameMode(true, prefix);

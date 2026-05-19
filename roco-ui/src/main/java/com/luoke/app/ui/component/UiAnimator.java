@@ -1,6 +1,6 @@
 package com.luoke.app.ui.component;
 
-import com.luoke.app.config.AppConfig;
+import com.luoke.app.config.RenderConfig;
 import javafx.animation.TranslateTransition;
 import javafx.application.Platform;
 import javafx.scene.Node;
@@ -42,8 +42,8 @@ public class UiAnimator {
         if (sidebarNode == null) return;
         double currentWidth = sidebarNode.getLayoutBounds().getWidth();
 
-        TranslateTransition st = new TranslateTransition(Duration.millis(AppConfig.SIDEBAR_ANIM_MS), sidebarNode);
-        TranslateTransition ft = new TranslateTransition(Duration.millis(AppConfig.SIDEBAR_ANIM_MS), floatNode);
+        TranslateTransition st = new TranslateTransition(Duration.millis(RenderConfig.SIDEBAR_ANIM_MS), sidebarNode);
+        TranslateTransition ft = new TranslateTransition(Duration.millis(RenderConfig.SIDEBAR_ANIM_MS), floatNode);
 
         double targetX = sidebarVisible ? -currentWidth : 0;
         double floatTargetX = sidebarVisible ? 0 : currentWidth;

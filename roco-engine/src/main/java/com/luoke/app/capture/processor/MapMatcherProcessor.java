@@ -3,8 +3,12 @@ package com.luoke.app.capture.processor;
 import com.luoke.app.capture.CaptureFrameBuffer;
 import com.luoke.app.capture.ROIData;
 import com.luoke.app.capture.RoiProcessor;
-import com.luoke.app.config.AppConfig;
+import com.luoke.app.config.CaptureConfig;
+import com.luoke.app.config.SiftConfig;
 import com.luoke.app.context.StatsContext;
+import com.luoke.app.hook.HookEventType;
+import com.luoke.app.hook.event.StatusCarouselEvent;
+import com.luoke.app.hook.multicast.HookRegistry;
 import com.luoke.app.macher.SiftMatchHandler;
 import com.luoke.app.macher.player.ArrowDetector;
 import com.luoke.app.macher.player.PlayerStateTracker;
@@ -28,14 +32,14 @@ public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
 
     private final int targetRoiIndex;
     //roi h为0, 自动截取正方形
-    private final ROIData cachedRoi = new ROIData(AppConfig.ROI_MAP_X, AppConfig.ROI_MAP_Y, AppConfig.ROI_MAP_W, AppConfig.ROI_MAP_H);
+    private final ROIData cachedRoi = new ROIData(SiftConfig.ROI_MAP_X, SiftConfig.ROI_MAP_Y, SiftConfig.ROI_MAP_W, SiftConfig.ROI_MAP_H);
     // 独立进程匹配客户端
     private final SiftMatchHandler matchClient;
     // 状态追踪 (纯 Java, 无 native 依赖)
     private final PlayerStateTracker stateTracker = new PlayerStateTracker();
 
     // 频率限制
-    private final long delay = 1000L / AppConfig.TARGET_CAPTURE_FPS;
+    private final long delay = 1000L / CaptureConfig.TARGET_CAPTURE_FPS;
     // 统计
     private final StatsContext stats = StatsContext.getInstance();
     // 门控：上一帧匹配未完成时跳过当前帧，防止并发调用超时
@@ -43,6 +47,8 @@ public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
     private long prevTime = 0L;
     private boolean arrowInit = false;
     private volatile Double lastDetectedAngle = null;
+    /** 上一帧小地图丢失状态，用于检测状态变化时发布轮播事件 */
+    private boolean wasMapLost = true;
 
     public MapMatcherProcessor(int targetRoiIndex, SiftMatchHandler matchClient) {
         this.targetRoiIndex = targetRoiIndex;
@@ -67,7 +73,7 @@ public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
     private void executeArrowDect(byte[] data, int width, int height) {
         // 截取中心区域用于箭头 CNN 检测
         long start = System.currentTimeMillis();
-        int cs = AppConfig.ARROW_CROP_SIZE;
+        int cs = SiftConfig.ARROW_CROP_SIZE;
         byte[] dest = new byte[cs * cs];
         int half = cs / 2;
         int offsetX = width / 2 - half;
@@ -97,10 +103,12 @@ public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
                         data, width, height,
                         hintX != null ? hintX : Double.NaN,
                         hintY != null ? hintY : Double.NaN,
-                        AppConfig.MATCH_TIMEOUT_MS);
+                        SiftConfig.MATCH_TIMEOUT_MS);
 
                 long elapsed = System.currentTimeMillis() - tStart;
                 stats.recordMatch(elapsed);
+                // 记录 C++ 端分段耗时（小地图检测/特征提取/FLANN匹配）
+                stats.recordSiftTimings(result.tMinimapMs(), result.tExtractMs(), result.tFlannMs());
 
                 if (result.success()) {
                     stateTracker.onMatchSuccess(result.x(), result.y(), lastDetectedAngle);
@@ -114,6 +122,17 @@ public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
                 log.error("匹配异常", e);
                 stateTracker.onMatchFailure("exception: " + e.getMessage());
             }
+
+            // 检测小地图丢失/恢复状态变化，发布轮播事件
+            boolean mapLost = stateTracker.isMapLost();
+            if (mapLost && !wasMapLost) {
+                HookRegistry.INSTANCE.publish(HookEventType.STATUS_CAROUSEL,
+                        StatusCarouselEvent.minimapLost());
+            } else if (!mapLost && wasMapLost) {
+                HookRegistry.INSTANCE.publish(HookEventType.STATUS_CAROUSEL,
+                        StatusCarouselEvent.minimapFound());
+            }
+            wasMapLost = mapLost;
         } finally {
             matching.set(false);
         }

@@ -1,6 +1,6 @@
 package com.luoke.app.ui.service;
 
-import com.luoke.app.config.AppConfig;
+import com.luoke.app.config.UiConfig;
 import javafx.scene.Cursor;
 import javafx.scene.layout.AnchorPane;
 import javafx.scene.paint.Color;
@@ -106,7 +106,7 @@ public class WindowManager {
 
             if (resizeX instanceof Integer dirX) {
                 double newW = stage.getWidth() + (deltaX * dirX);
-                if (newW > AppConfig.MIN_WINDOW_WIDTH && newW <= maxWidth) {
+                if (newW > UiConfig.MIN_WINDOW_WIDTH && newW <= maxWidth) {
                     if (moveX) stage.setX(stage.getX() + deltaX);
                     stage.setWidth(newW);
                 }
@@ -114,7 +114,7 @@ public class WindowManager {
 
             if (resizeY instanceof Integer dirY) {
                 double newH = stage.getHeight() + (deltaY * dirY);
-                if (newH > AppConfig.MIN_WINDOW_HEIGHT && newH <= maxHeight) {
+                if (newH > UiConfig.MIN_WINDOW_HEIGHT && newH <= maxHeight) {
                     if (moveY) stage.setY(stage.getY() + deltaY);
                     stage.setHeight(newH);
                 }

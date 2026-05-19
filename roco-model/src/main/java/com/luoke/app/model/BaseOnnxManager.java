@@ -6,7 +6,7 @@ import ai.djl.ndarray.NDManager;
 import ai.djl.repository.zoo.Criteria;
 import ai.djl.repository.zoo.ZooModel;
 import ai.djl.translate.NoopTranslator;
-import com.luoke.app.config.AppConfig;
+import com.luoke.app.config.PathConfig;
 import com.luoke.app.utils.ResourceUtils;
 import lombok.Getter;
 
@@ -29,7 +29,7 @@ public abstract class BaseOnnxManager implements AutoCloseable {
     }
 
     protected void loadModel() throws Exception {
-        String path = ResourceUtils.getExternalPath(AppConfig.MODEL_DIR + modelName, true);
+        String path = ResourceUtils.getExternalPath(PathConfig.MODEL_DIR + modelName, true);
 
         Criteria.Builder<NDList, NDList> builder = Criteria.builder()
                 .setTypes(NDList.class, NDList.class)

@@ -1,0 +1,89 @@
+package com.luoke.app.config;
+
+import java.util.Properties;
+
+/**
+ * UI 与交互配置持久化 
+ */
+public final class UiConfig {
+
+    private UiConfig() {
+        throw new AssertionError("禁止实例化配置类");
+    }
+
+    // ============================================================
+    // 字段声明
+    // ============================================================
+    /** JavaFX 主题名称 */
+    public static String THEME = "PrimerDark";
+    /** UI 基础字号 */
+    public static int UI_FONT_SIZE = 14;
+    /** 窗口边缘拖拽缩放感应区宽度（像素） */
+    public static int RESIZE_MARGIN = 8;
+    /** 窗口最小宽度 */
+    public static double MIN_WINDOW_WIDTH = 400;
+    /** 窗口最小高度 */
+    public static double MIN_WINDOW_HEIGHT = 300;
+    /** 滚轮缩放因子（>1 放大，<1 缩小） */
+    public static double INTERACTIVE_ZOOM_FACTOR = 1.1;
+    /** 资源点鼠标悬停检测半径（逻辑像素） */
+    public static double HOVER_DETECT_RADIUS = 16.0;
+    /** 地图最大视觉缩放比例 */
+    public static double MAP_VIEW_MAX_SCALE = 15.0;
+    /** 侧边栏宽度 */
+    public static double SIDEBAR_WIDTH = 240;
+    /** 侧边栏列表视图宽度 */
+    public static double SIDEBAR_LIST_WIDTH = 210;
+    /** 统计面板字体名称 */
+    public static String STATS_FONT_NAME = "Microsoft YaHei";
+    /** 统计面板字号 */
+    public static int STATS_FONT_SIZE = 13;
+    /** 统计面板内边距 */
+    public static int STATS_PADDING = 5;
+    /** 物资采集面板宽度 */
+    public static double RESOURCE_COUNTER_WIDTH = 220;
+    /** 物资采集面板不透明度 */
+    public static double RESOURCE_COUNTER_OPACITY = 0.88;
+    /** Toast 最大宽度 */
+    public static double TOAST_MAX_WIDTH = 400;
+    /** Toast 最大高度 */
+    public static double TOAST_MAX_HEIGHT = 50;
+    /** 搜索后台更新条目高度 */
+    public static int WIKI_ITEM_HEIGHT = 38;
+
+    public static void load(Properties prop) {
+        THEME = ConfigHelper.getStr(prop, "ui.theme", THEME);
+        UI_FONT_SIZE = ConfigHelper.getInt(prop, "ui.font.size", UI_FONT_SIZE);
+        MAP_VIEW_MAX_SCALE = ConfigHelper.getDouble(prop, "map.view.max.scale", MAP_VIEW_MAX_SCALE);
+        RESIZE_MARGIN = ConfigHelper.getInt(prop, "resize.margin", RESIZE_MARGIN);
+        MIN_WINDOW_WIDTH = ConfigHelper.getDouble(prop, "min.window.width", MIN_WINDOW_WIDTH);
+        MIN_WINDOW_HEIGHT = ConfigHelper.getDouble(prop, "min.window.height", MIN_WINDOW_HEIGHT);
+        INTERACTIVE_ZOOM_FACTOR = ConfigHelper.getDouble(prop, "interactive.zoom.factor", INTERACTIVE_ZOOM_FACTOR);
+        HOVER_DETECT_RADIUS = ConfigHelper.getDouble(prop, "hover.detect.radius", HOVER_DETECT_RADIUS);
+        SIDEBAR_WIDTH = ConfigHelper.getDouble(prop, "sidebar.width", SIDEBAR_WIDTH);
+        STATS_FONT_SIZE = ConfigHelper.getInt(prop, "stats.font.size", STATS_FONT_SIZE);
+    }
+
+    public static void save(StringBuilder sb) {
+        sb.append("# JavaFX 主题名称\n");
+        sb.append("ui.theme=").append(THEME).append("\n");
+        sb.append("# UI 基础字号\n");
+        sb.append("ui.font.size=").append(UI_FONT_SIZE).append("\n");
+        sb.append("# 地图最大视觉缩放比例\n");
+        sb.append("map.view.max.scale=").append(MAP_VIEW_MAX_SCALE).append("\n");
+        sb.append("# 窗口边缘拖拽缩放感应区宽度（像素）\n");
+        sb.append("resize.margin=").append(RESIZE_MARGIN).append("\n");
+        sb.append("# 窗口最小宽度\n");
+        sb.append("min.window.width=").append(MIN_WINDOW_WIDTH).append("\n");
+        sb.append("# 窗口最小高度\n");
+        sb.append("min.window.height=").append(MIN_WINDOW_HEIGHT).append("\n");
+        sb.append("# 滚轮缩放因子（>1 放大，<1 缩小）\n");
+        sb.append("interactive.zoom.factor=").append(INTERACTIVE_ZOOM_FACTOR).append("\n");
+        sb.append("# 资源点鼠标悬停检测半径（逻辑像素）\n");
+        sb.append("hover.detect.radius=").append(HOVER_DETECT_RADIUS).append("\n");
+        sb.append("# 侧边栏宽度\n");
+        sb.append("sidebar.width=").append(SIDEBAR_WIDTH).append("\n");
+        sb.append("# 统计面板字号\n");
+        sb.append("stats.font.size=").append(STATS_FONT_SIZE).append("\n\n");
+    }
+}

@@ -1,4 +1,4 @@
-package com.luoke.app.ui.component;
+package com.luoke.app.ui.component.setting;
 
 import atlantafx.base.theme.Styles;
 import com.luoke.app.ui.util.FxRippleUtil;

@@ -5,7 +5,7 @@ import ai.djl.ndarray.NDList;
 import ai.djl.ndarray.NDManager;
 import ai.djl.ndarray.types.Shape;
 import ai.djl.repository.zoo.Criteria;
-import com.luoke.app.config.AppConfig;
+import com.luoke.app.config.PathConfig;
 import com.luoke.app.model.BaseOnnxManager;
 import com.luoke.app.utils.ResourceUtils;
 import lombok.extern.slf4j.Slf4j;
@@ -24,7 +24,7 @@ public class OnnxRecManager extends BaseOnnxManager {
 
     public OnnxRecManager(String modelName) throws Exception {
         super(modelName);
-        this.dict = ResourceUtils.readResourceLines(AppConfig.MODEL_DIR + AppConfig.PPOCR_KEYS);
+        this.dict = ResourceUtils.readResourceLines(PathConfig.MODEL_DIR + PathConfig.PPOCR_KEYS);
         this.recManager = newSubManager();
     }
 

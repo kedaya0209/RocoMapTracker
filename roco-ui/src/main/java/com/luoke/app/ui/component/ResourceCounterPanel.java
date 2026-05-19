@@ -1,7 +1,7 @@
 package com.luoke.app.ui.component;
 
 import atlantafx.base.theme.Styles;
-import com.luoke.app.config.AppConfig;
+import com.luoke.app.config.UiConfig;
 import com.luoke.app.hook.AbstractGenericHook;
 import com.luoke.app.hook.HookEventType;
 import com.luoke.app.hook.event.MaterialCollectionEvent;
@@ -26,13 +26,13 @@ public class ResourceCounterPanel extends VBox {
     private ResourceCounterPanel() {
         super(10);
         setPadding(new Insets(15));
-        setPrefWidth(AppConfig.RESOURCE_COUNTER_WIDTH);
+        setPrefWidth(UiConfig.RESOURCE_COUNTER_WIDTH);
 
         setStyle("-fx-background-color: -color-bg-default; " +
                 "-fx-background-radius: 10; " +
                 "-fx-border-color: -color-border-muted; " +
                 "-fx-border-radius: 10;");
-        setOpacity(AppConfig.RESOURCE_COUNTER_OPACITY);
+        setOpacity(UiConfig.RESOURCE_COUNTER_OPACITY);
 
         Label titleLabel = new Label("采集统计");
         titleLabel.getStyleClass().add(Styles.TEXT_BOLD);
@@ -116,7 +116,7 @@ public class ResourceCounterPanel extends VBox {
         if (show) {
             setVisible(true);
             ft.setFromValue(getOpacity());
-            ft.setToValue(AppConfig.RESOURCE_COUNTER_OPACITY);
+            ft.setToValue(UiConfig.RESOURCE_COUNTER_OPACITY);
         } else {
             ft.setFromValue(getOpacity());
             ft.setToValue(0.0);

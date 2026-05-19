@@ -1,6 +1,6 @@
 package com.luoke.app.ui.component;
 
-import com.luoke.app.config.AppConfig;
+import com.luoke.app.config.ViewConfig;
 import com.luoke.app.context.CameraContext;
 import com.luoke.app.ui.service.SvgManager;
 import javafx.application.Platform;
@@ -107,7 +107,7 @@ public class FloatToolbox extends VBox {
                 panel.toggle(resourcePanelVisible);
                 icon.setFill(resourcePanelVisible ? Color.web(unifiedBlueColor) : Color.WHITE);
                 //获取图标当前点击状态
-                AppConfig.MATERIAL_COLLECTION = resourcePanelVisible;
+                ViewConfig.MATERIAL_COLLECTION = resourcePanelVisible;
             });
         }
         return btn;

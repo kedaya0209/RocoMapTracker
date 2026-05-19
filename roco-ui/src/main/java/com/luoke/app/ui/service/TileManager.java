@@ -1,6 +1,6 @@
-package com.luoke.app.ui.render;
+package com.luoke.app.ui.service;
 
-import com.luoke.app.config.AppConfig;
+import com.luoke.app.config.RenderConfig;
 import com.luoke.app.context.ResourceConfigContext;
 import com.luoke.app.utils.ResourceUtils;
 import javafx.scene.Group;
@@ -24,7 +24,7 @@ import java.util.concurrent.Executors;
 @Slf4j
 public class TileManager {
 
-    private static final int TILE_SIZE = AppConfig.TILE_SIZE;
+    private static final int TILE_SIZE = RenderConfig.TILE_SIZE;
 
     private final Group worldGroup;
     private final int mapW, mapH;
@@ -51,7 +51,7 @@ public class TileManager {
      * 当前是否缩放稳定（允许瓦片层级切换）
      */
     public boolean isScaleStable() {
-        return scaleStableFrames >= AppConfig.SCALE_STABLE_THRESHOLD;
+        return scaleStableFrames >= RenderConfig.SCALE_STABLE_THRESHOLD;
     }
 
     public void onScaleChanged() {
@@ -122,7 +122,7 @@ public class TileManager {
         if (vw <= 0 || vh <= 0) return;
 
         double worldTileSize = TILE_SIZE * (1 << level);
-        double buffer = AppConfig.TILE_BUFFER_MULTIPLIER * worldTileSize;
+        double buffer = RenderConfig.TILE_BUFFER_MULTIPLIER * worldTileSize;
         double minWorldX = -ox / scale - buffer;
         double minWorldY = -oy / scale - buffer;
         double maxWorldX = (-ox + vw) / scale + buffer;

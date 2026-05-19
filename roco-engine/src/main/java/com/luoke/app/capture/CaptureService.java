@@ -1,9 +1,12 @@
 package com.luoke.app.capture;
 
-import com.luoke.app.config.AppConfig;
+import com.luoke.app.config.CaptureConfig;
+import com.luoke.app.config.PathConfig;
 import com.luoke.app.hook.HookEventType;
 import com.luoke.app.hook.event.CaptureStateEvent;
+import com.luoke.app.hook.event.StatusCarouselEvent;
 import com.luoke.app.hook.multicast.HookRegistry;
+import com.luoke.app.process.NativeProcess;
 import com.luoke.app.socket.SocketServer;
 import com.luoke.app.utils.FileUtil;
 import lombok.Data;
@@ -24,7 +27,7 @@ public class CaptureService {
     private final AtomicInteger continuousBlackFrames = new AtomicInteger(0);
 
     private final CopyOnWriteArrayList<RoiProcessor> processors = new CopyOnWriteArrayList<>();
-    private final CaptureHandler handler = new CaptureHandler();
+    private final CaptureHandler handler = new CaptureHandler(SocketServer.instance(), NativeProcess::create);
     private final CaptureHandler.FrameCallback frameCallback;
     private final CaptureHandler.StateCallback stateCallback;
     private ROIData[] cachedRois;
@@ -46,8 +49,8 @@ public class CaptureService {
             // 黑帧检测 (始终用灰度图)
             if (index == 0) {
                 gray = bgraToGray(data, w, h, stride);
-                if (isAllBlack(gray, AppConfig.CAPTURE_BLACK_SAMPLE_SIZE)) {
-                    if (continuousBlackFrames.incrementAndGet() > AppConfig.MAX_BLACK_FRAMES) {
+                if (isAllBlack(gray, CaptureConfig.CAPTURE_BLACK_SAMPLE_SIZE)) {
+                    if (continuousBlackFrames.incrementAndGet() > CaptureConfig.MAX_BLACK_FRAMES) {
                         log.error("持续黑帧, 强制重置采集会话...");
                         this.stop();
                         return;
@@ -84,6 +87,8 @@ public class CaptureService {
                 log.warn("capture.exe 断开: {}", detail);
                 HookRegistry.INSTANCE.publish(HookEventType.CAPTURE_STATE,
                         new CaptureStateEvent(-1, false, windowTitle));
+                HookRegistry.INSTANCE.publish(HookEventType.STATUS_CAROUSEL,
+                        StatusCarouselEvent.captureDisconnected());
             }
         };
     }
@@ -109,19 +114,33 @@ public class CaptureService {
      */
     public boolean tryConnect() {
         long hwnd = WindowFinder.findWindowByKeyword(windowTitle);
-        if (hwnd <= 0) return false;
+        if (hwnd <= 0) {
+            HookRegistry.INSTANCE.publish(HookEventType.STATUS_CAROUSEL,
+                    StatusCarouselEvent.captureRetry());
+            return false;
+        }
 
-        String exePath = FileUtil.getExternalPath(AppConfig.CAPTURE_EXE, true);
+        String exePath = FileUtil.getExternalPath(PathConfig.CAPTURE_EXE, true);
 
-        boolean ok = handler.start(hwnd, AppConfig.TARGET_CAPTURE_FPS, exePath,
+        // 发布捕获加载中状态
+        HookRegistry.INSTANCE.publish(HookEventType.STATUS_CAROUSEL,
+                StatusCarouselEvent.captureLoading());
+
+        boolean ok = handler.start(hwnd, CaptureConfig.TARGET_CAPTURE_FPS, exePath,
                 cachedRois, frameCallback, stateCallback);
 
         if (ok) {
             log.info("成功连接窗口 [{}], HWND: 0x{}", windowTitle, Long.toHexString(hwnd));
             HookRegistry.INSTANCE.publish(HookEventType.CAPTURE_STATE,
                     new CaptureStateEvent(1, true, windowTitle));
+            HookRegistry.INSTANCE.publish(HookEventType.STATUS_CAROUSEL,
+                    StatusCarouselEvent.captureReady());
             return true;
         }
+
+        // handler.start 失败（如 capture.exe 启动异常）
+        HookRegistry.INSTANCE.publish(HookEventType.STATUS_CAROUSEL,
+                StatusCarouselEvent.captureStartFailed());
         return false;
     }
 

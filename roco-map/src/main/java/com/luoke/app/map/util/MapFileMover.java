@@ -1,6 +1,6 @@
 package com.luoke.app.map.util;
 
-import com.luoke.app.config.AppConfig;
+import com.luoke.app.config.PathConfig;
 import com.luoke.app.map.MapResourceUpdater;
 import com.luoke.app.utils.FileUtil;
 import com.luoke.app.utils.ResourceUtils;
@@ -27,7 +27,7 @@ public class MapFileMover {
      * 供 writeInitManifest() 写入 init 清单。
      */
     public static void recordIconUrl(String fileName, String sourceUrl) {
-        urlMap.put(AppConfig.ICON_DIR + fileName, sourceUrl);
+        urlMap.put(PathConfig.ICON_DIR + fileName, sourceUrl);
     }
 
     public static void moveAllResources() {
@@ -49,7 +49,7 @@ public class MapFileMover {
 
         // 目标：从 AppConfig 读取图标目录
         // 使用绝对路径，应用运行时使用
-        File dst = ResourceUtils.getExternalFile(AppConfig.ICON_DIR);
+        File dst = ResourceUtils.getExternalFile(PathConfig.ICON_DIR);
 
         // 如果目标目录不存在，自动创建
         if (!dst.exists()) dst.mkdirs();
@@ -64,7 +64,7 @@ public class MapFileMover {
 
         // 目标：从 AppConfig 读取点位目录
         // 使用绝对路径，应用运行时使用
-        File dst = ResourceUtils.getExternalFile(AppConfig.RESOURCE_ICON_DIR);
+        File dst = ResourceUtils.getExternalFile(PathConfig.RESOURCE_ICON_DIR);
 
         // 如果目标目录不存在，自动创建
         if (!dst.exists()) dst.mkdirs();
@@ -79,7 +79,7 @@ public class MapFileMover {
 
         // 目标：从 AppConfig 读取地图资源路径
         // 使用绝对路径，应用运行时使用
-        File dst = ResourceUtils.getExternalFile(AppConfig.MAP_RESOURCE_DIR);
+        File dst = ResourceUtils.getExternalFile(PathConfig.MAP_RESOURCE_DIR);
 
         // 如果目标目录不存在，自动创建
         if (!dst.exists()) dst.mkdirs();
@@ -95,28 +95,28 @@ public class MapFileMover {
      */
     public static void writeInitManifest() {
         // 收集 map 文件（类型标记：MAP）
-        File mapDir = ResourceUtils.getExternalFile(AppConfig.MAP_RESOURCE_DIR);
+        File mapDir = ResourceUtils.getExternalFile(PathConfig.MAP_RESOURCE_DIR);
         File[] mapFiles = mapDir.listFiles();
         if (mapFiles != null) {
             for (File f : mapFiles) {
                 if (f.isFile()) {
-                    urlMap.putIfAbsent(AppConfig.MAP_RESOURCE_DIR + f.getName(), "MAP");
+                    urlMap.putIfAbsent(PathConfig.MAP_RESOURCE_DIR + f.getName(), "MAP");
                 }
             }
         }
         // 收集 point 文件（类型标记：CONFIG）
-        File pointDir = ResourceUtils.getExternalFile(AppConfig.RESOURCE_ICON_DIR);
+        File pointDir = ResourceUtils.getExternalFile(PathConfig.RESOURCE_ICON_DIR);
         File[] ptFiles = pointDir.listFiles();
         if (ptFiles != null) {
             for (File f : ptFiles) {
                 if (f.isFile()) {
-                    urlMap.putIfAbsent(AppConfig.RESOURCE_ICON_DIR + f.getName(), "CONFIG");
+                    urlMap.putIfAbsent(PathConfig.RESOURCE_ICON_DIR + f.getName(), "CONFIG");
                 }
             }
         }
 
         try {
-            File initFile = ResourceUtils.getExternalFile(AppConfig.SOURCE_INIT);
+            File initFile = ResourceUtils.getExternalFile(PathConfig.SOURCE_INIT);
             initFile.getParentFile().mkdirs();
             try (PrintWriter w = new PrintWriter(initFile, StandardCharsets.UTF_8)) {
                 w.println("# RocoMapTracker Resource Manifest");

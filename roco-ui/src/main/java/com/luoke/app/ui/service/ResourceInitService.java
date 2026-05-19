@@ -1,6 +1,9 @@
 package com.luoke.app.ui.service;
 
-import com.luoke.app.config.AppConfig;
+import com.luoke.app.config.ConfigPersistence;
+import com.luoke.app.config.PathConfig;
+import com.luoke.app.config.DownloadConfig;
+import com.luoke.app.config.OcrConfig;
 import com.luoke.app.context.MapContext;
 import com.luoke.app.context.OcrAsyncManager;
 import com.luoke.app.context.ResourceConfigContext;
@@ -16,8 +19,6 @@ import com.luoke.app.map.core.IconDownloader;
 import com.luoke.app.map.core.MapDownloader;
 import com.luoke.app.map.model.ResourcePoint;
 import com.luoke.app.map.util.MapFileMover;
-import com.luoke.app.ui.render.IconCache;
-import com.luoke.app.ui.render.TileGeneratorService;
 import com.luoke.app.utils.ResourceUtils;
 import javafx.application.Platform;
 import lombok.extern.slf4j.Slf4j;
@@ -63,9 +64,9 @@ public class ResourceInitService {
      */
     public void start(Runnable onReady) {
         try {
-            OcrAsyncManager.initialize(AppConfig.OCR_CORE_SIZE);
+            OcrAsyncManager.initialize(OcrConfig.OCR_CORE_SIZE);
 
-            if (AppConfig.INTERNAL_RESOURCE) {
+            if (DownloadConfig.INTERNAL_RESOURCE) {
                 initWithInternalProfile(onReady);
             } else {
                 initWithExternalProfile(onReady);
@@ -98,7 +99,7 @@ public class ResourceInitService {
     // ================================================================
 
     private void initWithExternalProfile(Runnable onReady) throws Exception {
-        File initFile = ResourceUtils.getExternalFile(AppConfig.SOURCE_INIT);
+        File initFile = ResourceUtils.getExternalFile(PathConfig.SOURCE_INIT);
         if (initFile.exists()) {
             List<MissingEntry> missing = validateManifest(initFile);
             if (!missing.isEmpty()) {
@@ -145,11 +146,11 @@ public class ResourceInitService {
                 File f = ResourceUtils.getExternalFile(path);
                 if (!f.exists()) {
                     ResourceType type;
-                    if (path.startsWith(AppConfig.MAP_RESOURCE_DIR)) {
+                    if (path.startsWith(PathConfig.MAP_RESOURCE_DIR)) {
                         type = ResourceType.MAP;
-                    } else if (path.startsWith(AppConfig.ICON_DIR)) {
+                    } else if (path.startsWith(PathConfig.ICON_DIR)) {
                         type = ResourceType.ICON;
-                    } else if (path.startsWith(AppConfig.RESOURCE_ICON_DIR)) {
+                    } else if (path.startsWith(PathConfig.RESOURCE_ICON_DIR)) {
                         type = ResourceType.CONFIG;
                     } else {
                         continue;
@@ -191,8 +192,8 @@ public class ResourceInitService {
 
     private void startWithBuiltInResources(Runnable onReady) {
         try {
-            AppConfig.INTERNAL_RESOURCE = true;
-            AppConfig.save();
+            DownloadConfig.INTERNAL_RESOURCE = true;
+            ConfigPersistence.save();
             Thread.ofVirtual().start(() -> {
                 try {
                     log.info("后台开始下载 WIKI 资源...");
@@ -279,7 +280,7 @@ public class ResourceInitService {
         for (ResourcePoint rp : ResourcePointContext.getInstance().getAllPoints()) {
             String iconFile = rp.getConfig().getIcon();
             if (iconFile != null && !iconFile.isEmpty()) {
-                iconPaths.add(AppConfig.ICON_DIR + iconFile);
+                iconPaths.add(PathConfig.ICON_DIR + iconFile);
             }
         }
         if (!iconPaths.isEmpty()) {

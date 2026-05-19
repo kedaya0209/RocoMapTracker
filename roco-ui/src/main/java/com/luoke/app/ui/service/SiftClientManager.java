@@ -6,6 +6,7 @@ import com.luoke.app.hook.event.StatusEvent;
 import com.luoke.app.hook.multicast.HookRegistry;
 import com.luoke.app.macher.SiftMatchHandler;
 import com.luoke.app.macher.SiftVariant;
+import com.luoke.app.process.NativeProcess;
 import com.luoke.app.socket.SocketServer;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
@@ -23,7 +24,7 @@ public class SiftClientManager {
      * 初始化并启动 SIFT 客户端
      */
     public void init() {
-        client = new SiftMatchHandler();
+        client = new SiftMatchHandler(SocketServer.instance(), NativeProcess::create);
         SocketServer.instance().register(client);
 
         client.start((ready, detail) -> {

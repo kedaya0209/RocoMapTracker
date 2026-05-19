@@ -1,6 +1,6 @@
 package com.luoke.app.context;
 
-import com.luoke.app.config.AppConfig;
+import com.luoke.app.config.StatsConfig;
 import com.luoke.app.map.model.Point;
 import com.luoke.app.map.model.ResourcePoint;
 
@@ -26,8 +26,8 @@ public class ResourcePointGridIndex {
 
     public List<ResourcePoint> queryNear(double x, double y) {
         List<ResourcePoint> result = new ArrayList<>();
-        long cellX = (long) (x / AppConfig.GRID_CELL_SIZE);
-        long cellY = (long) (y / AppConfig.GRID_CELL_SIZE);
+        long cellX = (long) (x / StatsConfig.GRID_CELL_SIZE);
+        long cellY = (long) (y / StatsConfig.GRID_CELL_SIZE);
 
         for (long dx = -1; dx <= 1; dx++) {
             for (long dy = -1; dy <= 1; dy++) {
@@ -43,10 +43,10 @@ public class ResourcePointGridIndex {
      */
     public List<ResourcePoint> queryRect(double minX, double minY, double maxX, double maxY) {
         List<ResourcePoint> result = new ArrayList<>();
-        long minCellX = (long) (minX / AppConfig.GRID_CELL_SIZE);
-        long minCellY = (long) (minY / AppConfig.GRID_CELL_SIZE);
-        long maxCellX = (long) (maxX / AppConfig.GRID_CELL_SIZE);
-        long maxCellY = (long) (maxY / AppConfig.GRID_CELL_SIZE);
+        long minCellX = (long) (minX / StatsConfig.GRID_CELL_SIZE);
+        long minCellY = (long) (minY / StatsConfig.GRID_CELL_SIZE);
+        long maxCellX = (long) (maxX / StatsConfig.GRID_CELL_SIZE);
+        long maxCellY = (long) (maxY / StatsConfig.GRID_CELL_SIZE);
 
         for (long cx = minCellX; cx <= maxCellX; cx++) {
             for (long cy = minCellY; cy <= maxCellY; cy++) {
@@ -58,7 +58,7 @@ public class ResourcePointGridIndex {
     }
 
     private long calculateKey(double x, double y) {
-        return combine((long) (x / AppConfig.GRID_CELL_SIZE), (long) (y / AppConfig.GRID_CELL_SIZE));
+        return combine((long) (x / StatsConfig.GRID_CELL_SIZE), (long) (y / StatsConfig.GRID_CELL_SIZE));
     }
 
     private long combine(long cx, long cy) {

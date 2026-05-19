@@ -1,6 +1,6 @@
 package com.luoke.app.hook.multicast;
 
-import com.luoke.app.hook.AbstractGenericHook;
+import com.luoke.app.hook.IHook;
 import com.luoke.app.hook.HookEventType;
 import com.luoke.app.hook.container.HookContainer;
 
@@ -24,7 +24,7 @@ public enum HookRegistry {
      *
      * @param hook 要注册的钩子实例，不能为null
      */
-    public void register(AbstractGenericHook<?> hook) {
+    public void register(IHook<?> hook) {
         //防御型编程，启动事件多播器
         HookMulticast.getInstance();
         for (HookEventType eventType : hook.supportedEvents()) {
@@ -37,10 +37,10 @@ public enum HookRegistry {
      *
      * @param hooks 要注册的钩子实例数组，不能为null
      */
-    public void registers(AbstractGenericHook<?>... hooks) {
+    public void registers(IHook<?>... hooks) {
         // 防御性：确保 HookMulticast 已初始化（与 register() 保持一致）
         HookMulticast.getInstance();
-        for (AbstractGenericHook<?> hook : hooks) {
+        for (IHook<?> hook : hooks) {
             for (HookEventType eventType : hook.supportedEvents()) {
                 container.registerHook(eventType, hook);
             }
@@ -66,7 +66,7 @@ public enum HookRegistry {
         container.clear();
     }
 
-    public void unregister(AbstractGenericHook<?> hook) {
+    public void unregister(IHook<?> hook) {
         container.unregisterHook(hook);
     }
 }

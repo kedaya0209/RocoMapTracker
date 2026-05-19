@@ -4,7 +4,7 @@ import ai.djl.ndarray.NDArray;
 import ai.djl.ndarray.NDList;
 import ai.djl.ndarray.NDManager;
 import ai.djl.ndarray.types.Shape;
-import com.luoke.app.config.AppConfig;
+import com.luoke.app.config.PathConfig;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -27,7 +27,7 @@ public class ArrowPredictService implements AutoCloseable {
     private volatile boolean isClosed = false;
 
     public void init() throws Exception {
-        this.modelManager = new ArrowOnnxManager(AppConfig.ARROW_MODEL_NAME);
+        this.modelManager = new ArrowOnnxManager(PathConfig.ARROW_MODEL_NAME);
         // 创建专用 NDManager，不再每帧 newSubManager
         this.predictManager = modelManager.newSubManager();
         log.info("箭头预测服务初始化完成 (Native零泄漏版)");

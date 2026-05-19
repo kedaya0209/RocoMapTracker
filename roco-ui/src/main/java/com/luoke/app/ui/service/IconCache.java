@@ -1,11 +1,8 @@
-package com.luoke.app.ui.render;
+package com.luoke.app.ui.service;
 
-import com.luoke.app.config.AppConfig;
+import com.luoke.app.config.RenderConfig;
 import com.luoke.app.map.loader.ImageLoader;
-import javafx.scene.image.Image;
-import javafx.scene.image.PixelReader;
-import javafx.scene.image.PixelWriter;
-import javafx.scene.image.WritableImage;
+import javafx.scene.image.*;
 import lombok.Getter;
 
 import java.io.ByteArrayInputStream;
@@ -22,7 +19,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class IconCache {
 
-    private static final int SIZE = (int) AppConfig.ICON_SIZE;
+    private static final int SIZE = (int) RenderConfig.ICON_SIZE;
     private static final IconCache INSTANCE = new IconCache();
     // 兜底缓存
     private final Map<String, Image> colorCache = new ConcurrentHashMap<>();
@@ -111,8 +108,8 @@ public class IconCache {
 
             for (int y = 0; y < ih; y++) {
                 // 彩色像素行
-                reader.getPixels(0, y, iw, 1, javafx.scene.image.PixelFormat.getIntArgbPreInstance(), rowBuf, 0, iw);
-                colorWriter.setPixels(baseX, baseY + y, iw, 1, javafx.scene.image.PixelFormat.getIntArgbPreInstance(), rowBuf, 0, iw);
+                reader.getPixels(0, y, iw, 1, PixelFormat.getIntArgbPreInstance(), rowBuf, 0, iw);
+                colorWriter.setPixels(baseX, baseY + y, iw, 1, PixelFormat.getIntArgbPreInstance(), rowBuf, 0, iw);
 
                 // 灰度：逐像素计算亮度后写入
                 for (int x = 0; x < iw; x++) {
@@ -124,7 +121,7 @@ public class IconCache {
                     int lum = (int) (0.299 * r + 0.587 * g + 0.114 * b);
                     rowBuf[x] = (a << 24) | (lum << 16) | (lum << 8) | lum;
                 }
-                grayWriter.setPixels(baseX, baseY + y, iw, 1, javafx.scene.image.PixelFormat.getIntArgbPreInstance(), rowBuf, 0, iw);
+                grayWriter.setPixels(baseX, baseY + y, iw, 1, PixelFormat.getIntArgbPreInstance(), rowBuf, 0, iw);
             }
 
             map.put(path, new AtlasSlot(baseX, baseY));

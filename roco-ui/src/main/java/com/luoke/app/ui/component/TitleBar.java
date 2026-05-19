@@ -1,7 +1,12 @@
 package com.luoke.app.ui.component;
 
 import atlantafx.base.theme.Styles;
-import com.luoke.app.config.AppConfig;
+import com.luoke.app.config.CaptureConfig;
+import com.luoke.app.config.PathConfig;
+import com.luoke.app.hook.HookEventType;
+import com.luoke.app.hook.IHook;
+import com.luoke.app.hook.event.StatusCarouselEvent;
+import com.luoke.app.hook.multicast.HookRegistry;
 import com.luoke.app.ui.service.SvgManager;
 import com.luoke.app.ui.util.DialogUtils;
 import javafx.geometry.Insets;
@@ -15,16 +20,25 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
+import javafx.scene.shape.Rectangle;
 import javafx.scene.shape.SVGPath;
 import javafx.stage.Stage;
+import javafx.animation.TranslateTransition;
+import javafx.application.Platform;
+import javafx.util.Duration;
 import lombok.Getter;
 
-public class TitleBar extends HBox {
+import java.util.Set;
+
+public class TitleBar extends HBox implements IHook<Object> {
 
     private double xOffset = 0;
     private double yOffset = 0;
     @Getter
     private boolean ghostMode = false;
+    /** 标题栏内联状态轮播标签 */
+    private final Label statusLabel = new Label();
+    private static final double STATUS_H = 20;
 
     private TitleBar(Stage stage, Button menuBtn, Node... overlayNodes) {
         super(12);
@@ -33,8 +47,21 @@ public class TitleBar extends HBox {
         setPadding(new Insets(5, 10, 5, 10));
         setStyle("-fx-background-color: -color-bg-default; -fx-border-color: -color-border-muted; -fx-border-width: 0 0 1 0;");
 
-        Label titleLabel = new Label(AppConfig.APP_MAIN_TITLE);
+        Label titleLabel = new Label(CaptureConfig.APP_MAIN_TITLE);
         titleLabel.getStyleClass().add(Styles.TITLE_4);
+
+        // --- 内联状态轮播 ---
+        statusLabel.setPrefHeight(STATUS_H);
+        statusLabel.setMaxHeight(STATUS_H);
+        statusLabel.setStyle("-fx-text-fill: -color-fg-muted; -fx-font-size: 12px;");
+        // clip 容器，实现从下至上的滚动效果
+        Rectangle statusClip = new Rectangle(0, 0, 0, STATUS_H);
+        StackPane statusContainer = new StackPane(statusLabel);
+        statusClip.widthProperty().bind(statusContainer.widthProperty());
+        statusContainer.setClip(statusClip);
+        statusContainer.setPrefHeight(STATUS_H);
+        statusContainer.setMaxHeight(STATUS_H);
+        statusContainer.setMinWidth(0);
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
@@ -95,7 +122,7 @@ public class TitleBar extends HBox {
         Button closeBtn = getCloseButton(stage);
 
         // --- 4. 调整子组件顺序：滑块在图标左侧，图标靠右锚定 ---
-        getChildren().addAll(menuBtn, titleLabel, spacer, opacitySlider, ghostBtn, closeBtn);
+        getChildren().addAll(menuBtn, titleLabel, statusContainer, spacer, opacitySlider, ghostBtn, closeBtn);
 
         // 窗口移动逻辑保持不变
         setOnMousePressed(e -> {
@@ -110,6 +137,9 @@ public class TitleBar extends HBox {
                 stage.setY(e.getScreenY() - yOffset);
             }
         });
+
+        // 注册状态轮播事件
+        HookRegistry.INSTANCE.register(this);
     }
 
     public static TitleBar getInstance(Stage stage, Button menuBtn, Node... overlayNodes) {
@@ -142,7 +172,7 @@ public class TitleBar extends HBox {
 
     private static Node createGhostIcon() {
         try {
-            return SvgManager.createIcon(AppConfig.GHOST, 20);
+            return SvgManager.createIcon(PathConfig.GHOST, 20);
         } catch (Exception ex) {
             // fallback: 圆环图标
             SVGPath fallback = new SVGPath();
@@ -154,6 +184,63 @@ public class TitleBar extends HBox {
             box.setMaxSize(20, 20);
             return box;
         }
+    }
+
+    // ============================================================
+    // 状态轮播
+    // ============================================================
+
+    /**
+     * 更新标题栏内联状态文本，附带从下至上的滚动动画效果。
+     * 每个新状态文本从下方滚入，旧状态从上方滚出。
+     */
+    public void updateStatus(StatusCarouselEvent event) {
+        if (event == null) return;
+        if (event.text() == null || event.text().isBlank()) {
+            statusLabel.setText("");
+            statusLabel.setStyle("-fx-text-fill: -color-fg-muted; -fx-font-size: 12px;");
+            return;
+        }
+
+        String color = switch (event.type()) {
+            case LOADING -> "#FFD700";
+            case SUCCESS -> "#00E676";
+            case ERROR -> "#FF5252";
+            case INFO -> "-color-fg-muted";
+        };
+        String newStyle = String.format("-fx-text-fill: %s; -fx-font-size: 12px;", color);
+
+        // 首次设置 / 当前为空 → 直接显示，不动画
+        if (statusLabel.getText().isEmpty()) {
+            statusLabel.setText(event.text());
+            statusLabel.setStyle(newStyle);
+            return;
+        }
+
+        // 文本未变 → 忽略
+        if (event.text().equals(statusLabel.getText())) return;
+
+        // 从下至上滚动动画：旧文本向上滚出，新文本从下方滚入
+        // Step 1: 旧文本向上平移移出 clip
+        TranslateTransition exit = getTranslateTransition(event, newStyle);
+        exit.play();
+    }
+
+    private TranslateTransition getTranslateTransition(StatusCarouselEvent event, String newStyle) {
+        TranslateTransition exit = new TranslateTransition(Duration.millis(120), statusLabel);
+        exit.setToY(-STATUS_H);
+        exit.setOnFinished(_ -> {
+            // Step 2: 在 clip 外更换文本 + 重置到下方
+            statusLabel.setText(event.text());
+            statusLabel.setStyle(newStyle);
+            statusLabel.setTranslateY(STATUS_H);
+
+            // Step 3: 新文本向上平移进入 clip
+            TranslateTransition enter = new TranslateTransition(Duration.millis(120), statusLabel);
+            enter.setToY(0);
+            enter.play();
+        });
+        return exit;
     }
 
     private Button getCloseButton(Stage stage) {
@@ -210,6 +297,18 @@ public class TitleBar extends HBox {
         // ====================================================================
 
         return closeBtn;
+    }
+
+    @Override
+    public Set<HookEventType> supportedEvents() {
+        return Set.of(HookEventType.STATUS_CAROUSEL);
+    }
+
+    @Override
+    public void onEvent(HookEventType type, Object data) {
+        if (data instanceof StatusCarouselEvent event) {
+            Platform.runLater(() -> updateStatus(event));
+        }
     }
 
     private static class Holder {

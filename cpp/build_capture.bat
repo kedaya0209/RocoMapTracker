@@ -13,7 +13,7 @@ if %_VC_ERR% neq 0 (
     exit /b 1
 )
 
-set "OUTPUT=capture.exe"
+set "OUTPUT=RocoMapTracker-capture.exe"
 
 echo.
 echo Compiling capture_main.cpp ...

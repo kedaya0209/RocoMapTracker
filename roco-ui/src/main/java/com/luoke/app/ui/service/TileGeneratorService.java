@@ -1,6 +1,6 @@
-package com.luoke.app.ui.render;
+package com.luoke.app.ui.service;
 
-import com.luoke.app.config.AppConfig;
+import com.luoke.app.config.RenderConfig;
 import com.luoke.app.context.MapContext;
 import com.luoke.app.context.ResourceConfigContext;
 import com.luoke.app.utils.ResourceUtils;
@@ -34,7 +34,7 @@ public class TileGeneratorService {
 
         int mapW = (int) MapContext.getInstance().getMapWidth();
         int mapH = (int) MapContext.getInstance().getMapHeight();
-        int tileSize = AppConfig.TILE_SIZE;
+        int tileSize = RenderConfig.TILE_SIZE;
 
         List<LevelInfo> levels = new ArrayList<>();
         for (int lv = 0; lv < 5; lv++) {

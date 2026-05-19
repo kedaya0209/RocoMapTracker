@@ -1,6 +1,8 @@
 package com.luoke.app.map;
 
-import com.luoke.app.config.AppConfig;
+import com.luoke.app.config.ConfigPersistence;
+import com.luoke.app.config.ViewConfig;
+import com.luoke.app.config.DownloadConfig;
 import com.luoke.app.map.dto.MapCategoryItem;
 import com.luoke.app.map.dto.MapConfig;
 import com.luoke.app.map.dto.MapPointItem;
@@ -32,8 +34,8 @@ public class LoadInfo {
         // 更新地图缩放级别配置
         // 使用三元运算符确保配置值大于0时才更新，否则保留原有值
         // 这样可以防止无效配置导致应用异常
-        AppConfig.MAP_MAX_ZOOM = cfg.getMaxZoom() > 0 ? cfg.getMaxZoom() : AppConfig.MAP_MAX_ZOOM;
-        AppConfig.MAP_MIN_ZOOM = cfg.getMinZoom() > 0 ? cfg.getMinZoom() : AppConfig.MAP_MIN_ZOOM;
+        ViewConfig.MAP_MAX_ZOOM = cfg.getMaxZoom() > 0 ? cfg.getMaxZoom() : ViewConfig.MAP_MAX_ZOOM;
+        ViewConfig.MAP_MIN_ZOOM = cfg.getMinZoom() > 0 ? cfg.getMinZoom() : ViewConfig.MAP_MIN_ZOOM;
 
         // 初始化临时列表，用于收集有效的图层信息
         // 使用ArrayList保证添加顺序和迭代顺序一致
@@ -64,18 +66,18 @@ public class LoadInfo {
             // 将URL模板中的{z}占位符替换为实际的缩放级别
             // 使用Stream API进行批量替换和转换，代码简洁高效
             // 替换后的URL可以直接用于瓦片下载请求
-            AppConfig.MAP_REMOTE_URLS = urlList.stream()
-                    .map(u -> u.replace("{z}", String.valueOf(AppConfig.MAP_ZOOM)))
+            DownloadConfig.MAP_REMOTE_URLS = urlList.stream()
+                    .map(u -> u.replace("{z}", String.valueOf(ViewConfig.MAP_ZOOM)))
                     .toArray(String[]::new);
 
             // 将排序索引列表转换为int数组，用于图层排序
             // 使用mapToInt避免自动装箱，提高性能
-            AppConfig.MAP_REMOTE_URL_SORT = sortList.stream().mapToInt(i -> i).toArray();
+            DownloadConfig.MAP_REMOTE_URL_SORT = sortList.stream().mapToInt(i -> i).toArray();
 
             // 将图层名称列表转换为String数组
             // 使用toArray方法进行转换，类型安全且高效
-            AppConfig.MAP_REMOTE_URL_NAME = nameList.toArray(String[]::new);
-            AppConfig.save();
+            DownloadConfig.MAP_REMOTE_URL_NAME = nameList.toArray(String[]::new);
+            ConfigPersistence.save();
             // 记录加载成功的日志，包含解析到的地图数量
             log.info("✅ 远程配置加载完成，地图数量：{}", urlList.size());
         } else {

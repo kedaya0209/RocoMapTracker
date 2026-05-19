@@ -3,6 +3,7 @@ package com.luoke.app.test;
 import com.luoke.app.context.ResourceConfigContext;
 import com.luoke.app.macher.SiftMatchHandler;
 import com.luoke.app.macher.miniMap.CircleMaskApplier;
+import com.luoke.app.process.NativeProcess;
 import com.luoke.app.socket.SocketServer;
 import com.luoke.app.utils.ResourceUtils;
 import lombok.extern.slf4j.Slf4j;
@@ -66,7 +67,7 @@ public class MatchOnlyTest {
         AtomicBoolean matchReady = new AtomicBoolean(false);
         CountDownLatch readyLatch = new CountDownLatch(1);
 
-        client = new SiftMatchHandler();
+        client = new SiftMatchHandler(SocketServer.instance(), NativeProcess::create);
         SocketServer.instance().register(client);
 
         boolean started = client.start((ready, detail) -> {

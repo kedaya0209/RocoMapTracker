@@ -1,6 +1,6 @@
 package com.luoke.app.context;
 
-import com.luoke.app.config.AppConfig;
+import com.luoke.app.config.ViewConfig;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -15,7 +15,7 @@ public class CameraContext {
     /**
      * 跟随模式开关
      */
-    private final AtomicBoolean followMode = new AtomicBoolean(AppConfig.DEFAULT_FOLLOW_MODE);
+    private final AtomicBoolean followMode = new AtomicBoolean(ViewConfig.DEFAULT_FOLLOW_MODE);
 
     /**
      * 跟随模式变化监听器
@@ -24,7 +24,7 @@ public class CameraContext {
 
     @Getter
     @Setter
-    private double followScale = AppConfig.DEFAULT_FOLLOW_SCALE;
+    private double followScale = ViewConfig.DEFAULT_FOLLOW_SCALE;
 
     private CameraContext() {
     }

@@ -1,6 +1,6 @@
 package com.luoke.app.socket;
 
-import com.luoke.app.config.AppConfig;
+import com.luoke.app.config.SocketConfig;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
@@ -68,7 +68,7 @@ public class SocketServer {
     public int start() throws IOException {
         if (running.get()) return serverSocket.getLocalPort();
 
-        serverSocket = new ServerSocket(0, AppConfig.SOCKET_BACKLOG); // port=0 → OS 随机分配
+        serverSocket = new ServerSocket(0, SocketConfig.SOCKET_BACKLOG); // port=0 → OS 随机分配
         running.set(true);
 
         acceptThread = new Thread(this::acceptLoop, "socket-accept");

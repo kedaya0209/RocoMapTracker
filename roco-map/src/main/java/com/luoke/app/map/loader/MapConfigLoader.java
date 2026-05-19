@@ -1,6 +1,6 @@
 package com.luoke.app.map.loader;
 
-import com.luoke.app.config.AppConfig;
+import com.luoke.app.config.DownloadConfig;
 import com.luoke.app.map.dto.MapConfig;
 import com.luoke.app.map.parse.JsMapConfigParser;
 import lombok.extern.slf4j.Slf4j;
@@ -21,7 +21,7 @@ public class MapConfigLoader {
             // 使用Jsoup访问远程页面，获取HTML内容
             // 设置User-Agent和Referer模拟浏览器请求，避免被服务器拒绝
             // 设置超时时间为15秒，防止长时间阻塞
-            Document doc = Jsoup.connect(AppConfig.MAP_RESOURCE_INFO_URL)
+            Document doc = Jsoup.connect(DownloadConfig.MAP_RESOURCE_INFO_URL)
                     .userAgent("Mozilla/5.0")  // 模拟Chrome浏览器
                     .referrer("https://wiki.biligame.com/")  // 设置Referer
                     .timeout(15000)  // 设置超时时间为15秒

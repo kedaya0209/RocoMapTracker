@@ -1,6 +1,6 @@
 package com.luoke.app.macher;
 
-import com.luoke.app.config.AppConfig;
+import com.luoke.app.config.SiftConfig;
 import com.luoke.app.context.ResourceConfigContext;
 import com.luoke.app.utils.FileUtil;
 import com.luoke.app.utils.ResourceUtils;
@@ -61,22 +61,22 @@ public class SiftMatchProtocol {
         ByteBuffer buf = ByteBuffer.allocate(bodyLen).order(ByteOrder.BIG_ENDIAN);
 
         buf.putInt(variant);
-        buf.putInt(AppConfig.SIFT_N_FEATURES);
-        buf.putInt(AppConfig.SIFT_N_OCTAVE_LAYERS);
-        buf.putDouble(AppConfig.SIFT_CONTRAST_THRESHOLD);
-        buf.putDouble(AppConfig.SIFT_EDGE_THRESHOLD);
-        buf.putDouble(AppConfig.SIFT_SIGMA);
+        buf.putInt(SiftConfig.SIFT_N_FEATURES);
+        buf.putInt(SiftConfig.SIFT_N_OCTAVE_LAYERS);
+        buf.putDouble(SiftConfig.SIFT_CONTRAST_THRESHOLD);
+        buf.putDouble(SiftConfig.SIFT_EDGE_THRESHOLD);
+        buf.putDouble(SiftConfig.SIFT_SIGMA);
 
-        buf.putDouble(AppConfig.MATCH_RATIO_THRESHOLD);
-        buf.putInt(AppConfig.MATCH_MIN_COUNT);
-        buf.putInt(AppConfig.SEARCH_RADIUS);
+        buf.putDouble(SiftConfig.MATCH_RATIO_THRESHOLD);
+        buf.putInt(SiftConfig.MATCH_MIN_COUNT);
+        buf.putInt(SiftConfig.SEARCH_RADIUS);
 
         buf.putInt(1);  // KDTreeIndexParams(1)
         buf.putInt(24); // SearchParams(24, 0, true)
 
-        buf.putDouble(AppConfig.RANSAC_REPROJ_THRESHOLD);
-        buf.putInt(AppConfig.RANSAC_MAX_ITERS);
-        buf.putDouble(AppConfig.RANSAC_CONFIDENCE);
+        buf.putDouble(SiftConfig.RANSAC_REPROJ_THRESHOLD);
+        buf.putInt(SiftConfig.RANSAC_MAX_ITERS);
+        buf.putDouble(SiftConfig.RANSAC_CONFIDENCE);
 
         buf.putInt(cachePathBytes.length);
         buf.put(cachePathBytes);
@@ -134,15 +134,23 @@ public class SiftMatchProtocol {
     }
 
     /**
-     * 解析 MATCH_RESULT 体，返回 MatchResult
+     * 解析 MATCH_RESULT 体，返回 MatchResult（含耗时统计）
+     * <pre>
+     *   [1]success [8]x [8]y [8]angle [4]tMinimapMs [4]tExtractMs [4]tFlannMs
+     * </pre>
      */
     public static SiftMatchHandler.MatchResult decodeMatchResult(byte[] body) {
-        if (body == null || body.length < 17) return SiftMatchHandler.MatchResult.FAIL;
+        if (body == null || body.length < 25) return SiftMatchHandler.MatchResult.FAIL;
         ByteBuffer buf = ByteBuffer.wrap(body).order(ByteOrder.BIG_ENDIAN);
         boolean success = buf.get() == 1;
         double x = buf.getDouble();
         double y = buf.getDouble();
-        return new SiftMatchHandler.MatchResult(success, x, y);
+        // skip angle (double, 8 bytes)
+        buf.getDouble();
+        float tMinimap = buf.getFloat();
+        float tExtract = buf.getFloat();
+        float tFlann = buf.getFloat();
+        return new SiftMatchHandler.MatchResult(success, x, y, tMinimap, tExtract, tFlann);
     }
 
     // ==================== 工具方法 ====================

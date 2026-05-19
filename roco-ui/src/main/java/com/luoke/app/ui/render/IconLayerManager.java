@@ -1,0 +1,138 @@
+package com.luoke.app.ui.render;
+
+import com.luoke.app.config.PathConfig;
+import com.luoke.app.config.RenderConfig;
+import com.luoke.app.config.ViewConfig;
+import com.luoke.app.context.MapContext;
+import com.luoke.app.context.ResourcePointContext;
+import com.luoke.app.map.model.Point;
+import com.luoke.app.map.model.ResourcePoint;
+import com.luoke.app.ui.service.IconCache;
+import javafx.geometry.Rectangle2D;
+import javafx.scene.Group;
+import javafx.scene.Node;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
+import lombok.extern.slf4j.Slf4j;
+
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+/**
+ * 图标管理层 — 资源点 ImageView 构建 + 变灰切换。
+ * <p>
+ * 所有 ImageView 放入 iconGroup（worldGroup 子级），与瓦片共用 GPU 变换。
+ * 变灰直接切换 ImageView 的 image 引用（colorAtlas ↔ grayAtlas），零 CPU 重绘。
+ */
+@Slf4j
+public class IconLayerManager implements RenderLayer {
+
+    private final Group iconGroup;
+    private final Map<ResourcePoint, ImageView> iconViews = new ConcurrentHashMap<>();
+    private double lastGrayCheckX = Double.NaN;
+    private double lastGrayCheckY = Double.NaN;
+
+    public IconLayerManager(Group worldGroup) {
+        iconGroup = new Group();
+        iconGroup.setPickOnBounds(false);
+        iconGroup.setMouseTransparent(true);
+        worldGroup.getChildren().add(iconGroup);
+    }
+
+    @Override
+    public Node getNode() {
+        return iconGroup;
+    }
+
+    @Override
+    public void onFrame() {
+        MapContext mm = MapContext.getInstance();
+        if (mm.isPlayerInitialized()) {
+            updateGrayStates(mm.getPlayerX(), mm.getPlayerY());
+        }
+    }
+
+    /**
+     * 为每个资源点创建 ImageView，放入 iconGroup
+     */
+    public void buildIconLayer() {
+        IconCache cache = IconCache.getInstance();
+        if (!cache.isAtlasReady()) {
+            log.warn("图集未就绪，跳过图标层构建");
+            return;
+        }
+
+        Image colorAtlas = cache.getColorAtlas();
+        Image grayAtlas = cache.getGrayAtlas();
+        int built = 0;
+
+        for (ResourcePoint rp : ResourcePointContext.getInstance().getAllPoints()) {
+            String iconFile = rp.getConfig().getIcon();
+            if (iconFile == null || iconFile.isEmpty()) continue;
+
+            String iconPath = PathConfig.ICON_DIR + iconFile;
+            IconCache.AtlasSlot slot = cache.getSlot(iconPath);
+            if (slot == null) continue;
+
+            ImageView iv = new ImageView();
+            iv.setImage(rp.isGrayed() ? grayAtlas : colorAtlas);
+            iv.setViewport(new Rectangle2D(slot.sx, slot.sy, RenderConfig.ICON_SIZE, RenderConfig.ICON_SIZE));
+            iv.setPreserveRatio(false);
+            iv.setSmooth(false);
+            iv.setMouseTransparent(true);
+            iv.setPickOnBounds(false);
+
+            Point pos = rp.getScreenPosition();
+            iv.setLayoutX(pos.getX() - RenderConfig.ICON_SIZE / 2.0);
+            iv.setLayoutY(pos.getY() - RenderConfig.ICON_SIZE / 2.0);
+            iv.setFitWidth(RenderConfig.ICON_SIZE);
+            iv.setFitHeight(RenderConfig.ICON_SIZE);
+
+            iconViews.put(rp, iv);
+            iconGroup.getChildren().add(iv);
+            built++;
+        }
+        log.info("图标 ImageView 层已构建: {} 个点位", built);
+    }
+
+    /**
+     * 检测玩家附近新变灰的资源点，直接切换 ImageView 的图集引用。
+     */
+    void updateGrayStates(double playerX, double playerY) {
+        // 减少检测频率：玩家移动超过阈值才检测
+        double dx = playerX - lastGrayCheckX;
+        double dy = playerY - lastGrayCheckY;
+        if (dx * dx + dy * dy <= RenderConfig.GRAY_CHECK_THRESHOLD * RenderConfig.GRAY_CHECK_THRESHOLD) {
+            return;
+        }
+        lastGrayCheckX = playerX;
+        lastGrayCheckY = playerY;
+
+        double r2 = ViewConfig.GRAY_DISTANCE * ViewConfig.GRAY_DISTANCE;
+        IconCache cache = IconCache.getInstance();
+        Image grayAtlas = cache.getGrayAtlas();
+        if (grayAtlas == null) {
+            log.warn("[gray] grayAtlas is null, skipping");
+            return;
+        }
+
+        List<ResourcePoint> nearby = ResourcePointContext.getInstance().getNearbyResources(playerX, playerY);
+        for (ResourcePoint rp : nearby) {
+            if (rp.isGrayed()) continue;
+            Point pos = rp.getScreenPosition();
+            double pdx = pos.getX() - playerX;
+            double pdy = pos.getY() - playerY;
+            if (pdx * pdx + pdy * pdy > r2) continue;
+            if (!ResourcePointContext.getInstance().isCollect(rp.getConfig().getMarkTypeName())) continue;
+
+            // ⚠️ 必须先从 HashMap 获取 ImageView，再修改 grayed，
+            //    否则 grayed 改变 hashCode → get() 查不到
+            ImageView iv = iconViews.get(rp);
+            rp.setGrayed(true);
+            if (iv != null) {
+                iv.setImage(grayAtlas);
+            }
+        }
+    }
+}

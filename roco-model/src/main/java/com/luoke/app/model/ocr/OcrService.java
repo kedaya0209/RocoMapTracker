@@ -1,6 +1,7 @@
 package com.luoke.app.model.ocr;
 
-import com.luoke.app.config.AppConfig;
+import com.luoke.app.config.PathConfig;
+import com.luoke.app.config.OcrConfig;
 import lombok.extern.slf4j.Slf4j;
 
 import java.nio.ByteBuffer;
@@ -97,8 +98,8 @@ public class OcrService implements AutoCloseable {
     }
 
     public void init() throws Exception {
-        this.detManager = new OnnxDetManager(AppConfig.OCR_DET_MODEL);
-        this.recManager = new OnnxRecManager(AppConfig.OCR_REC_MODEL);
+        this.detManager = new OnnxDetManager(PathConfig.OCR_DET_MODEL);
+        this.recManager = new OnnxRecManager(PathConfig.OCR_REC_MODEL);
 
         this.detFloatBuffer = ByteBuffer.allocateDirect(3 * 1024 * 1024 * 4)
                 .order(ByteOrder.nativeOrder())
@@ -123,8 +124,8 @@ public class OcrService implements AutoCloseable {
         System.arraycopy(grayData, 0, fullPixels, 0, grayData.length);
 
         try {
-            int detW = alignTo(width, AppConfig.OCR_DET_ALIGNMENT);
-            int detH = alignTo(height, AppConfig.OCR_DET_ALIGNMENT);
+            int detW = alignTo(width, OcrConfig.OCR_DET_ALIGNMENT);
+            int detH = alignTo(height, OcrConfig.OCR_DET_ALIGNMENT);
 
             LetterboxInfo info = new LetterboxInfo();
             byte[] letterbox = createLetterbox(fullPixels, fullW, fullH, detW, detH, info);
@@ -140,9 +141,9 @@ public class OcrService implements AutoCloseable {
                 byte[] linePixels = crop(fullPixels, fullW, fullH, box.x, box.y, box.width, box.height);
                 if (linePixels.length == 0) continue;
 
-                int recW = alignTo((int) (box.width * (double) AppConfig.OCR_REC_STD_HEIGHT / box.height), AppConfig.OCR_REC_WIDTH_ALIGNMENT);
-                FloatBuffer recBuffer = fastBuildTensor(linePixels, box.width, box.height, recW, AppConfig.OCR_REC_STD_HEIGHT, false);
-                String text = recManager.recognize(recBuffer, AppConfig.OCR_REC_STD_HEIGHT, recW);
+                int recW = alignTo((int) (box.width * (double) OcrConfig.OCR_REC_STD_HEIGHT / box.height), OcrConfig.OCR_REC_WIDTH_ALIGNMENT);
+                FloatBuffer recBuffer = fastBuildTensor(linePixels, box.width, box.height, recW, OcrConfig.OCR_REC_STD_HEIGHT, false);
+                String text = recManager.recognize(recBuffer, OcrConfig.OCR_REC_STD_HEIGHT, recW);
 
                 text = text.replaceAll("[^\\u4e00-\\u9fa5xX×*0-9a-zA-Z]", "").trim();
                 if (!text.isEmpty()) resultList.add(text);
@@ -210,7 +211,7 @@ public class OcrService implements AutoCloseable {
             System.arraycopy(resized, y * tw, rowCache, 0, tw);
             for (int x = 0; x < tw; x++) {
                 int gray = rowCache[x] & 0xFF;
-                float val = (gray > AppConfig.OCR_BINARY_THRESHOLD) ? 0.0f : 1.0f;
+                float val = (gray > OcrConfig.OCR_BINARY_THRESHOLD) ? 0.0f : 1.0f;
                 int idx = y * tw + x;
                 float norm = (val - 0.5f) / 0.5f;
                 dataCache[idx] = norm;
@@ -236,7 +237,7 @@ public class OcrService implements AutoCloseable {
             boolean hasText = false;
             int rowOffset = y * w;
             for (int x = 0; x < w; x++) {
-                if (heatMap[rowOffset + x] >= AppConfig.OCR_TEXT_HEAT_THRESHOLD) {
+                if (heatMap[rowOffset + x] >= OcrConfig.OCR_TEXT_HEAT_THRESHOLD) {
                     hasText = true;
                     break;
                 }
@@ -256,8 +257,8 @@ public class OcrService implements AutoCloseable {
                         float invScale, float ratioH, int srcW, int srcH) {
         float realY1 = (y1 * ratioH - info.padY) * invScale;
         float realY2 = (y2 * ratioH - info.padY) * invScale;
-        int rectY = Math.max(0, (int) realY1 - AppConfig.OCR_EXPAND_Y);
-        int rectBottom = Math.min(srcH, (int) realY2 + AppConfig.OCR_EXPAND_Y);
+        int rectY = Math.max(0, (int) realY1 - OcrConfig.OCR_EXPAND_Y);
+        int rectBottom = Math.min(srcH, (int) realY2 + OcrConfig.OCR_EXPAND_Y);
         int rectHeight = rectBottom - rectY;
         if (rectHeight > 5) boxes.add(new Rect(0, rectY, srcW, rectHeight));
     }

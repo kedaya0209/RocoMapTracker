@@ -1,17 +1,19 @@
-package com.luoke.app.ui.component;
+package com.luoke.app.ui.component.setting;
 
-import com.luoke.app.config.AppConfig;
+import com.luoke.app.config.ConfigPersistence;
 import javafx.scene.control.*;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 
-import java.lang.reflect.Field;
 import java.util.*;
 
 /**
- * 设置配置管理器 — 负责配置字段的反射读写、控件注册、变更追踪和快照管理。
+ * 设置配置管理器 — 负责配置字段的读写、控件注册、变更追踪和快照管理。
  * 不包含任何 UI 逻辑，仅管理数据与控制绑定。
+ * <p>
+ * 读写通过 {@link SettingDef#getter()}/{@link SettingDef#setter()} 回调，
+ * 不依赖反射，Native Image 兼容。
  */
 @Slf4j
 public class SettingConfigManager {
@@ -39,34 +41,6 @@ public class SettingConfigManager {
     // ================================================================
 
     /**
-     * 将值适配为目标字段类型
-     */
-    private static Object adaptType(Object value, Class<?> targetType) {
-        if (targetType == float.class && value instanceof Number n) return n.floatValue();
-        if (targetType == double.class && value instanceof Number n) return n.doubleValue();
-        if (targetType == int.class && value instanceof Number n) return n.intValue();
-        if (targetType == long.class && value instanceof Number n) return n.longValue();
-        if (targetType == boolean.class && value instanceof Boolean b) return b;
-        return value;
-    }
-
-    /**
-     * 比较当前值与控件值是否无实质变化（含浮点精度容差）
-     */
-    private static boolean isUnchanged(Object current, Object typed) {
-        if (current == typed) return true;
-        if (current == null || typed == null) return false;
-        if (current instanceof Number n1 && typed instanceof Number n2) {
-            return Math.abs(n1.doubleValue() - n2.doubleValue()) < 1e-9;
-        }
-        return current.equals(typed);
-    }
-
-    // ================================================================
-    // 反射字段访问
-    // ================================================================
-
-    /**
      * 注册控件到管理器
      */
     public void registerControl(String key, Control control) {
@@ -80,22 +54,24 @@ public class SettingConfigManager {
         controlMap.clear();
     }
 
+    // ================================================================
+    // 字段访问（通过 SettingDef getter/setter，无反射）
+    // ================================================================
+
     /**
-     * 读取 AppConfig 静态字段值
+     * 通过 SettingDef getter 读取字段当前值
      */
     public Object readField(String key) {
-        try {
-            Field field = AppConfig.class.getDeclaredField(key);
-            field.setAccessible(true);
-            return field.get(null);
-        } catch (Exception e) {
-            log.warn("读取配置字段失败: {}", key, e);
+        SettingDef def = SettingDefinitions.findDef(key);
+        if (def == null || def.getter() == null) {
+            log.warn("未找到配置字段的 getter: {}", key);
             return null;
         }
+        return def.getter().get();
     }
 
     /**
-     * 读取控件实时值（已注册则取控件实时值，否则回退到 AppConfig）。
+     * 读取控件实时值（已注册则取控件实时值，否则回退到 getter）。
      * 对可编辑 Spinner 优先取编辑器文本，确保键盘输入也能实时反映。
      * 供 PlayerPreview 实时预览使用。
      */
@@ -118,7 +94,6 @@ public class SettingConfigManager {
                     default -> extractValue(control);
                 };
             } catch (NumberFormatException e) {
-                // 解析失败（如输入中间态 "1."），回退到已提交值
                 return sp.getValue();
             }
         }
@@ -131,17 +106,35 @@ public class SettingConfigManager {
     // ================================================================
 
     /**
-     * 写入 AppConfig 静态字段，自动处理类型适配（如 Double→float）
+     * 通过 SettingDef setter 写入字段值
      */
     public void writeField(String key, Object value) {
-        try {
-            Field field = AppConfig.class.getDeclaredField(key);
-            field.setAccessible(true);
-            Class<?> fieldType = field.getType();
-            Object adapted = adaptType(value, fieldType);
-            field.set(null, adapted);
-        } catch (Exception e) {
-            log.warn("写入配置字段失败: {} = {}", key, value, e);
+        SettingDef def = SettingDefinitions.findDef(key);
+        if (def == null || def.setter() == null) {
+            log.warn("未找到配置字段的 setter: {}", key);
+            return;
+        }
+        def.setter().accept(value);
+    }
+
+    /**
+     * 将控件值从配置 getter 同步（用于 RoiPreview 拖拽后刷新 Spinner）
+     */
+    public void syncRoiControls(String prefix) {
+        syncControl(prefix + "X");
+        syncControl(prefix + "Y");
+        syncControl(prefix + "W");
+        syncControl(prefix + "H");
+    }
+
+    private void syncControl(String key) {
+        Control control = controlMap.get(key);
+        if (control == null) return;
+        SettingDef def = SettingDefinitions.findDef(key);
+        if (def == null || def.getter() == null) return;
+        Object value = def.getter().get();
+        if (control instanceof Spinner sp) {
+            sp.getValueFactory().setValue(value);
         }
     }
 
@@ -172,7 +165,7 @@ public class SettingConfigManager {
     }
 
     /**
-     * 应用所有修改：读取控件值 → 反射写入 AppConfig → 持久化 → 执行回调。
+     * 应用所有修改：读取控件值 → 通过 setter 写入 → 持久化 → 执行回调。
      *
      * @return 需要重启才能生效的字段标签列表
      */
@@ -182,7 +175,7 @@ public class SettingConfigManager {
         for (Map.Entry<String, Control> entry : controlMap.entrySet()) {
             String key = entry.getKey();
             SettingDef def = SettingDefinitions.findDef(key);
-            if (def == null) continue;
+            if (def == null || def.setter() == null) continue;
 
             Control control = entry.getValue();
             Object rawValue = extractValue(control);
@@ -192,14 +185,14 @@ public class SettingConfigManager {
             Object currentValue = readField(key);
             if (isUnchanged(currentValue, typedValue)) continue;
 
-            writeField(key, typedValue);
+            def.setter().accept(typedValue);
             if (def.restartRequired()) {
                 restartFields.add(def.label());
             }
         }
 
         // 持久化
-        AppConfig.save();
+        ConfigPersistence.save();
 
         // 执行回调
         for (Map.Entry<String, Control> entry : controlMap.entrySet()) {
@@ -218,6 +211,18 @@ public class SettingConfigManager {
         }
 
         return restartFields;
+    }
+
+    /**
+     * 比较当前值与控件值是否无实质变化（含浮点精度容差）
+     */
+    private static boolean isUnchanged(Object current, Object typed) {
+        if (current == typed) return true;
+        if (current == null || typed == null) return false;
+        if (current instanceof Number n1 && typed instanceof Number n2) {
+            return Math.abs(n1.doubleValue() - n2.doubleValue()) < 1e-9;
+        }
+        return current.equals(typed);
     }
 
     /**
@@ -271,24 +276,30 @@ public class SettingConfigManager {
     // ================================================================
 
     /**
-     * 保存当前所有配置值的快照
+     * 保存当前所有配置值的快照（通过 getter，无反射）
      */
     public Map<String, Object> takeSnapshot() {
         Map<String, Object> snap = new HashMap<>();
         for (SettingCategory cat : SettingDefinitions.CATEGORIES) {
             for (SettingDef def : cat.fields()) {
-                snap.put(def.key(), readField(def.key()));
+                if (def.getter() != null) {
+                    snap.put(def.key(), def.getter().get());
+                }
             }
         }
         return snap;
     }
 
     /**
-     * 从快照恢复所有配置值
+     * 从快照恢复所有配置值（通过 setter，无反射）
      */
     public void restoreSnapshot(Map<String, Object> snap) {
-        for (Map.Entry<String, Object> entry : snap.entrySet()) {
-            writeField(entry.getKey(), entry.getValue());
+        for (SettingCategory cat : SettingDefinitions.CATEGORIES) {
+            for (SettingDef def : cat.fields()) {
+                if (def.setter() != null && snap.containsKey(def.key())) {
+                    def.setter().accept(snap.get(def.key()));
+                }
+            }
         }
     }
 }

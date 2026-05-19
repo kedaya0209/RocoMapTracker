@@ -1,13 +1,17 @@
 package com.luoke.app.ui.component;
 
 import atlantafx.base.theme.Styles;
-import com.luoke.app.config.AppConfig;
+import com.luoke.app.config.ConfigPersistence;
+import com.luoke.app.config.DownloadConfig;
+import com.luoke.app.config.UiConfig;
+import com.luoke.app.config.SiftConfig;
 import com.luoke.app.context.ResourceConfigContext;
 import com.luoke.app.hook.HookEventType;
 import com.luoke.app.hook.event.NotificationType;
 import com.luoke.app.hook.event.StatusEvent;
 import com.luoke.app.hook.multicast.HookRegistry;
 import com.luoke.app.macher.map.SwitchMapMatcher;
+import com.luoke.app.ui.component.setting.SettingsStage;
 import com.luoke.app.ui.service.SvgManager;
 import com.luoke.app.ui.service.ThemeManager;
 import com.luoke.app.ui.util.DialogUtils;
@@ -71,7 +75,7 @@ public class Sidebar extends VBox {
 
         getChildren().addAll(title, listView);
 
-        if (!AppConfig.INTERNAL_RESOURCE) {
+        if (!DownloadConfig.INTERNAL_RESOURCE) {
             initWikiFooter();
         }
     }
@@ -84,16 +88,16 @@ public class Sidebar extends VBox {
 
         // 匹配算法选择
         items.add(new SidebarItem(SidebarItem.Type.HEADER, "匹配算法选择",
-                SidebarItem.Category.ALGORITHM, AppConfig.MAP_MATCHAER, null, false, "/icon/match.svg", null));
+                SidebarItem.Category.ALGORITHM, SiftConfig.MAP_MATCHAER, null, false, "/icon/match.svg", null));
 
         // 资源模式切换
         items.add(new SidebarItem(SidebarItem.Type.HEADER, "资源模式切换",
                 SidebarItem.Category.RESOURCE,
-                AppConfig.INTERNAL_RESOURCE ? "内置资源" : "WIKI资源", null, false, "/icon/resources.svg", null));
+                DownloadConfig.INTERNAL_RESOURCE ? "内置资源" : "WIKI资源", null, false, "/icon/resources.svg", null));
 
         // 主题切换
         items.add(new SidebarItem(SidebarItem.Type.HEADER, "主题切换",
-                SidebarItem.Category.THEME, AppConfig.THEME, null, false, "/icon/theme.svg", null));
+                SidebarItem.Category.THEME, UiConfig.THEME, null, false, "/icon/theme.svg", null));
 
         // 路线管理
         items.add(new SidebarItem(SidebarItem.Type.ACTION, "路线管理", null, null, null, false, "/icon/route.svg", this::openRouteManager));
@@ -168,15 +172,15 @@ public class Sidebar extends VBox {
 
     private void switchResource(String resource, SidebarItem header) {
         boolean isInternal = resource.equals("内置资源");
-        if (isInternal == AppConfig.INTERNAL_RESOURCE) return;
+        if (isInternal == DownloadConfig.INTERNAL_RESOURCE) return;
 
         DialogUtils.showConfirmDialog(
                 findRootPane(),
                 "模式切换",
                 "切换资源模式需要重启程序生效，是否继续？",
                 () -> {
-                    AppConfig.INTERNAL_RESOURCE = isInternal;
-                    AppConfig.save();
+                    DownloadConfig.INTERNAL_RESOURCE = isInternal;
+                    ConfigPersistence.save();
                     RestartUtils.restart();
                 },
                 () -> {
@@ -261,7 +265,7 @@ public class Sidebar extends VBox {
     // ========== Item Model ==========
 
     private StackPane findRootPane() {
-        javafx.scene.Node node = this;
+        Node node = this;
         while ((node = node.getParent()) != null) {
             if (node instanceof StackPane sp) return sp;
         }

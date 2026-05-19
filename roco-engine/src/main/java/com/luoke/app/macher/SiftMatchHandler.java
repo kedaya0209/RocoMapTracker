@@ -1,45 +1,34 @@
 package com.luoke.app.macher;
 
-import com.luoke.app.config.AppConfig;
-import com.luoke.app.process.JobObjectManager;
+import com.luoke.app.config.SiftConfig;
+import com.luoke.app.config.SocketConfig;
+import com.luoke.app.hook.HookEventType;
+import com.luoke.app.hook.event.StatusCarouselEvent;
+import com.luoke.app.hook.multicast.HookRegistry;
 import com.luoke.app.process.NativeProcess;
+import com.luoke.app.process.NativeProcessFactory;
 import com.luoke.app.socket.SocketHandler;
 import com.luoke.app.socket.SocketServer;
 import com.luoke.app.socket.SocketSession;
-import com.luoke.app.utils.FileUtil;
 import lombok.extern.slf4j.Slf4j;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
+import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 
 import static com.luoke.app.macher.SiftMatchProtocol.*;
 
 /**
- * SIFT 匹配客户端 — 管理 sift_match.exe 子进程，通过 Socket 通信.
+ * SIFT 匹配协调器 — 编排 {@link SiftProcessManager}（子进程生命周期）和
+ * {@link SiftSessionManager}（Socket 会话管理），对外保持与旧版本完全兼容的 API。
  *
- * <p>协议 (msgType 200-209):
- * <pre>
- *   HANDSHAKE:
- *   208 C++→Java: REQUEST_CONFIG  {}                     — 请求算法参数
- *   209 Java→C++: CONFIG_DATA     {binary}              — SIFT/FLANN/RANSAC/MATCH 参数 + 路径
- *   200 C++→Java: REQUEST_MAP     {}                     — 缓存未命中，请求地图数据
- *   201 Java→C++: MAP_DATA        {w(int32),h(int32),pixelsLen(int32),gray8}
- *   202 C++→Java: INIT_COMPLETE   {featureCount(int32)}
- *   203 C++→Java: INIT_FAILED     {errcode(int32),msg(ascii)}
- *
- *   MATCHING LOOP:
- *   204 C++→Java: READY           {}
- *   205 Java→C++: FRAME_DATA      {w,h,hintX,hintY,pixelsLen,gray8}
- *   206 C++→Java: MATCH_RESULT    {success(1/0),x(f64),y(f64)}
- *
- *   SHUTDOWN:
- *   207 Java→C++: SHUTDOWN        {}
- * </pre>
- *
- * <p>无感热切换: restart() 先启动新进程，旧进程继续服务，
- * 新进程握手完成后原子交换，零停机时间。
+ * <p>协调器自身职责：
+ * <ul>
+ *   <li>消息路由（handlers 路由表）</li>
+ *   <li>帧匹配同步（resultLock + pendingResult）</li>
+ *   <li>变体跟踪（activeVariant）</li>
+ *   <li>热切换编排（同时协调进程切换与会话切换）</li>
+ *   <li>崩溃恢复编排</li>
+ * </ul>
  */
 @Slf4j
 public class SiftMatchHandler implements SocketHandler {
@@ -48,24 +37,47 @@ public class SiftMatchHandler implements SocketHandler {
             MSG_REQUEST_MAP, MSG_REQUEST_CONFIG,
             MSG_INIT_COMPLETE, MSG_INIT_FAILED,
             MSG_READY, MSG_MATCH_RESULT);
-    // 匹配结果同步: 每帧一个请求-响应周期, wait/notify 替代忙等
-    private final Object resultLock = new Object();
-    // ---- 当前服务中的进程 (active) ----
-    private NativeProcess activeProcess;
-    private volatile SocketSession activeSession;
-    private volatile boolean activeInitialized;
+
+    // ==================== 子管理器 ====================
+
+    private final SiftProcessManager processManager;
+    private final SiftSessionManager sessionManager;
+
+    // ==================== 协调器自身字段 ====================
+
+    private final SocketServer server;
     private volatile SiftVariant activeVariant;
-    // ---- 正在初始化的新进程 (pending)，用于无感热切换 ----
-    private NativeProcess pendingProcess;
-    private volatile SocketSession pendingSession;
-    private volatile boolean pendingInitialized;
-    private volatile boolean switching;
-    private MatchResult pendingResult;
+
+    // 帧匹配同步
+    private final Object resultLock = new Object();
+    private volatile MatchResult pendingResult;
+
+    // 外部回调
     private volatile StateCallback stateCallback;
 
-    // ---- SocketHandler 实现 ----
-    // 崩溃重启限速，防止子进程反复崩溃时无限快速重启
-    private volatile long lastRestartTime = 0;
+    // ==================== 消息路由 ====================
+
+    @FunctionalInterface
+    private interface MessageHandler {
+        void handle(byte[] body, SocketSession session);
+    }
+
+    private final Map<Integer, MessageHandler> handlers = Map.of(
+            MSG_REQUEST_CONFIG, (b, s) -> handleRequestConfig(s),
+            MSG_REQUEST_MAP, (b, s) -> handleRequestMap(s),
+            MSG_INIT_COMPLETE, this::handleInitComplete,
+            MSG_INIT_FAILED, this::handleInitFailed,
+            MSG_READY, (b, s) -> { /* backpressure ack */ },
+            MSG_MATCH_RESULT, this::handleMatchResult
+    );
+
+    public SiftMatchHandler(SocketServer server, NativeProcessFactory processFactory) {
+        this.server = server;
+        this.processManager = new SiftProcessManager(processFactory);
+        this.sessionManager = new SiftSessionManager();
+    }
+
+    // ==================== SocketHandler ====================
 
     @Override
     public Set<Integer> messageTypes() {
@@ -79,114 +91,65 @@ public class SiftMatchHandler implements SocketHandler {
 
     @Override
     public void onConnect(SocketSession session) {
-        if (switching && pendingSession == null) {
-            this.pendingSession = session;
-            log.info("SiftMatchHandler bound pending session #{}", session.id());
-        } else if (activeSession == null || activeSession.isClosed()) {
-            this.activeSession = session;
-            log.info("SiftMatchHandler bound active session #{}", session.id());
-        }
+        sessionManager.onConnect(session);
     }
 
     @Override
     public void onMessage(int type, byte[] body, SocketSession session) {
-        boolean fromPending = switching && session == pendingSession;
-
-        switch (type) {
-            case MSG_REQUEST_CONFIG -> handleRequestConfig(session);
-            case MSG_REQUEST_MAP -> handleRequestMap(session);
-            case MSG_INIT_COMPLETE -> {
-                if (fromPending) handlePendingInitComplete(body);
-                else handleInitComplete(body, session);
-            }
-            case MSG_INIT_FAILED -> {
-                if (fromPending) handlePendingInitFailed(body);
-                else handleInitFailed(body);
-            }
-            case MSG_READY -> { /* backpressure ack, no action needed */ }
-            case MSG_MATCH_RESULT -> {
-                if (!fromPending) handleMatchResult(body);
-            }
+        MessageHandler handler = handlers.get(type);
+        if (handler != null) {
+            handler.handle(body, session);
+        } else {
+            log.warn("Unknown SIFT message type: {}", type);
         }
     }
 
     @Override
     public void onDisconnect(SocketSession session, String reason) {
-        if (session != activeSession && session != pendingSession) return;
-
-        // Pending 进程断开 — 取消热切换，不影响 active
-        if (switching && session == pendingSession) {
-            log.warn("Pending sift_match.exe #{} disconnected during switch: {}", session.id(), reason);
-            cancelPendingCleanup();
+        if (session != sessionManager.getActiveSession()
+                && session != sessionManager.getPendingSession()) {
             return;
         }
 
-        // Active 进程断开
-        log.warn("SiftMatchHandler active session #{} disconnected: {}", session.id(), reason);
-        this.activeSession = null;
-        this.activeInitialized = false;
+        // ── Pending 进程断开 — 取消热切换，不影响 active ──
+        if (sessionManager.isFromPending(session)) {
+            log.warn("Pending sift_match.exe #{} disconnected during switch: {}", session.id(), reason);
+            sessionManager.cancelPendingCleanup();
+            processManager.clearPending();
+            return;
+        }
 
-        // 唤醒等待匹配结果的线程，防止死等 500ms 超时
+        // ── Active 进程断开 ──
+        log.warn("SiftMatchHandler active session #{} disconnected: {}", session.id(), reason);
+        sessionManager.handleActiveDisconnect();
+        HookRegistry.INSTANCE.publish(HookEventType.STATUS_CAROUSEL,
+                StatusCarouselEvent.siftDisconnected());
+
+        // 唤醒等待匹配结果的线程，防止死等超时
         synchronized (resultLock) {
             pendingResult = MatchResult.FAIL;
             resultLock.notify();
         }
 
-        if (switching) {
+        if (sessionManager.isSwitching()) {
             log.info("Active disconnected during switch, waiting for pending to take over");
         } else {
-            // 自动重启 C++ 子进程，使匹配自动恢复
-            restartAfterCrash();
+            // 异步重启 C++ 子进程
+            Thread.ofVirtual().name("sift-restart").start(() -> {
+                try {
+                    Thread.sleep(SocketConfig.SIFT_RESTART_DELAY);
+                    processManager.restartAfterCrash(server);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            });
             if (stateCallback != null) {
                 stateCallback.onStateChange(false, reason);
             }
         }
     }
 
-    private void restartAfterCrash() {
-        long now = System.currentTimeMillis();
-        if (now - lastRestartTime < AppConfig.SIFT_RESTART_MIN_INTERVAL) {
-            log.warn("Skipping sift_match.exe restart due to rate limit ({}ms < {}ms)",
-                    now - lastRestartTime, AppConfig.SIFT_RESTART_MIN_INTERVAL);
-            return;
-        }
-        lastRestartTime = now;
-
-        Thread.ofVirtual().name("sift-restart").start(() -> {
-            try {
-                Thread.sleep(AppConfig.SIFT_RESTART_DELAY); // 等待旧进程完全退出
-
-                int port = SocketServer.instance().getPort();
-                if (port <= 0) {
-                    log.error("SocketServer not running, cannot restart sift_match.exe");
-                    return;
-                }
-
-                // 清理旧进程句柄
-                NativeProcess oldProc = activeProcess;
-                if (oldProc != null && oldProc.isAlive()) {
-                    oldProc.destroyForcibly();
-                }
-                activeProcess = null;
-
-                String exePath = FileUtil.getExternalPath(AppConfig.SIFT_MATCH_EXE, false);
-                String cmdLine = "\"" + exePath + "\" " + port;
-                NativeProcess newProc = NativeProcess.create(cmdLine, JobObjectManager.getJobHandle(), true);
-                if (newProc == null) {
-                    log.error("Failed to restart sift_match.exe after crash");
-                    return;
-                }
-
-                activeProcess = newProc;
-                startReaderThread(newProc, "sift-stdout");
-                log.info("sift_match.exe restarted (pid={}) after crash", newProc.pid());
-            } catch (Exception e) {
-                log.error("Error restarting sift_match.exe", e);
-            }
-        });
-    }
-
-    // ---- 握手: 参数下发 ----
+    // ==================== 握手协议 ====================
 
     private void handleRequestConfig(SocketSession session) {
         log.info("Received REQUEST_CONFIG, sending parameters...");
@@ -197,12 +160,11 @@ public class SiftMatchHandler implements SocketHandler {
             log.info("CONFIG_DATA sent ({} bytes)", body.length);
         } catch (Exception e) {
             log.error("Failed to serialize CONFIG_DATA", e);
-            byte[] errBody = ("Config error: " + e.getMessage()).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            byte[] errBody = ("Config error: " + e.getMessage())
+                    .getBytes(java.nio.charset.StandardCharsets.UTF_8);
             session.send(MSG_INIT_FAILED, errBody);
         }
     }
-
-    // ---- 握手: 地图数据 ----
 
     private void handleRequestMap(SocketSession session) {
         log.info("Received REQUEST_MAP, loading map...");
@@ -210,73 +172,72 @@ public class SiftMatchHandler implements SocketHandler {
             MapImageData mapData = loadMapGray();
             byte[] body = encodeMapData(mapData.grayPixels(), mapData.width(), mapData.height());
             session.send(MSG_MAP_DATA, body);
-            log.info("Map data sent: {}x{} ({} gray pixels)", mapData.width(), mapData.height(), mapData.grayPixels().length);
+            log.info("Map data sent: {}x{} ({} gray pixels)",
+                    mapData.width(), mapData.height(), mapData.grayPixels().length);
         } catch (Exception e) {
             log.error("Failed to load map data", e);
-            byte[] errBody = ("Map load error: " + e.getMessage()).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            byte[] errBody = ("Map load error: " + e.getMessage())
+                    .getBytes(java.nio.charset.StandardCharsets.UTF_8);
             session.send(MSG_INIT_FAILED, errBody);
         }
     }
 
-    // ---- Active 进程初始化完成 ----
-
     private void handleInitComplete(byte[] body, SocketSession session) {
-        this.activeSession = session;
-        int featureCount = decodeInitComplete(body);
-        log.info("SIFT ready, {} features", featureCount);
-        activeInitialized = true;
+        if (sessionManager.isFromPending(session)) {
+            handlePendingInitComplete(body);
+            return;
+        }
+        int featureCount = sessionManager.handleInitComplete(body);
+        HookRegistry.INSTANCE.publish(HookEventType.STATUS_CAROUSEL,
+                StatusCarouselEvent.siftReady());
         if (stateCallback != null) {
             stateCallback.onStateChange(true, "SIFT ready (" + featureCount + " features)");
         }
     }
 
-    private void handleInitFailed(byte[] body) {
-        String msg = decodeInitFailed(body);
-        log.error("SIFT init failed: {}", msg);
+    private void handleInitFailed(byte[] body, SocketSession session) {
+        if (sessionManager.isFromPending(session)) {
+            handlePendingInitFailed(body);
+            return;
+        }
+        String msg = sessionManager.handleInitFailed(body);
+        HookRegistry.INSTANCE.publish(HookEventType.STATUS_CAROUSEL,
+                StatusCarouselEvent.siftFailed());
         if (stateCallback != null) {
             stateCallback.onStateChange(false, msg);
         }
     }
 
-    // ---- Pending 进程热切换完成 ----
-
     private void handlePendingInitComplete(byte[] body) {
-        int featureCount = decodeInitComplete(body);
-        log.info("Pending SIFT ready ({} features), swapping...", featureCount);
+        SiftSessionManager.SwapResult swap = sessionManager.handlePendingInitComplete(body);
 
-        NativeProcess oldProcess = this.activeProcess;
-        SocketSession oldSession = this.activeSession;
-
-        this.activeProcess = this.pendingProcess;
-        this.activeSession = this.pendingSession;
-        this.activeInitialized = true;
-
-        this.pendingProcess = null;
-        this.pendingSession = null;
-        this.pendingInitialized = false;
-        this.switching = false;
-
-        log.info("Seamless switch complete, variant={}, {} features", activeVariant, featureCount);
-
-        if (stateCallback != null) {
-            stateCallback.onStateChange(true, "SIFT ready (" + featureCount + " features)");
+        // 关闭旧会话
+        if (swap.oldActiveSession() != null && !swap.oldActiveSession().isClosed()) {
+            swap.oldActiveSession().send(MSG_SHUTDOWN, null);
         }
+        // 切换并停止旧进程
+        NativeProcess oldProcess = processManager.promotePending();
+        processManager.stopProcess(oldProcess);
 
-        stopProcess(oldSession, oldProcess);
+        log.info("Seamless switch complete, variant={}, {} features",
+                activeVariant, swap.featureCount());
+        if (stateCallback != null) {
+            stateCallback.onStateChange(true, "SIFT ready (" + swap.featureCount() + " features)");
+        }
     }
 
     private void handlePendingInitFailed(byte[] body) {
-        String msg = decodeInitFailed(body);
-        log.error("Pending SIFT init failed: {}, keeping current active", msg);
-        cancelPendingCleanup();
+        String msg = sessionManager.handlePendingInitFailed(body);
+        processManager.clearPending();
         if (stateCallback != null) {
             stateCallback.onStateChange(false, "Switch failed: " + msg);
         }
     }
 
-    // ---- 匹配结果处理 ----
+    // ==================== 匹配结果 ====================
 
-    private void handleMatchResult(byte[] body) {
+    private void handleMatchResult(byte[] body, SocketSession session) {
+        if (sessionManager.isFromPending(session)) return;
         MatchResult result = decodeMatchResult(body);
         synchronized (resultLock) {
             pendingResult = result;
@@ -284,89 +245,18 @@ public class SiftMatchHandler implements SocketHandler {
         }
     }
 
-    // ---- 进程管理 ----
+    // ==================== 帧匹配 ====================
 
-    public boolean start(StateCallback stateCb) {
-        if (activeVariant == null) {
-            activeVariant = SiftVariant.fromDisplayName(AppConfig.MAP_MATCHAER);
-        }
-        this.stateCallback = stateCb;
-
-        int port = SocketServer.instance().getPort();
-        if (port <= 0) {
-            log.error("SocketServer is not running");
-            return false;
-        }
-
-        String exePath = FileUtil.getExternalPath(AppConfig.SIFT_MATCH_EXE, false);
-        String cmdLine = "\"" + exePath + "\" " + port;
-        activeProcess = NativeProcess.create(cmdLine, JobObjectManager.getJobHandle(), true);
-        if (activeProcess == null) {
-            log.error("Failed to launch sift_match.exe via NativeProcess");
-            return false;
-        }
-
-        startReaderThread(activeProcess, "sift-stdout");
-        log.info("sift_match.exe launched (pid={}), port={}", activeProcess.pid(), port);
-        return true;
-    }
-
-    private boolean launchPendingProcess() {
-        int port = SocketServer.instance().getPort();
-        if (port <= 0) {
-            log.error("SocketServer is not running");
-            return false;
-        }
-
-        String exePath = FileUtil.getExternalPath(AppConfig.SIFT_MATCH_EXE, false);
-        String cmdLine = "\"" + exePath + "\" " + port;
-        pendingProcess = NativeProcess.create(cmdLine, JobObjectManager.getJobHandle(), true);
-        if (pendingProcess == null) {
-            log.error("Failed to launch pending sift_match.exe via NativeProcess");
-            return false;
-        }
-
-        startReaderThread(pendingProcess, "sift-stdout-pending");
-        log.info("Pending sift_match.exe launched (pid={}), port={}, variant={}",
-                pendingProcess.pid(), port, activeVariant);
-        return true;
-    }
-
-    private void startReaderThread(NativeProcess process, String name) {
-        Thread.ofVirtual()
-                .name(name)
-                .start(() -> {
-                    try (BufferedReader r = new BufferedReader(
-                            new InputStreamReader(process.getInputStream()))) {
-                        String line;
-                        while ((line = r.readLine()) != null) {
-                            log.info("[{}] {}", name, line);
-                        }
-                    } catch (Exception ignored) {
-                    }
-                    log.info("{} exited with code {}", name, process.exitCode());
-                });
-    }
-
-    private void stopProcess(SocketSession session, NativeProcess process) {
-        if (session != null && !session.isClosed()) {
-            session.send(MSG_SHUTDOWN, null);
-        }
-        if (process != null && process.isAlive()) {
-            process.destroy();
-            if (!process.waitFor(AppConfig.SIFT_PROCESS_STOP_TIMEOUT, TimeUnit.SECONDS)) {
-                process.destroyForcibly();
-            }
-        }
-    }
-
-    // ---- 帧匹配 ----
-
+    /**
+     * 发送帧数据并等待匹配结果。
+     *
+     * @return 匹配结果（成功/失败 + 坐标），超时返回 MatchResult.FAIL
+     */
     public MatchResult sendFrameAndWait(byte[] grayData, int width, int height,
                                         double hintX, double hintY,
                                         long timeoutMs) throws InterruptedException {
-        SocketSession s = activeSession;
-        if (s == null || !activeInitialized) {
+        SocketSession s = sessionManager.getActiveSession();
+        if (s == null || !sessionManager.isReady()) {
             return MatchResult.FAIL;
         }
 
@@ -391,69 +281,96 @@ public class SiftMatchHandler implements SocketHandler {
         return MatchResult.FAIL;
     }
 
-    // ---- 热切换 ----
+    // ==================== 生命周期 ====================
 
+    /**
+     * 启动 sift_match.exe 子进程。
+     */
+    public boolean start(StateCallback stateCb) {
+        this.stateCallback = stateCb;
+        if (activeVariant == null) {
+            activeVariant = SiftVariant.fromDisplayName(SiftConfig.MAP_MATCHAER);
+        }
+
+        NativeProcess proc = processManager.launchProcess(server, "sift-stdout");
+        if (proc == null) {
+            return false;
+        }
+        processManager.setActiveProcess(proc);
+
+        HookRegistry.INSTANCE.publish(HookEventType.STATUS_CAROUSEL,
+                StatusCarouselEvent.siftLoading());
+        return true;
+    }
+
+    /**
+     * 无感热切换 SIFT 变体。
+     */
     public void restart(int newVariantOrdinal) {
         SiftVariant newVariant = SiftVariant.fromOrdinal(newVariantOrdinal);
-        if (newVariant == activeVariant && !switching) return;
+        if (newVariant == activeVariant && !sessionManager.isSwitching()) return;
 
-        log.info("Seamless restart: variant {} -> {} (switching={})",
-                activeVariant, newVariant, switching);
-
-        if (switching) cancelPendingCleanup();
+        // 取消正在进行的切换
+        if (sessionManager.isSwitching()) {
+            SocketSession oldPending = sessionManager.cancelPendingCleanup();
+            if (oldPending != null && !oldPending.isClosed()) {
+                oldPending.send(MSG_SHUTDOWN, null);
+            }
+            processManager.clearPending();
+        }
 
         this.activeVariant = newVariant;
-        this.switching = true;
+        sessionManager.enterSwitching();
 
-        if (!launchPendingProcess()) {
+        if (processManager.launchPendingProcess(server) == null) {
             log.error("Failed to launch pending process, keeping current active");
-            this.switching = false;
+            sessionManager.resetSwitching();
             if (stateCallback != null) {
                 stateCallback.onStateChange(false, "Failed to launch new process");
             }
         }
     }
 
-    // ---- 取消 & 清理 ----
-
-    private void cancelPendingCleanup() {
-        log.info("Cancelling previous pending switch");
-        NativeProcess p = pendingProcess;
-        SocketSession s = pendingSession;
-        pendingProcess = null;
-        pendingSession = null;
-        pendingInitialized = false;
-        switching = false;
-
-        if (s != null && !s.isClosed()) {
-            s.send(MSG_SHUTDOWN, null);
-        }
-        if (p != null && p.isAlive()) {
-            p.destroyForcibly();
-        }
-    }
-
+    /**
+     * 停止所有子进程和会话。
+     */
     public void stop() {
-        switching = false;
-        cancelPendingCleanup();
-        stopProcess(activeSession, activeProcess);
-        activeSession = null;
-        activeInitialized = false;
-        activeProcess = null;
+        // 取消 pending
+        if (sessionManager.isSwitching()) {
+            SocketSession oldPending = sessionManager.cancelPendingCleanup();
+            if (oldPending != null && !oldPending.isClosed()) {
+                oldPending.send(MSG_SHUTDOWN, null);
+            }
+            processManager.clearPending();
+        }
+
+        // 停止 active
+        SocketSession activeSess = sessionManager.getActiveSession();
+        if (activeSess != null && !activeSess.isClosed()) {
+            activeSess.send(MSG_SHUTDOWN, null);
+        }
+        processManager.stopProcess(processManager.getActiveProcess());
+        sessionManager.reset();
+
         log.info("SiftMatchHandler stopped");
     }
 
+    /**
+     * 检查 active 进程和会话是否就绪。
+     */
     public boolean isReady() {
-        return activeInitialized && activeSession != null && !activeSession.isClosed()
-                && activeProcess != null && activeProcess.isAlive();
+        return sessionManager.isReady();
     }
+
+    // ==================== 内嵌类型（向后兼容） ====================
 
     @FunctionalInterface
     public interface StateCallback {
         void onStateChange(boolean ready, String detail);
     }
 
-    public record MatchResult(boolean success, double x, double y) {
-        public static final MatchResult FAIL = new MatchResult(false, 0, 0);
+    public record MatchResult(boolean success, double x, double y,
+                               float tMinimapMs, float tExtractMs, float tFlannMs) {
+        public static final MatchResult FAIL = new MatchResult(false, 0, 0, 0, 0, 0);
     }
 }

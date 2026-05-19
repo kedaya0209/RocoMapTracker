@@ -1,6 +1,9 @@
 package com.luoke.app.ui;
 
-import com.luoke.app.config.AppConfig;
+import com.luoke.app.config.ConfigPersistence;
+import com.luoke.app.config.PathConfig;
+import com.luoke.app.config.UiConfig;
+import com.luoke.app.config.ViewConfig;
 import com.luoke.app.context.OcrAsyncManager;
 import com.luoke.app.hook.impl.UiResponseHook;
 import com.luoke.app.hook.multicast.HookRegistry;
@@ -9,6 +12,7 @@ import com.luoke.app.socket.SocketServer;
 import com.luoke.app.ui.component.LoadingOverlay;
 import com.luoke.app.ui.component.UiAnimator;
 import com.luoke.app.ui.service.*;
+import com.luoke.app.ui.util.DialogUtils;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.scene.Scene;
@@ -37,7 +41,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class ModernCanvasApp extends Application {
 
-    private final WindowManager windowManager = new WindowManager(AppConfig.RESIZE_MARGIN);
+    private final WindowManager windowManager = new WindowManager(UiConfig.RESIZE_MARGIN);
     private final UiAnimator uiAnimator = new UiAnimator();
     private final SiftClientManager siftClientManager = new SiftClientManager();
     private final CaptureServiceManager captureServiceManager = new CaptureServiceManager();
@@ -50,6 +54,7 @@ public class ModernCanvasApp extends Application {
 
     @Override
     public void start(Stage primaryStage) {
+        ConfigPersistence.init(); // 配置加载必须在所有 Config 字段读取之前
         this.primaryStage = primaryStage;
 
         // ---- 1. 场景骨架 ----
@@ -70,14 +75,14 @@ public class ModernCanvasApp extends Application {
         rootStack.getChildren().add(globalLoading);
         HookRegistry.INSTANCE.register(new UiResponseHook(rootStack, globalLoading));
 
-        Scene scene = new Scene(wrapper, AppConfig.INITIAL_WINDOW_WIDTH, AppConfig.INITIAL_WINDOW_HEIGHT);
+        Scene scene = new Scene(wrapper, ViewConfig.INITIAL_WINDOW_WIDTH, ViewConfig.INITIAL_WINDOW_HEIGHT);
         scene.setFill(Color.TRANSPARENT);
         primaryStage.initStyle(StageStyle.TRANSPARENT);
         primaryStage.setScene(scene);
 
         // 程序图标
         try {
-            Image icon = SvgManager.createImage(AppConfig.ICON, 256);
+            Image icon = SvgManager.createImage(PathConfig.ICON, 256);
             if (icon != null) primaryStage.getIcons().add(icon);
         } catch (Exception e) {
             log.warn("程序图标加载失败", e);
@@ -88,7 +93,7 @@ public class ModernCanvasApp extends Application {
         InfrastructureManager.init();
 
         // ---- 3. 主题 ----
-        ThemeManager.applyTheme(AppConfig.THEME);
+        ThemeManager.applyTheme(UiConfig.THEME);
 
         // ---- 4. SIFT 切换回调 ----
         SwitchMapMatcher.getInstance().setSwitchCallback(newVariant -> {
@@ -97,10 +102,15 @@ public class ModernCanvasApp extends Application {
         });
 
         // ---- 5. 资源初始化 → 主界面构建 ----
+        ResourceInitService initService = getResourceInitService();
+        initService.start(this::buildMainUi);
+    }
+
+    private ResourceInitService getResourceInitService() {
         ResourceInitUiDelegate uiDelegate = new ResourceInitUiDelegate() {
             @Override
             public void showFirstRunDialog(Runnable onDownload, Runnable onBuiltIn, Runnable onExit) {
-                com.luoke.app.ui.util.DialogUtils.showFirstRunDialog(
+                DialogUtils.showFirstRunDialog(
                         rootStack, "资源准备", "本地资源未准备好，选择启动方式：",
                         onDownload, onBuiltIn, onExit);
             }
@@ -125,8 +135,7 @@ public class ModernCanvasApp extends Application {
             }
         };
 
-        ResourceInitService initService = new ResourceInitService(uiDelegate);
-        initService.start(this::buildMainUi);
+        return new ResourceInitService(uiDelegate);
     }
 
     /**

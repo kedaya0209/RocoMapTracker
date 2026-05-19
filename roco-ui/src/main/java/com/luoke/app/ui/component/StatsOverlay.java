@@ -1,6 +1,7 @@
 package com.luoke.app.ui.component;
 
-import com.luoke.app.config.AppConfig;
+import com.luoke.app.config.StatsConfig;
+import com.luoke.app.config.UiConfig;
 import com.luoke.app.context.StatsContext;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -9,17 +10,17 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
 import javafx.scene.text.Font;
+import javafx.scene.text.TextAlignment;
 
 public class StatsOverlay extends StackPane {
 
     private final Label statsLabel;
     // 缓存可见状态，避免每帧调用 isVisible()/setVisible()/setManaged()
-    // 这些 JavaFX Node 方法在高频热路径上累积原生资源导致 5GB 泄漏
     private boolean shown;
 
     private StatsOverlay() {
         statsLabel = new Label();
-        statsLabel.setFont(Font.font(AppConfig.STATS_FONT_NAME, AppConfig.STATS_FONT_SIZE));
+        statsLabel.setFont(Font.font(UiConfig.STATS_FONT_NAME, UiConfig.STATS_FONT_SIZE));
         statsLabel.setTextFill(Color.WHITE);
 
         Rectangle background = new Rectangle();
@@ -33,7 +34,7 @@ public class StatsOverlay extends StackPane {
         this.getChildren().addAll(background, statsLabel);
         this.setAlignment(Pos.CENTER);
         this.setPickOnBounds(false);
-        this.setPadding(new Insets(AppConfig.STATS_PADDING));
+        this.setPadding(new Insets(UiConfig.STATS_PADDING));
         this.setVisible(false);
         this.setManaged(true);
     }
@@ -43,8 +44,11 @@ public class StatsOverlay extends StackPane {
     }
 
     public void update() {
-        boolean active = AppConfig.SHOW_STATS_MATCH_TIME || AppConfig.SHOW_STATS_DIR_TIME
-                || AppConfig.SHOW_STATS_FPS;
+        boolean active = StatsConfig.SHOW_STATS_MATCH_TIME || StatsConfig.SHOW_STATS_DIR_TIME
+                || StatsConfig.SHOW_STATS_FPS
+                || StatsConfig.SHOW_STATS_SIFT_MINIMAP_TIME
+                || StatsConfig.SHOW_STATS_SIFT_EXTRACT_TIME
+                || StatsConfig.SHOW_STATS_SIFT_FLANN_TIME;
 
         if (active != shown) {
             shown = active;
@@ -62,12 +66,15 @@ public class StatsOverlay extends StackPane {
         }
 
         StatsContext stats = StatsContext.getInstance();
-        StringBuilder sb = new StringBuilder(64);
-        if (AppConfig.SHOW_STATS_MATCH_TIME) sb.append("匹配:").append(stats.getLastMatchMs()).append("ms  ");
-        if (AppConfig.SHOW_STATS_DIR_TIME) sb.append("朝向:").append(stats.getLastDirectionMs()).append("ms  ");
-        if (AppConfig.SHOW_STATS_FPS) sb.append("FPS:").append(stats.getFrequency());
-
-        statsLabel.setText(sb.toString());
+        StringBuilder sb = new StringBuilder(96);
+        if (StatsConfig.SHOW_STATS_FPS) sb.append("FPS:").append(stats.getFrequency()).append("\n");
+        if (StatsConfig.SHOW_STATS_MATCH_TIME) sb.append("匹配:").append(stats.getLastMatchMs()).append("ms  ");
+        if (StatsConfig.SHOW_STATS_DIR_TIME) sb.append("朝向:").append(stats.getLastDirectionMs()).append("ms\n");
+        if (StatsConfig.SHOW_STATS_SIFT_MINIMAP_TIME) sb.append("小地图:").append(stats.getLastSiftMinimapMs()).append("ms  ");
+        if (StatsConfig.SHOW_STATS_SIFT_EXTRACT_TIME) sb.append("提取:").append(stats.getLastSiftExtractMs()).append("ms  ");
+        if (StatsConfig.SHOW_STATS_SIFT_FLANN_TIME) sb.append("FLANN:").append(stats.getLastSiftFlannMs()).append("ms");
+        statsLabel.setTextAlignment(TextAlignment.RIGHT);
+        statsLabel.setText(sb.toString().trim());
     }
 
     private static class Holder {

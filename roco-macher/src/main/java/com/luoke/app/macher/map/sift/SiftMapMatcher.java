@@ -1,6 +1,6 @@
 package com.luoke.app.macher.map.sift;
 
-import com.luoke.app.config.AppConfig;
+import com.luoke.app.config.SiftConfig;
 import com.luoke.app.macher.map.MapMatcher;
 import com.luoke.app.utils.ResourceUtils;
 import lombok.extern.slf4j.Slf4j;
@@ -53,11 +53,11 @@ public class SiftMapMatcher implements MapMatcher {
 
     // ==================== 实例字段 ====================
     private final SIFT sift = SIFT.create(
-            AppConfig.SIFT_N_FEATURES,
-            AppConfig.SIFT_N_OCTAVE_LAYERS,
-            AppConfig.SIFT_CONTRAST_THRESHOLD,
-            AppConfig.SIFT_EDGE_THRESHOLD,
-            AppConfig.SIFT_SIGMA,
+            SiftConfig.SIFT_N_FEATURES,
+            SiftConfig.SIFT_N_OCTAVE_LAYERS,
+            SiftConfig.SIFT_CONTRAST_THRESHOLD,
+            SiftConfig.SIFT_EDGE_THRESHOLD,
+            SiftConfig.SIFT_SIGMA,
             false);
     // --- 持久化 Mat (scope 外创建, destroy 时关闭) ---
     private final Mat emptyMask = new Mat();
@@ -156,7 +156,7 @@ public class SiftMapMatcher implements MapMatcher {
             currentMatcher.knnMatch(queryDesc, rawMatches, 2);
 
             List<DMatch> goodMatches = new ArrayList<>(128);
-            float ratio = AppConfig.MATCH_RATIO_THRESHOLD;
+            float ratio = SiftConfig.MATCH_RATIO_THRESHOLD;
             long matchSize = rawMatches.size();
             for (long i = 0; i < matchSize; i++) {
                 DMatchVector dmv = rawMatches.get(i);
@@ -175,7 +175,7 @@ public class SiftMapMatcher implements MapMatcher {
                     ? filterByProximity(goodMatches, hintX, hintY)
                     : goodMatches;
 
-            if (filteredMatches.size() >= AppConfig.MATCH_MIN_COUNT) {
+            if (filteredMatches.size() >= SiftConfig.MATCH_MIN_COUNT) {
                 double[][] result = executeRansac(filteredMatches, sceneKeyPoints, width, height);
                 return result;
             }
@@ -201,12 +201,12 @@ public class SiftMapMatcher implements MapMatcher {
             float kx = fb.get(trainIdx * 2);
             float ky = fb.get(trainIdx * 2 + 1);
             double dist = Math.hypot(kx - hintX, ky - hintY);
-            if (dist <= AppConfig.SEARCH_RADIUS) {
+            if (dist <= SiftConfig.SEARCH_RADIUS) {
                 kept.add(dm);
             }
         }
         // 过滤后数量不足则返回原始列表，保证匹配不中断
-        return kept.size() >= AppConfig.MATCH_MIN_COUNT ? kept : matches;
+        return kept.size() >= SiftConfig.MATCH_MIN_COUNT ? kept : matches;
     }
 
     // ==================== RANSAC ====================
@@ -236,7 +236,7 @@ public class SiftMapMatcher implements MapMatcher {
             validCount++;
         }
 
-        if (validCount < AppConfig.MATCH_MIN_COUNT) return null;
+        if (validCount < SiftConfig.MATCH_MIN_COUNT) return null;
 
         Mat srcPts = new Mat(validCount, 1, opencv_core.CV_32FC2);
         Mat dstPts = new Mat(validCount, 1, opencv_core.CV_32FC2);
@@ -246,8 +246,8 @@ public class SiftMapMatcher implements MapMatcher {
         // 局部 Mat 避免与 destroy() 竞态
         Mat ransacMask = new Mat();
         Mat H = opencv_calib3d.findHomography(srcPts, dstPts, opencv_calib3d.RANSAC,
-                AppConfig.RANSAC_REPROJ_THRESHOLD, ransacMask,
-                AppConfig.RANSAC_MAX_ITERS, AppConfig.RANSAC_CONFIDENCE);
+                SiftConfig.RANSAC_REPROJ_THRESHOLD, ransacMask,
+                SiftConfig.RANSAC_MAX_ITERS, SiftConfig.RANSAC_CONFIDENCE);
 
         if (!H.empty() && H.rows() == 3) {
             // 计算 RANSAC 内点率，作为匹配置信度
@@ -284,8 +284,8 @@ public class SiftMapMatcher implements MapMatcher {
 
     private void initMatcher() {
         FlannBasedMatcher newMatcher = new FlannBasedMatcher(
-                new KDTreeIndexParams(AppConfig.FLANN_KD_TREES),
-                new SearchParams(AppConfig.FLANN_SEARCH_CHECKS, 0, true));
+                new KDTreeIndexParams(SiftConfig.FLANN_KD_TREES),
+                new SearchParams(SiftConfig.FLANN_SEARCH_CHECKS, 0, true));
 
         try (PointerScope scope = new PointerScope()) {
             Mat tempFloat = new Mat();
@@ -322,7 +322,7 @@ public class SiftMapMatcher implements MapMatcher {
             int mapW = mapGray.cols();
             long totalPixels = (long) mapW * mapH;
 
-            if (totalPixels >= AppConfig.SIFT_LARGE_MAP_THRESHOLD) {
+            if (totalPixels >= SiftConfig.SIFT_LARGE_MAP_THRESHOLD) {
                 log.info("{} 地图较大({}x{}={}px), 启用重叠分块特征提取", logName, mapW, mapH, totalPixels);
                 trainTiled(mapGray, mapW, mapH);
             } else {
@@ -376,14 +376,14 @@ public class SiftMapMatcher implements MapMatcher {
     /**
      * 大图重叠分块训练（Overlapping Tiling）。
      *
-     * <p>将地图切分为 AppConfig.SIFT_TILE_SIZE×AppConfig.SIFT_TILE_SIZE 的瓦片，
-     * 相邻瓦片重叠 AppConfig.SIFT_TILE_OVERLAP 像素。每块独立执行 SIFT 检测，
+     * <p>将地图切分为 SiftConfig.SIFT_TILE_SIZE×SiftConfig.SIFT_TILE_SIZE 的瓦片，
+     * 相邻瓦片重叠 SiftConfig.SIFT_TILE_OVERLAP 像素。每块独立执行 SIFT 检测，
      * 然后通过空间网格去重合并结果。
      */
     private void trainTiled(Mat mapGray, int mapW, int mapH) {
-        int stride = AppConfig.SIFT_TILE_SIZE - AppConfig.SIFT_TILE_OVERLAP;
-        int cols = (int) Math.ceil((double) (mapW - AppConfig.SIFT_TILE_OVERLAP) / stride);
-        int rows = (int) Math.ceil((double) (mapH - AppConfig.SIFT_TILE_OVERLAP) / stride);
+        int stride = SiftConfig.SIFT_TILE_SIZE - SiftConfig.SIFT_TILE_OVERLAP;
+        int cols = (int) Math.ceil((double) (mapW - SiftConfig.SIFT_TILE_OVERLAP) / stride);
+        int rows = (int) Math.ceil((double) (mapH - SiftConfig.SIFT_TILE_OVERLAP) / stride);
         log.info("{} 瓦片布局: {}x{} ({} tiles)", logName, cols, rows, cols * rows);
 
         // 收集所有瓦片的特征点
@@ -396,8 +396,8 @@ public class SiftMapMatcher implements MapMatcher {
             for (int c = 0; c < cols; c++) {
                 int tileX = c * stride;
                 int tileY = r * stride;
-                int tileW = Math.min(AppConfig.SIFT_TILE_SIZE, mapW - tileX);
-                int tileH = Math.min(AppConfig.SIFT_TILE_SIZE, mapH - tileY);
+                int tileW = Math.min(SiftConfig.SIFT_TILE_SIZE, mapW - tileX);
+                int tileH = Math.min(SiftConfig.SIFT_TILE_SIZE, mapH - tileY);
 
                 try (PointerScope scope = new PointerScope()) {
                     Rect roi = new Rect(tileX, tileY, tileW, tileH);
@@ -455,7 +455,7 @@ public class SiftMapMatcher implements MapMatcher {
         Arrays.sort(sortedIndices, (a, b) -> Float.compare(kpResponses.get(b), kpResponses.get(a)));
 
         // 空间网格索引，O(1) 近邻查询重复点
-        int cellSize = (int) Math.ceil(AppConfig.SIFT_DEDUP_DISTANCE);
+        int cellSize = (int) Math.ceil(SiftConfig.SIFT_DEDUP_DISTANCE);
         int gridCols = mapW / cellSize + 1;
         int gridRows = mapH / cellSize + 1;
         int[] grid = new int[gridCols * gridRows];
@@ -478,7 +478,7 @@ public class SiftMapMatcher implements MapMatcher {
                         if (existing >= 0) {
                             float[] ekp = kpCoords.get(existing);
                             float dist = (float) Math.hypot(coord[0] - ekp[0], coord[1] - ekp[1]);
-                            if (dist < AppConfig.SIFT_DEDUP_DISTANCE) {
+                            if (dist < SiftConfig.SIFT_DEDUP_DISTANCE) {
                                 duplicate = true;
                                 break outer;
                             }

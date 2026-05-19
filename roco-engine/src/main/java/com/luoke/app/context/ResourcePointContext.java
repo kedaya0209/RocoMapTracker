@@ -2,7 +2,7 @@ package com.luoke.app.context;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.luoke.app.config.AppConfig;
+import com.luoke.app.config.PathConfig;
 import com.luoke.app.hook.HookEventType;
 import com.luoke.app.hook.event.NotificationType;
 import com.luoke.app.hook.event.StatusEvent;
@@ -45,7 +45,7 @@ public class ResourcePointContext {
             rawResourceList.addAll(configs);
 
             //加载所有可收集资源
-            collectSet.addAll(ResourceUtils.readResourceLines(AppConfig.RESOURCE_COLLECT_SET));
+            collectSet.addAll(ResourceUtils.readResourceLines(PathConfig.RESOURCE_COLLECT_SET));
             preprocessPoints();
             log.info("资源点位加载完成，总数：{}", pointList.size());
         } catch (Exception e) {
@@ -128,7 +128,7 @@ public class ResourcePointContext {
     }
 
     private void saveToFile() throws Exception {
-        File target = ResourceUtils.getExternalFile(AppConfig.RESOURCE_POINT_CONFIG_PATH);
+        File target = ResourceUtils.getExternalFile(PathConfig.RESOURCE_POINT_CONFIG_PATH);
         objectMapper.writerWithDefaultPrettyPrinter().writeValue(target, rawResourceList);
     }
 
