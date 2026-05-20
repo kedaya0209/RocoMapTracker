@@ -49,8 +49,6 @@ public final class PathConfig {
     public static final String OCR_REC_MODEL = "ch_PP-OCRv4_rec_mobile.onnx";
     public static final String OCR_DET_MODEL = "ch_PP-OCRv4_det_mobile.onnx";
     public static final String PPOCR_KEYS = "ppocr_keys_v1.txt";
-    public static final String ARROW_MODEL_NAME = "arrow_fp32.onnx";
-
     // ============================================================
     // 配置文件
     // ============================================================

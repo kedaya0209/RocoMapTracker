@@ -38,6 +38,7 @@
         <javacv.version>4.13.0-1.5.13</javacv.version>
         <openblas.version>0.3.31-1.5.13</openblas.version>
         <javacpp.version>1.5.13</javacpp.version>
+        <app.version>${project.version}</app.version>
     </properties>
 
     <dependencyManagement>

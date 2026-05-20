@@ -8617,11 +8617,7 @@
     },
     {
       "glob": "logback.xml"
-    },
-    {
-      "glob": "model/arrow_fp32.onnx"
-    },
-    {
+    },    {
       "glob": "model/ch_PP-OCRv4_det_mobile.onnx"
     },
     {

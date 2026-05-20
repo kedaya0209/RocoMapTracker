@@ -114,12 +114,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-maven-
 
-      - name: Update version in pom.xml
-        shell: cmd
-        run: |
-          echo Setting version to ${{ github.event.inputs.version }}
-          mvn versions:set "-DnewVersion=${{ github.event.inputs.version }}" -DgenerateBackupPoms=false --no-transfer-progress
-
       - name: Download C++ binaries
         uses: actions/download-artifact@v4
         with:
@@ -146,7 +140,7 @@ jobs:
         uses: ilammy/msvc-dev-cmd@v1
 
       - name: Build Native Image
-        run: mvn -Pnative clean package -pl roco-ui -am --no-transfer-progress
+        run: mvn -Pnative clean package -pl roco-ui -am --no-transfer-progress "-Dapp.version=${{ github.event.inputs.version }}"
 
       - name: Download previous EXE from previous Release
         continue-on-error: true
