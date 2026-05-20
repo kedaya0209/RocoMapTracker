@@ -179,8 +179,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: RocoMapTracker-${{ github.sha }}
-          path: |
-            roco-ui/target/RocoMapTracker.exe
-            cpp/capture.exe
-            cpp/sift_match.exe
+          path: roco-ui/target/RocoMapTracker.exe
           compression-level: 0
