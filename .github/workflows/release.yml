@@ -148,11 +148,17 @@ jobs:
       - name: Build Native Image
         run: mvn -Pnative clean package -pl roco-ui -am --no-transfer-progress
 
-      - name: Download previous EXE from latest Release
+      - name: Download previous EXE from previous Release
         continue-on-error: true
         shell: bash
         run: |
-          gh release download latest --pattern "RocoMapTracker.exe" --repo kedaya0209/RocoMapTracker --skip-existing 2>/dev/null || echo "No previous release found, skipping"
+          PREV_TAG="${{ steps.prev_tag.outputs.prev_tag }}"
+          if [ -n "$PREV_TAG" ]; then
+            echo "Downloading previous exe from $PREV_TAG ..."
+            gh release download "$PREV_TAG" --pattern "RocoMapTracker.exe" --repo kedaya0209/RocoMapTracker --skip-existing 2>/dev/null || echo "No exe asset found in $PREV_TAG"
+          else
+            echo "No previous release tag found, skipping"
+          fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -194,6 +200,14 @@ jobs:
               powershell -Command "(Get-FileHash '%%f' -Algorithm SHA256).Hash.ToLower() | Set-Content '%%f.sha256' -Encoding ASCII"
             )
           )
+
+      - name: Cleanup existing release and tag
+        continue-on-error: true
+        shell: bash
+        run: |
+          echo "Cleaning up any existing v${{ github.event.inputs.version }} release and tag ..."
+          gh release delete "v${{ github.event.inputs.version }}" --yes 2>/dev/null || true
+          git push --delete origin "v${{ github.event.inputs.version }}" 2>/dev/null || true
 
       - name: Generate release notes
         shell: bash
