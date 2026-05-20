@@ -64,7 +64,7 @@ public class CaptureService {
                 try {
                     if (processor.targetRoiIndex() == -1 || processor.targetRoiIndex() == index) {
                         if (processor.requiredImageType() == RoiProcessor.ImageType.BGRA) {
-                            processor.onProcess(data, w, h);
+                            processor.onProcess(compactBgra(data, w, h, stride), w, h);
                         } else {
                             if (gray == null) {
                                 gray = bgraToGray(data, w, h, stride);
@@ -107,6 +107,20 @@ public class CaptureService {
             }
         }
         return gray;
+    }
+
+    /**
+     * 将 stride 对齐的 BGRA 缓冲区压缩为紧凑格式（w*h*4 字节），
+     * 方便传递给 RoiProcessor / Socket 通信。
+     * 若 stride == w*4 则直接返回原数组（无需拷贝）。
+     */
+    private static byte[] compactBgra(byte[] bgra, int w, int h, int stride) {
+        if (stride == w * 4) return bgra;
+        byte[] compact = new byte[w * h * 4];
+        for (int y = 0; y < h; y++) {
+            System.arraycopy(bgra, y * stride, compact, y * w * 4, w * 4);
+        }
+        return compact;
     }
 
     /**

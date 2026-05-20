@@ -2,10 +2,12 @@ package com.luoke.app.ui.render;
 
 import com.luoke.app.config.PathConfig;
 import com.luoke.app.config.RenderConfig;
+import com.luoke.app.context.CameraContext;
 import com.luoke.app.context.MapContext;
 import com.luoke.app.map.model.Point;
 import com.luoke.app.map.model.ResourcePoint;
 import com.luoke.app.ui.service.IconCache;
+import com.luoke.app.ui.util.CoordinateUtil;
 import javafx.scene.Node;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
@@ -62,7 +64,7 @@ public class HoverRenderer implements RenderLayer {
     }
 
     /**
-     * hover 光环绘制 — 世界坐标转屏幕坐标
+     * hover 光环绘制 — 世界坐标转屏幕坐标（含导航模式旋转补偿）
      */
     private void redrawHover(double ox, double oy, double scale) {
         double w = hoverCanvas.getWidth();
@@ -72,9 +74,14 @@ public class HoverRenderer implements RenderLayer {
         hoverGc.clearRect(0, 0, w, h);
         if (hoveredPoint == null) return;
 
+        CameraContext cam = CameraContext.getInstance();
+        double navAngle = cam.isNavMode() ? cam.getNavAngle() : 0;
+        double pivotX = hoverCanvas.getWidth() / 2;
+        double pivotY = hoverCanvas.getHeight() / 2;
+
         Point pos = hoveredPoint.getScreenPosition();
-        double sx = pos.getX() * scale + ox;
-        double sy = pos.getY() * scale + oy;
+        double[] screen = CoordinateUtil.worldToScreen(pos.getX(), pos.getY(), ox, oy, scale, navAngle, pivotX, pivotY);
+        double sx = screen[0], sy = screen[1];
 
         // 光环
         double hoverSize = RenderConfig.HOVER_ICON_SIZE;

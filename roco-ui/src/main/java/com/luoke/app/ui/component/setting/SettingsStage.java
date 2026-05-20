@@ -4,6 +4,8 @@ import atlantafx.base.theme.Styles;
 import com.luoke.app.capture.CaptureService;
 import com.luoke.app.ui.util.DialogUtils;
 import com.luoke.app.ui.util.FxRippleUtil;
+import javafx.application.Platform;
+import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Cursor;
@@ -182,18 +184,38 @@ public class SettingsStage extends Stage {
      * 打开设置面板，首次打开时延迟刷新分类内容避免卡顿
      */
     public void showDialog(StackPane ownerRoot) {
+        showDialog(ownerRoot, null);
+    }
+
+    /**
+     * 打开设置面板并选中指定分类
+     */
+    public void showDialog(StackPane ownerRoot, String selectCategoryName) {
         this.ownerRoot = ownerRoot;
         show();
         toFront();
 
         if (needsInitialRefresh) {
             needsInitialRefresh = false;
-            // 先显示窗口骨架，下一帧再填充分类控件
-            javafx.application.Platform.runLater(() -> {
-                categoryList.getSelectionModel().select(0);
-                // select 会触发 selectedItemProperty 监听器 → refreshCategory()
+            Platform.runLater(() -> {
+                int idx = findCategoryIndex(selectCategoryName);
+                categoryList.getSelectionModel().select(idx);
             });
+        } else if (selectCategoryName != null) {
+            int idx = findCategoryIndex(selectCategoryName);
+            if (idx >= 0) {
+                categoryList.getSelectionModel().select(idx);
+            }
         }
+    }
+
+    private int findCategoryIndex(String name) {
+        if (name == null) return 0;
+        ObservableList<SettingCategory> items = categoryList.getItems();
+        for (int i = 0; i < items.size(); i++) {
+            if (items.get(i).name().equals(name)) return i;
+        }
+        return 0;
     }
 
     // ================================================================

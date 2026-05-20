@@ -17,7 +17,7 @@ public final class CaptureConfig {
     /**
      * 应用主窗口标题
      */
-    public static String APP_MAIN_TITLE = "洛克王国地图";
+    public static String APP_MAIN_TITLE = "RocoMapTracker";
     /**
      * 目标捕获帧率
      */

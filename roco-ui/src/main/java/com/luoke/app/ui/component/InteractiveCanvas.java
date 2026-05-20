@@ -5,6 +5,7 @@ import com.luoke.app.config.ViewConfig;
 import com.luoke.app.context.CameraContext;
 import com.luoke.app.context.MapContext;
 import com.luoke.app.context.PathContext;
+import com.luoke.app.ui.util.CoordinateUtil;
 import com.luoke.app.map.model.ResourcePoint;
 import com.luoke.app.ui.render.MapRenderer;
 import javafx.application.Platform;
@@ -200,10 +201,30 @@ public class InteractiveCanvas extends Canvas {
     // ================================================================
 
     public double toLogicX(double canvasX) {
-        return (canvasX - mapManager.getOffsetX()) / mapManager.getScale();
+        double ox = mapManager.getOffsetX();
+        double oy = mapManager.getOffsetY();
+        double scale = mapManager.getScale();
+        if (cameraManager.isNavMode() && cameraManager.getNavAngle() != 0) {
+            double pivotX = getWidth() / 2;
+            double pivotY = getHeight() / 2;
+            double[] world = CoordinateUtil.screenToWorld(canvasX, pivotY, ox, oy, scale,
+                    cameraManager.getNavAngle(), pivotX, pivotY);
+            return world[0];
+        }
+        return (canvasX - ox) / scale;
     }
 
     public double toLogicY(double canvasY) {
-        return (canvasY - mapManager.getOffsetY()) / mapManager.getScale();
+        double ox = mapManager.getOffsetX();
+        double oy = mapManager.getOffsetY();
+        double scale = mapManager.getScale();
+        if (cameraManager.isNavMode() && cameraManager.getNavAngle() != 0) {
+            double pivotX = getWidth() / 2;
+            double pivotY = getHeight() / 2;
+            double[] world = CoordinateUtil.screenToWorld(pivotX, canvasY, ox, oy, scale,
+                    cameraManager.getNavAngle(), pivotX, pivotY);
+            return world[1];
+        }
+        return (canvasY - oy) / scale;
     }
 }

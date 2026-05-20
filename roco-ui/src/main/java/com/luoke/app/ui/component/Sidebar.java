@@ -3,8 +3,10 @@ package com.luoke.app.ui.component;
 import atlantafx.base.theme.Styles;
 import com.luoke.app.config.ConfigPersistence;
 import com.luoke.app.config.DownloadConfig;
+import com.luoke.app.config.NavigConfig;
 import com.luoke.app.config.UiConfig;
 import com.luoke.app.config.SiftConfig;
+import com.luoke.app.context.CameraContext;
 import com.luoke.app.context.ResourceConfigContext;
 import com.luoke.app.hook.HookEventType;
 import com.luoke.app.hook.event.NotificationType;
@@ -44,6 +46,7 @@ public class Sidebar extends VBox {
     // 当前展开状态
     private SidebarItem.Category expandedCategory = null;
     private volatile boolean isAlgorithmLoading = false;
+    private UiAnimator animator;
 
     public Sidebar() {
         super(0);
@@ -99,6 +102,14 @@ public class Sidebar extends VBox {
         items.add(new SidebarItem(SidebarItem.Type.HEADER, "主题切换",
                 SidebarItem.Category.THEME, UiConfig.THEME, null, false, "/icon/theme.svg", null));
 
+        // 视角跟随模式
+        items.add(new SidebarItem(SidebarItem.Type.HEADER, "视角跟随",
+                SidebarItem.Category.NAVIGATION, NavigConfig.NAVIGATION_ENABLED ? "已开启" : "已关闭", null, false, "/icon/navigation.svg", null));
+
+        // 匹配开关
+        items.add(new SidebarItem(SidebarItem.Type.HEADER, "匹配开关",
+                SidebarItem.Category.MATCH, SiftConfig.SIFT_MATCHING_ENABLED ? "已开启" : "已关闭", null, false, "/icon/match_toggle.svg", null));
+
         // 路线管理
         items.add(new SidebarItem(SidebarItem.Type.ACTION, "路线管理", null, null, null, false, "/icon/route.svg", this::openRouteManager));
 
@@ -117,6 +128,13 @@ public class Sidebar extends VBox {
             case ALGORITHM -> SwitchMapMatcher.getInstance().getMatchers().toArray(new String[0]);
             case RESOURCE -> ResourceConfigContext.getTags().toArray(new String[0]);
             case THEME -> ThemeManager.getAvailableThemes();
+            case NAVIGATION -> new String[]{
+                "启用视角跟随",
+                "打开导航设置"
+            };
+            case MATCH -> new String[]{
+                SiftConfig.SIFT_MATCHING_ENABLED ? "禁用匹配" : "启用匹配"
+            };
         };
         String currentValue = item.currentValue();
         int insertIndex = items.indexOf(item) + 1;
@@ -140,8 +158,54 @@ public class Sidebar extends VBox {
             case ALGORITHM -> switchAlgorithm(value, header);
             case RESOURCE -> switchResource(value, header);
             case THEME -> switchTheme(value, header);
+            case NAVIGATION -> handleNavOption(value, header);
+            case MATCH -> handleMatchOption(value, header);
         }
         collapseCurrent();
+    }
+
+    private void handleNavOption(String value, SidebarItem header) {
+        switch (value) {
+            case "启用视角跟随" -> {
+                boolean enabled = !NavigConfig.NAVIGATION_ENABLED;
+                NavigConfig.NAVIGATION_ENABLED = enabled;
+                CameraContext.getInstance().setNavMode(enabled);
+                TitleBar.getInstance().setNavModeFromExternal(enabled);
+                updateHeaderValue(header, enabled ? "已开启" : "已关闭");
+                closeSidebarAfterDelay();
+            }
+            case "打开导航设置" -> openSettingsCategory("视角跟随");
+        }
+    }
+
+    private void handleMatchOption(String value, SidebarItem header) {
+        boolean enabled = SiftConfig.SIFT_MATCHING_ENABLED;
+        switch (value) {
+            case "启用匹配" -> {
+                if (!enabled) {
+                    SiftConfig.SIFT_MATCHING_ENABLED = true;
+                    TitleBar.getInstance().publishMatchToggleEvent();
+                    updateHeaderValue(header, "已开启");
+                    closeSidebarAfterDelay();
+                }
+            }
+            case "禁用匹配" -> {
+                if (enabled) {
+                    SiftConfig.SIFT_MATCHING_ENABLED = false;
+                    TitleBar.getInstance().publishMatchToggleEvent();
+                    updateHeaderValue(header, "已关闭");
+                    closeSidebarAfterDelay();
+                }
+            }
+        }
+    }
+
+    private void closeSidebarAfterDelay() {
+        Platform.runLater(() -> {
+            if (animator != null) {
+                animator.closeSidebar();
+            }
+        });
     }
 
     private void collapseCurrent() {
@@ -204,6 +268,10 @@ public class Sidebar extends VBox {
     }
 
     private void openSettings() {
+        openSettingsCategory(null);
+    }
+
+    private void openSettingsCategory(String categoryName) {
         StackPane rootPane = findRootPane();
         if (rootPane == null) return;
 
@@ -211,7 +279,11 @@ public class Sidebar extends VBox {
         if (settingsStage.getOwner() == null && rootPane.getScene() != null) {
             settingsStage.initOwner(rootPane.getScene().getWindow());
         }
-        settingsStage.showDialog(rootPane);
+        settingsStage.showDialog(rootPane, categoryName);
+    }
+
+    public void setAnimator(UiAnimator animator) {
+        this.animator = animator;
     }
 
     private void openRouteManager() {
@@ -287,7 +359,7 @@ public class Sidebar extends VBox {
 
         enum Type {HEADER, OPTION, ACTION, WIKI}
 
-        enum Category {ALGORITHM, RESOURCE, THEME}
+        enum Category {ALGORITHM, RESOURCE, THEME, NAVIGATION, MATCH}
     }
 
     // ========== Cell ==========

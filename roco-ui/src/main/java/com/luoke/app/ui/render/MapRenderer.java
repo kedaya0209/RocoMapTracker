@@ -1,5 +1,6 @@
 package com.luoke.app.ui.render;
 
+import com.luoke.app.capture.processor.NavigationController;
 import com.luoke.app.config.RenderConfig;
 import com.luoke.app.context.CameraContext;
 import com.luoke.app.context.MapContext;
@@ -15,6 +16,7 @@ import javafx.animation.Timeline;
 import javafx.scene.Group;
 import javafx.scene.image.Image;
 import javafx.scene.layout.Pane;
+import javafx.scene.transform.Rotate;
 import javafx.scene.transform.Scale;
 import javafx.scene.transform.Translate;
 import javafx.util.Duration;
@@ -51,10 +53,14 @@ public class MapRenderer implements IHook<Object> {
     @Getter
     private final Pane parent;
     private final Group worldGroup;
-    // worldGroup 变换：Scale 锚点 (0,0)
+    // worldGroup 变换：Rotate(-navAngle, pivotX, pivotY) × Translate(ox,oy) × Scale(scale,scale,0,0)
     private final Scale worldScale;
     private final Translate worldTranslate;
+    private final Rotate worldRotate;
     private final Timeline loop;
+
+    // 导航模式旋转控制器
+    private final NavigationController navigationController;
 
     // 子渲染器
     private final IconLayerManager iconLayerManager;
@@ -78,10 +84,16 @@ public class MapRenderer implements IHook<Object> {
         worldGroup = new Group();
         tileManager = new TileManager(worldGroup, 0, 0);
         worldGroup.setPickOnBounds(false);
-        // 变换链： Translate(ox,oy) × Scale(scale,scale,0,0)
+        // 变换链： Rotate(-navAngle, pivotX, pivotY) × Translate(ox,oy) × Scale(scale,scale,0,0)
+        // JavaFX 变换按列表顺序从右到左合成，因此最后一个元素最先作用于子节点。
+        // Scale 最先应用到子节点坐标 → 然后 Translate → 最后 Rotate（绕视口中心）
         worldScale = new Scale(1, 1, 0, 0);
         worldTranslate = new Translate(0, 0);
-        worldGroup.getTransforms().addAll(worldTranslate, worldScale);
+        worldRotate = new Rotate(0, 0, 0);
+        worldGroup.getTransforms().addAll(worldRotate, worldTranslate, worldScale);
+
+        // 导航模式控制器
+        navigationController = new NavigationController();
 
         // 子渲染器
         iconLayerManager = new IconLayerManager(worldGroup);
@@ -151,6 +163,11 @@ public class MapRenderer implements IHook<Object> {
 
         cam.updateViewport();
 
+        // 导航模式：每帧更新旋转控制
+        if (mm.isPlayerInitialized()) {
+            navigationController.update(mm.getPlayerAngle(), cam.isNavMode());
+        }
+
         double ox = mm.getOffsetX();
         double oy = mm.getOffsetY();
         double scale = mm.getScale();
@@ -180,6 +197,18 @@ public class MapRenderer implements IHook<Object> {
         if (viewportMoved) {
             worldTranslate.setX(ox);
             worldTranslate.setY(oy);
+        }
+
+        // ====== 导航模式旋转 ======
+        if (cam.isNavMode()) {
+            double pivotX = parent.getWidth() / 2;
+            double pivotY = parent.getHeight() / 2;
+            double navAngle = cam.getNavAngle();
+            worldRotate.setPivotX(pivotX);
+            worldRotate.setPivotY(pivotY);
+            worldRotate.setAngle(-navAngle);
+        } else if (worldRotate.getAngle() != 0) {
+            worldRotate.setAngle(0);
         }
 
         // ====== 子渲染器（各层从上下文单例自行读取数据） ======

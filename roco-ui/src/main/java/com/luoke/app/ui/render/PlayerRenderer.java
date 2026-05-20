@@ -2,6 +2,7 @@ package com.luoke.app.ui.render;
 
 import com.luoke.app.config.RenderConfig;
 import com.luoke.app.config.ViewConfig;
+import com.luoke.app.context.CameraContext;
 import com.luoke.app.context.MapContext;
 import javafx.scene.Group;
 import javafx.scene.Node;
@@ -85,6 +86,7 @@ public class PlayerRenderer implements RenderLayer {
     public void onFrame() {
         frameCount++;
         MapContext mm = MapContext.getInstance();
+        CameraContext cam = CameraContext.getInstance();
         double scale = mm.getScale();
         double ox = mm.getOffsetX();
         double oy = mm.getOffsetY();
@@ -101,7 +103,12 @@ public class PlayerRenderer implements RenderLayer {
             double py = mm.getPlayerY();
             playerView.setLayoutX(px - half);
             playerView.setLayoutY(py - half);
-            playerView.setRotate(mm.getPlayerAngle());
+            // 导航模式下 counter-rotate 使图标保持指上
+            double playerAngle = mm.getPlayerAngle();
+            if (cam.isNavMode()) {
+                playerAngle -= cam.getNavAngle();
+            }
+            playerView.setRotate(playerAngle);
 
             // 光环和波纹中心每帧追踪玩家位置
             pickupHalo.setCenterX(px);

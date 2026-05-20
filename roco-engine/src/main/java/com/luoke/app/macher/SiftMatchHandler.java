@@ -7,6 +7,7 @@ import com.luoke.app.hook.event.StatusCarouselEvent;
 import com.luoke.app.hook.multicast.HookRegistry;
 import com.luoke.app.process.NativeProcess;
 import com.luoke.app.process.NativeProcessFactory;
+import com.luoke.app.process.ProcessRestartHelper;
 import com.luoke.app.socket.SocketHandler;
 import com.luoke.app.socket.SocketServer;
 import com.luoke.app.socket.SocketSession;
@@ -42,6 +43,7 @@ public class SiftMatchHandler implements SocketHandler {
 
     private final SiftProcessManager processManager;
     private final SiftSessionManager sessionManager;
+    private final ProcessRestartHelper restartHelper;
 
     // ==================== 协调器自身字段 ====================
 
@@ -75,6 +77,8 @@ public class SiftMatchHandler implements SocketHandler {
         this.server = server;
         this.processManager = new SiftProcessManager(processFactory);
         this.sessionManager = new SiftSessionManager();
+        this.restartHelper = new ProcessRestartHelper("sift_match",
+                SocketConfig.SIFT_RESTART_DELAY);
     }
 
     // ==================== SocketHandler ====================
@@ -120,6 +124,10 @@ public class SiftMatchHandler implements SocketHandler {
         }
 
         // ── Active 进程断开 ──
+        handleActiveDisconnect(session, reason);
+    }
+
+    private void handleActiveDisconnect(SocketSession session, String reason) {
         log.warn("SiftMatchHandler active session #{} disconnected: {}", session.id(), reason);
         sessionManager.handleActiveDisconnect();
         HookRegistry.INSTANCE.publish(HookEventType.STATUS_CAROUSEL,
@@ -133,19 +141,14 @@ public class SiftMatchHandler implements SocketHandler {
 
         if (sessionManager.isSwitching()) {
             log.info("Active disconnected during switch, waiting for pending to take over");
-        } else {
-            // 异步重启 C++ 子进程
-            Thread.ofVirtual().name("sift-restart").start(() -> {
-                try {
-                    Thread.sleep(SocketConfig.SIFT_RESTART_DELAY);
-                    processManager.restartAfterCrash(server);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                }
-            });
-            if (stateCallback != null) {
-                stateCallback.onStateChange(false, reason);
-            }
+            return;
+        }
+
+        // 异步重启 C++ 子进程（使用公共重启辅助组件）
+        restartHelper.restartAsync(server, processManager::restartAfterCrash);
+
+        if (stateCallback != null) {
+            stateCallback.onStateChange(false, reason);
         }
     }
 
@@ -261,6 +264,13 @@ public class SiftMatchHandler implements SocketHandler {
                                         long timeoutMs) throws InterruptedException {
         SocketSession s = sessionManager.getActiveSession();
         if (s == null || !sessionManager.isReady()) {
+            if (s == null) {
+                log.warn("sendFrameAndWait skipped: activeSession is null");
+            } else if (!sessionManager.isReady()) {
+                log.warn("sendFrameAndWait skipped: activeSession={} init={} ready={} closed={}",
+                        s, sessionManager.isActiveInitialized(),
+                        sessionManager.isActiveReady(), s.isClosed());
+            }
             return MatchResult.FAIL;
         }
 
@@ -373,8 +383,8 @@ public class SiftMatchHandler implements SocketHandler {
         void onStateChange(boolean ready, String detail);
     }
 
-    public record MatchResult(boolean success, double x, double y,
-                               float tMinimapMs, float tExtractMs, float tFlannMs) {
-        public static final MatchResult FAIL = new MatchResult(false, 0, 0, 0, 0, 0);
+    public record MatchResult(boolean success, double x, double y, double angle,
+                               float tMinimapMs, float tExtractMs, float tFlannMs, float tArrowMs) {
+        public static final MatchResult FAIL = new MatchResult(false, 0, 0, 0, 0, 0, 0, 0);
     }
 }

@@ -132,6 +132,16 @@ public class SiftSessionManager {
         return activeInitialized && activeReady && activeSession != null && !activeSession.isClosed();
     }
 
+    /** 诊断用 — 仅检查初始化标志 */
+    public boolean isActiveInitialized() {
+        return activeInitialized;
+    }
+
+    /** 诊断用 — 仅检查 READY 标志 */
+    public boolean isActiveReady() {
+        return activeReady;
+    }
+
     /**
      * 收到 C++ READY 信号，标记可发送帧数据。
      */
