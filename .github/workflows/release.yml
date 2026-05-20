@@ -185,6 +185,19 @@ jobs:
             )
           )
 
+      - name: Generate release notes
+        shell: bash
+        run: |
+          PREV_TAG="${{ steps.prev_tag.outputs.prev_tag }}"
+          if [ -z "$PREV_TAG" ]; then
+            echo "首次发版，使用全部 commit 日志" >&2
+            git log --no-merges --oneline --format="- %s" > releasenotes.md
+          else
+            git log "$PREV_TAG..HEAD" --no-merges --oneline --format="- %s" > releasenotes.md
+          fi
+          echo "" >> releasenotes.md
+          echo "**SHA256**: 见附件 \`.sha256\` 文件" >> releasenotes.md
+
       - name: Create GitHub Release
         run: |
           set "PREV_TAG=${{ steps.prev_tag.outputs.prev_tag }}"
@@ -200,7 +213,7 @@ jobs:
             %PATCH_FILE% ^
             %PATCH_SHA256% ^
             --title "v${{ github.event.inputs.version }}" ^
-            --notes "Release v${{ github.event.inputs.version }}" ^
+            --notes-file releasenotes.md ^
             --repo kedaya0209/RocoMapTracker
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
