@@ -9,13 +9,7 @@
 /dll/lcms.dll:lcms.dll:native
 /capture/RocoMapTracker-capture.exe:/capture/RocoMapTracker-capture.exe
 /sift/RocoMapTracker-sift_match.exe:/sift/RocoMapTracker-sift_match.exe
-/sift/opencv_core4.dll:/sift/opencv_core4.dll
-/sift/opencv_imgproc4.dll:/sift/opencv_imgproc4.dll
-/sift/opencv_features2d4.dll:/sift/opencv_features2d4.dll
-/sift/opencv_xfeatures2d4.dll:/sift/opencv_xfeatures2d4.dll
-/sift/opencv_calib3d4.dll:/sift/opencv_calib3d4.dll
-/sift/opencv_flann4.dll:/sift/opencv_flann4.dll
-/sift/opencv_dnn4.dll:/sift/opencv_dnn4.dll
+/sift/opencv_world4100.dll:/sift/opencv_world4100.dll
 /sift/libprotobuf.dll:/sift/libprotobuf.dll
 /sift/abseil_dll.dll:/sift/abseil_dll.dll
 /sift/zlib1.dll:/sift/zlib1.dll

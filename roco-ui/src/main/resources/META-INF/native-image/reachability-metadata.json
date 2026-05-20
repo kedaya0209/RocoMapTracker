@@ -8664,25 +8664,7 @@
       "glob": "sift/msvcp140_atomic_wait.dll"
     },
     {
-      "glob": "sift/opencv_calib3d4.dll"
-    },
-    {
-      "glob": "sift/opencv_core4.dll"
-    },
-    {
-      "glob": "sift/opencv_dnn4.dll"
-    },
-    {
-      "glob": "sift/opencv_features2d4.dll"
-    },
-    {
-      "glob": "sift/opencv_flann4.dll"
-    },
-    {
-      "glob": "sift/opencv_imgproc4.dll"
-    },
-    {
-      "glob": "sift/opencv_xfeatures2d4.dll"
+      "glob": "sift/opencv_world4100.dll"
     },
     {
       "glob": "sift/RocoMapTracker-sift_match.exe"

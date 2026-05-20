@@ -108,6 +108,7 @@ jobs:
           set "INCLUDE=D:\a\opencv\opencv\build\include;D:\a\zlib\include;%INCLUDE%"
           set "LIB=D:\a\opencv\opencv\build\x64\vc16\lib;D:\a\zlib\lib;%LIB%"
           cl /std:c++17 /O2 /EHsc /arch:AVX2 /Fe:sift_match.exe sift_match_main.cpp ws2_32.lib opencv_world4100.lib
+          copy /Y "D:\a\opencv\opencv\build\x64\vc16\bin\opencv_world4100.dll" .
         working-directory: cpp
         shell: cmd
 
@@ -118,6 +119,7 @@ jobs:
           path: |
             cpp/capture.exe
             cpp/sift_match.exe
+            cpp/opencv_world4100.dll
           compression-level: 0
 
   # ================================================================
@@ -159,6 +161,7 @@ jobs:
         run: |
           copy /Y cpp\capture.exe roco-ui\src\main\resources\capture\RocoMapTracker-capture.exe
           copy /Y cpp\sift_match.exe roco-ui\src\main\resources\sift\RocoMapTracker-sift_match.exe
+          copy /Y cpp\opencv_world4100.dll roco-ui\src\main\resources\sift\opencv_world4100.dll
 
       - name: Download private assets
         env:
