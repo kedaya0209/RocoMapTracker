@@ -157,8 +157,8 @@ jobs:
       - name: Copy C++ binaries to resource directories
         shell: cmd
         run: |
-          copy /Y cpp\capture.exe roco-ui\src\main\resources\capture\capture.exe
-          copy /Y cpp\sift_match.exe roco-ui\src\main\resources\sift\sift_match.exe
+          copy /Y cpp\capture.exe roco-ui\src\main\resources\capture\RocoMapTracker-capture.exe
+          copy /Y cpp\sift_match.exe roco-ui\src\main\resources\sift\RocoMapTracker-sift_match.exe
 
       - name: Download private assets
         env:
@@ -171,6 +171,12 @@ jobs:
 
       - name: Setup Visual Studio (MSVC)
         uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Download rcedit (for exe icon)
+        run: |
+          if not exist tools mkdir tools
+          curl.exe -L -o tools\rcedit-x64.exe "https://github.com/electron/rcedit/releases/download/v2.0.0/rcedit-x64.exe"
+        shell: cmd
 
       - name: Build Native Image
         run: mvn -Pnative clean package -pl roco-ui -am --no-transfer-progress

@@ -4275,7 +4275,7 @@
       "glob": "atlantafx/base/theme/primer-light.bss"
     },
     {
-      "glob": "capture/capture.exe"
+      "glob": "capture/RocoMapTracker-capture.exe"
     },
     {
       "glob": "com/sun/glass/ui/win/themes.properties"
@@ -8685,7 +8685,7 @@
       "glob": "sift/opencv_xfeatures2d4.dll"
     },
     {
-      "glob": "sift/sift_match.exe"
+      "glob": "sift/RocoMapTracker-sift_match.exe"
     },
     {
       "glob": "sift/vcruntime140.dll"
