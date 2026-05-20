@@ -92,6 +92,8 @@ jobs:
     name: Build & Release
     runs-on: windows-latest
     needs: build-cpp
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -148,8 +150,9 @@ jobs:
 
       - name: Download previous EXE from latest Release
         continue-on-error: true
+        shell: bash
         run: |
-          gh release download latest --pattern "RocoMapTracker.exe" --repo kedaya0209/RocoMapTracker --skip-existing
+          gh release download latest --pattern "RocoMapTracker.exe" --repo kedaya0209/RocoMapTracker --skip-existing 2>/dev/null || echo "No previous release found, skipping"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
