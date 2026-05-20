@@ -72,7 +72,7 @@ public class SiftMatchProtocol {
         buf.putInt(SiftConfig.SEARCH_RADIUS);
 
         buf.putInt(1);  // KDTreeIndexParams(1)
-        buf.putInt(24); // SearchParams(24, 0, true)
+        buf.putInt(SiftConfig.FLANN_SEARCH_CHECKS);
 
         buf.putDouble(SiftConfig.RANSAC_REPROJ_THRESHOLD);
         buf.putInt(SiftConfig.RANSAC_MAX_ITERS);
@@ -99,19 +99,19 @@ public class SiftMatchProtocol {
     }
 
     /**
-     * 编码匹配帧数据。
+     * 编码匹配帧数据（全彩 BGRA）。
      *
-     * @return [w(4B)][h(4B)][hintX(8B)][hintY(8B)][pixelsLen(4B)][gray8]
+     * @return [w(4B)][h(4B)][hintX(8B)][hintY(8B)][pixelsLen(4B)][BGRA32]
      */
-    public static byte[] encodeFrameData(byte[] grayData, int width, int height,
+    public static byte[] encodeFrameData(byte[] bgraData, int width, int height,
                                          double hintX, double hintY) {
-        ByteBuffer buf = ByteBuffer.allocate(28 + grayData.length).order(ByteOrder.BIG_ENDIAN);
+        ByteBuffer buf = ByteBuffer.allocate(28 + bgraData.length).order(ByteOrder.BIG_ENDIAN);
         buf.putInt(width);
         buf.putInt(height);
         buf.putDouble(Double.isNaN(hintX) ? -1 : hintX);
         buf.putDouble(Double.isNaN(hintY) ? -1 : hintY);
-        buf.putInt(grayData.length);
-        buf.put(grayData);
+        buf.putInt(bgraData.length);
+        buf.put(bgraData);
         return buf.array();
     }
 
@@ -140,17 +140,17 @@ public class SiftMatchProtocol {
      * </pre>
      */
     public static SiftMatchHandler.MatchResult decodeMatchResult(byte[] body) {
-        if (body == null || body.length < 25) return SiftMatchHandler.MatchResult.FAIL;
+        if (body == null || body.length < 37) return SiftMatchHandler.MatchResult.FAIL;
         ByteBuffer buf = ByteBuffer.wrap(body).order(ByteOrder.BIG_ENDIAN);
         boolean success = buf.get() == 1;
         double x = buf.getDouble();
         double y = buf.getDouble();
-        // skip angle (double, 8 bytes)
-        buf.getDouble();
+        double angle = buf.getDouble();
         float tMinimap = buf.getFloat();
         float tExtract = buf.getFloat();
         float tFlann = buf.getFloat();
-        return new SiftMatchHandler.MatchResult(success, x, y, tMinimap, tExtract, tFlann);
+        float tArrow = body.length >= 41 ? buf.getFloat() : 0;
+        return new SiftMatchHandler.MatchResult(success, x, y, angle, tMinimap, tExtract, tFlann, tArrow);
     }
 
     // ==================== 工具方法 ====================

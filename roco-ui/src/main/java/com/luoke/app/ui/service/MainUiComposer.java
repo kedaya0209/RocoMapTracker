@@ -120,6 +120,7 @@ public final class MainUiComposer {
 
         // 侧边栏切换
         uiAnimator.setupSidebarToggle(menuBtn, sidebar, floatContainer);
+        sidebar.setAnimator(uiAnimator);
 
         return new UiBuildResult(renderer, canvasContainer);
     }

@@ -2,7 +2,6 @@ package com.luoke.app.config;
 
 /**
  * 路径常量 — 系统物理路径，不可更改。
- * 从 {@link AppConfig} 拆分，所有字段均为 public static final。
  */
 public final class PathConfig {
 
@@ -59,5 +58,7 @@ public final class PathConfig {
     public static final String INTERNAL_PATHS = "/source/internal_map_paths.json";
     public static final String ICON = "/icon/rmt.svg";
     public static final String GHOST = "/icon/ghost.svg";
+    public static final String NAVIGATION = "/icon/navigation.svg";
+    public static final String MATCH_TOGGLE = "/icon/match_toggle.svg";
     public static final String CONFIG_FILE_NAME = "app_config.properties";
 }

@@ -17,6 +17,9 @@ public class StatsOverlay extends StackPane {
     private final Label statsLabel;
     // 缓存可见状态，避免每帧调用 isVisible()/setVisible()/setManaged()
     private boolean shown;
+    /** 文本更新节流：只每 N 帧重建字符串，降低 CPU/GC 开销 */
+    private int textThrottle;
+    private static final int TEXT_UPDATE_INTERVAL = 5; // ~6 FPS @ 30fps base
 
     private StatsOverlay() {
         statsLabel = new Label();
@@ -52,16 +55,18 @@ public class StatsOverlay extends StackPane {
 
         if (active != shown) {
             shown = active;
-            if (active) {
-                setVisible(true);
-                setManaged(true);
-            } else {
-                setVisible(false);
-                setManaged(false);
-            }
+            setVisible(active);
+            setManaged(active);
         }
 
         if (!active) {
+            textThrottle = 0;
+            return;
+        }
+
+        // 文本节流：可见性切换必须每帧执行，文本渲染可以降低频率
+        textThrottle++;
+        if ((textThrottle % TEXT_UPDATE_INTERVAL) != 0) {
             return;
         }
 

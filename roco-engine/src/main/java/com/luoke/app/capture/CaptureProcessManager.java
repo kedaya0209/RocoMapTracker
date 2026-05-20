@@ -55,6 +55,19 @@ public class CaptureProcessManager {
     }
 
     /**
+     * 重启 capture.exe 子进程（崩溃恢复用）
+     *
+     * @return 成功返回 true
+     */
+    public boolean restartProcess(SocketServer server, String exePath, long hwnd, int maxFps) {
+        // 清理旧进程
+        if (process != null && process.isAlive()) {
+            process.destroyForcibly();
+        }
+        return launchProcess(server, exePath, hwnd, maxFps);
+    }
+
+    /**
      * 优雅停止进程，超时后强制销毁
      */
     public void stopProcess() {

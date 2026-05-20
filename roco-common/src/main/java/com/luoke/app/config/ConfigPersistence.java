@@ -8,7 +8,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Properties;
 
 /**
- * 配置持久化管理 — 从 {@link AppConfig} 拆分出的 save/load 职责。
+ * 配置持久化管理
  *
  * <p>负责将各领域 Config 类的内存值写入磁盘 properties 文件，
  * 并在启动时从磁盘加载覆盖默认值。
@@ -52,6 +52,7 @@ public final class ConfigPersistence {
             OcrConfig.save(sb);
             MiniMapConfig.save(sb);
             StatsConfig.save(sb);
+            NavigConfig.save(sb);
 
             try (FileOutputStream fos = new FileOutputStream(configFile);
                  OutputStreamWriter osw = new OutputStreamWriter(fos, StandardCharsets.UTF_8)) {
@@ -96,5 +97,6 @@ public final class ConfigPersistence {
         OcrConfig.load(prop);
         MiniMapConfig.load(prop);
         StatsConfig.load(prop);
+        NavigConfig.load(prop);
     }
 }

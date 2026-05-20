@@ -4,7 +4,7 @@ import java.util.Arrays;
 import java.util.Properties;
 
 /**
- * 配置加载工具方法 — 从 {@link AppConfig} 拆分，供各 Config 类 load() 复用。
+ * 配置加载工具方法
  */
 public final class ConfigHelper {
 

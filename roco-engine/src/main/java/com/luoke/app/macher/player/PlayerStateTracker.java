@@ -2,27 +2,33 @@ package com.luoke.app.macher.player;
 
 import com.luoke.app.config.PlayerConfig;
 import com.luoke.app.context.MapContext;
-import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * 玩家状态追踪器：负责位置平滑、瞬移检测、地图丢失标志。
+ * 玩家状态追踪器：负责位置平滑、方向修正、速度预测（用于 SIFT hint）。
+ * <p>不再包含瞬移检测/地图切换/丢失恢复逻辑。</p>
  */
 @Slf4j
 public class PlayerStateTracker {
 
+    /** 速度模平方阈值 — 低于此值时不进行反方向修正 */
+    private static final double SPEED_THRESHOLD_SQ = 9.0;  // 3 px/frame
+    /** 反方向修正角度阈值 — 速度方向与箭头朝向相差超过此值时翻转 180° */
+    private static final double DIRECTION_ANGLE_THRESHOLD = 120.0;
+
     private boolean hasSmoothedPosition = false;
     private double smoothedX, smoothedY;
-    private int consecutiveFailureCount = 0;
-    @Getter
-    private boolean isMapLost = false;
 
     // ROI 预测：基于 EMA 平滑速度预测下一帧位置
     private double prevRawX, prevRawY;
     private boolean hasPreviousMatch;
     private double velocityX, velocityY;
-    @Getter
+
+    /** 预测位置（用于 SIFT hint） */
     private Double predictedX, predictedY;
+
+    public Double getPredictedX() { return predictedX; }
+    public Double getPredictedY() { return predictedY; }
 
     /**
      * 更新匹配成功时的位置
@@ -32,32 +38,38 @@ public class PlayerStateTracker {
      * @param angle 箭头检测得到的朝向角度 (可为 null)
      */
     public void onMatchSuccess(double x, double y, Double angle) {
-        consecutiveFailureCount = 0;
-        isMapLost = false;
-
+        // 首次定位 / 重置后：直接使用原始值
         if (!hasSmoothedPosition) {
             smoothedX = x;
             smoothedY = y;
             hasSmoothedPosition = true;
         } else {
-            double dx = x - smoothedX;
-            double dy = y - smoothedY;
-            double threshold = PlayerConfig.PLAYER_TELEPORT_THRESHOLD;
-            if (dx * dx + dy * dy > threshold * threshold) {
-                // 瞬移，直接重置平滑值
-                smoothedX = x;
-                smoothedY = y;
-            } else {
-                double alpha = PlayerConfig.PLAYER_EMA_ALPHA;
-                smoothedX = alpha * x + (1 - alpha) * smoothedX;
-                smoothedY = alpha * y + (1 - alpha) * smoothedY;
+            // EMA 平滑
+            double alpha = PlayerConfig.PLAYER_EMA_ALPHA;
+            smoothedX = alpha * x + (1 - alpha) * smoothedX;
+            smoothedY = alpha * y + (1 - alpha) * smoothedY;
+        }
+
+        // 反方向修正：速度方向与箭头朝向明显相反（>120°）时翻转 180°
+        // 偶发误判场景：箭头凸包最小内角顶点选到了尾部而非尖端
+        if (angle != null && hasPreviousMatch) {
+            double speedSq = velocityX * velocityX + velocityY * velocityY;
+            if (speedSq > SPEED_THRESHOLD_SQ) {
+                double moveAngle = Math.toDegrees(Math.atan2(velocityY, velocityX));
+                if (moveAngle < 0) moveAngle += 360;
+                moveAngle = (moveAngle + 90) % 360; // 统一到游戏坐标系 (0°=上)
+                double diff = Math.abs(angle - moveAngle);
+                diff = Math.min(diff, 360 - diff);
+                if (diff > DIRECTION_ANGLE_THRESHOLD) {
+                    angle = (angle + 180) % 360;
+                }
             }
         }
 
         MapContext.getInstance().updatePlayerState(smoothedX, smoothedY, angle);
 
-        // 速度预测：需要至少两帧有效数据，避免首帧 prevRawX=0 导致虚假位移
-        if (hasPreviousMatch && consecutiveFailureCount == 0) {
+        // 速度预测：为 SIFT 匹配提供 hint
+        if (hasPreviousMatch) {
             double frameDx = x - prevRawX;
             double frameDy = y - prevRawY;
             double vAlpha = PlayerConfig.PLAYER_VELOCITY_EMA_ALPHA;
@@ -72,28 +84,14 @@ public class PlayerStateTracker {
     }
 
     /**
-     * 处理匹配失败
-     *
-     * @param reason 失败原因（仅用于日志）
+     * 处理匹配失败 — 仅记录日志，不做状态变更。
      */
     public void onMatchFailure(String reason) {
-        consecutiveFailureCount++;
-        if (consecutiveFailureCount > PlayerConfig.PLAYER_MAP_LOST_THRESHOLD) {
-            isMapLost = true;
-            hasSmoothedPosition = false;
-            hasPreviousMatch = false;
-            predictedX = null;
-            predictedY = null;
-            velocityX = velocityY = 0;
-            MapContext.getInstance().updatePlayerState(-1, -1, null);
-            log.debug("地图丢失，重置平滑状态，原因: {}", reason);
-        }
+        // 预测位置可能变陈旧，SIFT hint 本就可以为 NaN，无需特殊处理
     }
 
     public void reset() {
         hasSmoothedPosition = false;
-        consecutiveFailureCount = 0;
-        isMapLost = false;
         smoothedX = smoothedY = 0;
         hasPreviousMatch = false;
         predictedX = null;

@@ -1,6 +1,8 @@
 package com.luoke.app.capture;
 
 import com.luoke.app.process.NativeProcessFactory;
+import com.luoke.app.process.ProcessRestartHelper;
+import com.luoke.app.config.SocketConfig;
 import com.luoke.app.socket.SocketHandler;
 import com.luoke.app.socket.SocketServer;
 import com.luoke.app.socket.SocketSession;
@@ -49,6 +51,7 @@ public class CaptureHandler implements SocketHandler {
 
     private final CaptureProcessManager processManager;
     private final CaptureSessionManager sessionManager;
+    private final ProcessRestartHelper restartHelper;
 
     // ==================== 协调器自身字段 ====================
 
@@ -59,6 +62,10 @@ public class CaptureHandler implements SocketHandler {
     private volatile StateCallback stateCallback;
     private volatile boolean handshakeDone;
     private ROIData[] pendingRois;
+    /** 崩溃恢复用 — 保存启动参数 */
+    private long launchHwnd;
+    private int launchMaxFps;
+    private String launchExePath;
     private long totalBytes;
     private long lastStatsTime;
     private volatile int fullFrameRoiIndex = -1;
@@ -81,6 +88,8 @@ public class CaptureHandler implements SocketHandler {
     public CaptureHandler(SocketServer server, NativeProcessFactory processFactory) {
         this.processManager = new CaptureProcessManager(processFactory);
         this.sessionManager = new CaptureSessionManager();
+        this.restartHelper = new ProcessRestartHelper("capture",
+                SocketConfig.SIFT_RESTART_DELAY);
     }
 
     // ==================== SocketHandler ====================
@@ -117,6 +126,9 @@ public class CaptureHandler implements SocketHandler {
         if (stateCallback != null) {
             stateCallback.onStateChange(false, reason);
         }
+        // 崩溃后自动重启
+        restartHelper.restartAsync(SocketServer.instance(),
+                svr -> processManager.restartProcess(svr, launchExePath, launchHwnd, launchMaxFps));
     }
 
     // ==================== 握手 ====================
@@ -226,6 +238,10 @@ public class CaptureHandler implements SocketHandler {
         this.pendingRois = rois;
         this.frameCallback = frameCb;
         this.stateCallback = stateCb;
+        this.launchHwnd = hwnd;
+        this.launchMaxFps = maxFps;
+        this.launchExePath = exePath;
+        this.restartHelper.reset();
 
         if (!processManager.launchProcess(SocketServer.instance(), exePath, hwnd, maxFps)) {
             return false;

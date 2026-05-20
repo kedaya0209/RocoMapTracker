@@ -26,7 +26,31 @@ public class CameraContext {
     @Setter
     private double followScale = ViewConfig.DEFAULT_FOLLOW_SCALE;
 
+    /** 导航模式是否启用 */
+    private volatile boolean navMode;
+    /** 导航模式下的地图旋转角度（度） */
+    private volatile double navAngle;
+
     private CameraContext() {
+    }
+
+    public boolean isNavMode() {
+        return navMode;
+    }
+
+    public void setNavMode(boolean navMode) {
+        this.navMode = navMode;
+        if (!navMode) {
+            this.navAngle = 0;
+        }
+    }
+
+    public double getNavAngle() {
+        return navAngle;
+    }
+
+    public void setNavAngle(double navAngle) {
+        this.navAngle = navAngle;
     }
 
     public static CameraContext getInstance() {

@@ -1,0 +1,70 @@
+package com.luoke.app.ui.util;
+
+/**
+ * 坐标变换工具 — 导航模式下的旋转补偿计算。
+ *
+ * <p>数学公式（视口中心为轴心）：
+ * <pre>
+ * Forward (world→screen):
+ *   sx = worldX * scale + ox
+ *   sy = worldY * scale + oy
+ *   dx = sx - pivotX, dy = sy - pivotY
+ *   rx = dx * cos - dy * sin + pivotX
+ *   ry = dx * sin + dy * cos + pivotY
+ *
+ * Inverse (screen→world):
+ *   dx = screenX - pivotX, dy = screenY - pivotY
+ *   cos = cos(+navAngle), sin = sin(+navAngle)
+ *   ux = dx * cos - dy * sin + pivotX
+ *   uy = dx * sin + dy * cos + pivotY
+ *   worldX = (ux - ox) / scale
+ *   worldY = (uy - oy) / scale
+ * </pre>
+ */
+public final class CoordinateUtil {
+
+    private CoordinateUtil() {
+        throw new AssertionError("禁止实例化工具类");
+    }
+
+    /**
+     * 世界坐标 → 屏幕坐标（含导航模式旋转补偿）
+     */
+    public static double[] worldToScreen(double worldX, double worldY,
+                                          double ox, double oy, double scale,
+                                          double navAngleDeg, double pivotX, double pivotY) {
+        double sx = worldX * scale + ox;
+        double sy = worldY * scale + oy;
+        if (navAngleDeg == 0) return new double[]{sx, sy};
+
+        double rad = Math.toRadians(-navAngleDeg);
+        double cos = Math.cos(rad);
+        double sin = Math.sin(rad);
+        double dx = sx - pivotX;
+        double dy = sy - pivotY;
+        return new double[]{
+                dx * cos - dy * sin + pivotX,
+                dx * sin + dy * cos + pivotY
+        };
+    }
+
+    /**
+     * 屏幕坐标 → 世界坐标（含导航模式逆旋转补偿）
+     */
+    public static double[] screenToWorld(double screenX, double screenY,
+                                          double ox, double oy, double scale,
+                                          double navAngleDeg, double pivotX, double pivotY) {
+        if (navAngleDeg == 0) {
+            return new double[]{(screenX - ox) / scale, (screenY - oy) / scale};
+        }
+
+        double rad = Math.toRadians(navAngleDeg);
+        double cos = Math.cos(rad);
+        double sin = Math.sin(rad);
+        double dx = screenX - pivotX;
+        double dy = screenY - pivotY;
+        double ux = dx * cos - dy * sin + pivotX;
+        double uy = dx * sin + dy * cos + pivotY;
+        return new double[]{(ux - ox) / scale, (uy - oy) / scale};
+    }
+}

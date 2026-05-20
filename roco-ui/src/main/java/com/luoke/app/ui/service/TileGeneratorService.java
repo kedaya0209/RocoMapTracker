@@ -44,7 +44,7 @@ public class TileGeneratorService {
         }
         File metaFile = ResourceUtils.getExternalFile(ResourceConfigContext.getTilesDir() + "/tiles_meta.json");
         if (metaFile.exists() && quickValidate(levels)) {
-            log.info("瓦片元数据校验通过，跳过生成");
+            log.info("瓦片元数据校验通过，跳过生成（无需加载源图）");
             return;
         }
         if (!sourceFile.exists()) {
@@ -52,7 +52,7 @@ public class TileGeneratorService {
             return;
         }
 
-        log.info("开始生成瓦片金字塔...");
+        log.info("瓦片缺失或元数据校验未通过，开始生成瓦片金字塔（将加载源图 {}）...", sourceFile.getAbsolutePath());
 
         // 1. 加载源图一次
         BufferedImage sourceImage = ImageIO.read(sourceFile);

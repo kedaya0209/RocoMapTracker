@@ -2,7 +2,6 @@ package com.luoke.app.test;
 
 import com.luoke.app.context.ResourceConfigContext;
 import com.luoke.app.macher.SiftMatchHandler;
-import com.luoke.app.macher.miniMap.CircleMaskApplier;
 import com.luoke.app.process.NativeProcess;
 import com.luoke.app.socket.SocketServer;
 import com.luoke.app.utils.ResourceUtils;
@@ -119,24 +118,40 @@ public class MatchOnlyTest {
             int cropX = ThreadLocalRandom.current().nextInt(maxX);
             int cropY = ThreadLocalRandom.current().nextInt(maxY);
 
-            // 截取灰度数据 (纯 Java)
-            byte[] grayData = new byte[CROP_W * CROP_H];
+            // 截取 BGRA 全彩数据 (C++ 侧接收后自行转为灰度，并用 HSV 检测箭头)
+            byte[] bgraData = new byte[CROP_W * CROP_H * 4];
             for (int y = 0; y < CROP_H; y++) {
                 for (int x = 0; x < CROP_W; x++) {
                     int rgb = mapImage.getRGB(cropX + x, cropY + y);
-                    // 灰度转换 (BT.601)
                     int r = (rgb >> 16) & 0xFF;
                     int g = (rgb >> 8) & 0xFF;
                     int b = rgb & 0xFF;
-                    grayData[y * CROP_W + x] = (byte) ((r * 299 + g * 587 + b * 114) / 1000);
+                    int pos = (y * CROP_W + x) * 4;
+                    bgraData[pos]     = (byte) b;
+                    bgraData[pos + 1] = (byte) g;
+                    bgraData[pos + 2] = (byte) r;
+                    bgraData[pos + 3] = (byte) 255;
                 }
             }
 
-            // 模拟小地图圆遮罩 (C++ 端会重新检测并遮罩，此处为模拟真实场景准备数据)
+            // 模拟小地图圆遮罩（圈外清零，使 C++ HoughCircles 能检测到圆边界）
             double cx = CROP_W / 2.0;
             double cy = CROP_H / 2.0;
             int radius = (int) (Math.min(CROP_W, CROP_H) * CIRCLE_RADIUS_RATIO);
-            CircleMaskApplier.applyMask(grayData, CROP_W, CROP_H, cx, cy, radius);
+            int r2 = radius * radius;
+            for (int y = 0; y < CROP_H; y++) {
+                for (int x = 0; x < CROP_W; x++) {
+                    double dx = x - cx;
+                    double dy = y - cy;
+                    if (dx * dx + dy * dy > r2) {
+                        int pos = (y * CROP_W + x) * 4;
+                        bgraData[pos]     = 0;
+                        bgraData[pos + 1] = 0;
+                        bgraData[pos + 2] = 0;
+                        bgraData[pos + 3] = 0;
+                    }
+                }
+            }
 
             // 真实中心坐标 (地图截取位置)
             double trueCenterX = cropX + CROP_W / 2.0;
@@ -146,7 +161,7 @@ public class MatchOnlyTest {
             long t0 = System.currentTimeMillis();
             SiftMatchHandler.MatchResult result;
             try {
-                result = client.sendFrameAndWait(grayData, CROP_W, CROP_H,
+                result = client.sendFrameAndWait(bgraData, CROP_W, CROP_H,
                         Double.NaN, Double.NaN, 500);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();

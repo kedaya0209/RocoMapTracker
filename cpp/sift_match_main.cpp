@@ -1,6 +1,7 @@
 // sift_match_main.cpp — Standalone SIFT matching process via TCP Socket.
 // JavaCPP-free: all SIFT/FLANN/RANSAC/HoughCircles run in this process.
-// Arrow direction (CNN/ONNX) is handled separately; angle always returns NaN from here.
+// Arrow direction (HSV color-based: inRange + convex hull + min interior angle)
+// is computed directly in this process on BGRA frame data.
 //
 // Protocol (binary TCP, big-endian):
 //   HELLO:
@@ -16,7 +17,7 @@
 //
 //   MATCHING LOOP:
 //   204 C++→Java: READY           {}                    — backpressure, ready for next frame
-//   205 Java→C++: FRAME_DATA      {w,h,hintX,hintY,pixelsLen,gray8}
+//   205 Java→C++: FRAME_DATA      {w,h,hintX,hintY,pixelsLen,BGRA32}
 //   206 C++→Java: MATCH_RESULT    {success,x,y,angle}
 //
 //   SHUTDOWN:
@@ -615,6 +616,126 @@ static void apply_circle_mask(uint8_t* data, int w, int h,
 }
 
 // ============================================================================
+// Arrow angle detection: HSV color-based method
+//
+// Ported from ArrowAngleDrawer.java — uses the same HSV thresholds
+// (H 10~25, S 200~255, V 200~255) and geometric analysis pipeline.
+//
+// Algorithm: BGRA → crop center 64×64 → HSV → inRange → largest contour →
+// convex hull → smallest interior angle vertex = tip →
+// base midpoint → direction angle.
+//
+// Returns 0~360° angle, or NaN if detection fails.
+// ============================================================================
+static double detect_arrow_angle_hsv(const uint8_t* bgra_data, int w, int h,
+                                      double cx, double cy, int radius) {
+    if (radius < 15) return std::numeric_limits<double>::quiet_NaN();
+
+    // 只处理圆中心 64×64 区域（箭头必定在小地图中心附近）
+    static constexpr int CROP_SIZE = 64;
+    int cropX = (int)std::round(cx - CROP_SIZE / 2);
+    int cropY = (int)std::round(cy - CROP_SIZE / 2);
+    // 裁剪边界保护
+    if (cropX < 0) cropX = 0;
+    if (cropY < 0) cropY = 0;
+    if (cropX + CROP_SIZE > w) cropX = w - CROP_SIZE;
+    if (cropY + CROP_SIZE > h) cropY = h - CROP_SIZE;
+    if (cropX < 0 || cropY < 0) return std::numeric_limits<double>::quiet_NaN();
+
+    // BGRA ROI（别名，不拷贝）
+    cv::Mat full(h, w, CV_8UC4, const_cast<uint8_t*>(bgra_data));
+    cv::Mat roi(full, cv::Rect(cropX, cropY, CROP_SIZE, CROP_SIZE));
+
+    // ---- 1. HSV 颜色过滤（与 Java ArrowAngleDrawer 阈值一致） ----
+    // H: 10~25（橙色范围，OpenCV 中 H 0~179）
+    // S: 200~255（高饱和度，过滤背景浅色）
+    // V: 200~255（中高亮度，捕获箭头渐变阴影）
+    cv::Mat hsv;
+    cv::cvtColor(roi, hsv, cv::COLOR_BGRA2BGR);
+    cv::cvtColor(hsv, hsv, cv::COLOR_BGR2HSV);
+
+    cv::Mat mask;
+    cv::inRange(hsv, cv::Scalar(10, 200, 200), cv::Scalar(25, 255, 255), mask);
+
+    // 闭运算填充细小孔洞（箭头内部可能因阴影有空洞）
+    cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3));
+    cv::morphologyEx(mask, mask, cv::MORPH_CLOSE, kernel);
+
+    // ---- 2. 找最大外部轮廓 ----
+    // 箭头尾部在 HSV 过滤后有时会分离出独立小圆点，
+    // 只取最大轮廓可以自动过滤这种干扰
+    std::vector<std::vector<cv::Point>> contours;
+    cv::findContours(mask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+    if (contours.empty()) return std::numeric_limits<double>::quiet_NaN();
+
+    int maxIdx = 0;
+    double maxArea = 0;
+    for (size_t i = 0; i < contours.size(); i++) {
+        double area = cv::contourArea(contours[i]);
+        if (area > maxArea) {
+            maxArea = area;
+            maxIdx = (int)i;
+        }
+    }
+    if (maxArea < 20) return std::numeric_limits<double>::quiet_NaN();
+
+    // ---- 3. 凸包构建 ----
+    std::vector<cv::Point> hull;
+    cv::convexHull(contours[maxIdx], hull, false, true);
+    if (hull.size() < 3) return std::numeric_limits<double>::quiet_NaN();
+
+    // 顶点过多时简化（epsilon = 2% 周长）
+    if (hull.size() > 5) {
+        std::vector<cv::Point> simplified;
+        cv::approxPolyDP(hull, simplified,
+                         0.02 * cv::arcLength(contours[maxIdx], true), true);
+        if (simplified.size() >= 3) hull = simplified;
+    }
+
+    // ---- 4. 最小内角顶点 = 箭头尖端 ----
+    int tipIdx = 0;
+    double minAngle = 1e10;
+    int n = (int)hull.size();
+    for (int i = 0; i < n; i++) {
+        const cv::Point& cur = hull[i];
+        const cv::Point& prev = hull[(i - 1 + n) % n];
+        const cv::Point& next = hull[(i + 1) % n];
+
+        double e1x = prev.x - cur.x, e1y = prev.y - cur.y;
+        double e2x = next.x - cur.x, e2y = next.y - cur.y;
+        double len1 = std::sqrt(e1x * e1x + e1y * e1y);
+        double len2 = std::sqrt(e2x * e2x + e2y * e2y);
+        if (len1 < 1 || len2 < 1) continue;
+
+        double dot = (e1x * e2x + e1y * e2y) / (len1 * len2);
+        double angle = std::acos(std::max(-1.0, std::min(1.0, dot)));
+        if (angle < minAngle) {
+            minAngle = angle;
+            tipIdx = i;
+        }
+    }
+
+    // ---- 5. 底边中点定向 ----
+    // 方向 = 底边中点 → 尖端
+    // 使用底边中点而非重心作为参考点的原因：
+    //   重心受尾部质量分布影响（如尾部小圆点），可能偏移；
+    //   底边中点是纯几何量，不受质量分布影响，方向更准确。
+    const cv::Point& tip = hull[tipIdx];
+    const cv::Point& prevPt = hull[(tipIdx - 1 + n) % n];
+    const cv::Point& nextPt = hull[(tipIdx + 1) % n];
+
+    double baseMX = (prevPt.x + nextPt.x) / 2.0;
+    double baseMY = (prevPt.y + nextPt.y) / 2.0;
+
+    double dx = tip.x - baseMX;
+    double dy = tip.y - baseMY;
+    double angleDeg = std::atan2(dy, dx) * 180.0 / CV_PI;
+    if (angleDeg < 0) angleDeg += 360;
+
+    return angleDeg;
+}
+
+// ============================================================================
 // 重叠分块训练常量 (Overlapping Tiling)
 // ============================================================================
 static constexpr int TILE_SIZE = 2000;                     // 瓦片尺寸
@@ -653,6 +774,7 @@ public:
     double ransac_reproj_threshold = 10.0;
     int ransac_max_iters = 200;
     double ransac_confidence = 0.95;
+    int flann_search_checks = 24;
 
     SiftMatcher(const AlgoParams& p)
         : match_ratio_threshold((float)p.matchRatioThreshold)
@@ -661,6 +783,7 @@ public:
         , ransac_reproj_threshold(p.ransacReprojThreshold)
         , ransac_max_iters(p.ransacMaxIters)
         , ransac_confidence(p.ransacConfidence)
+        , flann_search_checks(p.flannSearchChecks)
     {
         sift = cv::SIFT::create(
             p.nfeatures,
@@ -957,7 +1080,7 @@ public:
                 float dists[2];
                 u8_index->knnSearch(qmat, cvflann::Matrix<int>(idx, 1, 2),
                                     cvflann::Matrix<float>(dists, 1, 2), 2,
-                                    cvflann::SearchParams(24));
+                                    cvflann::SearchParams(flann_search_checks));
                 if (idx[1] >= 0 && dists[0] < match_ratio_threshold * dists[1]) {
                     good_matches.push_back(cv::DMatch(qi, idx[0], dists[0]));
                 }
@@ -973,7 +1096,7 @@ public:
                 float dists[2];
                 f32_index->knnSearch(qmat, cvflann::Matrix<int>(idx, 1, 2),
                                      cvflann::Matrix<float>(dists, 1, 2), 2,
-                                     cvflann::SearchParams(24));
+                                     cvflann::SearchParams(flann_search_checks));
                 if (idx[1] >= 0 && dists[0] < match_ratio_threshold * dists[1]) {
                     good_matches.push_back(cv::DMatch(qi, idx[0], dists[0]));
                 }
@@ -1206,10 +1329,12 @@ static bool load_cache_file(const std::string& path, SiftMatcher& matcher) {
 
 // ============================================================================
 // Serialize MATCH_RESULT body: [1]success [8]x [8]y [8]angle
+//                              [4]t_minimap_ms [4]t_extract_ms [4]t_flann_ms [4]t_arrow_ms
 // ============================================================================
 static std::vector<uint8_t> serialize_result(bool success, double x, double y, double angle,
-                                              float t_minimap_ms = 0, float t_extract_ms = 0, float t_flann_ms = 0) {
-    std::vector<uint8_t> buf(37);  // 1 + 8 + 8 + 8 + 4 + 4 + 4
+                                              float t_minimap_ms = 0, float t_extract_ms = 0,
+                                              float t_flann_ms = 0, float t_arrow_ms = 0) {
+    std::vector<uint8_t> buf(41);  // 1 + 8 + 8 + 8 + 4 + 4 + 4 + 4
     buf[0] = success ? 1 : 0;
     write_double(buf.data() + 1, x);
     write_double(buf.data() + 9, y);
@@ -1217,6 +1342,7 @@ static std::vector<uint8_t> serialize_result(bool success, double x, double y, d
     write_float_be(buf.data() + 25, t_minimap_ms);
     write_float_be(buf.data() + 29, t_extract_ms);
     write_float_be(buf.data() + 33, t_flann_ms);
+    write_float_be(buf.data() + 37, t_arrow_ms);
     return buf;
 }
 
@@ -1436,7 +1562,7 @@ int main(int argc, char* argv[]) {
 
         frame_count++;
 
-        // Parse FRAME body: [4]w [4]h [8]hintX [8]hintY [4]pixelsLen [pixelsLen]gray8
+        // Parse FRAME body: [4]w [4]h [8]hintX [8]hintY [4]pixelsLen [pixelsLen]BGRA32
         if (recv_body.size() < 28) {
             LOGERR("FRAME body too short: %zu bytes (frame=%lld)", recv_body.size(), (long long)frame_count);
             continue;
@@ -1453,15 +1579,21 @@ int main(int argc, char* argv[]) {
             continue;
         }
 
-        uint8_t* pixels = recv_body.data() + 28;
+        uint8_t* bgra_data = recv_body.data() + 28;
 
         // ---- Process frame ----
         try {
             SiftMatcher::MatchResult match_res;
 
+            // Convert BGRA → grayscale for minimap detection and SIFT matching
+            cv::Mat bgra_mat(fh, fw, CV_8UC4, bgra_data);
+            cv::Mat gray_mat;
+            cv::cvtColor(bgra_mat, gray_mat, cv::COLOR_BGRA2GRAY);
+            uint8_t* gray_data = gray_mat.data;
+
             // 1. Minimap detection (with timing)
             auto t_minimap_start = std::chrono::steady_clock::now();
-            auto detection = minimap.detect(pixels, fw, fh);
+            auto detection = minimap.detect(gray_data, fw, fh);
             float t_minimap = std::chrono::duration<float, std::milli>(
                 std::chrono::steady_clock::now() - t_minimap_start).count();
 
@@ -1479,19 +1611,26 @@ int main(int argc, char* argv[]) {
                 continue;
             }
 
-            // 2. Apply circle mask
-            apply_circle_mask(pixels, fw, fh, detection.center_x, detection.center_y, detection.radius);
+            // 2. Apply circle mask to grayscale (zeros non-minimap area for SIFT)
+            apply_circle_mask(gray_data, fw, fh, detection.center_x, detection.center_y, detection.radius);
 
-            // 3. SIFT matching (arrow angle detached to separate process, always NaN)
-            match_res = matcher.match(pixels, fw, fh, hint_x, hint_y);
+            // 3. SIFT matching (uses masked grayscale)
+            match_res = matcher.match(gray_data, fw, fh, hint_x, hint_y);
             match_res.t_minimap_ms = t_minimap;
 
             if (match_res.success) success_count++;
 
-            // 4. Send result with timing (angle always NaN for now)
+            // 4. Arrow direction detection (HSV 颜色过滤 + 凸包 → 最小内角 → 底边中点定向)
+            auto t_arrow_start = std::chrono::steady_clock::now();
+            double arrow_angle = detect_arrow_angle_hsv(bgra_data, fw, fh,
+                detection.center_x, detection.center_y, detection.radius);
+            float t_arrow_ms = std::chrono::duration<float, std::milli>(
+                std::chrono::steady_clock::now() - t_arrow_start).count();
+
+            // 5. Send result with timing
             auto result_buf = serialize_result(match_res.success, match_res.x, match_res.y,
-                std::numeric_limits<double>::quiet_NaN(),
-                match_res.t_minimap_ms, match_res.t_extract_ms, match_res.t_flann_ms);
+                arrow_angle,
+                match_res.t_minimap_ms, match_res.t_extract_ms, match_res.t_flann_ms, t_arrow_ms);
             if (!send_message(sock, MATCH_RESULT, result_buf.data(), (uint32_t)result_buf.size())) {
                 LOG("Socket send failed (RESULT)");
                 break;

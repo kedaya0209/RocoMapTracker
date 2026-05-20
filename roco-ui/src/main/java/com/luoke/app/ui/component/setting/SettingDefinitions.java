@@ -1,5 +1,6 @@
 package com.luoke.app.ui.component.setting;
 
+import com.luoke.app.config.ConfigPersistence;
 import com.luoke.app.config.RenderConfig;
 import com.luoke.app.config.SocketConfig;
 import com.luoke.app.config.UiConfig;
@@ -11,6 +12,9 @@ import com.luoke.app.config.ViewConfig;
 import com.luoke.app.config.DownloadConfig;
 import com.luoke.app.config.OcrConfig;
 import com.luoke.app.config.SiftConfig;
+import com.luoke.app.config.NavigConfig;
+import com.luoke.app.context.CameraContext;
+import com.luoke.app.ui.component.TitleBar;
 import com.luoke.app.context.CameraContext;
 import com.luoke.app.macher.map.SwitchMapMatcher;
 import com.luoke.app.ui.service.ThemeManager;
@@ -33,6 +37,17 @@ public final class SettingDefinitions {
     public static final List<SettingCategory> CATEGORIES = buildCategories();
 
     private SettingDefinitions() {
+    }
+
+    /**
+     * 获取 TitleBar 实例（可能为 null）
+     */
+    private static TitleBar getTitleBar() {
+        try {
+            return TitleBar.getInstance();
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     // ================================================================
@@ -292,6 +307,37 @@ public final class SettingDefinitions {
                                 () -> RenderConfig.PANEL_FADE_MS,
                                 v -> RenderConfig.PANEL_FADE_MS = (Integer) v)
                 ),
+                cat("视角跟随", "/icon/navigation.svg",
+                        bool("NAVIGATION_ENABLED", "启用视角跟随",
+                                () -> {
+                                    boolean enabled = NavigConfig.NAVIGATION_ENABLED;
+                                    CameraContext.getInstance().setNavMode(enabled);
+                                    TitleBar titleBar = getTitleBar();
+                                    if (titleBar != null) titleBar.setNavModeFromExternal(enabled);
+                                    ConfigPersistence.save();
+                                },
+                                () -> NavigConfig.NAVIGATION_ENABLED,
+                                v -> NavigConfig.NAVIGATION_ENABLED = (Boolean) v),
+                        bool("AUTO_FOLLOW_MODE", "进入视角跟随时自动开启跟随",
+                                ConfigPersistence::save,
+                                () -> NavigConfig.AUTO_FOLLOW_MODE,
+                                v -> NavigConfig.AUTO_FOLLOW_MODE = (Boolean) v),
+                        doub("MAX_DEFLECTION_ANGLE", "最大偏转角度(度)",
+                                () -> NavigConfig.MAX_DEFLECTION_ANGLE,
+                                v -> NavigConfig.MAX_DEFLECTION_ANGLE = (Double) v),
+                        long_("ROTATION_DELAY_MS", "地图旋转延迟(ms)",
+                                () -> NavigConfig.ROTATION_DELAY_MS,
+                                v -> NavigConfig.ROTATION_DELAY_MS = (Long) v),
+                        long_("ROTATION_INTERVAL_MS", "旋转最小间隔(ms)",
+                                () -> NavigConfig.ROTATION_INTERVAL_MS,
+                                v -> NavigConfig.ROTATION_INTERVAL_MS = (Long) v),
+                        doub("NAV_WINDOW_OPACITY", "窗口默认透明度",
+                                () -> NavigConfig.NAV_WINDOW_OPACITY,
+                                v -> NavigConfig.NAV_WINDOW_OPACITY = (Double) v),
+                        doub("DEBOUNCE_THRESHOLD", "防抖阈值(度)",
+                                () -> NavigConfig.DEBOUNCE_THRESHOLD,
+                                v -> NavigConfig.DEBOUNCE_THRESHOLD = (Double) v)
+                ),
                 cat("玩家", "/icon/player.svg",
                         doub("PLAYER_IMG_SIZE", "玩家图标尺寸",
                                 () -> RenderConfig.PLAYER_IMG_SIZE,
@@ -334,15 +380,9 @@ public final class SettingDefinitions {
                         doub("PLAYER_EMA_ALPHA", "位置平滑因子",
                                 () -> PlayerConfig.PLAYER_EMA_ALPHA,
                                 v -> PlayerConfig.PLAYER_EMA_ALPHA = (Double) v),
-                        doub("PLAYER_TELEPORT_THRESHOLD", "瞬移检测阈值",
-                                () -> PlayerConfig.PLAYER_TELEPORT_THRESHOLD,
-                                v -> PlayerConfig.PLAYER_TELEPORT_THRESHOLD = (Double) v),
                         doub("PLAYER_VELOCITY_EMA_ALPHA", "速度平滑因子",
                                 () -> PlayerConfig.PLAYER_VELOCITY_EMA_ALPHA,
-                                v -> PlayerConfig.PLAYER_VELOCITY_EMA_ALPHA = (Double) v),
-                        integer("PLAYER_MAP_LOST_THRESHOLD", "地图丢失阈值",
-                                () -> PlayerConfig.PLAYER_MAP_LOST_THRESHOLD,
-                                v -> PlayerConfig.PLAYER_MAP_LOST_THRESHOLD = (Integer) v)
+                                v -> PlayerConfig.PLAYER_VELOCITY_EMA_ALPHA = (Double) v)
                 ),
                 cat("匹配", "/icon/match.svg",
                         combo("MAP_MATCHAER", "匹配器类型",

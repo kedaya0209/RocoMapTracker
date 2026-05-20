@@ -97,6 +97,12 @@ public final class SiftConfig {
      */
     public static double RANSAC_CONFIDENCE = 0.95;
 
+    // --- 匹配开关 ---
+    /**
+     * SIFT 匹配总开关
+     */
+    public static volatile boolean SIFT_MATCHING_ENABLED = true;
+
     // --- ROI 与匹配调度 ---
     /**
      * 小地图 ROI 万分比坐标 X
@@ -141,6 +147,7 @@ public final class SiftConfig {
         RANSAC_MAX_ITERS = ConfigHelper.getInt(prop, "ransac.max.iters", RANSAC_MAX_ITERS);
         MATCH_TIMEOUT_MS = ConfigHelper.getLong(prop, "match.timeout.ms", MATCH_TIMEOUT_MS);
         ARROW_CROP_SIZE = ConfigHelper.getInt(prop, "arrow.crop.size", ARROW_CROP_SIZE);
+        SIFT_MATCHING_ENABLED = ConfigHelper.getBool(prop, "sift.matching.enabled", true);
     }
 
     public static void save(StringBuilder sb) {
@@ -165,6 +172,8 @@ public final class SiftConfig {
         sb.append("# SIFT 匹配等待超时（毫秒）\n");
         sb.append("match.timeout.ms=").append(MATCH_TIMEOUT_MS).append("\n");
         sb.append("# 箭头 CNN 裁剪尺寸（像素，正方形）\n");
-        sb.append("arrow.crop.size=").append(ARROW_CROP_SIZE).append("\n\n");
+        sb.append("arrow.crop.size=").append(ARROW_CROP_SIZE).append("\n");
+        sb.append("# SIFT 匹配总开关\n");
+        sb.append("sift.matching.enabled=").append(SIFT_MATCHING_ENABLED).append("\n\n");
     }
 }

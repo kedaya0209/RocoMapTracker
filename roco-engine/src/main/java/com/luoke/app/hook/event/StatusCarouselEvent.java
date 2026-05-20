@@ -23,6 +23,7 @@ public record StatusCarouselEvent(String key, String text, Type type) {
     public static final String KEY_CAPTURE = "capture";
     public static final String KEY_SIFT = "sift";
     public static final String KEY_MINIMAP = "minimap";
+    public static final String KEY_MATCH = "match";
 
     // ======================== Capture 状态 ========================
 
@@ -105,6 +106,22 @@ public record StatusCarouselEvent(String key, String text, Type type) {
             return null;
         }
         return new StatusCarouselEvent(KEY_MINIMAP, "检测到小地图，正在跟踪", Type.SUCCESS);
+    }
+
+    // ======================== 匹配开关状态 ========================
+
+    public static StatusCarouselEvent matchingPaused() {
+        if (!StatusStateMachine.getInstance().tryTransition(StatusStateMachine.StatusKey.MATCH, StatusStateMachine.State.PAUSED)) {
+            return null;
+        }
+        return new StatusCarouselEvent(KEY_MATCH, "匹配已暂停", Type.INFO);
+    }
+
+    public static StatusCarouselEvent matchingResumed() {
+        if (!StatusStateMachine.getInstance().tryTransition(StatusStateMachine.StatusKey.MATCH, StatusStateMachine.State.ACTIVE)) {
+            return null;
+        }
+        return new StatusCarouselEvent(KEY_MATCH, "匹配已开启", Type.SUCCESS);
     }
 
     // ======================== 类型枚举 ========================

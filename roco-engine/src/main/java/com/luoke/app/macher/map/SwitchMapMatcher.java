@@ -16,7 +16,6 @@ import java.util.Set;
  * 现在所有匹配逻辑移交独立 C++ 进程 (sift_match.exe)，本类仅负责:
  * <ul>
  *   <li>维护可选变体名称列表 (供 UI 下拉菜单)</li>
- *   <li>持久化用户选择到 AppConfig</li>
  *   <li>通过回调通知上层重启 C++ 进程</li>
  * </ul>
  */

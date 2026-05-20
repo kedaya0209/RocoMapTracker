@@ -3,6 +3,7 @@ package com.luoke.app.ui.render;
 import com.luoke.app.config.PathConfig;
 import com.luoke.app.config.RenderConfig;
 import com.luoke.app.config.ViewConfig;
+import com.luoke.app.context.CameraContext;
 import com.luoke.app.context.MapContext;
 import com.luoke.app.context.ResourcePointContext;
 import com.luoke.app.map.model.Point;
@@ -32,6 +33,8 @@ public class IconLayerManager implements RenderLayer {
     private final Map<ResourcePoint, ImageView> iconViews = new ConcurrentHashMap<>();
     private double lastGrayCheckX = Double.NaN;
     private double lastGrayCheckY = Double.NaN;
+    /** 上次 counter-rotate 角度，用于脏检测 */
+    private double lastCounterRotate = 0;
 
     public IconLayerManager(Group worldGroup) {
         iconGroup = new Group();
@@ -47,6 +50,16 @@ public class IconLayerManager implements RenderLayer {
 
     @Override
     public void onFrame() {
+        // 导航模式 counter-rotate：抵消 worldGroup 的旋转，保持图标朝上
+        CameraContext cam = CameraContext.getInstance();
+        double counterAngle = cam.isNavMode() ? cam.getNavAngle() : 0;
+        if (Math.abs(counterAngle - lastCounterRotate) > 0.01) {
+            for (ImageView iv : iconViews.values()) {
+                iv.setRotate(counterAngle);
+            }
+            lastCounterRotate = counterAngle;
+        }
+
         MapContext mm = MapContext.getInstance();
         if (mm.isPlayerInitialized()) {
             updateGrayStates(mm.getPlayerX(), mm.getPlayerY());

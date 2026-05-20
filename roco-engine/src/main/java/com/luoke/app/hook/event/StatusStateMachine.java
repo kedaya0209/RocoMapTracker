@@ -42,7 +42,9 @@ public final class StatusStateMachine {
         FAILED,
         DISCONNECTED,
         LOST,
-        TRACKING
+        TRACKING,
+        ACTIVE,
+        PAUSED
     }
 
     // ======================== 状态键 ========================
@@ -50,7 +52,8 @@ public final class StatusStateMachine {
     public enum StatusKey {
         CAPTURE,
         SIFT,
-        MINIMAP
+        MINIMAP,
+        MATCH
     }
 
     // ======================== 合法转换表 ========================
@@ -74,6 +77,11 @@ public final class StatusStateMachine {
                     State.IDLE, Set.of(State.TRACKING, State.LOST),
                     State.TRACKING, Set.of(State.LOST),
                     State.LOST, Set.of(State.TRACKING)
+            ),
+            StatusKey.MATCH, Map.of(
+                    State.IDLE, Set.of(State.ACTIVE),
+                    State.ACTIVE, Set.of(State.PAUSED),
+                    State.PAUSED, Set.of(State.ACTIVE)
             )
     );
 
@@ -162,6 +170,7 @@ public final class StatusStateMachine {
             case StatusCarouselEvent.KEY_CAPTURE -> StatusKey.CAPTURE;
             case StatusCarouselEvent.KEY_SIFT -> StatusKey.SIFT;
             case StatusCarouselEvent.KEY_MINIMAP -> StatusKey.MINIMAP;
+            case StatusCarouselEvent.KEY_MATCH -> StatusKey.MATCH;
             default -> null;
         };
     }

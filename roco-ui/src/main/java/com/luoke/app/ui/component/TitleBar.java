@@ -2,7 +2,12 @@ package com.luoke.app.ui.component;
 
 import atlantafx.base.theme.Styles;
 import com.luoke.app.config.CaptureConfig;
+import com.luoke.app.config.ConfigPersistence;
+import com.luoke.app.config.NavigConfig;
 import com.luoke.app.config.PathConfig;
+import com.luoke.app.config.SiftConfig;
+import com.luoke.app.context.CameraContext;
+import com.luoke.app.context.MapContext;
 import com.luoke.app.hook.HookEventType;
 import com.luoke.app.hook.IHook;
 import com.luoke.app.hook.event.StatusCarouselEvent;
@@ -27,8 +32,11 @@ import javafx.animation.TranslateTransition;
 import javafx.application.Platform;
 import javafx.util.Duration;
 import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.Set;
+
+@Slf4j
 
 public class TitleBar extends HBox implements IHook<Object> {
 
@@ -36,6 +44,18 @@ public class TitleBar extends HBox implements IHook<Object> {
     private double yOffset = 0;
     @Getter
     private boolean ghostMode = false;
+    @Getter
+    private boolean navMode = false;
+    /** 导航模式按钮，供外部引用图标着色 */
+    private final Button navBtn;
+    /** 匹配开关按钮 */
+    private final Button matchToggleBtn;
+    /** 幽灵模式按钮 */
+    private final Button ghostBtn;
+    /** 幽灵模式图标 */
+    private final Node ghostIcon;
+    /** 幽灵模式透明度滑块 */
+    private final Slider opacitySlider;
     /** 标题栏内联状态轮播标签 */
     private final Label statusLabel = new Label();
     private static final double STATUS_H = 20;
@@ -67,16 +87,24 @@ public class TitleBar extends HBox implements IHook<Object> {
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
         // --- 1. 进度条（滑块）设置 ---
-        Slider opacitySlider = new Slider(0.1, 1.0, 1.0);
+        opacitySlider = new Slider(0.1, 1.0, 1.0);
         opacitySlider.setPrefWidth(120);
         // 核心改动：默认完全透明，但不隐藏（Managed保持为true保证占位）
         opacitySlider.setOpacity(0.0);
         opacitySlider.setDisable(true); // 非幽灵模式下禁用，防止误触
-        opacitySlider.valueProperty().addListener((_, _, val) -> stage.setOpacity(val.doubleValue()));
         opacitySlider.setStyle("-fx-control-inner-background: -color-accent-emphasis;");
+        // 滑块值变化 → 设置窗口透明度；导航模式下同步回 NavigConfig
+        opacitySlider.valueProperty().addListener((_, _, val) -> {
+            stage.setOpacity(val.doubleValue());
+            if (navMode) {
+                NavigConfig.NAV_WINDOW_OPACITY = val.doubleValue();
+            }
+        });
+        // 拖动结束 → 持久化透明度
+        opacitySlider.setOnMouseReleased(_ -> ConfigPersistence.save());
 
         // --- 2. 幽灵模式锚点图标 ---
-        Button ghostBtn = new Button();
+        ghostBtn = new Button();
         ghostBtn.setStyle(
                 "-fx-background-color: transparent;" +
                         "-fx-border-color: transparent;" +
@@ -84,7 +112,7 @@ public class TitleBar extends HBox implements IHook<Object> {
                         "-fx-cursor: hand;"
         );
 
-        Node ghostIcon = createGhostIcon();
+        ghostIcon = createGhostIcon();
         setSvgFill(ghostIcon, "-color-fg-muted");
         ghostBtn.setGraphic(ghostIcon);
         ghostBtn.setPrefSize(32, 32);
@@ -114,15 +142,84 @@ public class TitleBar extends HBox implements IHook<Object> {
             for (Node node : overlayNodes) node.setMouseTransparent(ghostMode);
 
             if (!ghostMode) {
-                stage.setOpacity(1.0);
-                opacitySlider.setValue(1.0);
+                // 关闭幽灵模式：若导航模式处于激活状态则恢复导航透明度，否则恢复全透明
+                if (navMode) {
+                    stage.setOpacity(NavigConfig.NAV_WINDOW_OPACITY);
+                    opacitySlider.setValue(NavigConfig.NAV_WINDOW_OPACITY);
+                } else {
+                    stage.setOpacity(1.0);
+                    opacitySlider.setValue(1.0);
+                }
+            } else if (navMode) {
+                // 进入幽灵模式且导航模式已启用 → 应用导航透明度
+                stage.setOpacity(NavigConfig.NAV_WINDOW_OPACITY);
+                opacitySlider.setValue(NavigConfig.NAV_WINDOW_OPACITY);
             }
+        });
+
+        // --- 3. 导航模式按钮 ---
+        navBtn = new Button();
+        navBtn.setStyle(
+                "-fx-background-color: transparent;" +
+                        "-fx-border-color: transparent;" +
+                        "-fx-padding: 6px;" +
+                        "-fx-cursor: hand;"
+        );
+
+        Node navIcon = createNavIcon();
+        setSvgFill(navIcon, "-color-fg-muted");
+        navBtn.setGraphic(navIcon);
+        navBtn.setPrefSize(32, 32);
+        navBtn.setMinSize(32, 32);
+        navBtn.setMaxSize(32, 32);
+
+        String navBaseStyle = navBtn.getStyle();
+        navBtn.setOnMouseEntered(_ -> navBtn.setStyle(
+                navBaseStyle + "-fx-background-color: -color-bg-subtle;" +
+                        "-fx-background-radius: 6px;"
+        ));
+        navBtn.setOnMouseExited(_ -> navBtn.setStyle(navBaseStyle));
+
+        navBtn.setOnAction(_ -> toggleNavMode(stage, menuBtn, overlayNodes));
+
+        // --- 3.5 匹配开关按钮 ---
+        matchToggleBtn = new Button();
+        matchToggleBtn.setStyle(
+                "-fx-background-color: transparent;" +
+                        "-fx-border-color: transparent;" +
+                        "-fx-padding: 6px;" +
+                        "-fx-cursor: hand;"
+        );
+
+        Node matchIcon = createMatchToggleIcon();
+        boolean matchOn = SiftConfig.SIFT_MATCHING_ENABLED;
+        setSvgFill(matchIcon, matchOn ? "-color-accent-emphasis" : "-color-fg-muted");
+        matchToggleBtn.setGraphic(matchIcon);
+        matchToggleBtn.setPrefSize(32, 32);
+        matchToggleBtn.setMinSize(32, 32);
+        matchToggleBtn.setMaxSize(32, 32);
+
+        String matchBaseStyle = matchToggleBtn.getStyle();
+        matchToggleBtn.setOnMouseEntered(_ -> matchToggleBtn.setStyle(
+                matchBaseStyle + "-fx-background-color: -color-bg-subtle;" +
+                        "-fx-background-radius: 6px;"
+        ));
+        matchToggleBtn.setOnMouseExited(_ -> matchToggleBtn.setStyle(matchBaseStyle));
+
+        matchToggleBtn.setOnAction(_ -> {
+            SiftConfig.SIFT_MATCHING_ENABLED = !SiftConfig.SIFT_MATCHING_ENABLED;
+            boolean nowOn = SiftConfig.SIFT_MATCHING_ENABLED;
+            setSvgFill(matchIcon, nowOn ? "-color-accent-emphasis" : "-color-fg-muted");
+            // 发布轮播事件
+            HookRegistry.INSTANCE.publish(HookEventType.STATUS_CAROUSEL,
+                    nowOn ? StatusCarouselEvent.matchingResumed()
+                          : StatusCarouselEvent.matchingPaused());
         });
 
         Button closeBtn = getCloseButton(stage);
 
         // --- 4. 调整子组件顺序：滑块在图标左侧，图标靠右锚定 ---
-        getChildren().addAll(menuBtn, titleLabel, statusContainer, spacer, opacitySlider, ghostBtn, closeBtn);
+        getChildren().addAll(menuBtn, titleLabel, statusContainer, spacer, opacitySlider, ghostBtn, matchToggleBtn, navBtn, closeBtn);
 
         // 窗口移动逻辑保持不变
         setOnMousePressed(e -> {
@@ -184,6 +281,86 @@ public class TitleBar extends HBox implements IHook<Object> {
             box.setMaxSize(20, 20);
             return box;
         }
+    }
+
+    // ============================================================
+    // 导航模式
+    // ============================================================
+
+    /**
+     * 创建导航模式图标 — 指南针 SVG
+     */
+    private static Node createNavIcon() {
+        try {
+            return SvgManager.createIcon(PathConfig.NAVIGATION, 20);
+        } catch (Exception ex) {
+            log.warn("加载导航图标失败，回退到幽灵图标", ex);
+            return createGhostIcon();
+        }
+    }
+
+    /**
+     * 创建匹配开关图标
+     */
+    private static Node createMatchToggleIcon() {
+        try {
+            return SvgManager.createIcon(PathConfig.MATCH_TOGGLE, 20);
+        } catch (Exception ex) {
+            log.warn("加载匹配开关图标失败，回退到幽灵图标", ex);
+            return createGhostIcon();
+        }
+    }
+
+    /**
+     * 切换导航模式
+     */
+    private void toggleNavMode(Stage stage, Button menuBtn, Node... overlayNodes) {
+        navMode = !navMode;
+        NavigConfig.NAVIGATION_ENABLED = navMode;
+
+        Node navGraphic = navBtn.getGraphic();
+        setSvgFill(navGraphic, navMode ? "-color-accent-emphasis" : "-color-fg-muted");
+
+        CameraContext cam = CameraContext.getInstance();
+        cam.setNavMode(navMode);
+
+        if (navMode) {
+            // 应用导航透明度
+            stage.setOpacity(NavigConfig.NAV_WINDOW_OPACITY);
+            opacitySlider.setValue(NavigConfig.NAV_WINDOW_OPACITY);
+
+            // 自动开启跟随模式（updateViewport 内部有 hasValidPlayerPosition 保护）
+            if (NavigConfig.AUTO_FOLLOW_MODE) {
+                CameraContext.getInstance().setFollowMode(true);
+            }
+        } else {
+            // 恢复窗口正常状态
+            if (!ghostMode) {
+                stage.setOpacity(1.0);
+                opacitySlider.setValue(1.0);
+            }
+            cam.setNavAngle(0);
+        }
+    }
+
+    /**
+     * 外部调用 — 当 Sidebar/Setting 切换导航模式时同步 UI
+     */
+    public void setNavModeFromExternal(boolean enabled) {
+        if (enabled == navMode) return;
+        navBtn.fire();
+    }
+
+    /**
+     * 外部调用 — Sidebar 切换匹配开关时同步标题栏图标与轮播事件
+     */
+    public void publishMatchToggleEvent() {
+        boolean on = SiftConfig.SIFT_MATCHING_ENABLED;
+        Node icon = matchToggleBtn.getGraphic();
+        setSvgFill(icon, on ? "-color-accent-emphasis" : "-color-fg-muted");
+        HookRegistry.INSTANCE.publish(HookEventType.STATUS_CAROUSEL,
+                on ? StatusCarouselEvent.matchingResumed()
+                    : StatusCarouselEvent.matchingPaused());
     }
 
     // ============================================================

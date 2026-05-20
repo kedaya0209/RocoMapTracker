@@ -1,5 +1,6 @@
 package com.luoke.app.ui.render;
 
+import com.luoke.app.capture.processor.NavigationController;
 import com.luoke.app.config.RenderConfig;
 import com.luoke.app.context.CameraContext;
 import com.luoke.app.context.MapContext;
@@ -15,6 +16,7 @@ import javafx.animation.Timeline;
 import javafx.scene.Group;
 import javafx.scene.image.Image;
 import javafx.scene.layout.Pane;
+import javafx.scene.transform.Rotate;
 import javafx.scene.transform.Scale;
 import javafx.scene.transform.Translate;
 import javafx.util.Duration;
@@ -51,10 +53,14 @@ public class MapRenderer implements IHook<Object> {
     @Getter
     private final Pane parent;
     private final Group worldGroup;
-    // worldGroup 变换：Scale 锚点 (0,0)
+    // worldGroup 变换：Rotate(-navAngle, pivotX, pivotY) × Translate(ox,oy) × Scale(scale,scale,0,0)
     private final Scale worldScale;
     private final Translate worldTranslate;
+    private final Rotate worldRotate;
     private final Timeline loop;
+
+    // 导航模式旋转控制器
+    private final NavigationController navigationController;
 
     // 子渲染器
     private final IconLayerManager iconLayerManager;
@@ -64,8 +70,10 @@ public class MapRenderer implements IHook<Object> {
     private final List<RenderLayer> renderLayers;
 
     private TileManager tileManager;
-    // 视口追踪
+    // 视口追踪（避免不必要的 JavaFX 属性触发）
     private double lastScale;
+    private double lastOx = Double.NaN;
+    private double lastOy = Double.NaN;
     private boolean firstFrame = true;
 
     // ==================== 构造与初始化 ====================
@@ -76,10 +84,16 @@ public class MapRenderer implements IHook<Object> {
         worldGroup = new Group();
         tileManager = new TileManager(worldGroup, 0, 0);
         worldGroup.setPickOnBounds(false);
-        // 变换链： Translate(ox,oy) × Scale(scale,scale,0,0)
+        // 变换链： Rotate(-navAngle, pivotX, pivotY) × Translate(ox,oy) × Scale(scale,scale,0,0)
+        // JavaFX 变换按列表顺序从右到左合成，因此最后一个元素最先作用于子节点。
+        // Scale 最先应用到子节点坐标 → 然后 Translate → 最后 Rotate（绕视口中心）
         worldScale = new Scale(1, 1, 0, 0);
         worldTranslate = new Translate(0, 0);
-        worldGroup.getTransforms().addAll(worldTranslate, worldScale);
+        worldRotate = new Rotate(0, 0, 0);
+        worldGroup.getTransforms().addAll(worldRotate, worldTranslate, worldScale);
+
+        // 导航模式控制器
+        navigationController = new NavigationController();
 
         // 子渲染器
         iconLayerManager = new IconLayerManager(worldGroup);
@@ -149,6 +163,11 @@ public class MapRenderer implements IHook<Object> {
 
         cam.updateViewport();
 
+        // 导航模式：每帧更新旋转控制
+        if (mm.isPlayerInitialized()) {
+            navigationController.update(mm.getPlayerAngle(), cam.isNavMode());
+        }
+
         double ox = mm.getOffsetX();
         double oy = mm.getOffsetY();
         double scale = mm.getScale();
@@ -168,12 +187,29 @@ public class MapRenderer implements IHook<Object> {
         }
 
         boolean scaleChanged = Math.abs(scale - lastScale) > 1e-9;
+        boolean viewportMoved = firstFrame || Math.abs(ox - lastOx) > 1e-9 || Math.abs(oy - lastOy) > 1e-9;
 
-        // ====== GPU 变换（每帧，纯 GPU 操作） ======
-        worldScale.setX(scale);
-        worldScale.setY(scale);
-        worldTranslate.setX(ox);
-        worldTranslate.setY(oy);
+        // ====== GPU 变换（跳过未改变的 setter，避免触发 JavaFX 属性失效/布局重新计算） ======
+        if (scaleChanged) {
+            worldScale.setX(scale);
+            worldScale.setY(scale);
+        }
+        if (viewportMoved) {
+            worldTranslate.setX(ox);
+            worldTranslate.setY(oy);
+        }
+
+        // ====== 导航模式旋转 ======
+        if (cam.isNavMode()) {
+            double pivotX = parent.getWidth() / 2;
+            double pivotY = parent.getHeight() / 2;
+            double navAngle = cam.getNavAngle();
+            worldRotate.setPivotX(pivotX);
+            worldRotate.setPivotY(pivotY);
+            worldRotate.setAngle(-navAngle);
+        } else if (worldRotate.getAngle() != 0) {
+            worldRotate.setAngle(0);
+        }
 
         // ====== 子渲染器（各层从上下文单例自行读取数据） ======
         for (RenderLayer layer : renderLayers) {
@@ -197,6 +233,8 @@ public class MapRenderer implements IHook<Object> {
         }
 
         lastScale = scale;
+        lastOx = ox;
+        lastOy = oy;
     }
 
     private void autoFitViewport(MapContext mm) {

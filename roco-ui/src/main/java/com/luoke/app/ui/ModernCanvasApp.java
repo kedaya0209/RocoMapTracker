@@ -1,5 +1,6 @@
 package com.luoke.app.ui;
 
+import com.luoke.app.config.CaptureConfig;
 import com.luoke.app.config.ConfigPersistence;
 import com.luoke.app.config.PathConfig;
 import com.luoke.app.config.UiConfig;
@@ -87,6 +88,7 @@ public class ModernCanvasApp extends Application {
         } catch (Exception e) {
             log.warn("程序图标加载失败", e);
         }
+        primaryStage.setTitle(CaptureConfig.APP_MAIN_TITLE);
         primaryStage.show();
 
         // ---- 2. 基础设施 ----
