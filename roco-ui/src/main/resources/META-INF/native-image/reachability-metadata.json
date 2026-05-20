@@ -8751,10 +8751,16 @@
       "glob": "icon/match.svg"
     },
     {
+      "glob": "icon/match_toggle.svg"
+    },
+    {
       "glob": "icon/minimap.svg"
     },
     {
       "glob": "icon/motion.svg"
+    },
+    {
+      "glob": "icon/navigation.svg"
     },
     {
       "glob": "icon/ocr.svg"
