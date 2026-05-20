@@ -134,6 +134,31 @@ public class FileUtil {
         }
     }
 
+    // ==================== SHA256 校验 ====================
+
+    public static String computeFileSHA256(File file) {
+        try (InputStream in = new FileInputStream(file)) {
+            return computeSHA256(in);
+        } catch (IOException e) {
+            log.warn("计算文件 SHA256 失败：{}", file.getAbsolutePath(), e);
+            return "";
+        }
+    }
+
+    public static String computeSHA256(InputStream in) throws IOException {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] buf = new byte[8192];
+            int n;
+            while ((n = in.read(buf)) != -1) {
+                md.update(buf, 0, n);
+            }
+            return HexFormat.of().formatHex(md.digest());
+        } catch (NoSuchAlgorithmException e) {
+            throw new IOException("SHA-256 算法不可用", e);
+        }
+    }
+
     // ==================== MD5 校验 ====================
 
     public static String computeResourceMD5(String internalPath) {

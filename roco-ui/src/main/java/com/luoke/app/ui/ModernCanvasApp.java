@@ -4,8 +4,12 @@ import com.luoke.app.config.CaptureConfig;
 import com.luoke.app.config.ConfigPersistence;
 import com.luoke.app.config.PathConfig;
 import com.luoke.app.config.UiConfig;
+import com.luoke.app.config.UpdateConfig;
 import com.luoke.app.config.ViewConfig;
 import com.luoke.app.context.OcrAsyncManager;
+import com.luoke.app.hook.HookEventType;
+import com.luoke.app.hook.event.NotificationType;
+import com.luoke.app.hook.event.StatusEvent;
 import com.luoke.app.hook.impl.UiResponseHook;
 import com.luoke.app.hook.multicast.HookRegistry;
 import com.luoke.app.macher.map.SwitchMapMatcher;
@@ -14,6 +18,9 @@ import com.luoke.app.ui.component.LoadingOverlay;
 import com.luoke.app.ui.component.UiAnimator;
 import com.luoke.app.ui.service.*;
 import com.luoke.app.ui.util.DialogUtils;
+import com.luoke.app.update.UpdateManager;
+import com.luoke.app.update.UpdateUiDelegate;
+import com.luoke.app.update.VersionInfo;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.scene.Scene;
@@ -151,6 +158,46 @@ public class ModernCanvasApp extends Application {
         captureServiceManager.init(siftClientManager.getClient());
 
         result.renderer().start();
+
+        // 设置更新 UI 回调
+        UpdateManager.getInstance().setUiDelegate(new UpdateUiDelegate() {
+            @Override
+            public void showNotification(String message, NotificationType type) {
+                Platform.runLater(() ->
+                        HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION,
+                                new StatusEvent(message, type)));
+            }
+
+            @Override
+            public void showUpdateAvailable(VersionInfo info) {
+                Platform.runLater(() ->
+                        DialogUtils.showConfirmDialog(rootStack,
+                                "发现新版本 " + info.version(),
+                                "当前版本: " + com.luoke.app.config.BuildConfig.APP_VERSION + "\n"
+                                        + "最新版本: " + info.version() + "\n\n是否立即下载更新？",
+                                () -> UpdateManager.getInstance().startDownload(info),
+                                null));
+            }
+
+            @Override
+            public void restartApplication() {
+                Platform.runLater(() -> {
+                    // 短暂延迟确保 updater 脚本已启动
+                    try {
+                        Thread.sleep(500);
+                    } catch (InterruptedException ignored) {
+                    }
+                    Platform.exit();
+                    System.exit(0);
+                });
+            }
+        });
+
+        // 启动定时更新检查
+        if (UpdateConfig.CHECK_ENABLED) {
+            UpdateManager.getInstance().startPeriodicCheck(UpdateConfig.CHECK_INTERVAL_HOURS);
+        }
+
         log.info("主界面构建完成");
     }
 

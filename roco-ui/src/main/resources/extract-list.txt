@@ -22,3 +22,4 @@
 /sift/msvcp140_atomic_wait.dll:/sift/msvcp140_atomic_wait.dll
 /sift/vcruntime140_threads.dll:/sift/vcruntime140_threads.dll
 /source/point/collect_set.txt:/resources/source/point/collect_set.txt
+/update/hpatchz.exe:/update/hpatchz.exe
