@@ -201,6 +201,7 @@ jobs:
           echo "**SHA256**: 见附件 \`.sha256\` 文件" >> releasenotes.md
 
       - name: Create GitHub Release
+        shell: cmd
         run: |
           set "PREV_TAG=${{ steps.prev_tag.outputs.prev_tag }}"
           if "%PREV_TAG%"=="" set "PREV_TAG=v${{ github.event.inputs.version }}"
