@@ -15,6 +15,8 @@ public class SiftSessionManager {
 
     private volatile SocketSession activeSession;
     private volatile boolean activeInitialized;
+    /** 已收到 C++ 的 READY 信号，表示子进程已进入匹配循环，可安全发送帧数据 */
+    private volatile boolean activeReady;
     private volatile SocketSession pendingSession;
     private volatile boolean pendingInitialized;
     private volatile boolean switching;
@@ -80,6 +82,7 @@ public class SiftSessionManager {
 
         this.activeSession = this.pendingSession;
         this.activeInitialized = true;
+        this.activeReady = false;  // 等待新进程发送 READY
         this.pendingSession = null;
         this.pendingInitialized = false;
         this.switching = false;
@@ -109,6 +112,7 @@ public class SiftSessionManager {
         log.warn("SiftMatchHandler active session disconnected");
         this.activeSession = null;
         this.activeInitialized = false;
+        this.activeReady = false;
     }
 
     /**
@@ -125,7 +129,14 @@ public class SiftSessionManager {
     // ==================== 查询 ====================
 
     public boolean isReady() {
-        return activeInitialized && activeSession != null && !activeSession.isClosed();
+        return activeInitialized && activeReady && activeSession != null && !activeSession.isClosed();
+    }
+
+    /**
+     * 收到 C++ READY 信号，标记可发送帧数据。
+     */
+    public void handleReady() {
+        this.activeReady = true;
     }
 
     public boolean isSwitching() {
@@ -149,6 +160,7 @@ public class SiftSessionManager {
     public void reset() {
         activeSession = null;
         activeInitialized = false;
+        activeReady = false;
         pendingSession = null;
         pendingInitialized = false;
         switching = false;

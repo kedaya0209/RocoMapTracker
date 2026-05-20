@@ -67,7 +67,7 @@ public class SiftMatchHandler implements SocketHandler {
             MSG_REQUEST_MAP, (b, s) -> handleRequestMap(s),
             MSG_INIT_COMPLETE, this::handleInitComplete,
             MSG_INIT_FAILED, this::handleInitFailed,
-            MSG_READY, (b, s) -> { /* backpressure ack */ },
+            MSG_READY, this::handleReady,
             MSG_MATCH_RESULT, this::handleMatchResult
     );
 
@@ -243,6 +243,10 @@ public class SiftMatchHandler implements SocketHandler {
             pendingResult = result;
             resultLock.notify();
         }
+    }
+
+    private void handleReady(byte[] body, SocketSession session) {
+        sessionManager.handleReady();
     }
 
     // ==================== 帧匹配 ====================

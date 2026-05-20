@@ -72,7 +72,7 @@ public class SiftMatchProtocol {
         buf.putInt(SiftConfig.SEARCH_RADIUS);
 
         buf.putInt(1);  // KDTreeIndexParams(1)
-        buf.putInt(24); // SearchParams(24, 0, true)
+        buf.putInt(SiftConfig.FLANN_SEARCH_CHECKS);
 
         buf.putDouble(SiftConfig.RANSAC_REPROJ_THRESHOLD);
         buf.putInt(SiftConfig.RANSAC_MAX_ITERS);

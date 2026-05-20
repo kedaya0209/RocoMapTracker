@@ -653,6 +653,7 @@ public:
     double ransac_reproj_threshold = 10.0;
     int ransac_max_iters = 200;
     double ransac_confidence = 0.95;
+    int flann_search_checks = 24;
 
     SiftMatcher(const AlgoParams& p)
         : match_ratio_threshold((float)p.matchRatioThreshold)
@@ -661,6 +662,7 @@ public:
         , ransac_reproj_threshold(p.ransacReprojThreshold)
         , ransac_max_iters(p.ransacMaxIters)
         , ransac_confidence(p.ransacConfidence)
+        , flann_search_checks(p.flannSearchChecks)
     {
         sift = cv::SIFT::create(
             p.nfeatures,
@@ -957,7 +959,7 @@ public:
                 float dists[2];
                 u8_index->knnSearch(qmat, cvflann::Matrix<int>(idx, 1, 2),
                                     cvflann::Matrix<float>(dists, 1, 2), 2,
-                                    cvflann::SearchParams(24));
+                                    cvflann::SearchParams(flann_search_checks));
                 if (idx[1] >= 0 && dists[0] < match_ratio_threshold * dists[1]) {
                     good_matches.push_back(cv::DMatch(qi, idx[0], dists[0]));
                 }
@@ -973,7 +975,7 @@ public:
                 float dists[2];
                 f32_index->knnSearch(qmat, cvflann::Matrix<int>(idx, 1, 2),
                                      cvflann::Matrix<float>(dists, 1, 2), 2,
-                                     cvflann::SearchParams(24));
+                                     cvflann::SearchParams(flann_search_checks));
                 if (idx[1] >= 0 && dists[0] < match_ratio_threshold * dists[1]) {
                     good_matches.push_back(cv::DMatch(qi, idx[0], dists[0]));
                 }
