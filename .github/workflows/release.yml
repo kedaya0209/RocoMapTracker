@@ -195,6 +195,43 @@ jobs:
             )
           )
 
+      - name: Push HDiffPatch to patches branch for jsDelivr CDN
+        if: hashFiles('RocoMapTracker-*.hdiff') != ''
+        continue-on-error: true
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          ORIG_REF=$(git rev-parse HEAD)
+
+          # 孤儿分支，只包含最新 .hdiff，无历史积累
+          git checkout --orphan patches_tmp
+          git rm -rf . 2>/dev/null || true
+
+          mkdir -p updates
+          for f in RocoMapTracker-*.hdiff*; do
+            [ -f "$f" ] && cp "$f" "updates/$f"
+          done
+
+          git add updates/
+          git commit -m "chore: add patches for v${{ github.event.inputs.version }} [skip ci]"
+
+          # 强制推送 patches 分支
+          git push origin HEAD:patches --force
+
+          # 恢复原始工作树（即使 push 失败也要恢复）
+          git checkout -f "$ORIG_REF" 2>/dev/null || true
+
+      - name: Purge jsDelivr CDN cache
+        if: hashFiles('RocoMapTracker-*.hdiff') != ''
+        continue-on-error: true
+        shell: bash
+        run: |
+          for f in RocoMapTracker-*.hdiff*; do
+            [ -f "$f" ] && curl -sS -o /dev/null "https://purge.jsdelivr.net/gh/kedaya0209/RocoMapTracker@patches/updates/$f"
+          done
+
       - name: Cleanup existing release and tag
         continue-on-error: true
         shell: bash

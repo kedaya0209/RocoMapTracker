@@ -15,9 +15,11 @@ import com.luoke.app.hook.multicast.HookRegistry;
 import com.luoke.app.macher.map.SwitchMapMatcher;
 import com.luoke.app.socket.SocketServer;
 import com.luoke.app.ui.component.LoadingOverlay;
+import com.luoke.app.ui.component.Sidebar;
 import com.luoke.app.ui.component.UiAnimator;
 import com.luoke.app.ui.service.*;
 import com.luoke.app.ui.util.DialogUtils;
+import com.luoke.app.ui.util.DialogUtils.ProgressControl;
 import com.luoke.app.update.UpdateManager;
 import com.luoke.app.update.UpdateUiDelegate;
 import com.luoke.app.update.VersionInfo;
@@ -55,6 +57,7 @@ public class ModernCanvasApp extends Application {
     private final CaptureServiceManager captureServiceManager = new CaptureServiceManager();
     private StackPane rootStack;
     private Stage primaryStage;
+    private Sidebar sidebar;
 
     public static void main(String[] args) {
         launch(args);
@@ -158,9 +161,13 @@ public class ModernCanvasApp extends Application {
         captureServiceManager.init(siftClientManager.getClient());
 
         result.renderer().start();
+        this.sidebar = result.sidebar();
 
         // 设置更新 UI 回调
         UpdateManager.getInstance().setUiDelegate(new UpdateUiDelegate() {
+            private volatile ProgressControl downloadProgress;
+            private volatile boolean backgroundMode;
+
             @Override
             public void showNotification(String message, NotificationType type) {
                 Platform.runLater(() ->
@@ -171,12 +178,53 @@ public class ModernCanvasApp extends Application {
             @Override
             public void showUpdateAvailable(VersionInfo info) {
                 Platform.runLater(() ->
-                        DialogUtils.showConfirmDialog(rootStack,
+                        DialogUtils.showUpdateDialog(rootStack,
                                 "发现新版本 " + info.version(),
-                                "当前版本: " + com.luoke.app.config.BuildConfig.APP_VERSION + "\n"
-                                        + "最新版本: " + info.version() + "\n\n是否立即下载更新？",
+                                com.luoke.app.config.BuildConfig.APP_VERSION,
+                                info.version(),
+                                info.releaseNotes(),
                                 () -> UpdateManager.getInstance().startDownload(info),
-                                null));
+                                () -> {}));
+            }
+
+            @Override
+            public void showDownloadProgress(String version, double progress) {
+                Platform.runLater(() -> {
+                    if (backgroundMode) {
+                        sidebar.setDownloadProgress(progress);
+                        return;
+                    }
+                    if (downloadProgress == null) {
+                        downloadProgress = DialogUtils.showDownloadProgressDialog(rootStack, version, () -> {
+                            // 后台下载按钮回调：切到侧边栏显示进度
+                            backgroundMode = true;
+                            sidebar.setDownloadProgress(0);
+                        });
+                    }
+                    downloadProgress.updateProgress(progress,
+                            String.format("%.1f%%", progress * 100));
+                });
+            }
+
+            @Override
+            public void hideDownloadProgress() {
+                Platform.runLater(() -> {
+                    if (downloadProgress != null) {
+                        downloadProgress.close();
+                        downloadProgress = null;
+                    }
+                    if (backgroundMode) {
+                        backgroundMode = false;
+                        sidebar.setDownloadProgress(-1);
+                    }
+                });
+            }
+
+            @Override
+            public void showUpdateReadyDialog(VersionInfo info, Runnable onInstallNow, Runnable onLater) {
+                Platform.runLater(() ->
+                        DialogUtils.showUpdateReadyDialog(rootStack,
+                                info.version(), onInstallNow, onLater));
             }
 
             @Override

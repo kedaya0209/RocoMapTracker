@@ -62,6 +62,7 @@ public class UpdateChecker {
         String tagName = root.get("tag_name").asText("");
         String htmlUrl = root.get("html_url").asText("");
         String publishedAt = root.get("published_at").asText("");
+        String body = root.get("body").asText("");
 
         LocalDateTime dateTime = null;
         if (!publishedAt.isEmpty()) {
@@ -102,7 +103,7 @@ public class UpdateChecker {
 
         String version = tagName.startsWith("v") ? tagName.substring(1) : tagName;
         return new VersionInfo(tagName, version, htmlUrl, exeUrl, exeSha256Url,
-                patchUrl, patchFromVersion, patchSha256Url, dateTime);
+                patchUrl, patchFromVersion, patchSha256Url, dateTime, body);
     }
 
     public static boolean isNewer(String current, String latest) {

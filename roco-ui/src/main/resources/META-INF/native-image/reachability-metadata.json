@@ -8774,6 +8774,12 @@
       "glob": "icon/processor.svg"
     },
     {
+      "glob": "icon/about.svg"
+    },
+    {
+      "glob": "icon/update.svg"
+    },
+    {
       "glob": "source/icon/player.png"
     },
     {
@@ -13058,6 +13064,9 @@
     },
     {
       "bundle": "sun.util.logging.resources.logging"
+    },
+    {
+      "glob": "version.properties"
     },
     {
       "glob": "com/sun/prism/d3d/hlsl/*.obj"

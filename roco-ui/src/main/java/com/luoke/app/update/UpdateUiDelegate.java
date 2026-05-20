@@ -12,4 +12,13 @@ public interface UpdateUiDelegate {
     void showUpdateAvailable(VersionInfo info);
 
     void restartApplication();
+
+    /** 更新下载进度回调 */
+    void showDownloadProgress(String version, double progress);
+
+    /** 隐藏下载进度弹窗 */
+    void hideDownloadProgress();
+
+    /** 下载完毕就绪弹窗（立即更新 / 下次再说） */
+    void showUpdateReadyDialog(VersionInfo info, Runnable onInstallNow, Runnable onLater);
 }

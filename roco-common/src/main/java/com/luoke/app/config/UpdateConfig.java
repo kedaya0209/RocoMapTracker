@@ -13,6 +13,8 @@ public final class UpdateConfig {
     public static int CHECK_INTERVAL_HOURS = 24;
     /** 发现更新时自动下载 */
     public static boolean AUTO_DOWNLOAD;
+    /** 下载源：github / jsdelivr */
+    public static String DOWNLOAD_SOURCE = "github";
 
     private UpdateConfig() {
         throw new AssertionError("禁止实例化配置类");
@@ -22,6 +24,7 @@ public final class UpdateConfig {
         CHECK_ENABLED = ConfigHelper.getBool(prop, "update.check.enabled", true);
         CHECK_INTERVAL_HOURS = ConfigHelper.getInt(prop, "update.check.interval.hours", 24);
         AUTO_DOWNLOAD = ConfigHelper.getBool(prop, "update.auto.download", false);
+        DOWNLOAD_SOURCE = ConfigHelper.getStr(prop, "update.download.source", "github");
     }
 
     public static void save(StringBuilder sb) {
@@ -30,6 +33,8 @@ public final class UpdateConfig {
         sb.append("# 检查间隔（小时）\n");
         sb.append("update.check.interval.hours=").append(CHECK_INTERVAL_HOURS).append("\n");
         sb.append("# 发现更新时自动下载\n");
-        sb.append("update.auto.download=").append(AUTO_DOWNLOAD).append("\n\n");
+        sb.append("update.auto.download=").append(AUTO_DOWNLOAD).append("\n");
+        sb.append("# 下载源：github / jsdelivr\n");
+        sb.append("update.download.source=").append(DOWNLOAD_SOURCE).append("\n\n");
     }
 }

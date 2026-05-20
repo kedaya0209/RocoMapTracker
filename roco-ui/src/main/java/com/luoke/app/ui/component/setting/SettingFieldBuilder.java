@@ -68,6 +68,18 @@ public class SettingFieldBuilder {
             return sp;
         }
 
+        if (type == SettingType.BUTTON) {
+            Button btn = new Button(def.label());
+            btn.setMaxWidth(Double.MAX_VALUE);
+            btn.setPrefHeight(36);
+            btn.getStyleClass().addAll(Styles.BUTTON_OUTLINED, Styles.ACCENT);
+            FxRippleUtil.install(btn);
+            btn.setOnAction(_ -> {
+                if (def.onApply() != null) def.onApply().run();
+            });
+            return btn;
+        }
+
         if (type == SettingType.STRING) {
             if ("HOVER_GLOW_COLOR".equals(def.key())) {
                 return buildColorPicker(def);
@@ -75,7 +87,11 @@ public class SettingFieldBuilder {
             String val = currentValue != null ? currentValue.toString() : "";
             TextField tf = new TextField(val);
             tf.setPrefWidth(200);
-            tf.textProperty().addListener((_, _, _) -> configManager.markModified());
+            if (def.key().startsWith("ABOUT_")) {
+                tf.setEditable(false);
+            } else {
+                tf.textProperty().addListener((_, _, _) -> configManager.markModified());
+            }
             return tf;
         }
 

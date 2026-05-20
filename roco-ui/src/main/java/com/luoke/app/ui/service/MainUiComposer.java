@@ -122,7 +122,7 @@ public final class MainUiComposer {
         uiAnimator.setupSidebarToggle(menuBtn, sidebar, floatContainer);
         sidebar.setAnimator(uiAnimator);
 
-        return new UiBuildResult(renderer, canvasContainer);
+        return new UiBuildResult(renderer, canvasContainer, sidebar);
     }
 
     private static Button createMenuButton() {
@@ -153,6 +153,6 @@ public final class MainUiComposer {
     /**
      * 主界面构建结果
      */
-    public record UiBuildResult(MapRenderer renderer, Pane canvasContainer) {
+    public record UiBuildResult(MapRenderer renderer, Pane canvasContainer, Sidebar sidebar) {
     }
 }
