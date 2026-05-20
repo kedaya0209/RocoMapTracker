@@ -1,24 +1,11 @@
 package com.luoke.app.ui.component.setting;
 
-import com.luoke.app.config.ConfigPersistence;
-import com.luoke.app.config.RenderConfig;
-import com.luoke.app.config.SocketConfig;
-import com.luoke.app.config.UiConfig;
-import com.luoke.app.config.CaptureConfig;
-import com.luoke.app.config.PlayerConfig;
-import com.luoke.app.config.StatsConfig;
-import com.luoke.app.config.MiniMapConfig;
-import com.luoke.app.config.ViewConfig;
-import com.luoke.app.config.DownloadConfig;
-import com.luoke.app.config.OcrConfig;
-import com.luoke.app.config.SiftConfig;
-import com.luoke.app.config.NavigConfig;
-import com.luoke.app.config.UpdateConfig;
-import com.luoke.app.context.CameraContext;
-import com.luoke.app.ui.component.TitleBar;
+import com.luoke.app.config.*;
 import com.luoke.app.context.CameraContext;
 import com.luoke.app.macher.map.SwitchMapMatcher;
+import com.luoke.app.ui.component.TitleBar;
 import com.luoke.app.ui.service.ThemeManager;
+import com.luoke.app.update.UpdateManager;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
@@ -644,7 +631,7 @@ public final class SettingDefinitions {
                                 () -> SocketConfig.SIFT_PROCESS_STOP_TIMEOUT,
                                 v -> SocketConfig.SIFT_PROCESS_STOP_TIMEOUT = (Integer) v)
                 ),
-                cat("更新", "/icon/download.svg",
+                cat("更新", "/icon/update.svg",
                         bool("CHECK_ENABLED", "自动检查更新",
                                 () -> UpdateConfig.CHECK_ENABLED,
                                 v -> UpdateConfig.CHECK_ENABLED = (Boolean) v),
@@ -653,7 +640,26 @@ public final class SettingDefinitions {
                                 v -> UpdateConfig.CHECK_INTERVAL_HOURS = (Integer) v),
                         bool("AUTO_DOWNLOAD", "发现更新时自动下载",
                                 () -> UpdateConfig.AUTO_DOWNLOAD,
-                                v -> UpdateConfig.AUTO_DOWNLOAD = (Boolean) v)
+                                v -> UpdateConfig.AUTO_DOWNLOAD = (Boolean) v),
+                        combo("DOWNLOAD_SOURCE", "下载源",
+                                () -> new String[]{"github", "jsdelivr"},
+                                null,
+                                () -> UpdateConfig.DOWNLOAD_SOURCE,
+                                v -> UpdateConfig.DOWNLOAD_SOURCE = (String) v),
+                        new SettingDef("CHECK_NOW", "检查更新", SettingType.BUTTON,
+                                null, () -> UpdateManager.getInstance().manualCheck(null),
+                                false, null, null)
+                ),
+                cat("关于", "/icon/about.svg",
+                        new SettingDef("ABOUT_VERSION", "当前版本", SettingType.STRING,
+                                null, null, false,
+                                () -> com.luoke.app.config.BuildConfig.APP_VERSION, null),
+                        new SettingDef("ABOUT_BUILD_TIME", "构建时间", SettingType.STRING,
+                                null, null, false,
+                                () -> com.luoke.app.config.BuildConfig.BUILD_TIMESTAMP, null),
+                        new SettingDef("ABOUT_REPO", "GitHub仓库", SettingType.STRING,
+                                null, null, false,
+                                () -> "https://github.com/kedaya0209/RocoMapTracker", null)
                 )
         );
     }

@@ -1,7 +1,6 @@
 package com.luoke.app.update;
 
 import com.luoke.app.config.BuildConfig;
-import com.luoke.app.config.UpdateConfig;
 import com.luoke.app.hook.event.NotificationType;
 import com.luoke.app.utils.FileUtil;
 import lombok.extern.slf4j.Slf4j;
@@ -18,6 +17,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 
 /**
  * 更新管理器 — 检查/下载/安装全流程编排。
@@ -100,12 +100,7 @@ public class UpdateManager {
             }
             pendingUpdate.set(latest);
             if (uiDelegate != null) {
-                if (UpdateConfig.AUTO_DOWNLOAD) {
-                    notify("正在下载 " + latest.version() + " ...", NotificationType.INFO);
-                    startDownload(latest);
-                } else {
-                    uiDelegate.showUpdateAvailable(latest);
-                }
+                uiDelegate.showUpdateAvailable(latest);
             }
         } finally {
             checking.set(false);
@@ -113,27 +108,35 @@ public class UpdateManager {
     }
 
     /**
-     * 开始下载更新
+     * 开始下载更新 — 带进度条 + 下载完毕弹窗（立即更新 / 下次再说）
      */
     public void startDownload(VersionInfo info) {
         if (!downloading.compareAndSet(false, true)) {
             notify("正在下载中，请稍候", NotificationType.INFO);
             return;
         }
+        final boolean[] isPatchDone = {false};
+        final Path[] downloadPath = {null};
         Thread.ofVirtual().name("update-download").start(() -> {
             try {
                 String exeDir = detectAppDir();
-                Path patchPath = Path.of(exeDir, "update_" + info.version() + ".hdiff");
 
-                boolean patchOk = false;
+                // ── 尝试补丁下载 ──
                 if (info.patchDownloadUrl() != null && isPatchVersionMatch(info)) {
+                    Path patchPath = Path.of(exeDir, "update_" + info.version() + ".hdiff");
                     try {
-                        downloadFile(info.patchDownloadUrl(), patchPath);
+                        uiDelegate.showDownloadProgress(info.version(), 0);
+                        downloadFile(info.patchDownloadUrl(), patchPath, p ->
+                                uiDelegate.showDownloadProgress(info.version(), p));
                         if (info.patchSha256Url() != null) {
                             verifySha256(patchPath, info.patchSha256Url());
                         }
-                        if (Files.size(patchPath) > 0) patchOk = true;
-                        else Files.deleteIfExists(patchPath);
+                        if (Files.size(patchPath) > 0) {
+                            downloadPath[0] = patchPath;
+                            isPatchDone[0] = true;
+                        } else {
+                            Files.deleteIfExists(patchPath);
+                        }
                     } catch (Exception e) {
                         log.warn("Patch download/verify failed, will fallback to full exe", e);
                         Files.deleteIfExists(patchPath);
@@ -143,24 +146,36 @@ public class UpdateManager {
                             info.patchFromVersion(), BuildConfig.APP_VERSION);
                 }
 
-                if (patchOk) {
-                    pendingUpdate.set(info);
-                    notify("补丁下载完成，准备更新 " + info.version(), NotificationType.SUCCESS);
-                    installAndRestart(patchPath);
-                } else if (info.exeDownloadUrl() != null) {
+                // ── 补丁失败 / 无补丁 → 完整 exe 下载 ──
+                if (downloadPath[0] == null && info.exeDownloadUrl() != null) {
                     Path exePath = Path.of(exeDir, "RocoMapTracker_" + info.version() + ".exe");
-                    notify("正在下载完整安装包 ...", NotificationType.INFO);
-                    downloadFile(info.exeDownloadUrl(), exePath);
+                    uiDelegate.showDownloadProgress(info.version(), 0);
+                    downloadFile(info.exeDownloadUrl(), exePath, p ->
+                            uiDelegate.showDownloadProgress(info.version(), p));
                     if (info.exeSha256Url() != null) {
                         verifySha256(exePath, info.exeSha256Url());
                     }
+                    downloadPath[0] = exePath;
+                }
+
+                uiDelegate.hideDownloadProgress();
+
+                // ── 下载完毕 → 弹窗让用户选择 ──
+                if (downloadPath[0] != null) {
                     pendingUpdate.set(info);
-                    notify("下载完成，准备更新 " + info.version(), NotificationType.SUCCESS);
-                    installAndRestartExe(exePath);
+                    Path dPath = downloadPath[0];
+                    boolean isPatch = isPatchDone[0];
+                    uiDelegate.showUpdateReadyDialog(info,
+                            () -> Thread.ofVirtual().name("update-install").start(() -> {
+                                if (isPatch) installAndRestart(dPath);
+                                else installAndRestartExe(dPath);
+                            }),
+                            () -> log.info("用户选择稍后安装更新 {}", info.version()));
                 } else {
                     notify("更新失败：未找到可下载的文件", NotificationType.ERROR);
                 }
             } catch (Exception e) {
+                uiDelegate.hideDownloadProgress();
                 log.error("Download failed", e);
                 notify("下载更新失败：" + e.getMessage(), NotificationType.ERROR);
             } finally {
@@ -185,9 +200,12 @@ public class UpdateManager {
             Path scriptPath = Path.of(exeDir, "updater_" + UUID.randomUUID().toString().substring(0, 8) + ".bat");
             Files.writeString(scriptPath, script);
             log.info("Starting updater script: {}", scriptPath);
-            new ProcessBuilder("cmd.exe", "/c", "start", "/min", scriptPath.toString())
-                    .directory(new File(exeDir))
-                    .start();
+            startScriptDetached(scriptPath.toString(), exeDir);
+            // 等待 updater 初始化完成再退出（确保 WMI 已创建独立进程）
+            try {
+                Thread.sleep(2000);
+            } catch (InterruptedException ignored) {
+            }
             if (uiDelegate != null) uiDelegate.restartApplication();
         } catch (IOException e) {
             log.error("Failed to start updater script", e);
@@ -205,13 +223,49 @@ public class UpdateManager {
             Path scriptPath = Path.of(exeDir, "updater_" + UUID.randomUUID().toString().substring(0, 8) + ".bat");
             Files.writeString(scriptPath, script);
             log.info("Starting updater script: {}", scriptPath);
-            new ProcessBuilder("cmd.exe", "/c", "start", "/min", scriptPath.toString())
-                    .directory(new File(exeDir))
-                    .start();
+            startScriptDetached(scriptPath.toString(), exeDir);
+            // 等待 updater 初始化完成再退出（确保 WMI 已创建独立进程）
+            try {
+                Thread.sleep(2000);
+            } catch (InterruptedException ignored) {
+            }
             if (uiDelegate != null) uiDelegate.restartApplication();
         } catch (IOException e) {
             log.error("Failed to start updater script", e);
             notify("启动更新程序失败：" + e.getMessage(), NotificationType.ERROR);
+        }
+    }
+
+    /**
+     * 以脱离 JobObject 的方式启动 updater 脚本，防止 Java 进程退出时
+     * JobObject 的 KILL_ON_JOB_CLOSE 将脚本一同终止。
+     * <p>
+     * 策略：优先通过 WMI (wmic) 创建独立进程（不在 JobObject 内），
+     * 降级使用 cmd /c start /min。
+     */
+    private void startScriptDetached(String scriptPath, String workDir) {
+        // 优先尝试 wmic（创建独立进程，脱离 JobObject）
+        String wmicCmd = "wmic process call create \"cmd.exe /c " + scriptPath + "\"";
+        try {
+            Process p = new ProcessBuilder("cmd.exe", "/c", wmicCmd)
+                    .directory(new File(workDir))
+                    .start();
+            // wmic 启动较慢，最多等 5 秒让脚本启动
+            p.waitFor(5, java.util.concurrent.TimeUnit.SECONDS);
+            log.info("Updater script started via wmic");
+            return;
+        } catch (Exception e) {
+            log.warn("wmic start failed, fallback to start /min", e);
+        }
+
+        // 降级：start /min 可能在 JobObject 内被终止，但仍有几率成功
+        try {
+            new ProcessBuilder("cmd.exe", "/c", "start", "/min", scriptPath)
+                    .directory(new File(workDir))
+                    .start();
+            log.info("Updater script started via start /min (fallback)");
+        } catch (Exception e) {
+            log.error("Failed to start updater script (fallback)", e);
         }
     }
 
@@ -222,6 +276,7 @@ public class UpdateManager {
         return "@echo off\r\n"
                 + "setlocal enabledelayedexpansion\r\n"
                 + "title RocoMapTracker Updater\r\n"
+                + "cd /D \"%~dp0\"\r\n"
                 + "\r\n"
                 + ":WAIT\r\n"
                 + "tasklist /FI \"IMAGENAME eq " + exeName + "\" 2>nul | find /I \"" + exeName + "\" >nul\r\n"
@@ -301,6 +356,10 @@ public class UpdateManager {
     }
 
     private void downloadFile(String url, Path targetPath) throws IOException, InterruptedException {
+        downloadFile(url, targetPath, null);
+    }
+
+    private void downloadFile(String url, Path targetPath, Consumer<Double> progressCallback) throws IOException, InterruptedException {
         Path parent = targetPath.getParent();
         if (parent != null) Files.createDirectories(parent);
 
@@ -318,12 +377,26 @@ public class UpdateManager {
             throw new IOException("Download failed with status: " + response.statusCode());
         }
 
+        long totalBytes = response.headers().firstValueAsLong("Content-Length").orElse(-1L);
+        long bytesReadSoFar = 0;
+        long lastUpdateTime = 0;
+        // 最多每秒 20 次更新，避免 Platform.runLater 队列积压
+        long minInterval = 50;
+
         try (InputStream is = response.body();
              OutputStream os = new BufferedOutputStream(new FileOutputStream(targetPath.toFile()))) {
             byte[] buffer = new byte[8192];
             int bytesRead;
             while ((bytesRead = is.read(buffer)) != -1) {
                 os.write(buffer, 0, bytesRead);
+                bytesReadSoFar += bytesRead;
+                if (totalBytes > 0 && progressCallback != null) {
+                    long now = System.nanoTime();
+                    if (now - lastUpdateTime >= minInterval * 1_000_000L || bytesReadSoFar == totalBytes) {
+                        lastUpdateTime = now;
+                        progressCallback.accept((double) bytesReadSoFar / totalBytes);
+                    }
+                }
             }
             os.flush();
         }

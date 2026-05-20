@@ -17,5 +17,7 @@ public record VersionInfo(
         String patchFromVersion,
         /** 补丁的 SHA256 校验文件 URL */
         String patchSha256Url,
-        LocalDateTime publishedAt
+        LocalDateTime publishedAt,
+        /** GitHub Release 更新说明 (body) */
+        String releaseNotes
 ) {}

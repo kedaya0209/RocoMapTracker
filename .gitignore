@@ -121,3 +121,9 @@ coverage/
 # 私有资源（从 RocoMapTracker-resources 仓库获取）
 # ==============================
 /roco-map/src/main/resources/source/
+
+# ==============================
+# 运行时释放的依赖（Maven 提取）
+# ==============================
+/atlantafx/
+/update/

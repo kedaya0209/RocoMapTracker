@@ -1,11 +1,8 @@
 package com.luoke.app.ui.component;
 
+import atlantafx.base.controls.ToggleSwitch;
 import atlantafx.base.theme.Styles;
-import com.luoke.app.config.ConfigPersistence;
-import com.luoke.app.config.DownloadConfig;
-import com.luoke.app.config.NavigConfig;
-import com.luoke.app.config.UiConfig;
-import com.luoke.app.config.SiftConfig;
+import com.luoke.app.config.*;
 import com.luoke.app.context.CameraContext;
 import com.luoke.app.context.ResourceConfigContext;
 import com.luoke.app.hook.HookEventType;
@@ -19,6 +16,7 @@ import com.luoke.app.ui.service.ThemeManager;
 import com.luoke.app.ui.util.DialogUtils;
 import com.luoke.app.ui.util.FxRippleUtil;
 import com.luoke.app.ui.util.RestartUtils;
+import com.luoke.app.update.UpdateManager;
 import javafx.animation.FadeTransition;
 import javafx.animation.KeyFrame;
 import javafx.animation.KeyValue;
@@ -34,6 +32,7 @@ import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.scene.shape.SVGPath;
 import javafx.util.Duration;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -46,6 +45,7 @@ public class Sidebar extends VBox {
     // 当前展开状态
     private SidebarItem.Category expandedCategory = null;
     private volatile boolean isAlgorithmLoading = false;
+    @Setter
     private UiAnimator animator;
 
     public Sidebar() {
@@ -113,11 +113,22 @@ public class Sidebar extends VBox {
         // 路线管理
         items.add(new SidebarItem(SidebarItem.Type.ACTION, "路线管理", null, null, null, false, "/icon/route.svg", this::openRouteManager));
 
+        // 检查更新
+        items.add(new SidebarItem(SidebarItem.Type.ACTION, "检查更新", null, null, null, false, "/icon/update.svg", () -> {
+            HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION,
+                    new StatusEvent("正在检查更新，请稍候...", NotificationType.INFO));
+            UpdateManager.getInstance().manualCheck(null);
+        }));
+
+        // 关于
+        items.add(new SidebarItem(SidebarItem.Type.ACTION, "关于", null, null, null, false, "/icon/about.svg", this::openAboutDialog));
+
         // WIKI 更新（特殊容器）
         items.add(new SidebarItem(SidebarItem.Type.WIKI, null, null, null, wikiUpdater));
     }
 
     private void onHeaderClick(SidebarItem item) {
+        if (item.category() == SidebarItem.Category.MATCH) return; // Switch 控件直接控制，不展开
         if (expandedCategory == item.category()) {
             collapseCurrent();
             return;
@@ -132,10 +143,9 @@ public class Sidebar extends VBox {
                 "启用视角跟随",
                 "打开导航设置"
             };
-            case MATCH -> new String[]{
-                SiftConfig.SIFT_MATCHING_ENABLED ? "禁用匹配" : "启用匹配"
-            };
+            case MATCH -> new String[]{}; // 不会被执行（早期 return 保护）
         };
+
         String currentValue = item.currentValue();
         int insertIndex = items.indexOf(item) + 1;
         for (int i = 0; i < options.length; i++) {
@@ -159,7 +169,8 @@ public class Sidebar extends VBox {
             case RESOURCE -> switchResource(value, header);
             case THEME -> switchTheme(value, header);
             case NAVIGATION -> handleNavOption(value, header);
-            case MATCH -> handleMatchOption(value, header);
+            case MATCH -> {
+            } // Switch 控件直接控制
         }
         collapseCurrent();
     }
@@ -175,28 +186,6 @@ public class Sidebar extends VBox {
                 closeSidebarAfterDelay();
             }
             case "打开导航设置" -> openSettingsCategory("视角跟随");
-        }
-    }
-
-    private void handleMatchOption(String value, SidebarItem header) {
-        boolean enabled = SiftConfig.SIFT_MATCHING_ENABLED;
-        switch (value) {
-            case "启用匹配" -> {
-                if (!enabled) {
-                    SiftConfig.SIFT_MATCHING_ENABLED = true;
-                    TitleBar.getInstance().publishMatchToggleEvent();
-                    updateHeaderValue(header, "已开启");
-                    closeSidebarAfterDelay();
-                }
-            }
-            case "禁用匹配" -> {
-                if (enabled) {
-                    SiftConfig.SIFT_MATCHING_ENABLED = false;
-                    TitleBar.getInstance().publishMatchToggleEvent();
-                    updateHeaderValue(header, "已关闭");
-                    closeSidebarAfterDelay();
-                }
-            }
         }
     }
 
@@ -282,8 +271,24 @@ public class Sidebar extends VBox {
         settingsStage.showDialog(rootPane, categoryName);
     }
 
-    public void setAnimator(UiAnimator animator) {
-        this.animator = animator;
+    /**
+     * 更新"检查更新"项显示下载进度（后台下载模式）
+     *
+     * @param progress -1 表示隐藏进度，0~1 表示下载百分比
+     */
+    public void setDownloadProgress(double progress) {
+        Platform.runLater(() -> {
+            for (int i = 0; i < items.size(); i++) {
+                SidebarItem item = items.get(i);
+                if (!"检查更新".equals(item.title())) continue;
+                String title = progress < 0 ? "检查更新"
+                        : String.format("检查更新 (%.0f%%)", progress * 100);
+                items.set(i, new SidebarItem(SidebarItem.Type.ACTION, title,
+                        null, null, null, false, "/icon/update.svg",
+                        item.onAction(), progress));
+                return;
+            }
+        });
     }
 
     private void openRouteManager() {
@@ -302,6 +307,16 @@ public class Sidebar extends VBox {
             routeManagerStage.setY(rootPane.getScene().getWindow().getY() + 100);
             routeManagerStage.show();
         }
+    }
+
+    private void openAboutDialog() {
+        StackPane rootPane = findRootPane();
+        if (rootPane == null) return;
+        DialogUtils.showAboutDialog(rootPane,
+                BuildConfig.APP_NAME,
+                BuildConfig.APP_VERSION,
+                BuildConfig.BUILD_TIMESTAMP,
+                "https://github.com/kedaya0209/RocoMapTracker");
     }
 
     private void initWikiFooter() {
@@ -347,14 +362,21 @@ public class Sidebar extends VBox {
     // ========== Item Model ==========
 
     public record SidebarItem(Type type, String title, Category category, String currentValue,
-                              WikiUpdateManager wikiUpdater, boolean selected, String iconSvg, Runnable onAction) {
+                              WikiUpdateManager wikiUpdater, boolean selected, String iconSvg, Runnable onAction,
+                              double progress) {
+
+        public SidebarItem(Type type, String title, Category category, String currentValue,
+                           WikiUpdateManager wikiUpdater, boolean selected, String iconSvg,
+                           Runnable onAction) {
+            this(type, title, category, currentValue, wikiUpdater, selected, iconSvg, onAction, -1);
+        }
 
         public SidebarItem(Type type, String title, Category category, String currentValue, WikiUpdateManager wikiUpdater) {
-            this(type, title, category, currentValue, wikiUpdater, false, null, null);
+            this(type, title, category, currentValue, wikiUpdater, false, null, null, -1);
         }
 
         public SidebarItem(Type type, String title, Category category, String currentValue, WikiUpdateManager wikiUpdater, boolean selected) {
-            this(type, title, category, currentValue, wikiUpdater, selected, null, null);
+            this(type, title, category, currentValue, wikiUpdater, selected, null, null, -1);
         }
 
         enum Type {HEADER, OPTION, ACTION, WIKI}
@@ -399,6 +421,12 @@ public class Sidebar extends VBox {
             Label title = new Label(item.title());
             title.setStyle("-fx-text-fill: -color-fg-default; -fx-font-size: 13px;");
 
+            // 匹配开关 — 使用 AtlanFX ToggleSwitch
+            if (item.category() == SidebarItem.Category.MATCH) {
+                renderMatchToggle(item, icon, title);
+                return;
+            }
+
             Label value = new Label(item.currentValue());
             value.setStyle("-fx-text-fill: -color-fg-subtle; -fx-font-size: 11px;");
             value.setPadding(new Insets(0, 4, 0, 0));
@@ -437,6 +465,40 @@ public class Sidebar extends VBox {
             StackPane wrapper = new StackPane(row);
             wrapper.setPadding(new Insets(2, 0, 2, 0));
             wrapper.setMouseTransparent(true);
+            setPadding(new Insets(0));
+            setGraphic(wrapper);
+        }
+
+        // ── Match Toggle ────────────────────────────────────
+
+        private void renderMatchToggle(SidebarItem item, Node icon, Label title) {
+            ToggleSwitch toggle = new ToggleSwitch();
+            toggle.setSelected(SiftConfig.SIFT_MATCHING_ENABLED);
+            toggle.selectedProperty().addListener((obs, oldVal, newVal) -> {
+                SiftConfig.SIFT_MATCHING_ENABLED = newVal;
+                TitleBar.getInstance().publishMatchToggleEvent();
+            });
+
+            Region spacer = new Region();
+            HBox.setHgrow(spacer, Priority.ALWAYS);
+
+            HBox row = new HBox(6, icon, title, spacer, toggle);
+            row.setAlignment(Pos.CENTER_LEFT);
+            row.setPrefHeight(38);
+            row.setPadding(new Insets(0, 12, 0, 12));
+            row.setStyle(BG_STYLE);
+
+            setOnMouseEntered(e -> {
+                row.setStyle(BG_HOVER);
+                SvgManager.animateHoverDrawIcon(icon, true, 400);
+            });
+            setOnMouseExited(e -> {
+                row.setStyle(BG_STYLE);
+                SvgManager.animateHoverDrawIcon(icon, false, 400);
+            });
+
+            StackPane wrapper = new StackPane(row);
+            wrapper.setPadding(new Insets(2, 0, 2, 0));
             setPadding(new Insets(0));
             setGraphic(wrapper);
         }
@@ -480,6 +542,8 @@ public class Sidebar extends VBox {
         // ── Action（按钮样式，无箭头）────────────────────────────
 
         private void renderAction(SidebarItem item) {
+            boolean isProgress = item.progress() >= 0;
+
             setOnMouseClicked(null);
             setOnMouseEntered(null);
             setOnMouseExited(null);
@@ -488,7 +552,11 @@ public class Sidebar extends VBox {
             Node icon = SvgManager.createHoverDrawIcon(item.iconSvg(), 18, 1.5, 400);
 
             Label text = new Label(item.title());
-            text.setStyle("-fx-text-fill: -color-fg-default; -fx-font-size: 13px;");
+            if (isProgress) {
+                text.setStyle("-fx-text-fill: -color-fg-muted; -fx-font-size: 13px;");
+            } else {
+                text.setStyle("-fx-text-fill: -color-fg-default; -fx-font-size: 13px;");
+            }
 
             HBox content = new HBox(8, icon, text);
             content.setAlignment(Pos.CENTER_LEFT);
@@ -499,14 +567,18 @@ public class Sidebar extends VBox {
             btn.setAlignment(Pos.BASELINE_LEFT);
             btn.setStyle("-fx-background-color: -color-bg-subtle; -fx-text-fill: -color-fg-default; -fx-background-radius: 6; -fx-font-size: 13px; -fx-cursor: hand; -fx-padding: 0 12 0 12; -fx-effect: none; -fx-background-insets: 0;");
             btn.setGraphic(content);
-            FxRippleUtil.install(btn);
 
-            // 按钮 hover 触发图标画线动画
-            btn.setOnMouseEntered(e -> SvgManager.animateHoverDrawIcon(icon, true, 400));
-            btn.setOnMouseExited(e -> SvgManager.animateHoverDrawIcon(icon, false, 400));
-
-            if (item.onAction() != null) {
-                btn.setOnAction(e -> item.onAction().run());
+            if (isProgress) {
+                // 进度模式：纯展示，无交互
+                btn.setMouseTransparent(true);
+                btn.setCursor(Cursor.DEFAULT);
+            } else {
+                FxRippleUtil.install(btn);
+                btn.setOnMouseEntered(e -> SvgManager.animateHoverDrawIcon(icon, true, 400));
+                btn.setOnMouseExited(e -> SvgManager.animateHoverDrawIcon(icon, false, 400));
+                if (item.onAction() != null) {
+                    btn.setOnAction(e -> item.onAction().run());
+                }
             }
 
             Pane wrapper = new Pane() {
