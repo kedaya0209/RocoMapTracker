@@ -13,6 +13,7 @@ import com.luoke.app.config.DownloadConfig;
 import com.luoke.app.config.OcrConfig;
 import com.luoke.app.config.SiftConfig;
 import com.luoke.app.config.NavigConfig;
+import com.luoke.app.config.UpdateConfig;
 import com.luoke.app.context.CameraContext;
 import com.luoke.app.ui.component.TitleBar;
 import com.luoke.app.context.CameraContext;
@@ -642,6 +643,17 @@ public final class SettingDefinitions {
                         integer("SIFT_PROCESS_STOP_TIMEOUT", "进程停止超时(s)", true,
                                 () -> SocketConfig.SIFT_PROCESS_STOP_TIMEOUT,
                                 v -> SocketConfig.SIFT_PROCESS_STOP_TIMEOUT = (Integer) v)
+                ),
+                cat("更新", "/icon/download.svg",
+                        bool("CHECK_ENABLED", "自动检查更新",
+                                () -> UpdateConfig.CHECK_ENABLED,
+                                v -> UpdateConfig.CHECK_ENABLED = (Boolean) v),
+                        integer("CHECK_INTERVAL_HOURS", "检查间隔(小时)",
+                                () -> UpdateConfig.CHECK_INTERVAL_HOURS,
+                                v -> UpdateConfig.CHECK_INTERVAL_HOURS = (Integer) v),
+                        bool("AUTO_DOWNLOAD", "发现更新时自动下载",
+                                () -> UpdateConfig.AUTO_DOWNLOAD,
+                                v -> UpdateConfig.AUTO_DOWNLOAD = (Boolean) v)
                 )
         );
     }

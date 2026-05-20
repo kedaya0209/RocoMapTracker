@@ -53,6 +53,7 @@ public final class ConfigPersistence {
             MiniMapConfig.save(sb);
             StatsConfig.save(sb);
             NavigConfig.save(sb);
+            UpdateConfig.save(sb);
 
             try (FileOutputStream fos = new FileOutputStream(configFile);
                  OutputStreamWriter osw = new OutputStreamWriter(fos, StandardCharsets.UTF_8)) {
@@ -98,5 +99,6 @@ public final class ConfigPersistence {
         MiniMapConfig.load(prop);
         StatsConfig.load(prop);
         NavigConfig.load(prop);
+        UpdateConfig.load(prop);
     }
 }
