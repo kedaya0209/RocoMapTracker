@@ -167,8 +167,8 @@ jobs:
         run: |
           set "PREV_TAG=${{ steps.prev_tag.outputs.prev_tag }}"
           if "%PREV_TAG%"=="" set "PREV_TAG=v${{ github.event.inputs.version }}"
-          curl -L -o hdiffz.exe "https://github.com/sisong/HDiffPatch/releases/download/v4.12.2/hdiffpatch_v4.12.2_bin_windows64.zip"
-          7z e hdiffz.exe -y > nul
+          curl -L -o hdiffpatch.zip "https://github.com/sisong/HDiffPatch/releases/download/v4.12.2/hdiffpatch_v4.12.2_bin_windows64.zip"
+          7z e hdiffpatch.zip -y > nul
           if exist RocoMapTracker.exe (
             echo Generating HDiffPatch ...
             hdiffz.exe RocoMapTracker.exe roco-ui\target\RocoMapTracker.exe RocoMapTracker-%PREV_TAG%-to-v${{ github.event.inputs.version }}.hdiff
