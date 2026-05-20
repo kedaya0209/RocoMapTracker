@@ -113,8 +113,10 @@ jobs:
             ${{ runner.os }}-maven-
 
       - name: Update version in pom.xml
+        shell: cmd
         run: |
-          mvn versions:set -DnewVersion=${{ github.event.inputs.version }} -DgenerateBackupPoms=false --no-transfer-progress
+          echo Setting version to ${{ github.event.inputs.version }}
+          mvn versions:set "-DnewVersion=${{ github.event.inputs.version }}" -DgenerateBackupPoms=false --no-transfer-progress
 
       - name: Download C++ binaries
         uses: actions/download-artifact@v4
