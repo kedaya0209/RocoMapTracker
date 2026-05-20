@@ -1,9 +1,23 @@
 package com.luoke.app.ui.component.setting;
 
-import com.luoke.app.config.*;
+import com.luoke.app.config.ConfigPersistence;
+import com.luoke.app.config.RenderConfig;
+import com.luoke.app.config.SocketConfig;
+import com.luoke.app.config.UiConfig;
+import com.luoke.app.config.CaptureConfig;
+import com.luoke.app.config.PlayerConfig;
+import com.luoke.app.config.StatsConfig;
+import com.luoke.app.config.MiniMapConfig;
+import com.luoke.app.config.ViewConfig;
+import com.luoke.app.config.DownloadConfig;
+import com.luoke.app.config.OcrConfig;
+import com.luoke.app.config.SiftConfig;
+import com.luoke.app.config.NavigConfig;
+import com.luoke.app.config.UpdateConfig;
+import com.luoke.app.context.CameraContext;
+import com.luoke.app.ui.component.TitleBar;
 import com.luoke.app.context.CameraContext;
 import com.luoke.app.macher.map.SwitchMapMatcher;
-import com.luoke.app.ui.component.TitleBar;
 import com.luoke.app.ui.service.ThemeManager;
 import com.luoke.app.update.UpdateManager;
 import lombok.extern.slf4j.Slf4j;

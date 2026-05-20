@@ -1,19 +1,26 @@
 package com.luoke.app.ui.util;
 
 import atlantafx.base.theme.Styles;
-import com.luoke.app.ui.service.SvgManager;
 import javafx.animation.FadeTransition;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
-import javafx.scene.control.*;
-import javafx.scene.layout.*;
+import javafx.scene.control.Button;
+import javafx.scene.control.Hyperlink;
+import javafx.scene.control.Label;
+import javafx.scene.control.ProgressBar;
+import javafx.scene.control.TextArea;
+import javafx.scene.layout.FlowPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
+import javafx.scene.layout.VBox;
 import javafx.scene.shape.SVGPath;
 import javafx.scene.text.TextAlignment;
 import javafx.util.Duration;
 
-public class DialogUtils {
+import com.luoke.app.ui.service.SvgManager;public class DialogUtils {
 
     /**
      * 简易文本弹窗
@@ -67,9 +74,7 @@ public class DialogUtils {
                 iconStyle, onConfirm, onCancel, null);
     }
 
-    /**
-     * 带自定义图标的弹窗（默认最大高度 320）
-     */
+    /** 带自定义图标的弹窗（默认最大高度 320） */
     private static void buildBaseDialog(StackPane rootStack,
                                         String title,
                                         Node content,
@@ -83,9 +88,7 @@ public class DialogUtils {
                 iconStyle, onConfirm, onCancel, iconNode, 320);
     }
 
-    /**
-     * 完整参数的弹窗（指定最大高度）
-     */
+    /** 完整参数的弹窗（指定最大高度） */
     private static void buildBaseDialog(StackPane rootStack,
                                         String title,
                                         Node content,
@@ -170,12 +173,12 @@ public class DialogUtils {
      * 更新确认弹窗 — 显示版本号和 release notes
      */
     public static void showUpdateDialog(StackPane rootStack,
-                                        String title,
-                                        String currentVersion,
-                                        String newVersion,
-                                        String releaseNotes,
-                                        Runnable onConfirm,
-                                        Runnable onCancel) {
+                                         String title,
+                                         String currentVersion,
+                                         String newVersion,
+                                         String releaseNotes,
+                                         Runnable onConfirm,
+                                         Runnable onCancel) {
         VBox content = new VBox(8);
         content.setMaxWidth(Double.MAX_VALUE);
         content.setAlignment(Pos.TOP_LEFT);
@@ -200,11 +203,11 @@ public class DialogUtils {
             notesArea.setPrefHeight(220);
             notesArea.setStyle(
                     "-fx-background-color: -color-bg-subtle; " +
-                            "-fx-text-fill: -color-fg-muted; " +
-                            "-fx-font-size: 12px; " +
-                            "-fx-background-radius: 6; " +
-                            "-fx-border-color: -color-border-muted; " +
-                            "-fx-border-radius: 6;");
+                    "-fx-text-fill: -color-fg-muted; " +
+                    "-fx-font-size: 12px; " +
+                    "-fx-background-radius: 6; " +
+                    "-fx-border-color: -color-border-muted; " +
+                    "-fx-border-radius: 6;");
 
             content.getChildren().add(notesArea);
         }
@@ -217,10 +220,10 @@ public class DialogUtils {
      * 关于弹窗 — 左右布局：图标 | 项目信息
      */
     public static void showAboutDialog(StackPane rootStack,
-                                       String appName,
-                                       String version,
-                                       String buildTimestamp,
-                                       String repoUrl) {
+                                        String appName,
+                                        String version,
+                                        String buildTimestamp,
+                                        String repoUrl) {
         // 左侧图标
         Node iconNode;
         try {
@@ -275,13 +278,48 @@ public class DialogUtils {
         content.getChildren().addAll(iconNode, infoBox);
 
         buildBaseDialog(rootStack, "关于", content, "确定", Styles.SUCCESS,
-                "-color-accent-emphasis", () -> {
-                }, null, null);
+                "-color-accent-emphasis", () -> {}, null, null);
+    }
+
+    /**
+     * 下载进度控制 — 可在任意线程调用 update/close，自动切换到 JavaFX 线程
+     */
+    public static class ProgressControl {
+        private final StackPane mask;
+        private final ProgressBar progressBar;
+        private final Label statusLabel;
+
+        ProgressControl(StackPane mask, ProgressBar progressBar, Label statusLabel) {
+            this.mask = mask;
+            this.progressBar = progressBar;
+            this.statusLabel = statusLabel;
+        }
+
+        public void updateProgress(double progress, String text) {
+            Platform.runLater(() -> {
+                if (progress < 0) {
+                    progressBar.setProgress(ProgressBar.INDETERMINATE_PROGRESS);
+                } else {
+                    progressBar.setProgress(Math.clamp(progress, 0, 1));
+                }
+                if (text != null) statusLabel.setText(text);
+            });
+        }
+
+        public void close() {
+            Platform.runLater(() -> {
+                Node parentNode = mask.getParent();
+                if (!(parentNode instanceof StackPane parent)) return;
+                FadeTransition ft = new FadeTransition(Duration.millis(150), mask);
+                ft.setToValue(0);
+                ft.setOnFinished(e -> parent.getChildren().remove(mask));
+                ft.play();
+            });
+        }
     }
 
     /**
      * 下载进度弹窗
-     *
      * @param onBackground 非 null 时显示"后台下载"按钮
      */
     public static ProgressControl showDownloadProgressDialog(StackPane rootStack, String version, Runnable onBackground) {
@@ -339,9 +377,9 @@ public class DialogUtils {
      * 更新就绪弹窗 — 用户选择立即更新或下次再说
      */
     public static void showUpdateReadyDialog(StackPane rootStack,
-                                             String version,
-                                             Runnable onInstallNow,
-                                             Runnable onLater) {
+                                              String version,
+                                              Runnable onInstallNow,
+                                              Runnable onLater) {
         StackPane mask = new StackPane();
         mask.setStyle("-fx-background-color: rgba(0, 0, 0, 0.8);");
 
@@ -395,43 +433,6 @@ public class DialogUtils {
         FadeTransition ft = new FadeTransition(Duration.millis(200), mask);
         ft.setToValue(1);
         ft.play();
-    }
-
-    /**
-     * 下载进度控制 — 可在任意线程调用 update/close，自动切换到 JavaFX 线程
-     */
-    public static class ProgressControl {
-        private final StackPane mask;
-        private final ProgressBar progressBar;
-        private final Label statusLabel;
-
-        ProgressControl(StackPane mask, ProgressBar progressBar, Label statusLabel) {
-            this.mask = mask;
-            this.progressBar = progressBar;
-            this.statusLabel = statusLabel;
-        }
-
-        public void updateProgress(double progress, String text) {
-            Platform.runLater(() -> {
-                if (progress < 0) {
-                    progressBar.setProgress(ProgressBar.INDETERMINATE_PROGRESS);
-                } else {
-                    progressBar.setProgress(Math.clamp(progress, 0, 1));
-                }
-                if (text != null) statusLabel.setText(text);
-            });
-        }
-
-        public void close() {
-            Platform.runLater(() -> {
-                Node parentNode = mask.getParent();
-                if (!(parentNode instanceof StackPane parent)) return;
-                FadeTransition ft = new FadeTransition(Duration.millis(150), mask);
-                ft.setToValue(0);
-                ft.setOnFinished(e -> parent.getChildren().remove(mask));
-                ft.play();
-            });
-        }
     }
 
     /**

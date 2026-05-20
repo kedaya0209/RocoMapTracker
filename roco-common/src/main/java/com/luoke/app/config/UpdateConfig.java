@@ -13,9 +13,7 @@ public final class UpdateConfig {
     public static int CHECK_INTERVAL_HOURS = 24;
     /** 发现更新时自动下载 */
     public static boolean AUTO_DOWNLOAD;
-    /**
-     * 下载源：github / jsdelivr
-     */
+    /** 下载源：github / jsdelivr */
     public static String DOWNLOAD_SOURCE = "github";
 
     private UpdateConfig() {

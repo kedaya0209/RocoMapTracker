@@ -2,7 +2,12 @@ package com.luoke.app.ui.component;
 
 import atlantafx.base.controls.ToggleSwitch;
 import atlantafx.base.theme.Styles;
-import com.luoke.app.config.*;
+import com.luoke.app.config.ConfigPersistence;
+import com.luoke.app.config.DownloadConfig;
+import com.luoke.app.config.NavigConfig;
+import com.luoke.app.config.UiConfig;
+import com.luoke.app.config.SiftConfig;
+import com.luoke.app.config.BuildConfig;
 import com.luoke.app.context.CameraContext;
 import com.luoke.app.context.ResourceConfigContext;
 import com.luoke.app.hook.HookEventType;
@@ -13,10 +18,10 @@ import com.luoke.app.macher.map.SwitchMapMatcher;
 import com.luoke.app.ui.component.setting.SettingsStage;
 import com.luoke.app.ui.service.SvgManager;
 import com.luoke.app.ui.service.ThemeManager;
+import com.luoke.app.update.UpdateManager;
 import com.luoke.app.ui.util.DialogUtils;
 import com.luoke.app.ui.util.FxRippleUtil;
 import com.luoke.app.ui.util.RestartUtils;
-import com.luoke.app.update.UpdateManager;
 import javafx.animation.FadeTransition;
 import javafx.animation.KeyFrame;
 import javafx.animation.KeyValue;
@@ -169,8 +174,7 @@ public class Sidebar extends VBox {
             case RESOURCE -> switchResource(value, header);
             case THEME -> switchTheme(value, header);
             case NAVIGATION -> handleNavOption(value, header);
-            case MATCH -> {
-            } // Switch 控件直接控制
+            case MATCH -> {} // Switch 控件直接控制
         }
         collapseCurrent();
     }
@@ -273,7 +277,6 @@ public class Sidebar extends VBox {
 
     /**
      * 更新"检查更新"项显示下载进度（后台下载模式）
-     *
      * @param progress -1 表示隐藏进度，0~1 表示下载百分比
      */
     public void setDownloadProgress(double progress) {

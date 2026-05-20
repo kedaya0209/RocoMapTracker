@@ -29,6 +29,9 @@ public class UpdateManager {
 
     private static volatile UpdateManager instance;
 
+    /** jsDelivr CDN 加速前缀（对应 patches 分支上的 updates/ 目录） */
+    private static final String CDN_BASE = "https://cdn.jsdelivr.net/gh/kedaya0209/RocoMapTracker@patches/updates/";
+
     private final UpdateChecker checker;
     private final HttpClient httpClient;
     private final AtomicBoolean checking = new AtomicBoolean(false);
@@ -126,8 +129,18 @@ public class UpdateManager {
                     Path patchPath = Path.of(exeDir, "update_" + info.version() + ".hdiff");
                     try {
                         uiDelegate.showDownloadProgress(info.version(), 0);
-                        downloadFile(info.patchDownloadUrl(), patchPath, p ->
-                                uiDelegate.showDownloadProgress(info.version(), p));
+
+                        // CDN 优先，降级 GitHub Release
+                        String cdnUrl = toCdnUrl(info.patchDownloadUrl());
+                        try {
+                            downloadFile(cdnUrl, patchPath, p ->
+                                    uiDelegate.showDownloadProgress(info.version(), p));
+                        } catch (Exception e) {
+                            log.warn("CDN download failed, falling back to GitHub: {}", e.getMessage());
+                            Files.deleteIfExists(patchPath);
+                            downloadFile(info.patchDownloadUrl(), patchPath, p ->
+                                    uiDelegate.showDownloadProgress(info.version(), p));
+                        }
                         if (info.patchSha256Url() != null) {
                             verifySha256(patchPath, info.patchSha256Url());
                         }
@@ -202,10 +215,7 @@ public class UpdateManager {
             log.info("Starting updater script: {}", scriptPath);
             startScriptDetached(scriptPath.toString(), exeDir);
             // 等待 updater 初始化完成再退出（确保 WMI 已创建独立进程）
-            try {
-                Thread.sleep(2000);
-            } catch (InterruptedException ignored) {
-            }
+            try { Thread.sleep(2000); } catch (InterruptedException ignored) {}
             if (uiDelegate != null) uiDelegate.restartApplication();
         } catch (IOException e) {
             log.error("Failed to start updater script", e);
@@ -225,10 +235,7 @@ public class UpdateManager {
             log.info("Starting updater script: {}", scriptPath);
             startScriptDetached(scriptPath.toString(), exeDir);
             // 等待 updater 初始化完成再退出（确保 WMI 已创建独立进程）
-            try {
-                Thread.sleep(2000);
-            } catch (InterruptedException ignored) {
-            }
+            try { Thread.sleep(2000); } catch (InterruptedException ignored) {}
             if (uiDelegate != null) uiDelegate.restartApplication();
         } catch (IOException e) {
             log.error("Failed to start updater script", e);
@@ -406,6 +413,14 @@ public class UpdateManager {
     private boolean isPatchVersionMatch(VersionInfo info) {
         return info.patchFromVersion() != null
                 && info.patchFromVersion().equals(BuildConfig.APP_VERSION);
+    }
+
+    /** 将 GitHub Release 下载 URL 转换为 jsDelivr CDN URL */
+    private String toCdnUrl(String githubUrl) {
+        if (githubUrl == null) return null;
+        int lastSlash = githubUrl.lastIndexOf('/');
+        if (lastSlash < 0) return null;
+        return CDN_BASE + githubUrl.substring(lastSlash + 1);
     }
 
     /** 下载 SHA256 校验文件并验证文件完整性 */

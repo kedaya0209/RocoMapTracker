@@ -1,6 +1,11 @@
 package com.luoke.app.ui;
 
-import com.luoke.app.config.*;
+import com.luoke.app.config.CaptureConfig;
+import com.luoke.app.config.ConfigPersistence;
+import com.luoke.app.config.PathConfig;
+import com.luoke.app.config.UiConfig;
+import com.luoke.app.config.UpdateConfig;
+import com.luoke.app.config.ViewConfig;
 import com.luoke.app.context.OcrAsyncManager;
 import com.luoke.app.hook.HookEventType;
 import com.luoke.app.hook.event.NotificationType;
@@ -179,8 +184,7 @@ public class ModernCanvasApp extends Application {
                                 info.version(),
                                 info.releaseNotes(),
                                 () -> UpdateManager.getInstance().startDownload(info),
-                                () -> {
-                                }));
+                                () -> {}));
             }
 
             @Override

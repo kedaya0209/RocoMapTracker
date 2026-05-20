@@ -18,9 +18,7 @@ public final class BuildConfig {
     public static final String APP_VERSION;
     /** 应用名 */
     public static final String APP_NAME;
-    /**
-     * 构建时间
-     */
+    /** 构建时间 */
     public static final String BUILD_TIMESTAMP;
 
     static {
