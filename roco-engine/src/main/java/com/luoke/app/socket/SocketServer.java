@@ -174,11 +174,8 @@ public class SocketServer {
                 // 按消息 type 精准路由 onConnect 到对应的 handler。
 
                 // 为此 session 启动 recv 线程
-                Thread recvThread = new Thread(() -> recvLoop(session),
-                        "socket-recv-" + session.id());
-                recvThread.setDaemon(true);
-                recvThread.start();
-
+                Thread.ofVirtual().name("socket-recv-", session.id())
+                        .start(() -> recvLoop(session));
             } catch (IOException e) {
                 if (running.get()) log.error("Accept error", e);
                 break;
@@ -264,16 +261,14 @@ public class SocketServer {
                 List<SocketHandler> handlers = dispatch.get(msg.type());
 
                 if (handlers != null && !handlers.isEmpty()) {
-                    Thread.ofVirtual().start(() -> {
-                        for (SocketHandler h : handlers) {
-                            try {
-                                h.onMessage(msg.type(), msg.body(), session);
-                            } catch (Exception e) {
-                                log.error("onMessage error in {} for type={}",
-                                        h.getClass().getSimpleName(), msg.type(), e);
-                            }
+                    for (SocketHandler h : handlers) {
+                        try {
+                            h.onMessage(msg.type(), msg.body(), session);
+                        } catch (Exception e) {
+                            log.error("onMessage error in {} for type={}",
+                                    h.getClass().getSimpleName(), msg.type(), e);
                         }
-                    });
+                    }
                 } else {
                     log.debug("No handler for msgType={}", msg.type());
                 }

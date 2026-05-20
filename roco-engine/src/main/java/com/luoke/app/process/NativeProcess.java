@@ -396,7 +396,7 @@ public class NativeProcess {
     /**
      * 将 Windows pipe 读句柄包装为 InputStream.
      */
-    private class PipeInputStream extends InputStream {
+    private static class PipeInputStream extends InputStream {
         private final long handle;
         private volatile boolean closed;
 

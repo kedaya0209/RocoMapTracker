@@ -47,7 +47,6 @@ public class MapFileMover {
         // 下载来源：相对路径，临时存储
         File src = FileUtil.getRelativeFile(MapResourceUpdater.DOWNLOAD_ICON_DIR);
 
-        // 目标：从 AppConfig 读取图标目录
         // 使用绝对路径，应用运行时使用
         File dst = ResourceUtils.getExternalFile(PathConfig.ICON_DIR);
 
@@ -62,7 +61,6 @@ public class MapFileMover {
         // 下载来源：相对路径，临时存储
         File src = FileUtil.getRelativeFile(MapResourceUpdater.DOWNLOAD_POINT_DIR);
 
-        // 目标：从 AppConfig 读取点位目录
         // 使用绝对路径，应用运行时使用
         File dst = ResourceUtils.getExternalFile(PathConfig.RESOURCE_ICON_DIR);
 
@@ -77,7 +75,6 @@ public class MapFileMover {
         // 下载来源：相对路径，临时存储
         File src = FileUtil.getRelativeFile(MapResourceUpdater.DOWNLOAD_MAP_DIR);
 
-        // 目标：从 AppConfig 读取地图资源路径
         // 使用绝对路径，应用运行时使用
         File dst = ResourceUtils.getExternalFile(PathConfig.MAP_RESOURCE_DIR);
 

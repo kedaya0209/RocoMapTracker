@@ -31,7 +31,6 @@ public class SettingConfigManager {
     /**
      * -- SETTER --
      * 应用后钩子 — 全部配置写入并持久化后执行，
-     * 用于通知各组件重新读取 AppConfig 字段刷新 UI/行为。
      */
     @Setter
     private Runnable postApplyHook;

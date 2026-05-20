@@ -2,7 +2,6 @@ package com.luoke.app.config;
 
 /**
  * 路径常量 — 系统物理路径，不可更改。
- * 从 {@link AppConfig} 拆分，所有字段均为 public static final。
  */
 public final class PathConfig {
 

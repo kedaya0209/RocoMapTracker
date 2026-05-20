@@ -32,7 +32,7 @@ public class HookContainer {
         // 使用computeIfAbsent()原子地获取或创建钩子列表
         // 如果Map中不存在该事件类型的列表，则创建新的CopyOnWriteArrayList
         // computeIfAbsent()是线程安全的，避免了"检查-创建"的竞态条件
-        eventHookMap.computeIfAbsent(eventType, k -> new CopyOnWriteArrayList<>()).add(hook);
+        eventHookMap.computeIfAbsent(eventType, _ -> new CopyOnWriteArrayList<>()).add(hook);
     }
 
     public List<IHook<?>> getHookList(HookEventType eventType) {

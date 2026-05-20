@@ -113,6 +113,9 @@ public class ResourceInitService {
             publishInitStep(0.5, "正在验证地图瓦片...");
             if (ResourceConfigContext.getCurrentProfile() != ResourceConfigContext.ResourceProfile.INTERNAL) {
                 tileGeneratorService.validateAndGenerateTiles();
+                // 瓦片生成可能加载了 256MB BufferedImage，触发 GC 让堆缩回
+                System.gc();
+                log.info("瓦片验证完成，已触发堆内存回收");
             }
             publishInitStep(0.7, "构建坐标索引系统...");
             ResourcePointContext.getInstance().loadAndInit();

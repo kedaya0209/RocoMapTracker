@@ -52,13 +52,8 @@ public class StatsOverlay extends StackPane {
 
         if (active != shown) {
             shown = active;
-            if (active) {
-                setVisible(true);
-                setManaged(true);
-            } else {
-                setVisible(false);
-                setManaged(false);
-            }
+            setVisible(active);
+            setManaged(active);
         }
 
         if (!active) {

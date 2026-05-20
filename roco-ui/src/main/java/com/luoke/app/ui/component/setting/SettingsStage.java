@@ -68,7 +68,6 @@ public class SettingsStage extends Stage {
             }
         });
 
-        // 应用后钩子：预留，当前所有配置值均直接读取 AppConfig 无需重新加载
         configManager.setPostApplyHook(() -> {
         });
 
@@ -405,7 +404,6 @@ public class SettingsStage extends Stage {
                 javafx.scene.Node ctrl = fieldBuilder.buildControl(def);
                 if (ctrl instanceof javafx.scene.control.Control c) {
                     configManager.registerControl(def.key(), c);
-                    // ROI 控件实时更新 AppConfig，让预览即时生效
                     if (c instanceof Spinner<?> sp) {
                         sp.getValueFactory().valueProperty().addListener((_, _, newVal) -> {
                             if (newVal != null) configManager.writeField(def.key(), newVal);

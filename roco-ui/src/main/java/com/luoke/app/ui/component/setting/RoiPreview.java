@@ -38,7 +38,6 @@ import lombok.extern.slf4j.Slf4j;
  * - 全帧模式：从 CaptureFrameBuffer 读取全帧（BGRA）并叠加 ROI 矩形框
  *
  * <p>全帧模式下点击「放大」按钮弹出独立窗口，ROI 线框可拖拽移动位置、
- * 拖拽角落调整大小，修改实时写回 AppConfig 并通过 SettingDef.setter() 持久化。</p>
  */
 @Slf4j
 public class RoiPreview {

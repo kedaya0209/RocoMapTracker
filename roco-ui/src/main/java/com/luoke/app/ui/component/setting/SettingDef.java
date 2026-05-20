@@ -6,8 +6,6 @@ import java.util.function.Supplier;
 /**
  * 设置字段定义 — 描述一个配置项元数据。
  * <p>
- * {@code getter}/{@code setter} 替代反射读写 AppConfig，Native Image 兼容。
- *
  * @param key             字段键名
  * @param label           显示标签
  * @param type            字段类型
