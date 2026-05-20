@@ -172,12 +172,6 @@ jobs:
       - name: Setup Visual Studio (MSVC)
         uses: ilammy/msvc-dev-cmd@v1
 
-      - name: Download rcedit (for exe icon)
-        run: |
-          if not exist tools mkdir tools
-          curl.exe -L -o tools\rcedit-x64.exe "https://github.com/electron/rcedit/releases/download/v2.0.0/rcedit-x64.exe"
-        shell: cmd
-
       - name: Build Native Image
         run: mvn -Pnative clean package -pl roco-ui -am --no-transfer-progress
 

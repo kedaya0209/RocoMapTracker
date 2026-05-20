@@ -198,6 +198,7 @@
                                 <buildArg>-H:+ReportExceptionStackTraces</buildArg>
                                 <buildArg>--enable-url-protocols=http,https</buildArg>
                                 <buildArg>-H:+JNI</buildArg>
+                                <buildArg>-H:NativeLinkerOption=${project.build.directory}/rmt.res</buildArg>
                             </buildArgs>
                         </configuration>
                     </plugin>
@@ -207,17 +208,16 @@
                         <version>3.3.0</version>
                         <executions>
                             <execution>
-                                <id>embed-icon</id>
-                                <phase>package</phase>
+                                <id>compile-icon-resource</id>
+                                <phase>initialize</phase>
                                 <goals>
                                     <goal>exec</goal>
                                 </goals>
                                 <configuration>
-                                    <executable>${session.executionRootDirectory}/tools/rcedit-x64.exe</executable>
+                                    <executable>${session.executionRootDirectory}/compile_icon.bat</executable>
                                     <arguments>
-                                        <argument>${project.build.directory}/RocoMapTracker.exe</argument>
-                                        <argument>--set-icon</argument>
-                                        <argument>${project.basedir}/src/main/resources/icon/rmt.ico</argument>
+                                        <argument>${project.build.directory}/rmt.res</argument>
+                                        <argument>${project.basedir}/src/main/resources/icon/rmt.rc</argument>
                                     </arguments>
                                 </configuration>
                             </execution>
@@ -363,6 +363,7 @@
                                 <buildArg>--add-exports=javafx.graphics/com.sun.prism.shader=ALL-UNNAMED</buildArg>
                                 <buildArg>--add-exports=javafx.graphics/com.sun.glass.ui=ALL-UNNAMED</buildArg>
                                 <buildArg>--add-exports=javafx.graphics/com.sun.prism.d3d=ALL-UNNAMED</buildArg>
+                                <buildArg>-H:NativeLinkerOption=${project.build.directory}/rmt.res</buildArg>
                             </buildArgs>
                         </configuration>
                     </plugin>
@@ -372,17 +373,16 @@
                         <version>3.3.0</version>
                         <executions>
                             <execution>
-                                <id>embed-icon</id>
-                                <phase>package</phase>
+                                <id>compile-icon-resource</id>
+                                <phase>initialize</phase>
                                 <goals>
                                     <goal>exec</goal>
                                 </goals>
                                 <configuration>
-                                    <executable>${session.executionRootDirectory}/tools/rcedit-x64.exe</executable>
+                                    <executable>${session.executionRootDirectory}/compile_icon.bat</executable>
                                     <arguments>
-                                        <argument>${project.build.directory}/RocoMapTracker.exe</argument>
-                                        <argument>--set-icon</argument>
-                                        <argument>${project.basedir}/src/main/resources/icon/rmt.ico</argument>
+                                        <argument>${project.build.directory}/rmt.res</argument>
+                                        <argument>${project.basedir}/src/main/resources/icon/rmt.rc</argument>
                                     </arguments>
                                 </configuration>
                             </execution>
