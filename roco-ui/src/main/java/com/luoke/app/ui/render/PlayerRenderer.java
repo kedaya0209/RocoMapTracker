@@ -27,7 +27,10 @@ public class PlayerRenderer implements RenderLayer {
     private final Scale playerScale;
     private final Translate playerTranslate;
     private final double[] rippleProgress;
+    /** 帧计数器，用于装饰效果节流 */
     private int frameCount;
+    /** 装饰效果（波纹+光晕）更新间隔：每 N 帧更新一次，位置/旋转每帧更新 */
+    private static final int DECORATION_INTERVAL = 2;
 
     public PlayerRenderer() {
         playerGroup = new Group();
@@ -100,25 +103,31 @@ public class PlayerRenderer implements RenderLayer {
             playerView.setLayoutY(py - half);
             playerView.setRotate(mm.getPlayerAngle());
 
+            // 光环和波纹中心每帧追踪玩家位置
             pickupHalo.setCenterX(px);
             pickupHalo.setCenterY(py);
-
-            // 潮汐波纹：N 圈错峰扩散
             for (int i = 0; i < RenderConfig.RIPPLE_COUNT; i++) {
-                rippleProgress[i] += RenderConfig.RIPPLE_STEP;
-                if (rippleProgress[i] > 1.0) rippleProgress[i] -= 1.0;
-                double p = rippleProgress[i];
-                ripples[i].setRadius(p * ViewConfig.GRAY_DISTANCE);
                 ripples[i].setCenterX(px);
                 ripples[i].setCenterY(py);
-                ripples[i].setStroke(Color.rgb(255, 255, 200, (1 - p) * RenderConfig.RIPPLE_ALPHA));
             }
 
-            // 边界慢呼吸：周期约 7s，仅透明度变化，范围不变
-            double breath = Math.sin(frameCount * RenderConfig.HALO_BREATHE_FREQ) * 0.5 + 0.5;
-            double base = RenderConfig.HALO_BREATHE_MIN_ALPHA;
-            double range = RenderConfig.HALO_BREATHE_MAX_ALPHA - base;
-            pickupHalo.setStroke(Color.rgb(255, 255, 200, base + breath * range));
+            // 装饰效果（波纹扩散 + 光晕呼吸）每 DECORATION_INTERVAL 帧更新一次，降低 CPU
+            if ((frameCount % DECORATION_INTERVAL) == 0) {
+                // 潮汐波纹：N 圈错峰扩散
+                for (int i = 0; i < RenderConfig.RIPPLE_COUNT; i++) {
+                    rippleProgress[i] += RenderConfig.RIPPLE_STEP * DECORATION_INTERVAL;
+                    if (rippleProgress[i] > 1.0) rippleProgress[i] -= 1.0;
+                    double p = rippleProgress[i];
+                    ripples[i].setRadius(p * ViewConfig.GRAY_DISTANCE);
+                    ripples[i].setStroke(Color.rgb(255, 255, 200, (1 - p) * RenderConfig.RIPPLE_ALPHA));
+                }
+
+                // 边界慢呼吸：周期约 7s，仅透明度变化，范围不变
+                double breath = Math.sin(frameCount * RenderConfig.HALO_BREATHE_FREQ) * 0.5 + 0.5;
+                double base = RenderConfig.HALO_BREATHE_MIN_ALPHA;
+                double range = RenderConfig.HALO_BREATHE_MAX_ALPHA - base;
+                pickupHalo.setStroke(Color.rgb(255, 255, 200, base + breath * range));
+            }
         } else {
             playerView.setVisible(false);
         }

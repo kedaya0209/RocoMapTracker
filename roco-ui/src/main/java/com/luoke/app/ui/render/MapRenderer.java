@@ -64,8 +64,10 @@ public class MapRenderer implements IHook<Object> {
     private final List<RenderLayer> renderLayers;
 
     private TileManager tileManager;
-    // 视口追踪
+    // 视口追踪（避免不必要的 JavaFX 属性触发）
     private double lastScale;
+    private double lastOx = Double.NaN;
+    private double lastOy = Double.NaN;
     private boolean firstFrame = true;
 
     // ==================== 构造与初始化 ====================
@@ -168,12 +170,17 @@ public class MapRenderer implements IHook<Object> {
         }
 
         boolean scaleChanged = Math.abs(scale - lastScale) > 1e-9;
+        boolean viewportMoved = firstFrame || Math.abs(ox - lastOx) > 1e-9 || Math.abs(oy - lastOy) > 1e-9;
 
-        // ====== GPU 变换（每帧，纯 GPU 操作） ======
-        worldScale.setX(scale);
-        worldScale.setY(scale);
-        worldTranslate.setX(ox);
-        worldTranslate.setY(oy);
+        // ====== GPU 变换（跳过未改变的 setter，避免触发 JavaFX 属性失效/布局重新计算） ======
+        if (scaleChanged) {
+            worldScale.setX(scale);
+            worldScale.setY(scale);
+        }
+        if (viewportMoved) {
+            worldTranslate.setX(ox);
+            worldTranslate.setY(oy);
+        }
 
         // ====== 子渲染器（各层从上下文单例自行读取数据） ======
         for (RenderLayer layer : renderLayers) {
@@ -197,6 +204,8 @@ public class MapRenderer implements IHook<Object> {
         }
 
         lastScale = scale;
+        lastOx = ox;
+        lastOy = oy;
     }
 
     private void autoFitViewport(MapContext mm) {
