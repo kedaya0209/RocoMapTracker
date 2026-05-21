@@ -67,7 +67,17 @@ public class ResourceInitService {
             OcrAsyncManager.initialize(OcrConfig.OCR_CORE_SIZE);
 
             if (DownloadConfig.INTERNAL_RESOURCE) {
-                initWithInternalProfile(onReady);
+                // 内置资源全部从 classpath 加载（JAR 解压/PNG 解码），耗时较长。
+                // 在虚拟线程执行以免阻塞 JavaFX Application Thread，确保进度更新能送达 UI。
+                Thread.ofVirtual().name("init-internal-profile").start(() -> {
+                    try {
+                        initWithInternalProfile(onReady);
+                    } catch (Exception e) {
+                        log.error("内置资源初始化异常: ", e);
+                        HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION,
+                                new StatusEvent("内置资源初始化失败: " + e.getMessage(), NotificationType.ERROR));
+                    }
+                });
             } else {
                 initWithExternalProfile(onReady);
             }
@@ -206,7 +216,15 @@ public class ResourceInitService {
                     log.warn("后台资源下载异常（可忽略，下次启动会重试）", e);
                 }
             });
-            initWithInternalProfile(onReady);
+            Thread.ofVirtual().name("init-internal-builtin").start(() -> {
+                try {
+                    initWithInternalProfile(onReady);
+                } catch (Exception e) {
+                    log.error("内置资源初始化异常: ", e);
+                    HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION,
+                            new StatusEvent("内置资源初始化失败: " + e.getMessage(), NotificationType.ERROR));
+                }
+            });
         } catch (Exception e) {
             log.error("内置资源模式启动失败", e);
         }
