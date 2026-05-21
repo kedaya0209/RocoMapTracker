@@ -1,7 +1,9 @@
 package com.luoke.app.hook;
 
+import net.jcip.annotations.ThreadSafe;
 import java.util.Set;
 
+@ThreadSafe
 public interface IHook<T> {
 
 

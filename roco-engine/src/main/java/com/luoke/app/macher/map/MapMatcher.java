@@ -1,9 +1,12 @@
 package com.luoke.app.macher.map;
 
+import net.jcip.annotations.ThreadSafe;
+
 /**
  * 地图匹配器接口
  * 定义地图匹配的核心操作，用于在大型地图中定位小图的位置
  */
+@ThreadSafe
 public interface MapMatcher {
 
     /**

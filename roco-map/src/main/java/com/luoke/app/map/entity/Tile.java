@@ -1,15 +1,14 @@
 package com.luoke.app.map.entity;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
+import net.jcip.annotations.ThreadSafe;
 
-@Data
-@AllArgsConstructor
-public class Tile {
-
-    private int x;
-
-    private int y;
-
-    private byte[] data;
+/**
+ * 地图瓦片数据。
+ *
+ * @param x    列号
+ * @param y    行号
+ * @param data 瓦片图像字节
+ */
+@ThreadSafe
+public record Tile(int x, int y, byte[] data) {
 }

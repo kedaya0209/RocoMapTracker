@@ -10,9 +10,6 @@
 /capture/RocoMapTracker-capture.exe:/capture/RocoMapTracker-capture.exe
 /sift/RocoMapTracker-sift_match.exe:/sift/RocoMapTracker-sift_match.exe
 /sift/opencv_world4100.dll:/sift/opencv_world4100.dll
-/sift/libprotobuf.dll:/sift/libprotobuf.dll
-/sift/abseil_dll.dll:/sift/abseil_dll.dll
-/sift/zlib1.dll:/sift/zlib1.dll
 /sift/concrt140.dll:/sift/concrt140.dll
 /sift/vcruntime140.dll:/sift/vcruntime140.dll
 /sift/vcruntime140_1.dll:/sift/vcruntime140_1.dll

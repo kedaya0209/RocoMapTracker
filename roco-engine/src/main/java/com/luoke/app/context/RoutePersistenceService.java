@@ -1,5 +1,6 @@
 package com.luoke.app.context;
 
+import net.jcip.annotations.ThreadSafe;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.luoke.app.map.model.RoutePath;
 import com.luoke.app.utils.JsonUtils;
@@ -7,6 +8,8 @@ import com.luoke.app.utils.ResourceUtils;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.File;
+import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -14,6 +17,7 @@ import java.util.List;
  * 无状态设计，与 PathContext 的状态管理分离。
  * 遵循单一职责原则：仅负责文件 I/O，不管理路线状态。
  */
+@ThreadSafe
 @Slf4j
 public class RoutePersistenceService {
 
@@ -30,7 +34,7 @@ public class RoutePersistenceService {
             JsonUtils.getMapper().writerWithDefaultPrettyPrinter().writeValue(file, routes);
             log.info("路线已持久化 ({} 条)", routes.size());
             return true;
-        } catch (Exception e) {
+        } catch (IOException e) {
             log.error("保存路线失败", e);
             return false;
         }
@@ -42,9 +46,9 @@ public class RoutePersistenceService {
     public List<RoutePath> load(File file) {
         try {
             return JsonUtils.getMapper().readValue(file, ROUTE_LIST_TYPE);
-        } catch (Exception e) {
+        } catch (IOException e) {
             log.error("解析路线文件失败", e);
-            return null;
+            return Collections.emptyList();
         }
     }
 
@@ -55,7 +59,7 @@ public class RoutePersistenceService {
         try {
             JsonUtils.getMapper().writeValue(file, List.of(route));
             return true;
-        } catch (Exception e) {
+        } catch (IOException e) {
             log.error("导出路线失败", e);
             return false;
         }
@@ -72,7 +76,7 @@ public class RoutePersistenceService {
                 log.info("已加载 {} 条路线", loaded.size());
                 return loaded;
             }
-        } catch (Exception e) {
+        } catch (IOException e) {
             log.warn("加载默认路线失败", e);
         }
         return List.of();

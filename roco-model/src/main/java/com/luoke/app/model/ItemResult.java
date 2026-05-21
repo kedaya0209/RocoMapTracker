@@ -1,7 +1,10 @@
 package com.luoke.app.model;
 
+import net.jcip.annotations.ThreadSafe;
+
 import java.util.Objects;
 
+@ThreadSafe
 public record ItemResult(String name, int count) {
 
     @Override

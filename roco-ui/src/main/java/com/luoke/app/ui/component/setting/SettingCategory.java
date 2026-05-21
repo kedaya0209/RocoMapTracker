@@ -1,5 +1,6 @@
 package com.luoke.app.ui.component.setting;
 
+import net.jcip.annotations.ThreadSafe;
 import java.util.List;
 
 /**
@@ -9,5 +10,6 @@ import java.util.List;
  * @param iconSvg 图标资源路径
  * @param fields  字段列表
  */
+@ThreadSafe
 public record SettingCategory(String name, String iconSvg, List<SettingDef> fields) {
 }

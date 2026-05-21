@@ -1,10 +1,12 @@
 package com.luoke.app.update;
 
+import net.jcip.annotations.ThreadSafe;
 import java.time.LocalDateTime;
 
 /**
  * GitHub Release 版本信息
  */
+@ThreadSafe
 public record VersionInfo(
         String tagName,
         String version,

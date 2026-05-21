@@ -1,5 +1,6 @@
 package com.luoke.app.ui.render;
 
+import net.jcip.annotations.NotThreadSafe;
 import com.luoke.app.capture.processor.NavigationController;
 import com.luoke.app.config.RenderConfig;
 import com.luoke.app.context.CameraContext;
@@ -47,6 +48,7 @@ import java.util.Set;
  * 玩家：
  * - ImageView 放入 playerGroup，世界坐标定位，自动跟随地图变换
  */
+@NotThreadSafe
 @Slf4j
 public class MapRenderer implements IHook<Object> {
 

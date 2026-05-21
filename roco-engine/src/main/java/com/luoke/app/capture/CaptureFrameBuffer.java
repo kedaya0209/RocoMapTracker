@@ -2,6 +2,7 @@ package com.luoke.app.capture;
 
 import lombok.Getter;
 
+import net.jcip.annotations.ThreadSafe;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -9,6 +10,7 @@ import java.util.concurrent.ConcurrentMap;
  * 截帧缓冲区 — 存储各 ROI 最新一帧的原始像素数据以及全帧数据，供 UI 预览使用。
  * 线程安全：写入来自虚拟线程，读取来自 JavaFX 线程。
  */
+@ThreadSafe
 public class CaptureFrameBuffer {
 
     private static final CaptureFrameBuffer INSTANCE = new CaptureFrameBuffer();

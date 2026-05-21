@@ -1,5 +1,6 @@
 package com.luoke.app.context;
 
+import net.jcip.annotations.ThreadSafe;
 import com.luoke.app.map.model.Point;
 
 import java.util.HashMap;
@@ -9,6 +10,7 @@ import java.util.Map;
  * 地图坐标管理器（单例模式）
  * 负责管理地图配置信息和坐标转换
  */
+@ThreadSafe
 public class MapCoordinateManager {
     private static final MapCoordinateManager INSTANCE = new MapCoordinateManager();
     private final Map<String, MapConfig> mapConfigMap = new HashMap<>();

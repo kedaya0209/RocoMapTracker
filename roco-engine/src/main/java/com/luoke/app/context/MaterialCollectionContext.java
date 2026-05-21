@@ -1,5 +1,6 @@
 package com.luoke.app.context;
 
+import net.jcip.annotations.ThreadSafe;
 import com.luoke.app.hook.HookEventType;
 import com.luoke.app.hook.event.MaterialCollectionEvent;
 import com.luoke.app.hook.multicast.HookRegistry;
@@ -13,6 +14,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
+@ThreadSafe
 @Slf4j
 @Data
 public class MaterialCollectionContext {

@@ -3,6 +3,7 @@ package com.luoke.app.context;
 import com.luoke.app.config.PathConfig;
 import com.luoke.app.config.DownloadConfig;
 import lombok.Getter;
+import net.jcip.annotations.ThreadSafe;
 
 import java.util.Arrays;
 import java.util.Set;
@@ -11,6 +12,7 @@ import java.util.stream.Collectors;
 /**
  * 资源上下文：支持多套资源路径切换
  */
+@ThreadSafe
 public class ResourceConfigContext {
 
     /**

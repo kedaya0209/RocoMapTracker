@@ -1,8 +1,9 @@
 package com.luoke.app.update;
 
+import net.jcip.annotations.ThreadSafe;
 import com.luoke.app.config.BuildConfig;
 import com.luoke.app.hook.event.NotificationType;
-import com.luoke.app.utils.FileUtil;
+import com.luoke.app.utils.HashUtil;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.*;
@@ -25,6 +26,7 @@ import java.util.function.Consumer;
  * 状态机: IDLE → CHECKING → DOWNLOADING → READY → INSTALLING → RESTARTING
  */
 @Slf4j
+@ThreadSafe
 public class UpdateManager {
 
     private static volatile UpdateManager instance;
@@ -69,10 +71,10 @@ public class UpdateManager {
      */
     public void startPeriodicCheck(int intervalHours) {
         this.appDir = detectAppDir();
-        Thread.ofVirtual().name("update-checker").start(() -> {
+        Thread.ofPlatform().daemon(true).name("update-checker").start(() -> {
             try { Thread.sleep(10_000); } catch (InterruptedException ignored) { return; }
             while (!Thread.currentThread().isInterrupted()) {
-                try { checkAndNotify(); } catch (Exception e) { log.warn("Periodic update check failed", e); }
+                try { checkAndNotify(); } catch (Exception e) { log.warn("Periodic update check failed", e); } // 后台周期性检查，捕获所有异常避免线程终止
                 try { Thread.sleep(intervalHours * 3600_000L); } catch (InterruptedException ignored) { break; }
             }
         });
@@ -82,7 +84,7 @@ public class UpdateManager {
      * 手动检查更新
      */
     public void manualCheck(Runnable onResult) {
-        Thread.ofVirtual().name("update-manual-check").start(() -> {
+        Thread.ofPlatform().daemon(true).name("update-manual-check").start(() -> {
             checkAndNotify();
             if (onResult != null) onResult.run();
         });
@@ -120,7 +122,7 @@ public class UpdateManager {
         }
         final boolean[] isPatchDone = {false};
         final Path[] downloadPath = {null};
-        Thread.ofVirtual().name("update-download").start(() -> {
+        Thread.ofPlatform().daemon(true).name("update-download").start(() -> {
             try {
                 String exeDir = detectAppDir();
 
@@ -135,7 +137,7 @@ public class UpdateManager {
                         try {
                             downloadFile(cdnUrl, patchPath, p ->
                                     uiDelegate.showDownloadProgress(info.version(), p));
-                        } catch (Exception e) {
+                        } catch (IOException | InterruptedException e) {
                             log.warn("CDN download failed, falling back to GitHub: {}", e.getMessage());
                             Files.deleteIfExists(patchPath);
                             downloadFile(info.patchDownloadUrl(), patchPath, p ->
@@ -150,7 +152,7 @@ public class UpdateManager {
                         } else {
                             Files.deleteIfExists(patchPath);
                         }
-                    } catch (Exception e) {
+                    } catch (IOException | InterruptedException e) {
                         log.warn("Patch download/verify failed, will fallback to full exe", e);
                         Files.deleteIfExists(patchPath);
                     }
@@ -179,7 +181,7 @@ public class UpdateManager {
                     Path dPath = downloadPath[0];
                     boolean isPatch = isPatchDone[0];
                     uiDelegate.showUpdateReadyDialog(info,
-                            () -> Thread.ofVirtual().name("update-install").start(() -> {
+                            () -> Thread.ofPlatform().daemon(true).name("update-install").start(() -> {
                                 if (isPatch) installAndRestart(dPath);
                                 else installAndRestartExe(dPath);
                             }),
@@ -187,7 +189,7 @@ public class UpdateManager {
                 } else {
                     notify("更新失败：未找到可下载的文件", NotificationType.ERROR);
                 }
-            } catch (Exception e) {
+            } catch (IOException | InterruptedException e) {
                 uiDelegate.hideDownloadProgress();
                 log.error("Download failed", e);
                 notify("下载更新失败：" + e.getMessage(), NotificationType.ERROR);
@@ -261,7 +263,7 @@ public class UpdateManager {
             p.waitFor(5, java.util.concurrent.TimeUnit.SECONDS);
             log.info("Updater script started via wmic");
             return;
-        } catch (Exception e) {
+        } catch (IOException | InterruptedException e) {
             log.warn("wmic start failed, fallback to start /min", e);
         }
 
@@ -271,7 +273,7 @@ public class UpdateManager {
                     .directory(new File(workDir))
                     .start();
             log.info("Updater script started via start /min (fallback)");
-        } catch (Exception e) {
+        } catch (IOException e) {
             log.error("Failed to start updater script (fallback)", e);
         }
     }
@@ -366,6 +368,9 @@ public class UpdateManager {
         downloadFile(url, targetPath, null);
     }
 
+    /** 最大重试次数（瞬态网络错误时自动重试） */
+    private static final int MAX_DOWNLOAD_RETRIES = 3;
+
     private void downloadFile(String url, Path targetPath, Consumer<Double> progressCallback) throws IOException, InterruptedException {
         Path parent = targetPath.getParent();
         if (parent != null) Files.createDirectories(parent);
@@ -377,12 +382,33 @@ public class UpdateManager {
                 .GET()
                 .build();
 
-        HttpResponse<InputStream> response = httpClient.send(request,
-                HttpResponse.BodyHandlers.ofInputStream());
+        // 对瞬态网络错误（Connection reset / SocketException 等）自动重试
+        HttpResponse<InputStream> response = null;
+        IOException lastException = null;
+        for (int attempt = 1; attempt <= MAX_DOWNLOAD_RETRIES; attempt++) {
+            try {
+                response = httpClient.send(request,
+                        HttpResponse.BodyHandlers.ofInputStream());
 
-        if (response.statusCode() != 200) {
-            throw new IOException("Download failed with status: " + response.statusCode());
+                if (response.statusCode() != 200) {
+                    throw new IOException("Download failed with status: " + response.statusCode());
+                }
+
+                // 成功
+                lastException = null;
+                break;
+            } catch (IOException e) {
+                lastException = e;
+                if (attempt < MAX_DOWNLOAD_RETRIES) {
+                    long delay = (long) Math.pow(2, attempt) * 1000L; // 2s, 4s
+                    log.warn("下载失败（第 {}/{} 次），{} 秒后重试: {}", attempt, MAX_DOWNLOAD_RETRIES, delay / 1000, e.getMessage());
+                    try { Thread.sleep(delay); } catch (InterruptedException ie) { throw ie; }
+                } else {
+                    throw e; // 最后一次仍失败，向上抛
+                }
+            }
         }
+        if (lastException != null) throw lastException;
 
         long totalBytes = response.headers().firstValueAsLong("Content-Length").orElse(-1L);
         long bytesReadSoFar = 0;
@@ -429,7 +455,7 @@ public class UpdateManager {
         try {
             downloadFile(sha256Url, sha256Path);
             String expected = Files.readString(sha256Path).trim();
-            String actual = FileUtil.computeFileSHA256(filePath.toFile());
+            String actual = HashUtil.computeFileSHA256(filePath.toFile());
             if (!expected.equalsIgnoreCase(actual)) {
                 Files.deleteIfExists(filePath);
                 throw new IOException("SHA256 校验失败：期望 " + expected + "，实际 " + actual);
@@ -448,7 +474,7 @@ public class UpdateManager {
             File jarFile = new File(path);
             appDir = jarFile.getParent();
             if (appDir == null) appDir = ".";
-        } catch (Exception e) {
+        } catch (Exception e) { // getProtectionDomain().getCodeSource() 可能因环境不同抛出多种异常
             appDir = ".";
         }
         return appDir;

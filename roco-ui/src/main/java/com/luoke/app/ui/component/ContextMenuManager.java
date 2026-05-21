@@ -1,5 +1,6 @@
 package com.luoke.app.ui.component;
 
+import net.jcip.annotations.NotThreadSafe;
 import com.luoke.app.context.ResourcePointContext;
 import com.luoke.app.map.model.ResourcePoint;
 import com.luoke.app.ui.util.DialogUtils;
@@ -13,6 +14,7 @@ import javafx.scene.layout.StackPane;
  * 右键菜单管理器 — 从 InteractiveCanvas 拆分，
  * 负责地图菜单和资源点菜单的创建与显示。
  */
+@NotThreadSafe
 public class ContextMenuManager {
 
     private final ContextMenu mapMenu = new ContextMenu();

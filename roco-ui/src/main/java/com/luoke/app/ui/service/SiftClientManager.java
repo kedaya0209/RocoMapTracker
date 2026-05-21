@@ -1,5 +1,6 @@
 package com.luoke.app.ui.service;
 
+import net.jcip.annotations.ThreadSafe;
 import com.luoke.app.hook.HookEventType;
 import com.luoke.app.hook.event.NotificationType;
 import com.luoke.app.hook.event.StatusEvent;
@@ -15,6 +16,7 @@ import lombok.extern.slf4j.Slf4j;
  * SIFT 客户端生命周期管理。
  */
 @Slf4j
+@ThreadSafe
 public class SiftClientManager {
 
     @Getter

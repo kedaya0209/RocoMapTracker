@@ -2,6 +2,7 @@ package com.luoke.app.map;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import net.jcip.annotations.NotThreadSafe;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
@@ -21,6 +22,7 @@ import java.util.Set;
  * 坐标系：图片中心为 (0,0)
  * 功能：自动去重、自动图标复制、脏数据过滤
  */
+@NotThreadSafe
 public class ResourceExporter {
 
     private static final String BASE_DIR = "C:\\Users\\tangh\\Desktop\\map";
@@ -90,11 +92,9 @@ public class ResourceExporter {
                     Files.copy(source, Path.of(iconDir.getAbsolutePath(), targetName), StandardCopyOption.REPLACE_EXISTING);
                     nameToIconMap.put(name, targetName);
                 }
-            } catch (Exception ignore) {
+            } catch (IOException ignore) {
             }
         });
-
-        // --- 3. 生成 JSON 并执行坐标去重 ---
         ArrayNode root = mapper.createArrayNode();
         Set<String> deduplicationSet = new HashSet<>();
 
@@ -137,7 +137,7 @@ public class ResourceExporter {
                         root.add(node);
                     }
                 }
-            } catch (Exception ignore) {
+            } catch (RuntimeException ignore) {
             }
         });
 
@@ -182,7 +182,7 @@ public class ResourceExporter {
             mapper.readTree(f).get("RocoDataRows").fields().forEachRemaining(e -> {
                 try {
                     map.put(Integer.parseInt(e.getKey()), e.getValue());
-                } catch (Exception ignore) {
+                } catch (NumberFormatException ignore) {
                 }
             });
         }

@@ -1,5 +1,6 @@
 package com.luoke.app.ui.component.setting;
 
+import net.jcip.annotations.ThreadSafe;
 import com.luoke.app.config.ConfigPersistence;
 import javafx.scene.control.*;
 import lombok.Getter;
@@ -16,6 +17,7 @@ import java.util.*;
  * 不依赖反射，Native Image 兼容。
  */
 @Slf4j
+@ThreadSafe
 public class SettingConfigManager {
 
     private final Map<String, Control> controlMap = new LinkedHashMap<>();

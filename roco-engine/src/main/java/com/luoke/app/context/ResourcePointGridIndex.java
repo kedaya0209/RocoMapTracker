@@ -1,5 +1,6 @@
 package com.luoke.app.context;
 
+import net.jcip.annotations.NotThreadSafe;
 import com.luoke.app.config.StatsConfig;
 import com.luoke.app.map.model.Point;
 import com.luoke.app.map.model.ResourcePoint;
@@ -12,6 +13,7 @@ import java.util.Map;
 /**
  * 资源点控件索引
  */
+@NotThreadSafe
 public class ResourcePointGridIndex {
     private final Map<Long, List<ResourcePoint>> grid = new HashMap<>();
 

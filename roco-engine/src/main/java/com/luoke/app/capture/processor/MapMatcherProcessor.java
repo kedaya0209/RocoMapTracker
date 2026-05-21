@@ -1,5 +1,6 @@
 package com.luoke.app.capture.processor;
 
+import net.jcip.annotations.NotThreadSafe;
 import com.luoke.app.capture.CaptureFrameBuffer;
 import com.luoke.app.capture.ROIData;
 import com.luoke.app.capture.RoiProcessor;
@@ -13,6 +14,8 @@ import com.luoke.app.macher.SiftMatchHandler;
 import com.luoke.app.macher.player.PlayerStateTracker;
 import lombok.extern.slf4j.Slf4j;
 
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -26,6 +29,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *
  * <p>每帧流程: 接收 BGRA 全彩图 → 发送给 C++ → C++ 完成灰度转换+小地图检测+遮罩+SIFT匹配+HSV箭头检测 → 返回坐标+角度
  */
+@NotThreadSafe
 @Slf4j
 public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
 
@@ -37,6 +41,12 @@ public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
     // 状态追踪 (纯 Java, 无 native 依赖)
     private final PlayerStateTracker stateTracker = new PlayerStateTracker();
 
+    // 专用单线程池，避免 Substrate VM 虚拟线程 Continuation bug (RIP=0 DEP)
+    private final ExecutorService executor = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "matcher-worker");
+        t.setDaemon(true);
+        return t;
+    });
     // 频率限制
     private final long delay = 1000L / CaptureConfig.TARGET_CAPTURE_FPS;
     // 统计
@@ -91,7 +101,7 @@ public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
             }
         }
 
-        Thread.startVirtualThread(() -> executeMatching(data, width, height));
+        executor.submit(() -> executeMatching(data, width, height));
     }
 
     private void executeMatching(byte[] data, int width, int height) {
@@ -150,6 +160,7 @@ public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
                 stateTracker.onMatchFailure("interrupted");
                 log.warn("[seq={}] matching interrupted", seq);
             } catch (Exception e) {
+                // 匹配管道中含多种未检查异常，保留通用捕获
                 log.error("[seq={}] 匹配异常", seq, e);
                 stateTracker.onMatchFailure("exception: " + e.getMessage());
             }
@@ -172,6 +183,7 @@ public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
 
     @Override
     public void close() {
+        executor.shutdownNow();
         log.info("MapMatcherProcessor closed");
     }
 }

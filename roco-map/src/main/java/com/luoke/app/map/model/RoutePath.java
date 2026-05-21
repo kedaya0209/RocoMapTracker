@@ -1,11 +1,13 @@
 package com.luoke.app.map.model;
 
 import lombok.Data;
+import net.jcip.annotations.NotThreadSafe;
 
 import java.util.ArrayList;
 import java.util.List;
 
 @Data
+@NotThreadSafe
 public class RoutePath {
     private String name;
     private List<Point> nodes = new ArrayList<>();

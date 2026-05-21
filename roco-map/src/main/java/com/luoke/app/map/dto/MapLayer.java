@@ -1,12 +1,14 @@
 package com.luoke.app.map.dto;
 
 import lombok.Data;
+import net.jcip.annotations.NotThreadSafe;
 
 /**
  * 地图图层配置数据传输对象
  * 封装单个地图图层的配置信息
  */
 @Data
+@NotThreadSafe
 public class MapLayer {
     /**
      * 图层的选项配置，包含瓦片服务URL等

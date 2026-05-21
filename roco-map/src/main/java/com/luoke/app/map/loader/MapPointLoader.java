@@ -1,18 +1,22 @@
 package com.luoke.app.map.loader;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.luoke.app.config.DownloadConfig;
 import com.luoke.app.map.dto.MapPointItem;
 import com.luoke.app.utils.JsonUtils;
 import lombok.extern.slf4j.Slf4j;
+import net.jcip.annotations.ThreadSafe;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
 @Slf4j
+@ThreadSafe
 public class MapPointLoader {
 
     private static final ObjectMapper om = JsonUtils.getMapper();
@@ -72,7 +76,7 @@ public class MapPointLoader {
                             // treeToValue方法使用Jackson的自动映射功能
                             // 将JSON对象转换为Java对象，属性名和字段名自动匹配
                             items.add(om.treeToValue(node, MapPointItem.class));
-                        } catch (Exception e) {
+                        } catch (JsonProcessingException e) {
                             // 单条数据解析失败，记录DEBUG日志
                             // 使用DEBUG级别避免日志过多
                             // 单条数据失败不影响其他数据的解析
@@ -87,7 +91,7 @@ public class MapPointLoader {
             log.info("✅ 点位解析完成，共 {} 条", items.size());
             return items;
 
-        } catch (Exception e) {
+        } catch (IOException e) {
             // 捕获所有可能的异常（网络异常、解析异常等）
             // 记录错误日志，包含异常堆栈信息，便于问题排查
             log.error("❌ 点位加载失败", e);

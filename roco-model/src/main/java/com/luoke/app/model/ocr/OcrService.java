@@ -1,5 +1,8 @@
 package com.luoke.app.model.ocr;
 
+import net.jcip.annotations.NotThreadSafe;
+
+import ai.djl.translate.TranslateException;
 import com.luoke.app.config.PathConfig;
 import com.luoke.app.config.OcrConfig;
 import lombok.extern.slf4j.Slf4j;
@@ -18,6 +21,7 @@ import java.util.List;
  * <p>替代 OpenCV Mat 操作：byte[] + 手动双线性插值 resize / copyMakeBorder / crop.
  */
 @Slf4j
+@NotThreadSafe
 public class OcrService implements AutoCloseable {
 
     private byte[] fullPixels;
@@ -150,8 +154,11 @@ public class OcrService implements AutoCloseable {
             }
             return resultList;
 
+        } catch (TranslateException e) {
+            log.error("OCR 匹配链路异常 (DJL 推理异常)", e);
+            return Collections.emptyList();
         } catch (Exception e) {
-            log.error("OCR 匹配链路异常", e);
+            log.error("OCR 识别异常", e);
             return Collections.emptyList();
         }
     }

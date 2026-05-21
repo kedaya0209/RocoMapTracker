@@ -1,5 +1,6 @@
 package com.luoke.app.ui.component.setting;
 
+import net.jcip.annotations.NotThreadSafe;
 import com.luoke.app.config.RenderConfig;
 import com.luoke.app.config.ViewConfig;
 import com.luoke.app.context.ResourceConfigContext;
@@ -14,14 +15,17 @@ import lombok.extern.slf4j.Slf4j;
 
 /**
  * 玩家图标与光环实时预览 — 设置面板「玩家」分类顶部展示。
- * 暗色半透明底衬确保低透明度光环清晰可见，AnimationTimer {@code 60fps} 每帧从
- * {@link SettingConfigManager#getCurrentValue} 读取控件实时值，修改即渲染。
+ * 暗色半透明底衬确保低透明度光环清晰可见，AnimationTimer {@code 60fps} 驱动动画，
+ * 配置值按 {@link #REFRESH_INTERVAL} 帧间隔从控件读取缓存，减少高频读取开销。
  */
+@NotThreadSafe
 @Slf4j
 public class PlayerPreview {
 
     private static final int MAX_RIPPLES = 10;
     private static final double PREVIEW_HEIGHT = 200;
+    /** 配置值刷新间隔（帧数）：每 15 帧 ~4fps 刷新一次，减少控件读取开销 */
+    private static final int REFRESH_INTERVAL = 15;
 
     private final Pane root;
     private final Circle backdrop;
@@ -31,6 +35,18 @@ public class PlayerPreview {
     private final double[] rippleProgress;
     private final AnimationTimer timer;
     private final SettingConfigManager configManager;
+
+    // 缓存配置值，按 REFRESH_INTERVAL 批量刷新
+    private double cachedGrayDist;
+    private double cachedRippleStep;
+    private double cachedRippleAlpha;
+    private double cachedRippleStroke;
+    private int cachedRippleCount;
+    private double cachedHaloFreq;
+    private double cachedHaloMinAlpha;
+    private double cachedHaloMaxAlpha;
+    private double cachedHaloStroke;
+    private double cachedPlayerSize;
 
     public PlayerPreview(SettingConfigManager configManager) {
         this.configManager = configManager;
@@ -96,9 +112,14 @@ public class PlayerPreview {
                 if (now - lastFrame < 16_000_000) return;
                 lastFrame = now;
                 frameCount++;
-                tick(frameCount);
+                // 每帧更新动画；每隔 REFRESH_INTERVAL 帧刷新配置缓存
+                boolean refresh = (frameCount % REFRESH_INTERVAL) == 0;
+                tick(frameCount, refresh);
             }
         };
+
+        // 初始化配置缓存
+        refreshCache();
     }
 
     private static double clamp(double v) {
@@ -115,7 +136,21 @@ public class PlayerPreview {
         return v instanceof Number n ? n.intValue() : fallback;
     }
 
-    private void tick(int frameCount) {
+    private void refreshCache() {
+        cachedGrayDist = readDouble("GRAY_DISTANCE", ViewConfig.GRAY_DISTANCE);
+        cachedRippleStep = readDouble("RIPPLE_STEP", RenderConfig.RIPPLE_STEP);
+        cachedRippleAlpha = readDouble("RIPPLE_ALPHA", RenderConfig.RIPPLE_ALPHA);
+        cachedRippleStroke = readDouble("RIPPLE_STROKE_WIDTH", RenderConfig.RIPPLE_STROKE_WIDTH);
+        cachedRippleCount = Math.min(readInt("RIPPLE_COUNT", RenderConfig.RIPPLE_COUNT), MAX_RIPPLES);
+        cachedHaloFreq = readDouble("HALO_BREATHE_FREQ", RenderConfig.HALO_BREATHE_FREQ);
+        cachedHaloMinAlpha = readDouble("HALO_BREATHE_MIN_ALPHA", RenderConfig.HALO_BREATHE_MIN_ALPHA);
+        cachedHaloMaxAlpha = readDouble("HALO_BREATHE_MAX_ALPHA", RenderConfig.HALO_BREATHE_MAX_ALPHA);
+        cachedHaloStroke = readDouble("HALO_STROKE_WIDTH", RenderConfig.HALO_STROKE_WIDTH);
+        cachedPlayerSize = readDouble("PLAYER_VIEW_SIZE", RenderConfig.PLAYER_VIEW_SIZE);
+    }
+
+    private void tick(int frameCount, boolean refresh) {
+        if (refresh) refreshCache();
         double w = root.getWidth();
         double h = root.getHeight();
         if (w < 10 || h < 10) return;
@@ -123,17 +158,17 @@ public class PlayerPreview {
         double cx = w / 2.0;
         double cy = h / 2.0;
 
-        // 每帧从控件读取实时值（Spinner▲▼立即生效；键盘输入需按 Enter 提交）
-        double grayDist = readDouble("GRAY_DISTANCE", ViewConfig.GRAY_DISTANCE);
-        double rippleStep = readDouble("RIPPLE_STEP", RenderConfig.RIPPLE_STEP);
-        double rippleAlpha = readDouble("RIPPLE_ALPHA", RenderConfig.RIPPLE_ALPHA);
-        double rippleStroke = readDouble("RIPPLE_STROKE_WIDTH", RenderConfig.RIPPLE_STROKE_WIDTH);
-        int rippleCount = Math.min(readInt("RIPPLE_COUNT", RenderConfig.RIPPLE_COUNT), MAX_RIPPLES);
-        double haloFreq = readDouble("HALO_BREATHE_FREQ", RenderConfig.HALO_BREATHE_FREQ);
-        double haloMinAlpha = readDouble("HALO_BREATHE_MIN_ALPHA", RenderConfig.HALO_BREATHE_MIN_ALPHA);
-        double haloMaxAlpha = readDouble("HALO_BREATHE_MAX_ALPHA", RenderConfig.HALO_BREATHE_MAX_ALPHA);
-        double haloStroke = readDouble("HALO_STROKE_WIDTH", RenderConfig.HALO_STROKE_WIDTH);
-        double playerSize = readDouble("PLAYER_VIEW_SIZE", RenderConfig.PLAYER_VIEW_SIZE);
+        // 每帧从缓存读取配置值（由 refreshCache 按 REFRESH_INTERVAL 刷新）
+        double grayDist = cachedGrayDist;
+        double rippleStep = cachedRippleStep;
+        double rippleAlpha = cachedRippleAlpha;
+        double rippleStroke = cachedRippleStroke;
+        int rippleCount = cachedRippleCount;
+        double haloFreq = cachedHaloFreq;
+        double haloMinAlpha = cachedHaloMinAlpha;
+        double haloMaxAlpha = cachedHaloMaxAlpha;
+        double haloStroke = cachedHaloStroke;
+        double playerSize = cachedPlayerSize;
 
         // 等比缩放：确保光环不超出预览区域
         double maxR = Math.min(w, h) * 0.42;

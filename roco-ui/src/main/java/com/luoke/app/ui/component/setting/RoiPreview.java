@@ -1,5 +1,6 @@
 package com.luoke.app.ui.component.setting;
 
+import net.jcip.annotations.NotThreadSafe;
 import com.luoke.app.capture.CaptureFrameBuffer;
 import com.luoke.app.ui.service.SvgManager;
 import javafx.animation.AnimationTimer;
@@ -39,6 +40,7 @@ import lombok.extern.slf4j.Slf4j;
  *
  * <p>全帧模式下点击「放大」按钮弹出独立窗口，ROI 线框可拖拽移动位置、
  */
+@NotThreadSafe
 @Slf4j
 public class RoiPreview {
 

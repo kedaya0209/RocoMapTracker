@@ -1,5 +1,6 @@
 package com.luoke.app.ui.render;
 
+import net.jcip.annotations.NotThreadSafe;
 import com.luoke.app.config.RenderConfig;
 import com.luoke.app.context.CameraContext;
 import com.luoke.app.context.MapContext;
@@ -21,6 +22,7 @@ import java.util.List;
  * 缩放变化时全量重绘，纯平移时通过 GPU translate 补偿避免重绘。
  * 通过 PathContext / CameraContext 单例自动检测状态变化。
  */
+@NotThreadSafe
 public class RouteRenderer implements RenderLayer {
 
     private final Canvas routeCanvas;

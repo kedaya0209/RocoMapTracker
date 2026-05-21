@@ -1,10 +1,12 @@
 package com.luoke.app.config;
 
+import net.jcip.annotations.NotThreadSafe;
 import java.util.Properties;
 
 /**
  * 地图与视图配置持久化 
  */
+@NotThreadSafe
 public final class ViewConfig {
 
     // ============================================================

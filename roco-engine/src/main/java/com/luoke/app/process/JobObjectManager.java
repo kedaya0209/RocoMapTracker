@@ -1,5 +1,6 @@
 package com.luoke.app.process;
 
+import net.jcip.annotations.ThreadSafe;
 import lombok.extern.slf4j.Slf4j;
 
 import java.lang.foreign.*;
@@ -19,6 +20,7 @@ import java.lang.invoke.MethodHandle;
  * <p>当 Java 进程退出/崩溃时，JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE 确保
  * JobObject 内所有子进程被 OS 自动终止，防止孤儿进程残留。
  */
+@ThreadSafe
 @Slf4j
 public class JobObjectManager {
 

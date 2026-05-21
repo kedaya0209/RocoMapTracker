@@ -1,5 +1,6 @@
 package com.luoke.app.ui.component;
 
+import net.jcip.annotations.NotThreadSafe;
 import atlantafx.base.theme.Styles;
 import com.luoke.app.context.PathContext;
 import com.luoke.app.hook.HookEventType;
@@ -31,6 +32,7 @@ import java.util.List;
 /**
  * 路线管理工具窗口 - 单例模式 (双重检查锁实现)
  */
+@NotThreadSafe
 @Slf4j
 public class RouteManagerStage extends Stage {
 

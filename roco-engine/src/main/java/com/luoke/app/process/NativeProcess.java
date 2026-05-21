@@ -1,5 +1,6 @@
 package com.luoke.app.process;
 
+import net.jcip.annotations.NotThreadSafe;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.BufferedInputStream;
@@ -16,6 +17,7 @@ import java.util.concurrent.TimeUnit;
  *
  * <p>替代 {@link ProcessBuilder#start()}，同时完成 JobObject 归属。
  */
+@NotThreadSafe
 @Slf4j
 public class NativeProcess {
 
@@ -303,6 +305,7 @@ public class NativeProcess {
                     log.info("子进程 pid={} 优先级已提升至 HIGH_PRIORITY_CLASS", pid);
                 }
             } catch (Throwable e) {
+                // SetPriorityClass FFM 调用，保留通用捕获
                 log.warn("SetPriorityClass 调用异常 pid={}: {}", pid, e.toString());
             }
 

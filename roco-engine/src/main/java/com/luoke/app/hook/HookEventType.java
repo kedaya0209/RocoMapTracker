@@ -1,5 +1,8 @@
 package com.luoke.app.hook;
 
+import net.jcip.annotations.ThreadSafe;
+
+@ThreadSafe
 public enum HookEventType {
 
     UI_NOTIFICATION,

@@ -2,6 +2,7 @@ package com.luoke.app.map.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.Data;
+import net.jcip.annotations.NotThreadSafe;
 
 import java.util.List;
 
@@ -10,6 +11,7 @@ import java.util.List;
  * 封装地图的核心配置信息，包括缩放级别、中心点、边界范围、图层配置等
  */
 @Data
+@NotThreadSafe
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class MapConfig {
     /**

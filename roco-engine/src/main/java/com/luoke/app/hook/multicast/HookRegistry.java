@@ -1,5 +1,6 @@
 package com.luoke.app.hook.multicast;
 
+import net.jcip.annotations.ThreadSafe;
 import com.luoke.app.hook.IHook;
 import com.luoke.app.hook.HookEventType;
 import com.luoke.app.hook.container.HookContainer;
@@ -8,6 +9,7 @@ import com.luoke.app.hook.container.HookContainer;
  * 钩子注册中心
  * 提供钩子系统的全局访问点，负责钩子注册和事件发布
  */
+@ThreadSafe
 public enum HookRegistry {
     /**
      * 单例实例

@@ -1,5 +1,6 @@
 package com.luoke.app.macher;
 
+import net.jcip.annotations.NotThreadSafe;
 import com.luoke.app.socket.SocketSession;
 import lombok.extern.slf4j.Slf4j;
 
@@ -10,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
  * 状态变更通过返回值通知调用方（{@link SiftMatchHandler} 协调器），
  * 由协调器负责发布 Hook 事件和调用 StateCallback。</p>
  */
+@NotThreadSafe
 @Slf4j
 public class SiftSessionManager {
 

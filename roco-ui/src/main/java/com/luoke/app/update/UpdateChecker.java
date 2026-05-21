@@ -1,9 +1,11 @@
 package com.luoke.app.update;
 
+import net.jcip.annotations.ThreadSafe;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.luoke.app.utils.JsonUtils;
 import lombok.extern.slf4j.Slf4j;
 
+import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -11,12 +13,14 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.Optional;
 
 /**
  * GitHub Release 更新检查器。
  */
 @Slf4j
+@ThreadSafe
 public class UpdateChecker {
 
     private static final String GITHUB_API = "https://api.github.com/repos/kedaya0209/RocoMapTracker/releases/latest";
@@ -52,8 +56,12 @@ public class UpdateChecker {
             JsonNode root = JsonUtils.getMapper().readTree(response.body());
             return Optional.of(parseRelease(root));
 
-        } catch (Exception e) {
+        } catch (IOException e) {
             log.warn("Failed to check for updates", e);
+            return Optional.empty();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.warn("Update check interrupted", e);
             return Optional.empty();
         }
     }
@@ -68,7 +76,7 @@ public class UpdateChecker {
         if (!publishedAt.isEmpty()) {
             try {
                 dateTime = LocalDateTime.parse(publishedAt, DateTimeFormatter.ISO_DATE_TIME);
-            } catch (Exception e) {
+            } catch (DateTimeParseException e) {
                 log.warn("Failed to parse published_at: {}", publishedAt, e);
             }
         }

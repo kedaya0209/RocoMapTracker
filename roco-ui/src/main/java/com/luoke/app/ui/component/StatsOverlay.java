@@ -1,5 +1,6 @@
 package com.luoke.app.ui.component;
 
+import net.jcip.annotations.NotThreadSafe;
 import com.luoke.app.config.StatsConfig;
 import com.luoke.app.config.UiConfig;
 import com.luoke.app.context.StatsContext;
@@ -12,6 +13,7 @@ import javafx.scene.shape.Rectangle;
 import javafx.scene.text.Font;
 import javafx.scene.text.TextAlignment;
 
+@NotThreadSafe
 public class StatsOverlay extends StackPane {
 
     private final Label statsLabel;

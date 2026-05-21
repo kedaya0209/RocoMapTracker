@@ -2,11 +2,13 @@ package com.luoke.app.map.util;
 
 import com.luoke.app.config.PathConfig;
 import com.luoke.app.map.MapResourceUpdater;
-import com.luoke.app.utils.FileUtil;
+import com.luoke.app.utils.FilePathUtil;
 import com.luoke.app.utils.ResourceUtils;
 import lombok.extern.slf4j.Slf4j;
+import net.jcip.annotations.ThreadSafe;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -15,6 +17,7 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
+@ThreadSafe
 public class MapFileMover {
 
     /**
@@ -45,7 +48,7 @@ public class MapFileMover {
 
     public static void moveIcons() {
         // 下载来源：相对路径，临时存储
-        File src = FileUtil.getRelativeFile(MapResourceUpdater.DOWNLOAD_ICON_DIR);
+        File src = FilePathUtil.getRelativeFile(MapResourceUpdater.DOWNLOAD_ICON_DIR);
 
         // 使用绝对路径，应用运行时使用
         File dst = ResourceUtils.getExternalFile(PathConfig.ICON_DIR);
@@ -59,7 +62,7 @@ public class MapFileMover {
 
     public static void movePoints() {
         // 下载来源：相对路径，临时存储
-        File src = FileUtil.getRelativeFile(MapResourceUpdater.DOWNLOAD_POINT_DIR);
+        File src = FilePathUtil.getRelativeFile(MapResourceUpdater.DOWNLOAD_POINT_DIR);
 
         // 使用绝对路径，应用运行时使用
         File dst = ResourceUtils.getExternalFile(PathConfig.RESOURCE_ICON_DIR);
@@ -73,7 +76,7 @@ public class MapFileMover {
 
     public static void moveMapsToResource() {
         // 下载来源：相对路径，临时存储
-        File src = FileUtil.getRelativeFile(MapResourceUpdater.DOWNLOAD_MAP_DIR);
+        File src = FilePathUtil.getRelativeFile(MapResourceUpdater.DOWNLOAD_MAP_DIR);
 
         // 使用绝对路径，应用运行时使用
         File dst = ResourceUtils.getExternalFile(PathConfig.MAP_RESOURCE_DIR);
@@ -122,7 +125,7 @@ public class MapFileMover {
                 }
             }
             log.info("资源清单已写入: {} ({} 条目)", initFile.getAbsolutePath(), urlMap.size());
-        } catch (Exception e) {
+        } catch (IOException e) {
             log.error("写资源清单失败", e);
         }
     }
@@ -148,7 +151,7 @@ public class MapFileMover {
 
                 // 记录移动成功的日志
                 log.info("✅ 移动：{} → {}", f.getName(), dstDir);
-            } catch (Exception e) {
+            } catch (IOException e) {
                 // 捕获异常，记录错误日志
                 // 单个文件失败不影响其他文件
                 log.error("❌ 移动失败：{}", f.getName(), e);

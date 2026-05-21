@@ -1,5 +1,6 @@
 package com.luoke.app.ui.render;
 
+import net.jcip.annotations.NotThreadSafe;
 import com.luoke.app.config.PathConfig;
 import com.luoke.app.config.RenderConfig;
 import com.luoke.app.config.ViewConfig;
@@ -26,6 +27,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * 所有 ImageView 放入 iconGroup（worldGroup 子级），与瓦片共用 GPU 变换。
  * 变灰直接切换 ImageView 的 image 引用（colorAtlas ↔ grayAtlas），零 CPU 重绘。
  */
+@NotThreadSafe
 @Slf4j
 public class IconLayerManager implements RenderLayer {
 
@@ -90,7 +92,7 @@ public class IconLayerManager implements RenderLayer {
 
             ImageView iv = new ImageView();
             iv.setImage(rp.isGrayed() ? grayAtlas : colorAtlas);
-            iv.setViewport(new Rectangle2D(slot.sx, slot.sy, RenderConfig.ICON_SIZE, RenderConfig.ICON_SIZE));
+            iv.setViewport(new Rectangle2D(slot.sx(), slot.sy(), RenderConfig.ICON_SIZE, RenderConfig.ICON_SIZE));
             iv.setPreserveRatio(false);
             iv.setSmooth(false);
             iv.setMouseTransparent(true);

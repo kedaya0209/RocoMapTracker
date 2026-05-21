@@ -1,5 +1,6 @@
 package com.luoke.app.ui.component.setting;
 
+import net.jcip.annotations.NotThreadSafe;
 import com.luoke.app.config.ConfigPersistence;
 import com.luoke.app.config.RenderConfig;
 import com.luoke.app.config.SocketConfig;
@@ -14,6 +15,7 @@ import com.luoke.app.config.OcrConfig;
 import com.luoke.app.config.SiftConfig;
 import com.luoke.app.config.NavigConfig;
 import com.luoke.app.config.UpdateConfig;
+import com.luoke.app.config.BuildConfig;
 import com.luoke.app.context.CameraContext;
 import com.luoke.app.ui.component.TitleBar;
 import com.luoke.app.context.CameraContext;
@@ -30,6 +32,7 @@ import java.util.function.Supplier;
  * 设置分类定义 — 集中管理所有配置项的元数据定义。
  * 提供 builder 方法（cat / bool / integer / ...）和预构建的分类列表。
  */
+@NotThreadSafe
 @Slf4j
 public final class SettingDefinitions {
 
@@ -391,7 +394,7 @@ public final class SettingDefinitions {
                                 () -> {
                                     try {
                                         return SwitchMapMatcher.getInstance().getMatchers().toArray(new String[0]);
-                                    } catch (Exception e) {
+                                    } catch (Exception e) { // SwitchMapMatcher 可能因原生库异常失败，保留宽泛捕获
                                         return new String[]{"SIFT", "SIFT-PCA", "SIFT-ULTRA", "SIFT-PCA-ULTRA"};
                                     }
                                 },
@@ -667,10 +670,10 @@ public final class SettingDefinitions {
                 cat("关于", "/icon/about.svg",
                         new SettingDef("ABOUT_VERSION", "当前版本", SettingType.STRING,
                                 null, null, false,
-                                () -> com.luoke.app.config.BuildConfig.APP_VERSION, null),
+                                () -> BuildConfig.APP_VERSION, null),
                         new SettingDef("ABOUT_BUILD_TIME", "构建时间", SettingType.STRING,
                                 null, null, false,
-                                () -> com.luoke.app.config.BuildConfig.BUILD_TIMESTAMP, null),
+                                () -> BuildConfig.BUILD_TIMESTAMP, null),
                         new SettingDef("ABOUT_REPO", "GitHub仓库", SettingType.STRING,
                                 null, null, false,
                                 () -> "https://github.com/kedaya0209/RocoMapTracker", null)

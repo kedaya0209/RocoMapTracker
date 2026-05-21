@@ -1,5 +1,6 @@
 package com.luoke.app.hook.impl;
 
+import net.jcip.annotations.NotThreadSafe;
 import com.luoke.app.hook.AbstractGenericHook;
 import com.luoke.app.hook.HookEventType;
 import com.luoke.app.hook.event.CaptureStateEvent;
@@ -14,6 +15,7 @@ import javafx.scene.layout.StackPane;
 
 import java.util.Set;
 
+@NotThreadSafe
 public class UiResponseHook extends AbstractGenericHook<Object> {
 
     private final StackPane rootStack;

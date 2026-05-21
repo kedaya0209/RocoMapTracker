@@ -1,10 +1,12 @@
 package com.luoke.app.config;
 
+import net.jcip.annotations.NotThreadSafe;
 import java.util.Properties;
 
 /**
  * Socket 与子进程管理配置持久化 
  */
+@NotThreadSafe
 public final class SocketConfig {
 
     // ============================================================

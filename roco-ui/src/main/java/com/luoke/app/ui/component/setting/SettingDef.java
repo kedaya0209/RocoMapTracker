@@ -1,5 +1,6 @@
 package com.luoke.app.ui.component.setting;
 
+import net.jcip.annotations.ThreadSafe;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -15,6 +16,7 @@ import java.util.function.Supplier;
  * @param getter          读取当前值（替代反射）
  * @param setter          写入新值（替代反射）
  */
+@ThreadSafe
 public record SettingDef(String key, String label, SettingType type,
                          Supplier<String[]> optionsSupplier, Runnable onApply, boolean restartRequired,
                          Supplier<Object> getter, Consumer<Object> setter) {

@@ -1,5 +1,6 @@
 package com.luoke.app.ui.component;
 
+import net.jcip.annotations.NotThreadSafe;
 import com.luoke.app.config.ViewConfig;
 import com.luoke.app.context.MapContext;
 import com.luoke.app.context.PathContext;
@@ -14,6 +15,7 @@ import java.util.List;
  * 路径编辑器 — 从 InteractiveCanvas 拆分，
  * 负责路径绘图、编辑模式下的节点增删拖拽和键盘快捷键。
  */
+@NotThreadSafe
 @Slf4j
 public class PathEditor {
 

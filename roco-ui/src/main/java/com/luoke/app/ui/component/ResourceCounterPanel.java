@@ -1,5 +1,6 @@
 package com.luoke.app.ui.component;
 
+import net.jcip.annotations.NotThreadSafe;
 import atlantafx.base.theme.Styles;
 import com.luoke.app.config.UiConfig;
 import com.luoke.app.hook.AbstractGenericHook;
@@ -19,6 +20,7 @@ import javafx.util.Duration;
 import java.util.Map;
 import java.util.Set;
 
+@NotThreadSafe
 public class ResourceCounterPanel extends VBox {
 
     private static volatile ResourceCounterPanel instance;

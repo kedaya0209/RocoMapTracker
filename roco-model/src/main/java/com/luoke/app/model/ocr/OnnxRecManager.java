@@ -1,5 +1,7 @@
 package com.luoke.app.model.ocr;
 
+import net.jcip.annotations.NotThreadSafe;
+
 import ai.djl.ndarray.NDArray;
 import ai.djl.ndarray.NDList;
 import ai.djl.ndarray.NDManager;
@@ -17,6 +19,7 @@ import java.util.List;
  * ONNX 文本识别模型管理器。
  */
 @Slf4j
+@NotThreadSafe
 public class OnnxRecManager extends BaseOnnxManager {
 
     private final List<String> dict;

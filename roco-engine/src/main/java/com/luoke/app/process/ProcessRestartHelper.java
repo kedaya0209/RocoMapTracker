@@ -1,5 +1,6 @@
 package com.luoke.app.process;
 
+import net.jcip.annotations.ThreadSafe;
 import com.luoke.app.socket.SocketServer;
 import lombok.extern.slf4j.Slf4j;
 
@@ -22,6 +23,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * <p>所有子进程 Handler（{@link com.luoke.app.capture.CaptureHandler}、
  * {@link com.luoke.app.macher.SiftMatchHandler}）共用此组件。</p>
  */
+@ThreadSafe
 @Slf4j
 public class ProcessRestartHelper {
 
@@ -85,6 +87,7 @@ public class ProcessRestartHelper {
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             } catch (Exception e) {
+                // 重启回调可能抛出多种异常，保留通用捕获
                 log.error("[{}] 重启异常", processName, e);
             } finally {
                 // 归还令牌，允许下一次重启

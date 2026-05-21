@@ -1,9 +1,12 @@
 package com.luoke.app.ui.service;
 
+import net.jcip.annotations.NotThreadSafe;
+
 /**
  * 资源初始化 UI 回调接口。
  * ResourceInitService 不直接依赖 UI 类，通过此接口回调驱动 UI 变化。
  */
+@NotThreadSafe
 public interface ResourceInitUiDelegate {
 
     /**

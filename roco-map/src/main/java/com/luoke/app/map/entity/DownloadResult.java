@@ -1,9 +1,11 @@
 package com.luoke.app.map.entity;
 
 import lombok.Data;
+import net.jcip.annotations.NotThreadSafe;
 
 
 @Data
+@NotThreadSafe
 public class DownloadResult {
 
     private byte[] data;

@@ -1,10 +1,12 @@
 package com.luoke.app.config;
 
+import net.jcip.annotations.NotThreadSafe;
 import java.util.Properties;
 
 /**
  * 玩家状态追踪配置持久化 
  */
+@NotThreadSafe
 public final class PlayerConfig {
 
     // ============================================================

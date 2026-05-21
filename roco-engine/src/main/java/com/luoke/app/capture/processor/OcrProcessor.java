@@ -1,5 +1,6 @@
 package com.luoke.app.capture.processor;
 
+import net.jcip.annotations.NotThreadSafe;
 import com.luoke.app.capture.CaptureFrameBuffer;
 import com.luoke.app.capture.ROIData;
 import com.luoke.app.capture.RoiProcessor;
@@ -20,6 +21,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.Semaphore;
 
+@NotThreadSafe
 @Slf4j
 public class OcrProcessor implements RoiProcessor {
 
@@ -58,6 +60,7 @@ public class OcrProcessor implements RoiProcessor {
             try {
                 processOcrResult(lines);
             } catch (Exception e) {
+                // OCR 回调处理多种异常，保留通用捕获
                 log.error("OCR 异步回调处理异常", e);
             } finally {
                 parallel.release();

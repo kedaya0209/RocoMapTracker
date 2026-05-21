@@ -1,5 +1,6 @@
 package com.luoke.app.socket;
 
+import net.jcip.annotations.ThreadSafe;
 import com.luoke.app.config.SocketConfig;
 import lombok.extern.slf4j.Slf4j;
 
@@ -29,6 +30,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * server.register(captureHandler);     // 注册处理器
  * server.stop();                       // 程序退出时
  */
+@ThreadSafe
 @Slf4j
 public class SocketServer {
 
@@ -173,8 +175,8 @@ public class SocketServer {
                 // 不在此处广播 onConnect — 由 recvLoop 收到第一条消息后，
                 // 按消息 type 精准路由 onConnect 到对应的 handler。
 
-                // 为此 session 启动 recv 线程
-                Thread.ofVirtual().name("socket-recv-", session.id())
+                // 为此 session 启动 recv 线程（平台线程，避免 Native Image 虚拟线程阻塞 I/O 崩溃）
+                Thread.ofPlatform().daemon(true).name("socket-recv-" + session.id())
                         .start(() -> recvLoop(session));
             } catch (IOException e) {
                 if (running.get()) log.error("Accept error", e);
@@ -249,6 +251,7 @@ public class SocketServer {
                     try {
                         handler.onConnect(session);
                     } catch (Exception e) {
+                        // handler 回调可能抛出多种异常，保留通用捕获
                         log.error("onConnect error in {}", handler.getClass().getSimpleName(), e);
                     }
 
@@ -265,6 +268,7 @@ public class SocketServer {
                         try {
                             h.onMessage(msg.type(), msg.body(), session);
                         } catch (Exception e) {
+                            // handler 回调可能抛出多种异常，保留通用捕获
                             log.error("onMessage error in {} for type={}",
                                     h.getClass().getSimpleName(), msg.type(), e);
                         }
@@ -290,6 +294,7 @@ public class SocketServer {
                 try {
                     h.onDisconnect(session, "Connection closed");
                 } catch (Exception e) {
+                    // handler 回调可能抛出多种异常，保留通用捕获
                     log.error("onDisconnect error in {}", h.getClass().getSimpleName(), e);
                 }
             }

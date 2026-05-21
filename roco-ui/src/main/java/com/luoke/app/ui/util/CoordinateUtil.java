@@ -1,5 +1,7 @@
 package com.luoke.app.ui.util;
 
+import net.jcip.annotations.ThreadSafe;
+
 /**
  * 坐标变换工具 — 导航模式下的旋转补偿计算。
  *
@@ -21,6 +23,7 @@ package com.luoke.app.ui.util;
  *   worldY = (uy - oy) / scale
  * </pre>
  */
+@ThreadSafe
 public final class CoordinateUtil {
 
     private CoordinateUtil() {

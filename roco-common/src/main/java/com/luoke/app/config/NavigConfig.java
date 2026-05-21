@@ -1,10 +1,12 @@
 package com.luoke.app.config;
 
+import net.jcip.annotations.NotThreadSafe;
 import java.util.Properties;
 
 /**
  * 导航模式配置持久化
  */
+@NotThreadSafe
 public final class NavigConfig {
 
     /** 导航模式总开关 */

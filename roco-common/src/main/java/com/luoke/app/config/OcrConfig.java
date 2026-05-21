@@ -1,10 +1,12 @@
 package com.luoke.app.config;
 
+import net.jcip.annotations.NotThreadSafe;
 import java.util.Properties;
 
 /**
  * OCR 参数持久化 
  */
+@NotThreadSafe
 public final class OcrConfig {
 
     // ============================================================

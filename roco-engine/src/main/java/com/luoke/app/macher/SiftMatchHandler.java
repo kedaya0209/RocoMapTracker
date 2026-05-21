@@ -1,5 +1,6 @@
 package com.luoke.app.macher;
 
+import net.jcip.annotations.NotThreadSafe;
 import com.luoke.app.config.SiftConfig;
 import com.luoke.app.config.SocketConfig;
 import com.luoke.app.hook.HookEventType;
@@ -13,6 +14,8 @@ import com.luoke.app.socket.SocketServer;
 import com.luoke.app.socket.SocketSession;
 import lombok.extern.slf4j.Slf4j;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Set;
 
@@ -31,6 +34,7 @@ import static com.luoke.app.macher.SiftMatchProtocol.*;
  *   <li>崩溃恢复编排</li>
  * </ul>
  */
+@NotThreadSafe
 @Slf4j
 public class SiftMatchHandler implements SocketHandler {
 
@@ -161,10 +165,10 @@ public class SiftMatchHandler implements SocketHandler {
             byte[] body = encodeConfig(variant.variantOrdinal(), variant.cacheSuffix());
             session.send(MSG_CONFIG_DATA, body);
             log.info("CONFIG_DATA sent ({} bytes)", body.length);
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
             log.error("Failed to serialize CONFIG_DATA", e);
             byte[] errBody = ("Config error: " + e.getMessage())
-                    .getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                    .getBytes(StandardCharsets.UTF_8);
             session.send(MSG_INIT_FAILED, errBody);
         }
     }
@@ -180,7 +184,7 @@ public class SiftMatchHandler implements SocketHandler {
         } catch (Exception e) {
             log.error("Failed to load map data", e);
             byte[] errBody = ("Map load error: " + e.getMessage())
-                    .getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                    .getBytes(StandardCharsets.UTF_8);
             session.send(MSG_INIT_FAILED, errBody);
         }
     }

@@ -1,5 +1,6 @@
 package com.luoke.app.ui.service;
 
+import net.jcip.annotations.ThreadSafe;
 import com.luoke.app.config.RenderConfig;
 import com.luoke.app.map.loader.ImageLoader;
 import javafx.scene.image.*;
@@ -17,6 +18,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * <p>支持纹理图集模式：启动时调用 {@link #buildAtlas(Set)} 将所有图标
  * 合并为单张 WritableImage，全量重绘时减少 GPU 纹理绑定次数。
  */
+@ThreadSafe
 public class IconCache {
 
     private static final int SIZE = (int) RenderConfig.ICON_SIZE;
@@ -202,13 +204,6 @@ public class IconCache {
     /**
      * 图集中的图标坐标
      */
-    public static class AtlasSlot {
-        public final int sx; // 源 X（在图集中的像素位置）
-        public final int sy; // 源 Y
-
-        AtlasSlot(int sx, int sy) {
-            this.sx = sx;
-            this.sy = sy;
-        }
+    public record AtlasSlot(int sx, int sy) {
     }
 }

@@ -3,6 +3,7 @@ package com.luoke.app.map;
 import com.luoke.app.config.ConfigPersistence;
 import com.luoke.app.config.ViewConfig;
 import com.luoke.app.config.DownloadConfig;
+import net.jcip.annotations.NotThreadSafe;
 import com.luoke.app.map.dto.MapCategoryItem;
 import com.luoke.app.map.dto.MapConfig;
 import com.luoke.app.map.dto.MapPointItem;
@@ -15,6 +16,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Slf4j
+@NotThreadSafe
 public class LoadInfo {
 
     public static void remoteResolveConfig() {
@@ -48,7 +50,7 @@ public class LoadInfo {
             // 提取图层基本信息
             String name = layer.getName();  // 图层名称
             int index = layer.getIndex();   // 图层显示索引（用于排序）
-            String url = layer.getLayerOption().getTileUrl();  // 瓦片URL模板
+            String url = layer.getLayerOption().tileUrl();  // 瓦片URL模板
 
             // 数据校验：确保名称和URL都不为空且不全是空白字符
             // 这一步可以过滤掉无效的图层配置，避免后续处理出错

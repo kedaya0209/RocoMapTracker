@@ -4,15 +4,18 @@ import com.luoke.app.map.LoadInfo;
 import com.luoke.app.map.MapResourceUpdater;
 import com.luoke.app.map.dto.MapCategoryItem;
 import com.luoke.app.map.util.MapFileMover;
-import com.luoke.app.utils.FileUtil;
+import com.luoke.app.utils.FilePathUtil;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
+import net.jcip.annotations.NotThreadSafe;
 
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -27,6 +30,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * 集成进度上报与用户中断检测逻辑
  */
 @Slf4j
+@NotThreadSafe
 public class IconDownloader {
 
     // 共享停止标记，实现全局一键取消
@@ -85,7 +89,7 @@ public class IconDownloader {
             String name = url.substring(url.lastIndexOf("/") + 1);
             progress.setStatusText("正在下载图标: " + name);
 
-            File file = FileUtil.getRelativeFile(MapResourceUpdater.DOWNLOAD_ICON_DIR, name);
+            File file = FilePathUtil.getRelativeFile(MapResourceUpdater.DOWNLOAD_ICON_DIR, name);
 
             if (file.exists()) {
                 progress.finishTask();
@@ -120,7 +124,7 @@ public class IconDownloader {
 
             Thread.sleep(MapResourceUpdater.ICON_DELAY_MS);
 
-        } catch (Exception e) {
+        } catch (IOException | InterruptedException | URISyntaxException e) {
             progress.finishTask(); // 失败也要推进进度条，否则会卡在 99%
             log.error("❌ 下载失败: {}", url);
         } finally {

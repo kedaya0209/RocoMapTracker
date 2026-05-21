@@ -1,5 +1,6 @@
 package com.luoke.app.ui.component;
 
+import net.jcip.annotations.NotThreadSafe;
 import com.luoke.app.config.ViewConfig;
 import com.luoke.app.context.CameraContext;
 import com.luoke.app.ui.service.SvgManager;
@@ -16,6 +17,7 @@ import javafx.scene.shape.SVGPath;
 import javafx.scene.transform.Scale;
 import javafx.util.Duration;
 
+@NotThreadSafe
 public class FloatToolbox extends VBox {
     private boolean resourcePanelVisible = false;
 

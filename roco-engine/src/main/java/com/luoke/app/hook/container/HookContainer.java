@@ -1,5 +1,6 @@
 package com.luoke.app.hook.container;
 
+import net.jcip.annotations.ThreadSafe;
 import com.luoke.app.hook.HookEventType;
 import com.luoke.app.hook.IHook;
 
@@ -9,6 +10,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+@ThreadSafe
 public class HookContainer {
 
     private static final HookContainer INSTANCE = new HookContainer();

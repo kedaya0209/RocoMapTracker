@@ -1,10 +1,12 @@
 package com.luoke.app.ui.component.setting;
 
+import net.jcip.annotations.NotThreadSafe;
 import atlantafx.base.theme.Styles;
 import com.luoke.app.capture.CaptureService;
 import com.luoke.app.ui.util.DialogUtils;
 import com.luoke.app.ui.util.FxRippleUtil;
 import javafx.application.Platform;
+import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -30,6 +32,7 @@ import java.util.List;
  * <p>职责边界：仅处理 Stage 生命周期和 UI 编排。
  * 配置数据管理委托给 {@link SettingConfigManager}，控件创建委托给 {@link SettingFieldBuilder}。</p>
  */
+@NotThreadSafe
 @Slf4j
 public class SettingsStage extends Stage {
 
@@ -259,7 +262,7 @@ public class SettingsStage extends Stage {
         lv.setStyle("-fx-background-color: transparent; -fx-border-color: transparent; " +
                 "-fx-selection-bar: transparent; -fx-selection-bar-non-focused: transparent; -fx-hbar-policy: never;");
         lv.setFocusTraversable(false);
-        lv.setItems(javafx.collections.FXCollections.observableArrayList(SettingDefinitions.CATEGORIES));
+        lv.setItems(FXCollections.observableArrayList(SettingDefinitions.CATEGORIES));
         lv.setCellFactory(_ -> new SettingCategoryCell());
         return lv;
     }
@@ -350,9 +353,8 @@ public class SettingsStage extends Stage {
                     label.setStyle(label.getStyle() + " -fx-text-fill: -color-warning-fg;");
                 }
 
-                // 控件
-                javafx.scene.Node control = fieldBuilder.buildControl(def);
-                if (control instanceof javafx.scene.control.Control c) {
+                Node control = fieldBuilder.buildControl(def);
+                if (control instanceof Control c) {
                     configManager.registerControl(def.key(), c);
                 }
 
@@ -423,8 +425,8 @@ public class SettingsStage extends Stage {
                 if (!def.key().startsWith(prefix)) continue;
                 Label l = new Label(def.label());
                 l.setStyle("-fx-text-fill: -color-fg-default; -fx-font-size: 12px;");
-                javafx.scene.Node ctrl = fieldBuilder.buildControl(def);
-                if (ctrl instanceof javafx.scene.control.Control c) {
+                Node ctrl = fieldBuilder.buildControl(def);
+                if (ctrl instanceof Control c) {
                     configManager.registerControl(def.key(), c);
                     if (c instanceof Spinner<?> sp) {
                         sp.getValueFactory().valueProperty().addListener((_, _, newVal) -> {

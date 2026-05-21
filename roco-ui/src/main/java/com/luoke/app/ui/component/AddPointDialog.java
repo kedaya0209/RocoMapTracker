@@ -1,5 +1,6 @@
 package com.luoke.app.ui.component;
 
+import net.jcip.annotations.NotThreadSafe;
 import com.luoke.app.context.ResourcePointContext;
 import com.luoke.app.map.model.ResourcePoint;
 import com.luoke.app.ui.util.DialogUtils;
@@ -20,6 +21,7 @@ import java.util.TreeSet;
  * 新增标记点对话框 — 含自动补全 Popup。
  * 从 InteractiveCanvas 拆分，遵循单一职责原则。
  */
+@NotThreadSafe
 public class AddPointDialog {
 
     private AddPointDialog() {

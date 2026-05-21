@@ -8,10 +8,11 @@ import com.luoke.app.hook.event.StatusCarouselEvent;
 import com.luoke.app.hook.multicast.HookRegistry;
 import com.luoke.app.process.NativeProcess;
 import com.luoke.app.socket.SocketServer;
-import com.luoke.app.utils.FileUtil;
+import com.luoke.app.utils.FilePathUtil;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 
+import net.jcip.annotations.NotThreadSafe;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -20,6 +21,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * 截图会话管理器 — 通过 SocketServer + CaptureHandler 获取 WGC 帧数据
  * Socket 由 SocketServer 常驻, CaptureHandler 按需启动 capture.exe
  */
+@NotThreadSafe
 @Data
 @Slf4j
 public class CaptureService {
@@ -73,6 +75,7 @@ public class CaptureService {
                         }
                     }
                 } catch (Exception ignore) {
+                    // 处理器回调可能抛出多种异常，保留通用捕获
                 }
             }
 
@@ -134,7 +137,7 @@ public class CaptureService {
             return false;
         }
 
-        String exePath = FileUtil.getExternalPath(PathConfig.CAPTURE_EXE, true);
+        String exePath = FilePathUtil.getExternalPath(PathConfig.CAPTURE_EXE, true);
 
         // 发布捕获加载中状态
         HookRegistry.INSTANCE.publish(HookEventType.STATUS_CAROUSEL,

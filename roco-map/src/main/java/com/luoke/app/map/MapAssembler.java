@@ -1,5 +1,7 @@
 package com.luoke.app.map;
 
+import net.jcip.annotations.NotThreadSafe;
+
 import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.image.BufferedImage;
@@ -15,6 +17,7 @@ import java.util.stream.IntStream;
  * 洛克王国：世界 - 高性能地图合成工具
  * 修复：确保 SIFT 图包含陆地细节，展示图边缘浓郁
  */
+@NotThreadSafe
 public class MapAssembler {
     private static final int TILE_SIZE = 2048;
     private static final int GRID_COUNT = 4;
@@ -50,7 +53,7 @@ public class MapAssembler {
                     copyTileToBuffer(tile, fullColorPixels, x, y);
                     BufferedImage mask = ImageIO.read(new File(maskDir + String.format("T_BigMap_Mask_%02d.png", i + 1)));
                     generateHardFence(mask, fence, x, y);
-                } catch (Exception e) {
+                } catch (IOException e) {
                     System.err.println("加载瓦片 " + (i + 1) + " 失败: " + e.getMessage());
                 }
             });
@@ -109,7 +112,7 @@ public class MapAssembler {
             saveImage(displayPixels, basePath + "Final_WorldMap_Cloudy_Show.png");
             System.out.println("全部完成！耗时: " + (System.currentTimeMillis() - startTime) / 1000.0 + "s");
 
-        } catch (Exception e) {
+        } catch (IOException e) {
             e.printStackTrace();
         }
     }

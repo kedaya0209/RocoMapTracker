@@ -4,11 +4,15 @@ import com.luoke.app.config.DownloadConfig;
 import com.luoke.app.map.dto.MapConfig;
 import com.luoke.app.map.parse.JsMapConfigParser;
 import lombok.extern.slf4j.Slf4j;
+import net.jcip.annotations.ThreadSafe;
 import org.jsoup.Jsoup;
+
+import java.io.IOException;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 
 @Slf4j
+@ThreadSafe
 public class MapConfigLoader {
 
     // ==================== 公共API方法 ====================
@@ -51,7 +55,7 @@ public class MapConfigLoader {
             // 支持复杂的嵌套对象、数组、字符串、数字等数据类型
             return JsMapConfigParser.parse(script.data());
 
-        } catch (Exception e) {
+        } catch (IOException e) {
             // 捕获所有可能的异常（网络异常、解析异常等）
             // 记录错误日志，包含异常堆栈信息，便于问题排查
             log.error("❌ 地图配置加载失败", e);

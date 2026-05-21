@@ -1,10 +1,12 @@
 package com.luoke.app.config;
 
+import net.jcip.annotations.NotThreadSafe;
 import java.util.Properties;
 
 /**
  * 自动更新配置持久化
  */
+@NotThreadSafe
 public final class UpdateConfig {
 
     /** 自动检查更新开关 */

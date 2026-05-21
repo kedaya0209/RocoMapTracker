@@ -1,5 +1,6 @@
 package com.luoke.app.socket;
 
+import net.jcip.annotations.NotThreadSafe;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.*;
@@ -10,6 +11,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * TCP Socket 会话 — 纯传输层, 只负责 send/recv/close
  * 消息路由和 recv 循环由 SocketServer 统一管理
  */
+@NotThreadSafe
 @Slf4j
 public class SocketSession implements AutoCloseable {
 
