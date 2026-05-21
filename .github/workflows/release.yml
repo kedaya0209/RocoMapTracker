@@ -147,14 +147,13 @@ jobs:
         continue-on-error: true
         shell: bash
         run: |
-          NEW_TAG="v${{ github.event.inputs.version }}"
-          PREV_TAG=""
-          for TAG in $(git tag --sort=-version:refname); do
-            if [ "$TAG" != "$NEW_TAG" ]; then
-              PREV_TAG="$TAG"
-              break
-            fi
-          done
+          # 直接从远端查询 tag，不依赖本地 fetch
+          PREV_TAG=$(git ls-remote --tags origin 2>/dev/null | \
+            sed 's|.*refs/tags/||' | \
+            grep -v '\^{}' | \
+            sort -V | \
+            grep -v -x "v${{ github.event.inputs.version }}" | \
+            tail -1)
           echo "prev_tag=$PREV_TAG" >> "$GITHUB_OUTPUT"
 
       - name: Download previous EXE from previous Release
