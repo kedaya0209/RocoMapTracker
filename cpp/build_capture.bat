@@ -5,7 +5,7 @@ echo   Building capture.exe (Socket Mode)
 echo ========================================
 
 :: Setup MSVC environment
-call "C:\Program Files\Microsoft Visual Studio\18\Insiders\VC\Auxiliary\Build\vcvars64.bat" >nul
+call "C:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvars64.bat" >nul
 set _VC_ERR=%ERRORLEVEL%
 cd /d "%~dp0"
 if %_VC_ERR% neq 0 (
