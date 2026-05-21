@@ -37,10 +37,6 @@ public final class ViewConfig {
      */
     public static int JSON_ZOOM = 7;
     /**
-     * 坐标平滑系数（EMA alpha）
-     */
-    public static double COORDINATE_SMOOTH_FACTOR = 0.8;
-    /**
      * 资源变灰检测距离（世界像素）
      */
     public static double GRAY_DISTANCE = 25;
@@ -79,7 +75,6 @@ public final class ViewConfig {
 
     public static void load(Properties prop) {
         MAP_ZOOM = ConfigHelper.getInt(prop, "map.zoom", MAP_ZOOM);
-        COORDINATE_SMOOTH_FACTOR = ConfigHelper.getDouble(prop, "coordinate.smooth.factor", COORDINATE_SMOOTH_FACTOR);
         GRAY_DISTANCE = ConfigHelper.getDouble(prop, "gray.distance", GRAY_DISTANCE);
         MATERIAL_COLLECTION = ConfigHelper.getBool(prop, "material.collection", MATERIAL_COLLECTION);
     }
@@ -87,8 +82,6 @@ public final class ViewConfig {
     public static void save(StringBuilder sb) {
         sb.append("# 地图瓦片缩放级别\n");
         sb.append("map.zoom=").append(MAP_ZOOM).append("\n");
-        sb.append("# 坐标平滑系数（EMA alpha）\n");
-        sb.append("coordinate.smooth.factor=").append(COORDINATE_SMOOTH_FACTOR).append("\n");
         sb.append("# 资源变灰检测距离（世界像素）\n");
         sb.append("gray.distance=").append(GRAY_DISTANCE).append("\n");
         sb.append("# 启用物资采集统计\n");

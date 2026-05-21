@@ -23,7 +23,7 @@ public final class ConfigHelper {
     public static int getInt(Properties prop, String key, int def) {
         try {
             return Integer.parseInt(prop.getProperty(key).trim());
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException | NullPointerException e) {
             return def;
         }
     }
@@ -31,7 +31,7 @@ public final class ConfigHelper {
     public static long getLong(Properties prop, String key, long def) {
         try {
             return Long.parseLong(prop.getProperty(key).trim());
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException | NullPointerException e) {
             return def;
         }
     }
@@ -39,7 +39,7 @@ public final class ConfigHelper {
     public static double getDouble(Properties prop, String key, double def) {
         try {
             return Double.parseDouble(prop.getProperty(key).trim());
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException | NullPointerException e) {
             return def;
         }
     }

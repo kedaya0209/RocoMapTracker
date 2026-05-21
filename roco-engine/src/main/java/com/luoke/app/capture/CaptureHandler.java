@@ -62,6 +62,8 @@ public class CaptureHandler implements SocketHandler {
 
     private volatile FrameCallback frameCallback;
     private volatile StateCallback stateCallback;
+    /** 有意停止标记 — true 时 onDisconnect 不触发自动重启 */
+    private volatile boolean intentionalStop;
     private volatile boolean handshakeDone;
     private ROIData[] pendingRois;
     /** 崩溃恢复用 — 保存启动参数 */
@@ -128,9 +130,11 @@ public class CaptureHandler implements SocketHandler {
         if (stateCallback != null) {
             stateCallback.onStateChange(false, reason);
         }
-        // 崩溃后自动重启
-        restartHelper.restartAsync(SocketServer.instance(),
-                svr -> processManager.restartProcess(svr, launchExePath, launchHwnd, launchMaxFps));
+        // 有意停止（黑帧检测/用户手动停止）不触发自动重启，由 watchdog 以 5s 间隔兜底
+        if (!intentionalStop) {
+            restartHelper.restartAsync(SocketServer.instance(),
+                    svr -> processManager.restartProcess(svr, launchExePath, launchHwnd, launchMaxFps));
+        }
     }
 
     // ==================== 握手 ====================
@@ -238,6 +242,7 @@ public class CaptureHandler implements SocketHandler {
      */
     public boolean start(long hwnd, int maxFps, String exePath,
                          ROIData[] rois, FrameCallback frameCb, StateCallback stateCb) {
+        this.intentionalStop = false;
         this.pendingRois = rois;
         this.frameCallback = frameCb;
         this.stateCallback = stateCb;
@@ -259,6 +264,8 @@ public class CaptureHandler implements SocketHandler {
      * 停止截图
      */
     public void stop() {
+        intentionalStop = true;
+
         // 发送停止请求
         sessionManager.send(MSG_STOP_REQUEST, null);
 

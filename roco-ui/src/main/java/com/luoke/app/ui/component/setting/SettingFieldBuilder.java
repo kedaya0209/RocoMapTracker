@@ -14,6 +14,7 @@ import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
 import javafx.util.Duration;
+import java.util.Map;
 
 /**
  * 设置控件工厂 — 根据 SettingDef 生成对应的编辑控件。
@@ -90,14 +91,29 @@ public class SettingFieldBuilder {
             if ("HOVER_GLOW_COLOR".equals(def.key())) {
                 return buildColorPicker(def);
             }
+            // 关于信息仅展示，不使用输入框
+            if (def.key().startsWith("ABOUT_")) {
+                if ("ABOUT_REPO".equals(def.key())) {
+                    String url = currentValue != null ? currentValue.toString() : "";
+                    Hyperlink link = new Hyperlink(url);
+                    link.setStyle("-fx-font-size: 12px;");
+                    link.setOnAction(_ -> {
+                        try {
+                            java.awt.Desktop.getDesktop().browse(java.net.URI.create(url));
+                        } catch (Exception ignored) {
+                        }
+                    });
+                    return link;
+                }
+                Label label = new Label(currentValue != null ? currentValue.toString() : "");
+                label.setWrapText(true);
+                label.setStyle("-fx-text-fill: -color-fg-muted; -fx-font-size: 12px;");
+                return label;
+            }
             String val = currentValue != null ? currentValue.toString() : "";
             TextField tf = new TextField(val);
             tf.setPrefWidth(200);
-            if (def.key().startsWith("ABOUT_")) {
-                tf.setEditable(false);
-            } else {
-                tf.textProperty().addListener((_, _, _) -> configManager.markModified());
-            }
+            tf.textProperty().addListener((_, _, _) -> configManager.markModified());
             return tf;
         }
 
@@ -107,7 +123,29 @@ public class SettingFieldBuilder {
             ComboBox<String> cb = new ComboBox<>();
             cb.setItems(FXCollections.observableArrayList(options));
             cb.setValue(val);
-            cb.setPrefWidth(160);
+            cb.setPrefWidth("DOWNLOAD_SOURCE".equals(def.key()) ? 360 : 160);
+
+            if ("DOWNLOAD_SOURCE".equals(def.key())) {
+                Map<String, String> displayMap = Map.of(
+                        "github", "GitHub    https://api.github.com/repos/kedaya0209/RocoMapTracker/releases/latest",
+                        "jsdelivr", "jsDelivr  https://cdn.jsdelivr.net/gh/kedaya0209/RocoMapTracker@patches/updates/"
+                );
+                cb.setCellFactory(_ -> new ListCell<>() {
+                    @Override
+                    protected void updateItem(String item, boolean empty) {
+                        super.updateItem(item, empty);
+                        setText(empty || item == null ? null : displayMap.getOrDefault(item, item));
+                    }
+                });
+                cb.setButtonCell(new ListCell<>() {
+                    @Override
+                    protected void updateItem(String item, boolean empty) {
+                        super.updateItem(item, empty);
+                        setText(empty || item == null ? null : displayMap.getOrDefault(item, item));
+                    }
+                });
+            }
+
             cb.valueProperty().addListener((_, _, _) -> configManager.markModified());
             return cb;
         }

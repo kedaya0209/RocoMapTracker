@@ -84,15 +84,6 @@ public final class OcrConfig {
      * 二值化阈值（低于此值为文本）
      */
     public static int OCR_BINARY_THRESHOLD = 150;
-    /**
-     * 文本行最小高度过滤（像素）
-     */
-    public static int OCR_MIN_RECT_HEIGHT = 5;
-    /**
-     * OCR 名称最小长度（纯文本无数量时）
-     */
-    public static int OCR_NAME_MIN_LENGTH = 2;
-
     private OcrConfig() {
         throw new AssertionError("禁止实例化配置类");
     }

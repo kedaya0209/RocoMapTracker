@@ -34,14 +34,6 @@ public final class CaptureConfig {
      * 黑帧检测采样字节数
      */
     public static int CAPTURE_BLACK_SAMPLE_SIZE = 100;
-    /**
-     * 帧率统计日志间隔（毫秒）
-     */
-    public static int CAPTURE_STATS_INTERVAL = 10000;
-    /**
-     * capture.exe 进程优雅停止等待秒数
-     */
-    public static int CAPTURE_PROCESS_SHUTDOWN_WAIT = 3;
 
     private CaptureConfig() {
         throw new AssertionError("禁止实例化配置类");
@@ -52,8 +44,6 @@ public final class CaptureConfig {
         TARGET_CAPTURE_FPS = ConfigHelper.getInt(prop, "target.capture.fps", TARGET_CAPTURE_FPS);
         CAPTURE_BLACK_SAMPLE_SIZE = ConfigHelper.getInt(prop, "capture.black.sample.size", CAPTURE_BLACK_SAMPLE_SIZE);
         MAX_BLACK_FRAMES = ConfigHelper.getInt(prop, "capture.max.black.frames", MAX_BLACK_FRAMES);
-        CAPTURE_STATS_INTERVAL = ConfigHelper.getInt(prop, "capture.stats.interval", CAPTURE_STATS_INTERVAL);
-        CAPTURE_PROCESS_SHUTDOWN_WAIT = ConfigHelper.getInt(prop, "capture.process.shutdown.wait", CAPTURE_PROCESS_SHUTDOWN_WAIT);
     }
 
     public static void save(StringBuilder sb) {
@@ -64,10 +54,6 @@ public final class CaptureConfig {
         sb.append("# 黑帧检测采样字节数\n");
         sb.append("capture.black.sample.size=").append(CAPTURE_BLACK_SAMPLE_SIZE).append("\n");
         sb.append("# 连续黑帧最大数量（超过则断开）\n");
-        sb.append("capture.max.black.frames=").append(MAX_BLACK_FRAMES).append("\n");
-        sb.append("# 帧率统计日志间隔（毫秒）\n");
-        sb.append("capture.stats.interval=").append(CAPTURE_STATS_INTERVAL).append("\n");
-        sb.append("# capture.exe 进程优雅停止等待秒数\n");
-        sb.append("capture.process.shutdown.wait=").append(CAPTURE_PROCESS_SHUTDOWN_WAIT).append("\n\n");
+        sb.append("capture.max.black.frames=").append(MAX_BLACK_FRAMES).append("\n\n");
     }
 }

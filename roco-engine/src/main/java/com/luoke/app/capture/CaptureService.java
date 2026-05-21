@@ -30,7 +30,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class CaptureService {
     private final String windowTitle;
     private final AtomicInteger continuousBlackFrames = new AtomicInteger(0);
-
+    //退避策略 减少连续重启频率
+    private final AtomicInteger restartCount = new AtomicInteger(0);
+    private final int tolerance = 3;
     private final CopyOnWriteArrayList<RoiProcessor> processors = new CopyOnWriteArrayList<>();
     private final CaptureHandler handler = new CaptureHandler(SocketServer.instance(), NativeProcess::create);
     private final CaptureHandler.FrameCallback frameCallback;
@@ -55,13 +57,17 @@ public class CaptureService {
             if (index == 0) {
                 gray = bgraToGray(data, w, h, stride);
                 if (isAllBlack(gray, CaptureConfig.CAPTURE_BLACK_SAMPLE_SIZE)) {
-                    if (continuousBlackFrames.incrementAndGet() > CaptureConfig.MAX_BLACK_FRAMES) {
+                    if (continuousBlackFrames.incrementAndGet() > CaptureConfig.MAX_BLACK_FRAMES * (1 << Math.min(restartCount.get(), tolerance))) {
                         log.error("持续黑帧, 强制重置采集会话...");
+                        continuousBlackFrames.set(0);
+                        restartCount.incrementAndGet();
+                        restartCount.set(Math.min(restartCount.get(), tolerance));
                         this.stop();
                         return;
                     }
                 } else {
                     continuousBlackFrames.set(0);
+                    restartCount.set(0);
                 }
             }
 
