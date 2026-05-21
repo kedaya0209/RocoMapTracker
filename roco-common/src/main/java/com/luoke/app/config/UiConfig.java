@@ -18,8 +18,6 @@ public final class UiConfig {
     // ============================================================
     /** JavaFX 主题名称 */
     public static String THEME = "PrimerDark";
-    /** UI 基础字号 */
-    public static int UI_FONT_SIZE = 14;
     /** 窗口边缘拖拽缩放感应区宽度（像素） */
     public static int RESIZE_MARGIN = 8;
     /** 窗口最小宽度 */
@@ -32,10 +30,6 @@ public final class UiConfig {
     public static double HOVER_DETECT_RADIUS = 16.0;
     /** 地图最大视觉缩放比例 */
     public static double MAP_VIEW_MAX_SCALE = 15.0;
-    /** 侧边栏宽度 */
-    public static double SIDEBAR_WIDTH = 240;
-    /** 侧边栏列表视图宽度 */
-    public static double SIDEBAR_LIST_WIDTH = 210;
     /** 统计面板字体名称 */
     public static String STATS_FONT_NAME = "Microsoft YaHei";
     /** 统计面板字号 */
@@ -55,22 +49,25 @@ public final class UiConfig {
 
     public static void load(Properties prop) {
         THEME = ConfigHelper.getStr(prop, "ui.theme", THEME);
-        UI_FONT_SIZE = ConfigHelper.getInt(prop, "ui.font.size", UI_FONT_SIZE);
         MAP_VIEW_MAX_SCALE = ConfigHelper.getDouble(prop, "map.view.max.scale", MAP_VIEW_MAX_SCALE);
         RESIZE_MARGIN = ConfigHelper.getInt(prop, "resize.margin", RESIZE_MARGIN);
         MIN_WINDOW_WIDTH = ConfigHelper.getDouble(prop, "min.window.width", MIN_WINDOW_WIDTH);
         MIN_WINDOW_HEIGHT = ConfigHelper.getDouble(prop, "min.window.height", MIN_WINDOW_HEIGHT);
         INTERACTIVE_ZOOM_FACTOR = ConfigHelper.getDouble(prop, "interactive.zoom.factor", INTERACTIVE_ZOOM_FACTOR);
         HOVER_DETECT_RADIUS = ConfigHelper.getDouble(prop, "hover.detect.radius", HOVER_DETECT_RADIUS);
-        SIDEBAR_WIDTH = ConfigHelper.getDouble(prop, "sidebar.width", SIDEBAR_WIDTH);
+        STATS_FONT_NAME = ConfigHelper.getStr(prop, "stats.font.name", STATS_FONT_NAME);
         STATS_FONT_SIZE = ConfigHelper.getInt(prop, "stats.font.size", STATS_FONT_SIZE);
+        STATS_PADDING = ConfigHelper.getInt(prop, "stats.padding", STATS_PADDING);
+        TOAST_MAX_WIDTH = ConfigHelper.getDouble(prop, "toast.max.width", TOAST_MAX_WIDTH);
+        TOAST_MAX_HEIGHT = ConfigHelper.getDouble(prop, "toast.max.height", TOAST_MAX_HEIGHT);
+        WIKI_ITEM_HEIGHT = ConfigHelper.getInt(prop, "wiki.item.height", WIKI_ITEM_HEIGHT);
+        RESOURCE_COUNTER_WIDTH = ConfigHelper.getDouble(prop, "resource.counter.width", RESOURCE_COUNTER_WIDTH);
+        RESOURCE_COUNTER_OPACITY = ConfigHelper.getDouble(prop, "resource.counter.opacity", RESOURCE_COUNTER_OPACITY);
     }
 
     public static void save(StringBuilder sb) {
         sb.append("# JavaFX 主题名称\n");
         sb.append("ui.theme=").append(THEME).append("\n");
-        sb.append("# UI 基础字号\n");
-        sb.append("ui.font.size=").append(UI_FONT_SIZE).append("\n");
         sb.append("# 地图最大视觉缩放比例\n");
         sb.append("map.view.max.scale=").append(MAP_VIEW_MAX_SCALE).append("\n");
         sb.append("# 窗口边缘拖拽缩放感应区宽度（像素）\n");
@@ -83,9 +80,21 @@ public final class UiConfig {
         sb.append("interactive.zoom.factor=").append(INTERACTIVE_ZOOM_FACTOR).append("\n");
         sb.append("# 资源点鼠标悬停检测半径（逻辑像素）\n");
         sb.append("hover.detect.radius=").append(HOVER_DETECT_RADIUS).append("\n");
-        sb.append("# 侧边栏宽度\n");
-        sb.append("sidebar.width=").append(SIDEBAR_WIDTH).append("\n");
+        sb.append("# 统计面板字体名称\n");
+        sb.append("stats.font.name=").append(STATS_FONT_NAME).append("\n");
         sb.append("# 统计面板字号\n");
-        sb.append("stats.font.size=").append(STATS_FONT_SIZE).append("\n\n");
+        sb.append("stats.font.size=").append(STATS_FONT_SIZE).append("\n");
+        sb.append("# 统计面板内边距\n");
+        sb.append("stats.padding=").append(STATS_PADDING).append("\n");
+        sb.append("# Toast 最大宽度\n");
+        sb.append("toast.max.width=").append(TOAST_MAX_WIDTH).append("\n");
+        sb.append("# Toast 最大高度\n");
+        sb.append("toast.max.height=").append(TOAST_MAX_HEIGHT).append("\n");
+        sb.append("# WIKI 条目高度\n");
+        sb.append("wiki.item.height=").append(WIKI_ITEM_HEIGHT).append("\n");
+        sb.append("# 物资采集面板宽度\n");
+        sb.append("resource.counter.width=").append(RESOURCE_COUNTER_WIDTH).append("\n");
+        sb.append("# 物资采集面板不透明度\n");
+        sb.append("resource.counter.opacity=").append(RESOURCE_COUNTER_OPACITY).append("\n\n");
     }
 }

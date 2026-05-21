@@ -15,10 +15,10 @@ import java.util.Set;
  *
  * <h3>状态图</h3>
  * <pre>{@code
- * Capture: IDLE ─→ LOADING ─→ READY ─→ DISCONNECTED ─→ LOADING (重连)
+ * Capture: IDLE ─→ LOADING ─→ READY ─→ DISCONNECTED ─→ READY (自动重连)
  *                  │                            │
- *                  ├→ START_FAILED ─→ LOADING    └→ RETRY ─→ LOADING
- *                  └→ RETRY ───────→ LOADING
+ *                  ├→ START_FAILED ─→ LOADING    ├→ LOADING (手动重连)
+ *                  └→ RETRY ───────→ LOADING     └→ RETRY
  *
  * SIFT:    IDLE ─→ LOADING ─→ READY ─→ DISCONNECTED ─→ READY (重启完成)
  *                  │
@@ -67,7 +67,7 @@ public final class StatusStateMachine {
                     State.READY, Set.of(State.DISCONNECTED),
                     State.RETRY, Set.of(State.LOADING),
                     State.START_FAILED, Set.of(State.LOADING),
-                    State.DISCONNECTED, Set.of(State.LOADING, State.RETRY)
+                    State.DISCONNECTED, Set.of(State.LOADING, State.RETRY, State.READY)
             ),
             StatusKey.SIFT, Map.of(
                     State.IDLE, Set.of(State.LOADING),

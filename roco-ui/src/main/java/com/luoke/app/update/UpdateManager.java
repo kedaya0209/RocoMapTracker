@@ -1,7 +1,9 @@
 package com.luoke.app.update;
 
+import lombok.Setter;
 import net.jcip.annotations.ThreadSafe;
 import com.luoke.app.config.BuildConfig;
+import com.luoke.app.config.UpdateConfig;
 import com.luoke.app.hook.event.NotificationType;
 import com.luoke.app.utils.HashUtil;
 import lombok.extern.slf4j.Slf4j;
@@ -41,6 +43,7 @@ public class UpdateManager {
 
     private final AtomicReference<VersionInfo> pendingUpdate = new AtomicReference<>(null);
     private volatile String appDir;
+    @Setter
     private volatile UpdateUiDelegate uiDelegate;
 
     private UpdateManager() {
@@ -60,10 +63,6 @@ public class UpdateManager {
             }
         }
         return instance;
-    }
-
-    public void setUiDelegate(UpdateUiDelegate delegate) {
-        this.uiDelegate = delegate;
     }
 
     /**
@@ -104,8 +103,13 @@ public class UpdateManager {
                 return;
             }
             pendingUpdate.set(latest);
-            if (uiDelegate != null) {
-                uiDelegate.showUpdateAvailable(latest);
+            if (UpdateConfig.AUTO_DOWNLOAD) {
+                notify("发现新版本 " + latest.version() + "，开始自动下载", NotificationType.INFO);
+                startDownload(latest);
+            } else {
+                if (uiDelegate != null) {
+                    uiDelegate.showUpdateAvailable(latest);
+                }
             }
         } finally {
             checking.set(false);
@@ -126,22 +130,29 @@ public class UpdateManager {
             try {
                 String exeDir = detectAppDir();
 
+                // ── 按下载源优先级顺序（github / jsdelivr） ──
+                boolean githubFirst = !"jsdelivr".equals(UpdateConfig.DOWNLOAD_SOURCE);
+
                 // ── 尝试补丁下载 ──
                 if (info.patchDownloadUrl() != null && isPatchVersionMatch(info)) {
                     Path patchPath = Path.of(exeDir, "update_" + info.version() + ".hdiff");
                     try {
                         uiDelegate.showDownloadProgress(info.version(), 0);
 
-                        // CDN 优先，降级 GitHub Release
-                        String cdnUrl = toCdnUrl(info.patchDownloadUrl());
+                        String primaryPatch = githubFirst ? info.patchDownloadUrl() : toCdnUrl(info.patchDownloadUrl());
+                        String secondaryPatch = githubFirst ? toCdnUrl(info.patchDownloadUrl()) : info.patchDownloadUrl();
                         try {
-                            downloadFile(cdnUrl, patchPath, p ->
+                            downloadFile(primaryPatch, patchPath, p ->
                                     uiDelegate.showDownloadProgress(info.version(), p));
                         } catch (IOException | InterruptedException e) {
-                            log.warn("CDN download failed, falling back to GitHub: {}", e.getMessage());
+                            log.warn("首选源补丁下载失败，降级: {}", e.getMessage());
                             Files.deleteIfExists(patchPath);
-                            downloadFile(info.patchDownloadUrl(), patchPath, p ->
-                                    uiDelegate.showDownloadProgress(info.version(), p));
+                            if (secondaryPatch != null) {
+                                downloadFile(secondaryPatch, patchPath, p ->
+                                        uiDelegate.showDownloadProgress(info.version(), p));
+                            } else {
+                                throw e;
+                            }
                         }
                         if (info.patchSha256Url() != null) {
                             verifySha256(patchPath, info.patchSha256Url());
@@ -153,11 +164,11 @@ public class UpdateManager {
                             Files.deleteIfExists(patchPath);
                         }
                     } catch (IOException | InterruptedException e) {
-                        log.warn("Patch download/verify failed, will fallback to full exe", e);
+                        log.warn("补丁下载/校验失败，降级为完整 exe", e);
                         Files.deleteIfExists(patchPath);
                     }
                 } else if (info.patchDownloadUrl() != null) {
-                    log.info("Patch source {} != current {}, skipping patch",
+                    log.info("补丁源版本 {} != 当前 {}, 跳过补丁",
                             info.patchFromVersion(), BuildConfig.APP_VERSION);
                 }
 
@@ -165,8 +176,22 @@ public class UpdateManager {
                 if (downloadPath[0] == null && info.exeDownloadUrl() != null) {
                     Path exePath = Path.of(exeDir, "RocoMapTracker_" + info.version() + ".exe");
                     uiDelegate.showDownloadProgress(info.version(), 0);
-                    downloadFile(info.exeDownloadUrl(), exePath, p ->
-                            uiDelegate.showDownloadProgress(info.version(), p));
+
+                    String primaryExe = githubFirst ? info.exeDownloadUrl() : toCdnUrl(info.exeDownloadUrl());
+                    String secondaryExe = githubFirst ? toCdnUrl(info.exeDownloadUrl()) : info.exeDownloadUrl();
+                    try {
+                        downloadFile(primaryExe, exePath, p ->
+                                uiDelegate.showDownloadProgress(info.version(), p));
+                    } catch (IOException | InterruptedException e) {
+                        log.warn("首选源 exe 下载失败，降级: {}", e.getMessage());
+                        Files.deleteIfExists(exePath);
+                        if (secondaryExe != null) {
+                            downloadFile(secondaryExe, exePath, p ->
+                                    uiDelegate.showDownloadProgress(info.version(), p));
+                        } else {
+                            throw e;
+                        }
+                    }
                     if (info.exeSha256Url() != null) {
                         verifySha256(exePath, info.exeSha256Url());
                     }

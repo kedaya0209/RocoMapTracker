@@ -78,6 +78,7 @@ public class ContextMenuManager {
             if (rootStack != null) {
                 DialogUtils.showConfirmDialog(rootStack, "删除标记",
                         "确定要永久删除吗？",
+                        "确认删除",
                         () -> ResourcePointContext.getInstance().deletePoint(p), null);
             }
         });

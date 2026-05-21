@@ -16,11 +16,6 @@ public final class SiftConfig {
      * 匹配器类型（SIFT / SIFT-PCA / SIFT-ULTRA / SIFT-PCA-ULTRA）
      */
     public static String MAP_MATCHAER = "SIFT-ULTRA";
-    /**
-     * 缩放因子
-     */
-    public static double SCALE_FACTOR = 1.0;
-
     // --- SIFT 检测器 ---
     /**
      * SIFT 最大特征点数（0=无限制）
@@ -127,19 +122,12 @@ public final class SiftConfig {
      */
     public static long MATCH_TIMEOUT_MS = 500;
 
-    // --- 箭头检测 ---
-    /**
-     * 箭头 CNN 裁剪尺寸（像素，正方形）
-     */
-    public static int ARROW_CROP_SIZE = 64;
-
     private SiftConfig() {
         throw new AssertionError("禁止实例化配置类");
     }
 
     public static void load(Properties prop) {
         MAP_MATCHAER = ConfigHelper.getStr(prop, "map.matcher", MAP_MATCHAER);
-        SCALE_FACTOR = ConfigHelper.getDouble(prop, "scale.factor", SCALE_FACTOR);
         SIFT_N_FEATURES = ConfigHelper.getInt(prop, "sift.n.features", SIFT_N_FEATURES);
         FLANN_KD_TREES = ConfigHelper.getInt(prop, "flann.kd.trees", FLANN_KD_TREES);
         FLANN_SEARCH_CHECKS = ConfigHelper.getInt(prop, "flann.search.checks", FLANN_SEARCH_CHECKS);
@@ -148,15 +136,12 @@ public final class SiftConfig {
         SEARCH_RADIUS = ConfigHelper.getInt(prop, "search.radius", SEARCH_RADIUS);
         RANSAC_MAX_ITERS = ConfigHelper.getInt(prop, "ransac.max.iters", RANSAC_MAX_ITERS);
         MATCH_TIMEOUT_MS = ConfigHelper.getLong(prop, "match.timeout.ms", MATCH_TIMEOUT_MS);
-        ARROW_CROP_SIZE = ConfigHelper.getInt(prop, "arrow.crop.size", ARROW_CROP_SIZE);
         SIFT_MATCHING_ENABLED = ConfigHelper.getBool(prop, "sift.matching.enabled", true);
     }
 
     public static void save(StringBuilder sb) {
         sb.append("# 匹配器类型（SIFT / SIFT-PCA / SIFT-ULTRA / SIFT-PCA-ULTRA）\n");
         sb.append("map.matcher=").append(MAP_MATCHAER).append("\n");
-        sb.append("# 缩放因子\n");
-        sb.append("scale.factor=").append(SCALE_FACTOR).append("\n");
         sb.append("# SIFT 最大特征点数（0=无限制）\n");
         sb.append("sift.n.features=").append(SIFT_N_FEATURES).append("\n");
         sb.append("# FLANN KD 树数量\n");
@@ -173,8 +158,6 @@ public final class SiftConfig {
         sb.append("ransac.max.iters=").append(RANSAC_MAX_ITERS).append("\n");
         sb.append("# SIFT 匹配等待超时（毫秒）\n");
         sb.append("match.timeout.ms=").append(MATCH_TIMEOUT_MS).append("\n");
-        sb.append("# 箭头 CNN 裁剪尺寸（像素，正方形）\n");
-        sb.append("arrow.crop.size=").append(ARROW_CROP_SIZE).append("\n");
         sb.append("# SIFT 匹配总开关\n");
         sb.append("sift.matching.enabled=").append(SIFT_MATCHING_ENABLED).append("\n\n");
     }

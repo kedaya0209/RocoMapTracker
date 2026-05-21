@@ -5,6 +5,9 @@ import com.luoke.app.config.PathConfig;
 import com.luoke.app.hook.HookEventType;
 import com.luoke.app.hook.event.CaptureStateEvent;
 import com.luoke.app.hook.event.StatusCarouselEvent;
+import com.luoke.app.hook.event.StatusStateMachine;
+import com.luoke.app.hook.event.StatusStateMachine.State;
+import com.luoke.app.hook.event.StatusStateMachine.StatusKey;
 import com.luoke.app.hook.multicast.HookRegistry;
 import com.luoke.app.process.NativeProcess;
 import com.luoke.app.socket.SocketServer;
@@ -27,7 +30,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class CaptureService {
     private final String windowTitle;
     private final AtomicInteger continuousBlackFrames = new AtomicInteger(0);
-
+    //退避策略 减少连续重启频率
+    private final AtomicInteger restartCount = new AtomicInteger(0);
+    private final int tolerance = 3;
     private final CopyOnWriteArrayList<RoiProcessor> processors = new CopyOnWriteArrayList<>();
     private final CaptureHandler handler = new CaptureHandler(SocketServer.instance(), NativeProcess::create);
     private final CaptureHandler.FrameCallback frameCallback;
@@ -52,13 +57,17 @@ public class CaptureService {
             if (index == 0) {
                 gray = bgraToGray(data, w, h, stride);
                 if (isAllBlack(gray, CaptureConfig.CAPTURE_BLACK_SAMPLE_SIZE)) {
-                    if (continuousBlackFrames.incrementAndGet() > CaptureConfig.MAX_BLACK_FRAMES) {
+                    if (continuousBlackFrames.incrementAndGet() > CaptureConfig.MAX_BLACK_FRAMES * (1 << Math.min(restartCount.get(), tolerance))) {
                         log.error("持续黑帧, 强制重置采集会话...");
+                        continuousBlackFrames.set(0);
+                        restartCount.incrementAndGet();
+                        restartCount.set(Math.min(restartCount.get(), tolerance));
                         this.stop();
                         return;
                     }
                 } else {
                     continuousBlackFrames.set(0);
+                    restartCount.set(0);
                 }
             }
 
@@ -92,6 +101,10 @@ public class CaptureService {
                         new CaptureStateEvent(-1, false, windowTitle));
                 HookRegistry.INSTANCE.publish(HookEventType.STATUS_CAROUSEL,
                         StatusCarouselEvent.captureDisconnected());
+            } else {
+                log.info("capture.exe 已连接: {}", detail);
+                HookRegistry.INSTANCE.publish(HookEventType.STATUS_CAROUSEL,
+                        StatusCarouselEvent.captureReady());
             }
         };
     }
@@ -130,6 +143,13 @@ public class CaptureService {
      * 查找窗口 → 启动 capture.exe → 由 SocketServer 已注册的 CaptureHandler 接管通信
      */
     public boolean tryConnect() {
+        // 兜底：看门狗重连时如果状态机卡在 READY（例如前一次 stop() 未触发断开回调），
+        // 先走 DISCONNECTED 确保后续 captureRetry/captureLoading 转换合法
+        if (StatusStateMachine.getInstance().currentState(StatusKey.CAPTURE) == State.READY) {
+            HookRegistry.INSTANCE.publish(HookEventType.STATUS_CAROUSEL,
+                    StatusCarouselEvent.captureDisconnected());
+        }
+
         long hwnd = WindowFinder.findWindowByKeyword(windowTitle);
         if (hwnd <= 0) {
             HookRegistry.INSTANCE.publish(HookEventType.STATUS_CAROUSEL,
@@ -210,5 +230,7 @@ public class CaptureService {
         // 从而 isRunning() 永远返回 false，watchdog 陷入"创建→丢弃→创建"的死循环。
         HookRegistry.INSTANCE.publish(HookEventType.CAPTURE_STATE,
                 new CaptureStateEvent(-1, false, windowTitle));
+        HookRegistry.INSTANCE.publish(HookEventType.STATUS_CAROUSEL,
+                StatusCarouselEvent.captureDisconnected());
     }
 }

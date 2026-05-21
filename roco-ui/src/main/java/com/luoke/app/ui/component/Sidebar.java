@@ -59,7 +59,6 @@ public class Sidebar extends VBox {
     public Sidebar() {
         super(0);
         setPadding(new Insets(15, 15, 15, 15));
-        setPrefWidth(270);
         setStyle("-fx-background-color: -color-bg-default; -fx-border-color: -color-border-muted; -fx-border-width: 0 1 0 0;");
 
         // 标题
@@ -70,19 +69,20 @@ public class Sidebar extends VBox {
 
         // ListView
         listView = new ListView<>();
-        listView.setPrefWidth(240);
-        listView.setStyle("-fx-background-color: transparent; -fx-border-color: transparent; -fx-selection-bar: transparent; -fx-selection-bar-non-focused: transparent; -fx-hbar-policy: never;");
+        listView.setStyle("-fx-background-color: transparent; -fx-border-color: transparent; -fx-selection-bar: transparent; -fx-selection-bar-non-focused: transparent; -fx-padding: 0;");
         listView.setFocusTraversable(false);
-
         wikiUpdater = new WikiUpdateManager();
         wikiUpdater.checkAndShowProgress();
 
         buildItems();
         listView.setItems(items);
-        listView.setCellFactory(lv -> new SidebarCell());
-
+        listView.setCellFactory(_ -> new SidebarCell());
         // 让 ListView 自动填满可用高度
         VBox.setVgrow(listView, Priority.ALWAYS);
+        hideHScrollBar(listView);
+        listView.skinProperty().addListener((_, _, sk) -> {
+            if (sk != null) hideHScrollBar(listView);
+        });
 
         getChildren().addAll(title, listView);
 
@@ -121,6 +121,9 @@ public class Sidebar extends VBox {
         // 路线管理
         items.add(new SidebarItem(SidebarItem.Type.ACTION, "路线管理", null, null, null, false, "/icon/route.svg", this::openRouteManager));
 
+        // WIKI 更新（特殊容器）
+        items.add(new SidebarItem(SidebarItem.Type.WIKI, null, null, null, wikiUpdater));
+
         // 检查更新
         items.add(new SidebarItem(SidebarItem.Type.ACTION, "检查更新", null, null, null, false, "/icon/update.svg", () -> {
             HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION,
@@ -131,8 +134,6 @@ public class Sidebar extends VBox {
         // 关于
         items.add(new SidebarItem(SidebarItem.Type.ACTION, "关于", null, null, null, false, "/icon/about.svg", this::openAboutDialog));
 
-        // WIKI 更新（特殊容器）
-        items.add(new SidebarItem(SidebarItem.Type.WIKI, null, null, null, wikiUpdater));
     }
 
     private void onHeaderClick(SidebarItem item) {
@@ -238,6 +239,7 @@ public class Sidebar extends VBox {
                 findRootPane(),
                 "模式切换",
                 "切换资源模式需要重启程序生效，是否继续？",
+                "立即重启",
                 () -> {
                     DownloadConfig.INTERNAL_RESOURCE = isInternal;
                     ConfigPersistence.save();
@@ -265,6 +267,7 @@ public class Sidebar extends VBox {
 
     private void openSettings() {
         openSettingsCategory(null);
+        initRouteManager();
     }
 
     private void openSettingsCategory(String categoryName) {
@@ -298,14 +301,8 @@ public class Sidebar extends VBox {
     }
 
     private void openRouteManager() {
-        StackPane rootPane = findRootPane();
+        StackPane rootPane = initRouteManager();
         if (rootPane == null) return;
-
-        if (routeManagerStage == null) {
-            routeManagerStage = RouteManagerStage.getInstance(rootPane);
-            routeManagerStage.initOwner(rootPane.getScene().getWindow());
-        }
-
         if (routeManagerStage.isShowing()) {
             routeManagerStage.toFront();
         } else {
@@ -313,6 +310,16 @@ public class Sidebar extends VBox {
             routeManagerStage.setY(rootPane.getScene().getWindow().getY() + 100);
             routeManagerStage.show();
         }
+    }
+
+    private StackPane initRouteManager() {
+        StackPane rootPane = findRootPane();
+        if (rootPane == null) return null;
+        if (routeManagerStage == null) {
+            routeManagerStage = RouteManagerStage.getInstance(rootPane);
+            routeManagerStage.initOwner(rootPane.getScene().getWindow());
+        }
+        return rootPane;
     }
 
     private void openAboutDialog() {
@@ -353,6 +360,17 @@ public class Sidebar extends VBox {
         } catch (IOException e) {
             log.error("跳转失败", e);
         }
+    }
+
+    /**
+     * 隐藏 ListView 的横向滚动条。通过 Platform.runLater 确保 skin 的子节点已就绪。
+     */
+    private static void hideHScrollBar(ListView<?> lv) {
+        Platform.runLater(() -> {
+            for (Node hbar : lv.lookupAll(".scroll-bar:horizontal")) {
+                hbar.setStyle("-fx-pref-height: 0; -fx-min-height: 0; -fx-max-height: 0;");
+            }
+        });
     }
 
     // ========== Item Model ==========
@@ -435,7 +453,7 @@ public class Sidebar extends VBox {
 
             Label value = new Label(item.currentValue());
             value.setStyle("-fx-text-fill: -color-fg-subtle; -fx-font-size: 11px;");
-            value.setPadding(new Insets(0, 4, 0, 0));
+            value.setPadding(new Insets(0, 2, 0, 0));
 
             SVGPath arrow = new SVGPath();
             arrow.setContent("M7 10l5 5 5-5z");
@@ -448,7 +466,7 @@ public class Sidebar extends VBox {
             HBox row = new HBox(6, icon, title, spacer, value, arrow);
             row.setAlignment(Pos.CENTER_LEFT);
             row.setPrefHeight(38);
-            row.setPadding(new Insets(0, 12, 0, 12));
+            row.setPadding(new Insets(0, 10, 0, 12));
             row.setStyle(BG_STYLE);
             row.setMouseTransparent(true);  // 事件由 Cell 处理，row 只做显示
 

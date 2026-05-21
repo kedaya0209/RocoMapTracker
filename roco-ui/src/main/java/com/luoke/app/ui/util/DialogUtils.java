@@ -62,9 +62,10 @@ public class DialogUtils {
     public static void showConfirmDialog(StackPane rootStack,
                                          String title,
                                          String message,
+                                         String confirmText,
                                          Runnable onConfirm,
                                          Runnable onCancel) {
-        buildBaseDialog(rootStack, title, createMessageLabel(message), "确认退出", Styles.DANGER, "-color-warning-emphasis", onConfirm, onCancel);
+        buildBaseDialog(rootStack, title, createMessageLabel(message), confirmText, Styles.DANGER, "-color-warning-emphasis", onConfirm, onCancel);
     }
 
     private static void buildBaseDialog(StackPane rootStack,

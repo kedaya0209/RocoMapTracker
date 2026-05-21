@@ -463,6 +463,7 @@ public class TitleBar extends HBox implements IHook<Object> {
                         rootStack,
                         "确认退出",
                         "确定要关闭程序吗？\n所有识别与渲染服务将会停止运行。",
+                        "立即退出",
                         // 确认：关闭窗口
                         stage::close,
                         // 取消：什么都不做，直接关闭弹窗

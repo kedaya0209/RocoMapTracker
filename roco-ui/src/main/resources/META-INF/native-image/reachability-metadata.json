@@ -8726,6 +8726,9 @@
       "glob": "icon/ghost.svg"
     },
     {
+      "glob": "icon/interactive.svg"
+    },
+    {
       "glob": "icon/match.svg"
     },
     {
@@ -8763,6 +8766,9 @@
     },
     {
       "glob": "icon/settings.svg"
+    },
+    {
+      "glob": "icon/summary.svg"
     },
     {
       "glob": "icon/statistics.svg"

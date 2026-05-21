@@ -18,7 +18,9 @@ import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
 import javafx.scene.shape.SVGPath;
+import javafx.stage.Screen;
 import javafx.stage.Stage;
+import javafx.stage.Window;
 import javafx.stage.StageStyle;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -195,8 +197,22 @@ public class SettingsStage extends Stage {
      */
     public void showDialog(StackPane ownerRoot, String selectCategoryName) {
         this.ownerRoot = ownerRoot;
+
         show();
         toFront();
+
+        // 将窗口定位到主窗口所在屏幕的中心（支持多显示器）
+        Window owner = ownerRoot.getScene() != null ? ownerRoot.getScene().getWindow() : null;
+        if (owner != null) {
+            Screen screen = Screen.getScreensForRectangle(owner.getX(), owner.getY(), 1, 1)
+                    .stream().findFirst().orElse(null);
+            if (screen != null) {
+                setX(screen.getVisualBounds().getMinX()
+                        + (screen.getVisualBounds().getWidth() - getWidth()) / 2);
+                setY(screen.getVisualBounds().getMinY()
+                        + (screen.getVisualBounds().getHeight() - getHeight()) / 2);
+            }
+        }
 
         if (needsInitialRefresh) {
             needsInitialRefresh = false;
@@ -492,6 +508,7 @@ public class SettingsStage extends Stage {
             if (ownerRoot != null) {
                 DialogUtils.showConfirmDialog(rootStackPane, "未保存的更改",
                         "有未保存的更改，是否放弃？",
+                        "放弃",
                         this::hide, () -> {
                         });
             } else {

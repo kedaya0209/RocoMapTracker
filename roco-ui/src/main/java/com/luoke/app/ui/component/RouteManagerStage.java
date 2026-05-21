@@ -354,6 +354,7 @@ public class RouteManagerStage extends Stage {
                 rootContainer,
                 "确认删除",
                 "确定要永久删除路线 [" + target.getName() + "] 吗？",
+                "确认删除",
                 () -> {
                     PathContext.getInstance().removeRoute(target);
                     if (PathContext.getInstance().getActiveRoute() == target) {
