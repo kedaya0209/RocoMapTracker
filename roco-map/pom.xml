@@ -43,4 +43,22 @@
             <artifactId>junit-jupiter-engine</artifactId>
         </dependency>
     </dependencies>
+
+    <build>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>false</filtering>
+            </resource>
+            <resource>
+                <!-- 项目根目录 resources/ → classpath，供 ResourceUtils classpath 回退 -->
+                <directory>${session.executionRootDirectory}/resources</directory>
+                <filtering>false</filtering>
+                <includes>
+                    <include>source/point/*</include>
+                    <include>source/icon/*</include>
+                </includes>
+            </resource>
+        </resources>
+    </build>
 </project>
