@@ -1,5 +1,6 @@
 package com.luoke.app.capture.processor;
 
+import net.jcip.annotations.NotThreadSafe;
 import com.luoke.app.config.NavigConfig;
 import com.luoke.app.context.CameraContext;
 import lombok.extern.slf4j.Slf4j;
@@ -17,6 +18,7 @@ import lombok.extern.slf4j.Slf4j;
  *   <li>匀速旋转动画：navAngle 以 MAX_ROTATION_RATE °/帧 向目标逼近</li>
  * </ol>
  */
+@NotThreadSafe
 @Slf4j
 public class NavigationController {
 

@@ -2,11 +2,13 @@ package com.luoke.app.utils;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import net.jcip.annotations.ThreadSafe;
 
 /**
  * JSON处理工具类
  * 提供全局唯一的ObjectMapper单例用于JSON序列化和反序列化
  */
+@ThreadSafe
 public class JsonUtils {
 
     /**

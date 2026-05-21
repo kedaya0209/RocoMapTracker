@@ -1,5 +1,6 @@
 package com.luoke.app.ui.service;
 
+import net.jcip.annotations.ThreadSafe;
 import atlantafx.base.theme.*;
 import com.luoke.app.config.ConfigPersistence;
 import com.luoke.app.config.UiConfig;
@@ -10,6 +11,7 @@ import javafx.application.Application;
  * 纯静态工具类，无内部状态。
  * 从 ModernCanvasApp 拆分，遵循单一职责原则。
  */
+@ThreadSafe
 public class ThemeManager {
 
     public static String[] getAvailableThemes() {

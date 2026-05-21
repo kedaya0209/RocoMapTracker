@@ -1,5 +1,6 @@
 package com.luoke.app.ui.render;
 
+import net.jcip.annotations.NotThreadSafe;
 import javafx.scene.Node;
 
 /**
@@ -8,6 +9,7 @@ import javafx.scene.Node;
  * 实现类从上下文单例（MapContext / CameraContext 等）自行读取所需数据，
  * 无参数传递，降低编排器与渲染层的耦合。
  */
+@NotThreadSafe
 public interface RenderLayer {
 
     /**

@@ -1,5 +1,6 @@
 package com.luoke.app.ui.service;
 
+import net.jcip.annotations.ThreadSafe;
 import com.luoke.app.capture.CaptureService;
 import com.luoke.app.capture.ROIData;
 import com.luoke.app.capture.processor.MapMatcherProcessor;
@@ -18,6 +19,7 @@ import java.util.concurrent.TimeUnit;
  * 截图服务生命周期管理 + 断线 watchdog。
  */
 @Slf4j
+@ThreadSafe
 public class CaptureServiceManager {
 
     @Getter
@@ -52,7 +54,7 @@ public class CaptureServiceManager {
 
     private void startWatchdog() {
         watchdogRunning = true;
-        Thread.ofVirtual().start(() -> {
+        Thread.ofPlatform().daemon(true).name("capture-watchdog").start(() -> {
             while (watchdogRunning) {
                 try {
                     if (!captureService.isRunning()) {

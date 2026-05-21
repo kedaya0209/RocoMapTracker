@@ -1,15 +1,17 @@
 package com.luoke.app.macher;
 
+import net.jcip.annotations.NotThreadSafe;
 import com.luoke.app.config.PathConfig;
 import com.luoke.app.config.SocketConfig;
 import com.luoke.app.process.JobObjectManager;
 import com.luoke.app.process.NativeProcess;
 import com.luoke.app.process.NativeProcessFactory;
 import com.luoke.app.socket.SocketServer;
-import com.luoke.app.utils.FileUtil;
+import com.luoke.app.utils.FilePathUtil;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.concurrent.TimeUnit;
 
@@ -19,6 +21,7 @@ import java.util.concurrent.TimeUnit;
  * <p>不持有任何 SocketSession 引用，与会话管理完全解耦。
  * 所有方法均为同步操作，异步编排由 {@link SiftMatchHandler} 协调器负责。</p>
  */
+@NotThreadSafe
 @Slf4j
 public class SiftProcessManager {
 
@@ -47,7 +50,7 @@ public class SiftProcessManager {
             return null;
         }
 
-        String exePath = FileUtil.getExternalPath(PathConfig.SIFT_MATCH_EXE, true);
+        String exePath = FilePathUtil.getExternalPath(PathConfig.SIFT_MATCH_EXE, true);
         String cmdLine = "\"" + exePath + "\" " + port;
         NativeProcess proc = processFactory.create(cmdLine, JobObjectManager.getJobHandle(), true);
         if (proc == null) {
@@ -165,7 +168,8 @@ public class SiftProcessManager {
     // ==================== 内部工具 ====================
 
     private void startReaderThread(NativeProcess process, String name) {
-        Thread.ofVirtual()
+        Thread.ofPlatform()
+                .daemon(true)
                 .name(name)
                 .start(() -> {
                     try (BufferedReader r = new BufferedReader(
@@ -174,10 +178,15 @@ public class SiftProcessManager {
                         while ((line = r.readLine()) != null) {
                             log.info("[{}] {}", name, line);
                         }
-                    } catch (Exception ignored) {
-                        // 流关闭时正常退出
+                    } catch (IOException e) {
+                        log.warn("[{}] stdout reader exception: {}", name, e.getMessage());
                     }
-                    log.info("{} exited with code {}", name, process.exitCode());
+                    int code = process.exitCode();
+                    if (code == 0) {
+                        log.info("[{}] exited with code 0", name);
+                    } else {
+                        log.warn("[{}] exited with non-zero code {} (可能崩溃或被强杀)", name, code);
+                    }
                 });
     }
 }

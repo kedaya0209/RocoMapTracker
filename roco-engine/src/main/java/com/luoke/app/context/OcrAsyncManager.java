@@ -1,5 +1,6 @@
 package com.luoke.app.context;
 
+import net.jcip.annotations.ThreadSafe;
 import com.luoke.app.config.OcrConfig;
 import com.luoke.app.model.ocr.OcrService;
 import lombok.extern.slf4j.Slf4j;
@@ -13,6 +14,7 @@ import java.util.function.Consumer;
  * OCR异步任务管理器
  * 负责管理OCR服务的线程池和任务队列
  */
+@ThreadSafe
 @Slf4j
 public class OcrAsyncManager implements AutoCloseable {
     private static volatile OcrAsyncManager INSTANCE;
@@ -107,6 +109,7 @@ public class OcrAsyncManager implements AutoCloseable {
                     callback.accept(result);
                 }
             } catch (Exception e) {
+                // OCR 识别可能抛出多种异常，保留通用捕获
                 log.error("OCR 执行异常", e);
             } finally {
                 if (service != null) {

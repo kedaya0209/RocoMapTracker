@@ -1,5 +1,6 @@
 package com.luoke.app.ui.service;
 
+import net.jcip.annotations.NotThreadSafe;
 import com.luoke.app.config.RenderConfig;
 import com.luoke.app.context.MapContext;
 import com.luoke.app.context.ResourceConfigContext;
@@ -25,6 +26,7 @@ import lombok.extern.slf4j.Slf4j;
  * 纯静态工具类，无业务逻辑，仅负责 JavaFX 场景图构建。
  */
 @Slf4j
+@NotThreadSafe
 public final class MainUiComposer {
 
     private MainUiComposer() {

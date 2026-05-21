@@ -1,8 +1,10 @@
 package com.luoke.app.map.model;
 
 import lombok.Data;
+import net.jcip.annotations.NotThreadSafe;
 
 @Data
+@NotThreadSafe
 public class ResourceConfig {
     /**
      * 资源类型

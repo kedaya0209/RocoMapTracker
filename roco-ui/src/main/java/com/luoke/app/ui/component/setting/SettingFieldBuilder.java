@@ -1,8 +1,10 @@
 package com.luoke.app.ui.component.setting;
 
+import net.jcip.annotations.NotThreadSafe;
 import atlantafx.base.theme.Styles;
 import com.luoke.app.ui.util.FxRippleUtil;
 import javafx.animation.FadeTransition;
+import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Cursor;
@@ -17,6 +19,7 @@ import javafx.util.Duration;
  * 设置控件工厂 — 根据 SettingDef 生成对应的编辑控件。
  * 包含自定义取色器（统一主题弹窗）。
  */
+@NotThreadSafe
 public class SettingFieldBuilder {
 
     private final SettingConfigManager configManager;
@@ -31,8 +34,23 @@ public class SettingFieldBuilder {
      * 根据定义构建编辑控件。
      */
     public Node buildControl(SettingDef def) {
-        Object currentValue = configManager.readField(def.key());
         SettingType type = def.type();
+
+        // BUTTON 不需要读取配置值（无 getter），提前返回
+        if (type == SettingType.BUTTON) {
+            Button btn = new Button(def.label());
+            btn.setMaxWidth(Double.MAX_VALUE);
+            btn.setPrefHeight(36);
+            btn.getStyleClass().addAll(Styles.BUTTON_OUTLINED, Styles.ACCENT);
+            FxRippleUtil.install(btn);
+            btn.setOnAction(_ -> {
+                if (def.onApply() != null) def.onApply().run();
+            });
+            return btn;
+        }
+
+        // 其余类型需要当前配置值初始化控件
+        Object currentValue = configManager.readField(def.key());
 
         if (type == SettingType.BOOLEAN) {
             CheckBox cb = new CheckBox();
@@ -68,18 +86,6 @@ public class SettingFieldBuilder {
             return sp;
         }
 
-        if (type == SettingType.BUTTON) {
-            Button btn = new Button(def.label());
-            btn.setMaxWidth(Double.MAX_VALUE);
-            btn.setPrefHeight(36);
-            btn.getStyleClass().addAll(Styles.BUTTON_OUTLINED, Styles.ACCENT);
-            FxRippleUtil.install(btn);
-            btn.setOnAction(_ -> {
-                if (def.onApply() != null) def.onApply().run();
-            });
-            return btn;
-        }
-
         if (type == SettingType.STRING) {
             if ("HOVER_GLOW_COLOR".equals(def.key())) {
                 return buildColorPicker(def);
@@ -99,7 +105,7 @@ public class SettingFieldBuilder {
             String[] options = def.optionsSupplier().get();
             String val = currentValue != null ? currentValue.toString() : "";
             ComboBox<String> cb = new ComboBox<>();
-            cb.setItems(javafx.collections.FXCollections.observableArrayList(options));
+            cb.setItems(FXCollections.observableArrayList(options));
             cb.setValue(val);
             cb.setPrefWidth(160);
             cb.valueProperty().addListener((_, _, _) -> configManager.markModified());
@@ -127,13 +133,13 @@ public class SettingFieldBuilder {
         swatch.setStrokeWidth(0.5);
         try {
             swatch.setFill(Color.web(initColor));
-        } catch (Exception ignored) {
+        } catch (IllegalArgumentException ignored) {
         }
 
         hexField.textProperty().addListener((_, _, b) -> {
             try {
                 swatch.setFill(Color.web(b));
-            } catch (Exception ignored) {
+            } catch (IllegalArgumentException ignored) {
             }
             configManager.markModified();
         });
@@ -213,12 +219,12 @@ public class SettingFieldBuilder {
         customPreview.setStrokeWidth(0.5);
         try {
             customPreview.setFill(Color.web(customHex.getText()));
-        } catch (Exception ignored) {
+        } catch (IllegalArgumentException ignored) {
         }
         customHex.textProperty().addListener((_, _, b) -> {
             try {
                 customPreview.setFill(Color.web(b));
-            } catch (Exception ignored) {
+            } catch (IllegalArgumentException ignored) {
             }
         });
         customRow.getChildren().addAll(customHex, customPreview);
@@ -236,7 +242,7 @@ public class SettingFieldBuilder {
                 Color.web(color);
                 hexField.setText(color);
                 swatch.setFill(Color.web(color));
-            } catch (Exception ignored) {
+            } catch (IllegalArgumentException ignored) {
             }
             closeDialog(root, mask);
         });

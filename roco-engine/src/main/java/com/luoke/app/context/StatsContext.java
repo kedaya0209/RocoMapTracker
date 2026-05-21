@@ -1,8 +1,10 @@
 package com.luoke.app.context;
 
+import net.jcip.annotations.ThreadSafe;
 import com.luoke.app.config.StatsConfig;
 import lombok.Getter;
 
+@ThreadSafe
 @Getter
 public final class StatsContext {
 

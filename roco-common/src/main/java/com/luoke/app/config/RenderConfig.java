@@ -1,10 +1,12 @@
 package com.luoke.app.config;
 
+import net.jcip.annotations.NotThreadSafe;
 import java.util.Properties;
 
 /**
  * 渲染与动效配置持久化 
  */
+@NotThreadSafe
 public final class RenderConfig {
 
     private RenderConfig() {
@@ -23,13 +25,11 @@ public final class RenderConfig {
     /** 瓦片视口外预加载缓冲区倍数 */
     public static double TILE_BUFFER_MULTIPLIER = 1.5;
     /** 玩家图标绘制尺寸（像素） */
-    public static double PLAYER_IMG_SIZE = 36;
+    public static double PLAYER_IMG_SIZE = 72;
     /** 玩家图标显示尺寸（ImageView） */
-    public static double PLAYER_VIEW_SIZE = 72;
+    public static double PLAYER_VIEW_SIZE = 36;
     /** 无朝向时的回退圆点半径 */
     public static double PLAYER_DOT_RADIUS = 6;
-    /** 回退圆点描边宽度 */
-    public static double PLAYER_DOT_STROKE_WIDTH = 1.5;
     /** 非活跃路线描边宽度 */
     public static double ROUTE_INACTIVE_WIDTH = 2.0;
     /** 活跃路线描边宽度 */

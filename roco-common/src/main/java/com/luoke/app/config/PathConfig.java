@@ -1,8 +1,11 @@
 package com.luoke.app.config;
 
+import net.jcip.annotations.ThreadSafe;
+
 /**
  * 路径常量 — 系统物理路径，不可更改。
  */
+@ThreadSafe
 public final class PathConfig {
 
     private PathConfig() {

@@ -1,5 +1,6 @@
 package com.luoke.app.ui.component.setting;
 
+import net.jcip.annotations.NotThreadSafe;
 import com.luoke.app.ui.service.SvgManager;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -12,6 +13,7 @@ import javafx.scene.layout.StackPane;
 /**
  * 设置分类列表项渲染器 — 带图标和悬停高亮效果。
  */
+@NotThreadSafe
 public class SettingCategoryCell extends ListCell<SettingCategory> {
 
     private static final String BG_SELECTED = "-fx-background-color: -color-accent-subtle; -fx-background-radius: 6;";

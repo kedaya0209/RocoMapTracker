@@ -1,5 +1,6 @@
 package com.luoke.app.hook.multicast;
 
+import net.jcip.annotations.ThreadSafe;
 import com.luoke.app.hook.IHook;
 import com.luoke.app.hook.HookEventType;
 import com.luoke.app.hook.container.HookContainer;
@@ -11,6 +12,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 
+@ThreadSafe
 @Slf4j
 class HookMulticast {
 
@@ -72,8 +74,7 @@ class HookMulticast {
                     Thread.currentThread().interrupt();
                     break;
                 } catch (Exception e) {
-                    // 分发过程中发生异常，记录错误日志后继续消费
-                    // 使用日志记录异常详情，便于问题排查
+                    // 多种异常来源（钩子回调），保留通用捕获
                     log.error("钩子事件消费异常", e);
                 }
             }

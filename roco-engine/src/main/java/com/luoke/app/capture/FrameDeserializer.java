@@ -1,5 +1,6 @@
 package com.luoke.app.capture;
 
+import net.jcip.annotations.NotThreadSafe;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -14,6 +15,7 @@ import java.util.List;
  *   每个 ROI: [1]index [2]w [2]h [2]stride [4]dataLen [dataLen]BGRA
  * </pre>
  */
+@NotThreadSafe
 public class FrameDeserializer {
 
     public record FrameSlot(int index, byte[] pixels, int w, int h, int stride) {

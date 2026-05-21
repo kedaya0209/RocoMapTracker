@@ -1,5 +1,6 @@
 package com.luoke.app.macher.map;
 
+import net.jcip.annotations.ThreadSafe;
 import com.luoke.app.config.ConfigPersistence;
 import com.luoke.app.config.SiftConfig;
 import com.luoke.app.macher.SiftVariant;
@@ -19,6 +20,7 @@ import java.util.Set;
  *   <li>通过回调通知上层重启 C++ 进程</li>
  * </ul>
  */
+@ThreadSafe
 @Setter
 @Slf4j
 public class SwitchMapMatcher {

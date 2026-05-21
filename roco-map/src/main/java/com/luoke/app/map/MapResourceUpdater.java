@@ -2,6 +2,7 @@ package com.luoke.app.map;
 
 import com.luoke.app.config.DownloadConfig;
 import com.luoke.app.map.core.IconDownloader;
+import net.jcip.annotations.NotThreadSafe;
 import com.luoke.app.map.core.MapDownloader;
 import com.luoke.app.map.core.ResourceConfigBuilder;
 import com.luoke.app.map.util.MapFileMover;
@@ -23,6 +24,7 @@ import java.nio.file.attribute.BasicFileAttributes;
  * @since 1.0.0
  */
 @Slf4j
+@NotThreadSafe
 public final class MapResourceUpdater {
 
     // ========== 常量配置 ==========
@@ -136,7 +138,7 @@ public final class MapResourceUpdater {
                         return FileVisitResult.CONTINUE;
                     }
                 });
-            } catch (Exception e) {
+            } catch (IOException e) {
                 log.error("删除下载文件夹失败, e:", e);
             }
         }

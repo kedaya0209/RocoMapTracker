@@ -1,5 +1,6 @@
 package com.luoke.app.context;
 
+import net.jcip.annotations.ThreadSafe;
 import com.luoke.app.config.ViewConfig;
 import lombok.Getter;
 import lombok.Setter;
@@ -11,6 +12,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * 摄像机上下文管理类
  * 负责管理摄像机视角和跟随模式，实现地图视口的自动跟随玩家功能
  */
+@ThreadSafe
 public class CameraContext {
     /**
      * 跟随模式开关

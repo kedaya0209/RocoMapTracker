@@ -1,6 +1,9 @@
 package com.luoke.app.hook.event;
 
+import net.jcip.annotations.ThreadSafe;
+
 /**
+ * 状态轮播事件 — 用于 TitleBar 内联状态轮播展示.
  * 状态轮播事件 — 用于 TitleBar 内联状态轮播展示.
  *
  * <p>使用静态工厂方法创建，避免魔法值：
@@ -16,6 +19,7 @@ package com.luoke.app.hook.event;
  * @param text 显示文本
  * @param type 状态类型（决定颜色）
  */
+@ThreadSafe
 public record StatusCarouselEvent(String key, String text, Type type) {
 
     // ======================== Key 常量 ========================

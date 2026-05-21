@@ -1,5 +1,6 @@
 package com.luoke.app.capture;
 
+import net.jcip.annotations.NotThreadSafe;
 import com.luoke.app.socket.SocketSession;
 import lombok.extern.slf4j.Slf4j;
 
@@ -7,6 +8,7 @@ import lombok.extern.slf4j.Slf4j;
  * capture.exe Socket 会话管理器 — 单一职责：管理截图子进程的 Socket 会话状态。
  * <p>不持有任何 NativeProcess 引用，与进程管理完全解耦。</p>
  */
+@NotThreadSafe
 @Slf4j
 public class CaptureSessionManager {
 

@@ -1,11 +1,14 @@
 package com.luoke.app.config;
 
+import net.jcip.annotations.ThreadSafe;
+
 import java.util.Arrays;
 import java.util.Properties;
 
 /**
  * 配置加载工具方法
  */
+@ThreadSafe
 public final class ConfigHelper {
 
     private ConfigHelper() {
@@ -20,7 +23,7 @@ public final class ConfigHelper {
     public static int getInt(Properties prop, String key, int def) {
         try {
             return Integer.parseInt(prop.getProperty(key).trim());
-        } catch (Exception e) {
+        } catch (NumberFormatException e) {
             return def;
         }
     }
@@ -28,7 +31,7 @@ public final class ConfigHelper {
     public static long getLong(Properties prop, String key, long def) {
         try {
             return Long.parseLong(prop.getProperty(key).trim());
-        } catch (Exception e) {
+        } catch (NumberFormatException e) {
             return def;
         }
     }
@@ -36,7 +39,7 @@ public final class ConfigHelper {
     public static double getDouble(Properties prop, String key, double def) {
         try {
             return Double.parseDouble(prop.getProperty(key).trim());
-        } catch (Exception e) {
+        } catch (NumberFormatException e) {
             return def;
         }
     }
@@ -57,7 +60,7 @@ public final class ConfigHelper {
         if (s == null || s.isBlank()) return new int[0];
         try {
             return Arrays.stream(s.split(",")).map(String::trim).mapToInt(Integer::parseInt).toArray();
-        } catch (Exception e) {
+        } catch (NumberFormatException e) {
             return new int[0];
         }
     }

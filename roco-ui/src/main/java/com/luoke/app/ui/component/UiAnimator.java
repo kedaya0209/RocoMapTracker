@@ -1,5 +1,6 @@
 package com.luoke.app.ui.component;
 
+import net.jcip.annotations.NotThreadSafe;
 import com.luoke.app.config.RenderConfig;
 import javafx.animation.TranslateTransition;
 import javafx.application.Platform;
@@ -9,6 +10,7 @@ import javafx.util.Duration;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
+@NotThreadSafe
 @Slf4j
 public class UiAnimator {
     @Getter

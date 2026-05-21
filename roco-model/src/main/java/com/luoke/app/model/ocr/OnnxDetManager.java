@@ -1,5 +1,7 @@
 package com.luoke.app.model.ocr;
 
+import net.jcip.annotations.NotThreadSafe;
+
 import ai.djl.ndarray.NDArray;
 import ai.djl.ndarray.NDList;
 import ai.djl.ndarray.NDManager;
@@ -14,6 +16,7 @@ import java.nio.FloatBuffer;
  * ONNX 文本检测模型管理器。
  */
 @Slf4j
+@NotThreadSafe
 public class OnnxDetManager extends BaseOnnxManager {
 
     private final NDManager detManager;

@@ -1,5 +1,6 @@
 package com.luoke.app.macher;
 
+import net.jcip.annotations.ThreadSafe;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
@@ -7,6 +8,7 @@ import java.util.Set;
  * SIFT 变体枚举 — 将 variantOrdinal / cacheSuffix / displayName 统一管理。
  * 消除 SiftMatchHandler 和 SwitchMapMatcher 中重复的字符串常量。
  */
+@ThreadSafe
 public enum SiftVariant {
 
     STANDARD(0, "SIFT", ".v2.feat"),

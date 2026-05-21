@@ -1,5 +1,6 @@
 package com.luoke.app.ui.service;
 
+import net.jcip.annotations.NotThreadSafe;
 import com.luoke.app.config.RenderConfig;
 import com.luoke.app.context.MapContext;
 import com.luoke.app.context.ResourceConfigContext;
@@ -21,6 +22,7 @@ import java.util.concurrent.Executors;
  * 无状态设计，所有输入通过参数传递。
  * 从 ModernCanvasApp 拆分，遵循单一职责原则。
  */
+@NotThreadSafe
 @Slf4j
 public class TileGeneratorService {
 
@@ -116,7 +118,7 @@ public class TileGeneratorService {
             for (java.util.concurrent.Future<?> f : futures) {
                 try {
                     f.get();
-                } catch (Exception ignored) {
+                } catch (InterruptedException | java.util.concurrent.ExecutionException ignored) {
                 }
             }
         }

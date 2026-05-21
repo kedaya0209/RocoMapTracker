@@ -1,5 +1,6 @@
 package com.luoke.app.capture.processor;
 
+import net.jcip.annotations.NotThreadSafe;
 import com.luoke.app.capture.ROIData;
 import com.luoke.app.capture.RoiProcessor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,6 +18,7 @@ import java.time.Duration;
 /**
  * 将 ROI 帧通过 HTTP 发送到 DatasetGeneratorServer 进行箭头标注处理。
  */
+@NotThreadSafe
 @Slf4j
 public class SaveImageProcessor implements RoiProcessor {
 
@@ -48,9 +50,9 @@ public class SaveImageProcessor implements RoiProcessor {
         lastSaveTime = currentTime;
 
         byte[] pngBytes = encodeToPNG(data, width, height);
-        if (pngBytes == null) return;
+        if (pngBytes.length == 0) return;
 
-        Thread.ofVirtual().start(() -> uploadAsync(pngBytes));
+        Thread.ofPlatform().daemon(true).name("save-image-upload").start(() -> uploadAsync(pngBytes));
     }
 
     private byte[] encodeToPNG(byte[] bgra, int width, int height) {
@@ -70,7 +72,7 @@ public class SaveImageProcessor implements RoiProcessor {
             return bos.toByteArray();
         } catch (IOException e) {
             log.error("PNG 编码失败", e);
-            return null;
+            return new byte[0];
         }
     }
 
@@ -91,7 +93,10 @@ public class SaveImageProcessor implements RoiProcessor {
             } else {
                 log.warn("上传失败: {} {}", response.statusCode(), response.body());
             }
-        } catch (Exception e) {
+        } catch (IOException | InterruptedException e) {
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
             log.error("HTTP 上传异常: {}", e.getMessage());
         }
     }

@@ -1,5 +1,6 @@
 package com.luoke.app.ui.render;
 
+import net.jcip.annotations.NotThreadSafe;
 import com.luoke.app.config.PathConfig;
 import com.luoke.app.config.RenderConfig;
 import com.luoke.app.context.CameraContext;
@@ -21,6 +22,7 @@ import lombok.Getter;
  * <p>
  * 通过 setHoveredPoint() 设置目标点，下一帧自动绘制。
  */
+@NotThreadSafe
 public class HoverRenderer implements RenderLayer {
 
     private final Canvas hoverCanvas;
@@ -56,9 +58,15 @@ public class HoverRenderer implements RenderLayer {
 
     @Override
     public void onFrame() {
-        if (hoverDirty) {
+        if (hoveredPoint != null) {
+            // 有活跃 hover 点时每帧重绘，确保跟随地图平移/缩放/旋转
             MapContext mm = MapContext.getInstance();
             redrawHover(mm.getOffsetX(), mm.getOffsetY(), mm.getScale());
+        } else if (hoverDirty) {
+            // hover 结束时清除一次 Canvas
+            double w = hoverCanvas.getWidth();
+            double h = hoverCanvas.getHeight();
+            if (w > 0 && h > 0) hoverGc.clearRect(0, 0, w, h);
             hoverDirty = false;
         }
     }
@@ -99,7 +107,7 @@ public class HoverRenderer implements RenderLayer {
         if (cache.isAtlasReady()) {
             IconCache.AtlasSlot slot = cache.getSlot(iconPath);
             if (slot != null) {
-                hoverGc.drawImage(cache.getColorAtlas(), slot.sx, slot.sy, RenderConfig.ICON_SIZE, RenderConfig.ICON_SIZE,
+                hoverGc.drawImage(cache.getColorAtlas(), slot.sx(), slot.sy(), RenderConfig.ICON_SIZE, RenderConfig.ICON_SIZE,
                         sx - hoverSize / 2, sy - hoverSize / 2, hoverSize, hoverSize);
                 return;
             }

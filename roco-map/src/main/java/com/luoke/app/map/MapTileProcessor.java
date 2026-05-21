@@ -2,12 +2,14 @@ package com.luoke.app.map;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import net.jcip.annotations.NotThreadSafe;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+@NotThreadSafe
 public class MapTileProcessor {
 
     private static final ObjectMapper mapper = new ObjectMapper();

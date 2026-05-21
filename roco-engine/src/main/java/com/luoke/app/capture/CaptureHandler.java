@@ -8,6 +8,7 @@ import com.luoke.app.socket.SocketServer;
 import com.luoke.app.socket.SocketSession;
 import lombok.extern.slf4j.Slf4j;
 
+import net.jcip.annotations.NotThreadSafe;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.List;
@@ -28,6 +29,7 @@ import java.util.concurrent.atomic.AtomicLong;
  *   <li>性能统计（帧率/吞吐量）</li>
  * </ul>
  */
+@NotThreadSafe
 @Slf4j
 public class CaptureHandler implements SocketHandler {
 
@@ -185,6 +187,7 @@ public class CaptureHandler implements SocketHandler {
                 try {
                     cb.onFrame(slot.index(), slot.pixels(), slot.w(), slot.h(), slot.stride());
                 } catch (Exception e) {
+                    // 回调接口可能抛出多种异常，保留通用捕获以防 latch 死锁
                     log.error("Frame callback error ROI[{}]", slot.index(), e);
                 } finally {
                     latch.countDown();

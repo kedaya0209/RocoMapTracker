@@ -1,5 +1,6 @@
 package com.luoke.app.ui.component;
 
+import net.jcip.annotations.NotThreadSafe;
 import atlantafx.base.theme.Styles;
 import com.luoke.app.hook.AbstractGenericHook;
 import com.luoke.app.hook.HookEventType;
@@ -16,6 +17,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.util.Set;
 
+@NotThreadSafe
 @Slf4j
 public class LoadingOverlay extends VBox {
     private final ProgressBar progressBar = new ProgressBar(0);

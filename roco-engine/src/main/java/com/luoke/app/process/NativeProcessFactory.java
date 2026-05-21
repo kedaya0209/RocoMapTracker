@@ -1,5 +1,7 @@
 package com.luoke.app.process;
 
+import net.jcip.annotations.ThreadSafe;
+
 /**
  * 子进程创建工厂 — 函数式接口，替代 {@link NativeProcess#create} 静态调用。
  * <p>
@@ -7,6 +9,7 @@ package com.luoke.app.process;
  * 测试时可注入 mock 实现，无需真实启动子进程。
  */
 @FunctionalInterface
+@ThreadSafe
 public interface NativeProcessFactory {
 
     /**

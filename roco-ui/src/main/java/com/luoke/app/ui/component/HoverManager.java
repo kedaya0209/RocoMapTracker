@@ -1,7 +1,7 @@
 package com.luoke.app.ui.component;
 
+import net.jcip.annotations.NotThreadSafe;
 import com.luoke.app.config.UiConfig;
-import com.luoke.app.context.MapContext;
 import com.luoke.app.context.PathContext;
 import com.luoke.app.context.ResourcePointContext;
 import com.luoke.app.map.model.Point;
@@ -18,9 +18,9 @@ import java.util.List;
  * Hover 检测与 Tooltip 管理 — 从 InteractiveCanvas 拆分，
  * 负责资源点悬停检测、光标切换和提示显示。
  */
+@NotThreadSafe
 public class HoverManager {
 
-    private final MapContext mapContext = MapContext.getInstance();
     private final PathContext pathContext = PathContext.getInstance();
     private final ResourcePointContext pointContext = ResourcePointContext.getInstance();
     private final Node owner;
@@ -39,25 +39,29 @@ public class HoverManager {
     /**
      * 鼠标移动时更新 hover 状态。
      *
+     * @param logicX  预转换的地图逻辑 X 坐标（由 InteractiveCanvas 转换，含导航旋转补偿）
+     * @param logicY  预转换的地图逻辑 Y 坐标
+     * @param screenX 屏幕绝对 X（用于 Tooltip 定位，必须为屏幕坐标）
+     * @param screenY 屏幕绝对 Y
      * @return true 如果 hoveredPoint 发生变化
      */
-    public boolean onMouseMoved(double mx, double my, double sceneX, double sceneY) {
-        ResourcePoint point = findPointAt(mx, my);
+    public boolean onMouseMoved(double logicX, double logicY, double screenX, double screenY) {
+        ResourcePoint point = findPointAt(logicX, logicY);
         if (point != hoveredPoint) {
             hoveredPoint = point;
             if (hoveredPoint != null) {
                 owner.setCursor(Cursor.HAND);
                 String prefix = (pathContext.getCurrentMode() == PathContext.Mode.DRAWING) ? "吸附: " : "";
                 tooltip.setText(prefix + hoveredPoint.getConfig().getMarkTypeName());
-                tooltip.show(owner, sceneX + 10, sceneY + 10);
+                tooltip.show(owner, screenX + 10, screenY + 10);
             } else {
                 owner.setCursor(pathContext.getCurrentMode() != PathContext.Mode.VIEW ? Cursor.CROSSHAIR : Cursor.DEFAULT);
                 tooltip.hide();
             }
             return true;
         } else if (hoveredPoint != null) {
-            tooltip.setAnchorX(sceneX + 10);
-            tooltip.setAnchorY(sceneY + 10);
+            tooltip.setAnchorX(screenX + 10);
+            tooltip.setAnchorY(screenY + 10);
         }
         return false;
     }
@@ -81,30 +85,23 @@ public class HoverManager {
     }
 
     /**
-     * 在指定屏幕坐标附近查找资源点
+     * 在指定逻辑坐标附近查找资源点。
+     *
+     * @param logicX 地图逻辑 X（已由 InteractiveCanvas 转换）
+     * @param logicY 地图逻辑 Y
      */
-    private ResourcePoint findPointAt(double mx, double my) {
-        double lx = toLogicX(mx);
-        double ly = toLogicY(my);
-        List<ResourcePoint> nearbyPoints = pointContext.getNearbyResources(lx, ly);
+    private ResourcePoint findPointAt(double logicX, double logicY) {
+        List<ResourcePoint> nearbyPoints = pointContext.getNearbyResources(logicX, logicY);
         if (nearbyPoints.isEmpty()) return null;
         for (int i = nearbyPoints.size() - 1; i >= 0; i--) {
             ResourcePoint p = nearbyPoints.get(i);
             Point pos = p.getScreenPosition();
             double r = UiConfig.HOVER_DETECT_RADIUS;
-            if (lx >= pos.getX() - r && lx <= pos.getX() + r
-                    && ly >= pos.getY() - r * 2 && ly <= pos.getY()) {
+            if (logicX >= pos.getX() - r && logicX <= pos.getX() + r
+                    && logicY >= pos.getY() - r * 2 && logicY <= pos.getY()) {
                 return p;
             }
         }
         return null;
-    }
-
-    private double toLogicX(double canvasX) {
-        return (canvasX - mapContext.getOffsetX()) / mapContext.getScale();
-    }
-
-    private double toLogicY(double canvasY) {
-        return (canvasY - mapContext.getOffsetY()) / mapContext.getScale();
     }
 }

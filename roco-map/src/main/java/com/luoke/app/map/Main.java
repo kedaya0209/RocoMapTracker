@@ -1,7 +1,10 @@
 package com.luoke.app.map;
 
+import net.jcip.annotations.NotThreadSafe;
+
 import java.io.File;
 
+@NotThreadSafe
 public class Main {
 
     static void main() {

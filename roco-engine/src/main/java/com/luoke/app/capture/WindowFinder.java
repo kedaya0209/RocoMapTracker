@@ -1,11 +1,13 @@
 package com.luoke.app.capture;
 
+import net.jcip.annotations.ThreadSafe;
 import lombok.extern.slf4j.Slf4j;
 
 import java.lang.foreign.*;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
@@ -13,6 +15,7 @@ import java.util.Arrays;
  * FFM 版 Windows 窗口查找工具
  * 用 java.lang.foreign 替换 JNA User32
  */
+@ThreadSafe
 @Slf4j
 public class WindowFinder {
 
@@ -61,6 +64,7 @@ public class WindowFinder {
                     WindowFinder.class, "enumProcImpl",
                     MethodType.methodType(int.class, long.class, MemorySegment.class));
         } catch (Exception e) {
+            // FFM 查找可能抛出多种异常，保留通用捕获
             throw new RuntimeException("Failed to init user32 FFM handles", e);
         }
     }
@@ -112,6 +116,7 @@ public class WindowFinder {
 
             return 1; // continue
         } catch (Throwable e) {
+            // 原生回调中可能抛出多种异常，保留通用捕获
             return 0;
         }
     }
@@ -148,6 +153,7 @@ public class WindowFinder {
 
             return ctx.get(ValueLayout.JAVA_LONG, RESULT_OFFSET);
         } catch (Throwable e) {
+            // FFM 调用可能抛出多种异常，保留通用捕获
             log.error("EnumWindows FFM call failed", e);
             return 0;
         }
@@ -158,7 +164,7 @@ public class WindowFinder {
     private static String cleanNativeString(byte[] bytes) {
         try {
             return cleanString(new String(bytes, "GBK"));
-        } catch (Exception e) {
+        } catch (IOException e) {
             return cleanString(new String(bytes, StandardCharsets.UTF_8));
         }
     }

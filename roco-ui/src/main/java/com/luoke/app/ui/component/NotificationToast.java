@@ -1,5 +1,6 @@
 package com.luoke.app.ui.component;
 
+import net.jcip.annotations.NotThreadSafe;
 import atlantafx.base.theme.Styles;
 import com.luoke.app.config.RenderConfig;
 import com.luoke.app.config.UiConfig;
@@ -16,6 +17,7 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.shape.SVGPath;
 import javafx.util.Duration;
 
+@NotThreadSafe
 public class NotificationToast extends HBox {
 
     public NotificationToast(String message, NotificationType type) {

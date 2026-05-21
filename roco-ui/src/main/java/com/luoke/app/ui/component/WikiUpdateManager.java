@@ -1,5 +1,6 @@
 package com.luoke.app.ui.component;
 
+import net.jcip.annotations.NotThreadSafe;
 import com.luoke.app.config.UiConfig;
 import com.luoke.app.hook.HookEventType;
 import com.luoke.app.hook.event.NotificationType;
@@ -8,6 +9,7 @@ import com.luoke.app.hook.event.StatusEvent;
 import com.luoke.app.hook.multicast.HookRegistry;
 import com.luoke.app.map.MapResourceUpdater;
 import com.luoke.app.map.core.DownloadProgressContext;
+import java.io.IOException;
 import com.luoke.app.ui.service.SvgManager;
 import com.luoke.app.ui.util.DialogUtils;
 import com.luoke.app.ui.util.FxRippleUtil;
@@ -25,6 +27,7 @@ import javafx.scene.layout.StackPane;
  * WIKI 资源更新管理器 — 负责 WIKI 数据下载的 UI 与交互逻辑。
  * 从 Sidebar 拆分，遵循单一职责原则。
  */
+@NotThreadSafe
 public class WikiUpdateManager {
 
     private static final double ITEM_HEIGHT = UiConfig.WIKI_ITEM_HEIGHT;
@@ -104,13 +107,13 @@ public class WikiUpdateManager {
     }
 
     private void startDownloadTask() {
-        Thread.ofVirtual().start(() -> {
+        Thread.ofPlatform().daemon(true).name("wiki-update").start(() -> {
             try {
                 MapResourceUpdater.updateAllResources();
                 Platform.runLater(this::switchToNormalState);
                 HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION,
                         new StatusEvent("WIKI资源同步完成", NotificationType.SUCCESS));
-            } catch (Exception e) {
+            } catch (RuntimeException e) {
                 Platform.runLater(() -> {
                     switchToNormalState();
                     HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION,

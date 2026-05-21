@@ -1,8 +1,9 @@
 package com.luoke.app.macher;
 
+import net.jcip.annotations.ThreadSafe;
 import com.luoke.app.config.SiftConfig;
 import com.luoke.app.context.ResourceConfigContext;
-import com.luoke.app.utils.FileUtil;
+import com.luoke.app.utils.FilePathUtil;
 import com.luoke.app.utils.ResourceUtils;
 
 import javax.imageio.ImageIO;
@@ -16,6 +17,7 @@ import java.nio.charset.StandardCharsets;
  * 负责 Java ↔ C++ (sift_match.exe) 二进制消息的序列化与反序列化。
  * 从 SiftMatchHandler 拆分，消除 ByteBuffer 操作与业务逻辑的耦合。
  */
+@ThreadSafe
 public class SiftMatchProtocol {
 
     public static final int MSG_REQUEST_MAP = 200;
@@ -49,7 +51,7 @@ public class SiftMatchProtocol {
      */
     public static byte[] encodeConfig(int variant, String cacheSuffix) {
         String siftMapPath = ResourceConfigContext.getSiftMap();
-        String cacheFilePath = FileUtil.getExternalFile(cachePrefix + siftMapPath + cacheSuffix).getAbsolutePath();
+        String cacheFilePath = FilePathUtil.getExternalFile(cachePrefix + siftMapPath + cacheSuffix).getAbsolutePath();
         byte[] cachePathBytes = cacheFilePath.getBytes(StandardCharsets.UTF_8);
 
         int bodyLen = 4 + 4 + 4 + 8 + 8 + 8       // variant + SIFT

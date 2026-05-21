@@ -1,5 +1,6 @@
 package com.luoke.app.ui.service;
 
+import net.jcip.annotations.ThreadSafe;
 import com.luoke.app.config.UiConfig;
 import javafx.scene.Cursor;
 import javafx.scene.layout.AnchorPane;
@@ -10,6 +11,7 @@ import javafx.stage.Stage;
 /**
  * 物理边缘捕获器：通过透明矩形实现无边框缩放，解决光标不显示的问题
  */
+@ThreadSafe
 public class WindowManager {
 
     private final int margin;

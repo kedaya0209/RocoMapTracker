@@ -169,6 +169,14 @@
                 <scope>test</scope>
             </dependency>
 
+            <!-- Thread safety annotations (compile-time only) -->
+            <dependency>
+                <groupId>net.jcip</groupId>
+                <artifactId>jcip-annotations</artifactId>
+                <version>1.0</version>
+                <scope>provided</scope>
+            </dependency>
+
             <!-- Internal modules -->
             <dependency>
                 <groupId>com.luoke</groupId>
@@ -197,6 +205,13 @@
             </dependency>
         </dependencies>
     </dependencyManagement>
+
+    <dependencies>
+        <dependency>
+            <groupId>net.jcip</groupId>
+            <artifactId>jcip-annotations</artifactId>
+        </dependency>
+    </dependencies>
 
     <build>
         <pluginManagement>

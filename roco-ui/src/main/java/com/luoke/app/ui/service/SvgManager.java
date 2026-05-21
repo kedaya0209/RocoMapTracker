@@ -1,5 +1,6 @@
 package com.luoke.app.ui.service;
 
+import net.jcip.annotations.ThreadSafe;
 import javafx.animation.Interpolator;
 import javafx.animation.KeyFrame;
 import javafx.animation.KeyValue;
@@ -21,6 +22,7 @@ import javafx.scene.shape.SVGPath;
 import javafx.scene.shape.StrokeLineCap;
 import javafx.scene.shape.StrokeLineJoin;
 import javafx.scene.transform.Scale;
+import javafx.scene.transform.Transform;
 import javafx.scene.transform.Translate;
 import javafx.util.Duration;
 
@@ -29,6 +31,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.io.IOException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.w3c.dom.Document;
@@ -45,6 +48,7 @@ import org.w3c.dom.NodeList;
  * <p>内部使用 XML DOM 解析 + {@link Group} 包裹变换后的 {@link SVGPath} 节点，
  * Group 的 layoutBounds 包含子节点变换后尺寸，可安全放入 StackPane 等容器。</p>
  */
+@ThreadSafe
 public class SvgManager {
 
     /**
@@ -176,8 +180,8 @@ public class SvgManager {
             List<SVGPath> allPaths = collectPaths(group);
             double scale = 1.0;
             if (!allPaths.isEmpty()) {
-                for (javafx.scene.transform.Transform t : allPaths.getFirst().getTransforms()) {
-                    if (t instanceof javafx.scene.transform.Scale s) {
+                for (Transform t : allPaths.getFirst().getTransforms()) {
+                    if (t instanceof Scale s) {
                         scale = s.getX();
                         break;
                     }
@@ -200,7 +204,7 @@ public class SvgManager {
 
             // 入 scene 后修正为真实主题色
             deferredColorUpdate(box, group);
-        } catch (Exception e) {
+        } catch (Exception e) { // SVG 解析可能抛出 XML/IO 多种异常
             return box;
         }
 
@@ -250,7 +254,7 @@ public class SvgManager {
             Paint p = tmp.getFill();
             group.getChildren().remove(tmp);
             return p instanceof Color c ? c : null;
-        } catch (Exception e) {
+        } catch (Exception e) { // JavaFX CSS 解析可能抛出多种异常
             return null;
         }
     }
@@ -331,7 +335,7 @@ public class SvgManager {
             try (java.io.InputStream is = SvgManager.class.getResourceAsStream(path)) {
                 if (is == null) throw new RuntimeException("SVG not found: " + path);
                 return is.readAllBytes();
-            } catch (Exception e) {
+            } catch (IOException e) {
                 throw new RuntimeException("Failed to read SVG: " + path, e);
             }
         });

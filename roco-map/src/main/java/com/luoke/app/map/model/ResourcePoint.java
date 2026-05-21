@@ -1,11 +1,13 @@
 package com.luoke.app.map.model;
 
 import lombok.Data;
+import net.jcip.annotations.NotThreadSafe;
 
 /**
  * 地图资源点位 — 纯数据模型, 渲染逻辑由 UI 层负责
  */
 @Data
+@NotThreadSafe
 public class ResourcePoint {
 
     private final ResourceConfig config;

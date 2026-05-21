@@ -2,9 +2,11 @@ package com.luoke.app.map.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.Data;
+import net.jcip.annotations.NotThreadSafe;
 
 
 @Data
+@NotThreadSafe
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class MapCategoryItem {
 

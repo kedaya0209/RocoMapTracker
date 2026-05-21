@@ -1,5 +1,6 @@
 package com.luoke.app.utils;
 
+import net.jcip.annotations.ThreadSafe;
 import com.luoke.app.model.ItemResult;
 
 import java.util.regex.Matcher;
@@ -9,6 +10,7 @@ import java.util.regex.Pattern;
  * OCR结果验证器和解析器
  * 将OCR识别的原始文本解析为结构化的物品结果对象
  */
+@ThreadSafe
 public class OcrResultValidator {
     /**
      * 物品名称和数量的正则匹配模式

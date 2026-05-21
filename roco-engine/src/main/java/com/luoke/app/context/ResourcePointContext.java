@@ -1,5 +1,6 @@
 package com.luoke.app.context;
 
+import net.jcip.annotations.ThreadSafe;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.luoke.app.config.PathConfig;
@@ -15,9 +16,11 @@ import com.luoke.app.utils.ResourceUtils;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.InputStream;
 import java.util.*;
 
+@ThreadSafe
 @Slf4j
 public class ResourcePointContext {
     private static final ResourcePointContext INSTANCE = new ResourcePointContext();
@@ -38,18 +41,16 @@ public class ResourcePointContext {
 
     public void loadAndInit() {
         try (InputStream inputStream = ResourceUtils.getResourceStream(ResourceConfigContext.getPointResource())) {
-            List<ResourceConfig> configs = objectMapper.readValue(inputStream, new TypeReference<>() {
-            });
+            List<ResourceConfig> configs = objectMapper.readValue(inputStream, new TypeReference<>() {});
 
             rawResourceList.clear();
             rawResourceList.addAll(configs);
-
+            preprocessPoints();
             //加载所有可收集资源
             collectSet.addAll(ResourceUtils.readResourceLines(PathConfig.RESOURCE_COLLECT_SET));
-            preprocessPoints();
             log.info("资源点位加载完成，总数：{}", pointList.size());
-        } catch (Exception e) {
-            log.error("点位配置加载失败", e);
+        } catch (IOException e) {
+            log.error("可收集资源加载失败", e);
         }
     }
 
@@ -98,7 +99,7 @@ public class ResourcePointContext {
 
             HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION,
                     new StatusEvent("新增点位成功", NotificationType.SUCCESS));
-        } catch (Exception e) {
+        } catch (IOException e) {
             log.error("新增点位失败", e);
             HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION,
                     new StatusEvent("新增点位失败", NotificationType.ERROR));
@@ -120,14 +121,14 @@ public class ResourcePointContext {
                 HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION,
                         new StatusEvent("点位移除成功", NotificationType.SUCCESS));
             }
-        } catch (Exception e) {
+        } catch (IOException e) {
             log.error("删除点位失败", e);
             HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION,
                     new StatusEvent("点位移除失败", NotificationType.ERROR));
         }
     }
 
-    private void saveToFile() throws Exception {
+    private void saveToFile() throws IOException {
         File target = ResourceUtils.getExternalFile(PathConfig.RESOURCE_POINT_CONFIG_PATH);
         objectMapper.writerWithDefaultPrettyPrinter().writeValue(target, rawResourceList);
     }

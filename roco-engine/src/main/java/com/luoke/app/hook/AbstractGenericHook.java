@@ -1,5 +1,6 @@
 package com.luoke.app.hook;
 
+import net.jcip.annotations.NotThreadSafe;
 import lombok.Getter;
 
 import java.lang.reflect.ParameterizedType;
@@ -11,6 +12,7 @@ import java.lang.reflect.Type;
  *
  * @param <T> 事件数据类型
  */
+@NotThreadSafe
 @Getter
 public abstract class AbstractGenericHook<T> implements IHook<T> {
 

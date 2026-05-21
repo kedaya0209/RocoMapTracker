@@ -3,16 +3,25 @@ package com.luoke.app.map.core;
 import com.luoke.app.config.DownloadConfig;
 import com.luoke.app.map.LoadInfo;
 import com.luoke.app.map.MapResourceUpdater;
+import net.jcip.annotations.NotThreadSafe;
 import com.luoke.app.map.entity.DownloadResult;
 import com.luoke.app.map.entity.Tile;
 import com.luoke.app.map.util.MapFileMover;
-import com.luoke.app.utils.FileUtil;
+import com.luoke.app.utils.FilePathUtil;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
-import java.io.*;
+import java.io.InputStream;
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.ObjectOutputStream;
+import java.io.PrintWriter;
+import java.io.BufferedReader;
+import java.io.FileReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.file.Files;
@@ -25,6 +34,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * 采用 BFS 自动探测边界 + Java 21 虚拟线程并发 + 进度监控
  */
 @Slf4j
+@NotThreadSafe
 public class MapDownloader {
 
     private static final Queue<int[]> taskQueue = new ConcurrentLinkedQueue<>();
@@ -47,7 +57,7 @@ public class MapDownloader {
             }
             MapFileMover.moveMapsToResource();
             log.info("✅ 所有任务已圆满完成！");
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
             log.error("❌ 更新地图流程发生崩溃", e);
         }
     }
@@ -55,8 +65,8 @@ public class MapDownloader {
     private static void downloadAllMaps() {
         try {
             // 1. 准备目录
-            Files.createDirectories(FileUtil.getRelativeFile(MapResourceUpdater.DOWNLOAD_MAP_DIR).toPath());
-            Files.createDirectories(FileUtil.getRelativeFile(MapResourceUpdater.CHUNK_DIR).toPath());
+            Files.createDirectories(FilePathUtil.getRelativeFile(MapResourceUpdater.DOWNLOAD_MAP_DIR).toPath());
+            Files.createDirectories(FilePathUtil.getRelativeFile(MapResourceUpdater.CHUNK_DIR).toPath());
 
             if (DownloadConfig.MAP_REMOTE_URLS == null || DownloadConfig.MAP_REMOTE_URLS.length == 0) {
                 LoadInfo.remoteResolveConfig();
@@ -66,7 +76,7 @@ public class MapDownloader {
             for (int i = 0; i < DownloadConfig.MAP_REMOTE_URLS.length; i++) {
                 String tag = DownloadConfig.MAP_REMOTE_URL_NAME[i];
                 String urlTpl = DownloadConfig.MAP_REMOTE_URLS[i];
-                File targetImg = FileUtil.getRelativeFile(String.format(MapResourceUpdater.OUTPUT_FILE, tag));
+                File targetImg = FilePathUtil.getRelativeFile(String.format(MapResourceUpdater.OUTPUT_FILE, tag));
 
                 if (targetImg.exists()) {
                     log.info("跳过已存在的地图: {}", tag);
@@ -111,7 +121,7 @@ public class MapDownloader {
             // 4. 清理
             cleanTempFiles();
             resetState(); // 释放下载过程中积累的集合内存
-        } catch (Exception e) {
+        } catch (IOException e) {
             log.error("下载流程中断", e);
         }
     }
@@ -189,7 +199,7 @@ public class MapDownloader {
                 try (InputStream in = conn.getInputStream()) {
                     return DownloadResult.success(in.readAllBytes());
                 }
-            } catch (Exception e) {
+            } catch (IOException e) {
                 sleep(MapResourceUpdater.TILE_DELAY_MS * 2);
             } finally {
                 if (conn != null) conn.disconnect();
@@ -200,7 +210,7 @@ public class MapDownloader {
 
     private static void saveChunk(String tag) {
         if (chunkBuffer.isEmpty()) return;
-        File f = FileUtil.getRelativeFile(MapResourceUpdater.CHUNK_DIR, tag + "_" + chunkIndex + ".chunk");
+        File f = FilePathUtil.getRelativeFile(MapResourceUpdater.CHUNK_DIR, tag + "_" + chunkIndex + ".chunk");
         try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(f))) {
             oos.writeObject(new ArrayList<>(chunkBuffer));
             chunkBuffer.clear();
@@ -211,7 +221,7 @@ public class MapDownloader {
     }
 
     private static void loadMeta(String tag) {
-        File f = FileUtil.getRelativeFile(String.format(MapResourceUpdater.METADATA_FILE, tag));
+        File f = FilePathUtil.getRelativeFile(String.format(MapResourceUpdater.METADATA_FILE, tag));
         if (!f.exists()) return;
         try (BufferedReader br = new BufferedReader(new FileReader(f))) {
             String line;
@@ -223,16 +233,16 @@ public class MapDownloader {
     }
 
     private static void saveMeta(List<Tile> tiles, String tag) {
-        File f = FileUtil.getRelativeFile(String.format(MapResourceUpdater.METADATA_FILE, tag));
+        File f = FilePathUtil.getRelativeFile(String.format(MapResourceUpdater.METADATA_FILE, tag));
         try (PrintWriter pw = new PrintWriter(f)) {
-            for (Tile t : tiles) pw.println(t.getX() + "," + t.getY());
+            for (Tile t : tiles) pw.println(t.x() + "," + t.y());
         } catch (IOException e) {
             log.error("元数据保存失败", e);
         }
     }
 
     private static void cleanTempFiles() {
-        File chunkDir = FileUtil.getRelativeFile(MapResourceUpdater.CHUNK_DIR);
+        File chunkDir = FilePathUtil.getRelativeFile(MapResourceUpdater.CHUNK_DIR);
         deleteDir(chunkDir);
         log.info("临时缓存已清理");
     }
@@ -261,7 +271,7 @@ public class MapDownloader {
                 tileH = img.getHeight();
                 img.flush();
             }
-        } catch (Exception ignored) {
+        } catch (IOException ignored) {
             tileW = tileH = 256;
         }
     }

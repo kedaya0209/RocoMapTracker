@@ -1,5 +1,6 @@
 package com.luoke.app.ui.component;
 
+import net.jcip.annotations.NotThreadSafe;
 import atlantafx.base.controls.ToggleSwitch;
 import atlantafx.base.theme.Styles;
 import com.luoke.app.config.ConfigPersistence;
@@ -22,6 +23,7 @@ import com.luoke.app.update.UpdateManager;
 import com.luoke.app.ui.util.DialogUtils;
 import com.luoke.app.ui.util.FxRippleUtil;
 import com.luoke.app.ui.util.RestartUtils;
+import java.io.IOException;
 import javafx.animation.FadeTransition;
 import javafx.animation.KeyFrame;
 import javafx.animation.KeyValue;
@@ -40,6 +42,7 @@ import javafx.util.Duration;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 
+@NotThreadSafe
 @Slf4j
 public class Sidebar extends VBox {
 
@@ -213,12 +216,12 @@ public class Sidebar extends VBox {
         isAlgorithmLoading = true;
         updateHeaderValue(header, algo);
 
-        Thread.ofVirtual().start(() -> {
+        Thread.ofPlatform().daemon(true).name("sidebar-switch-algo").start(() -> {
             try {
                 SwitchMapMatcher.getInstance().switchMapMatcher(algo);
                 HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION,
                         new StatusEvent("正在重启匹配引擎: " + algo + " ...", NotificationType.INFO));
-            } catch (Exception e) {
+            } catch (Exception e) { // SwitchMapMatcher 涉及原生库调用，可能抛出多种异常
                 HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION,
                         new StatusEvent("切换算法失败", NotificationType.ERROR));
             } finally {
@@ -347,7 +350,7 @@ public class Sidebar extends VBox {
     private void openWebpage(String url) {
         try {
             new ProcessBuilder("cmd", "/c", "start", url).start();
-        } catch (Exception e) {
+        } catch (IOException e) {
             log.error("跳转失败", e);
         }
     }

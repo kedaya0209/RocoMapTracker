@@ -1,5 +1,7 @@
 package com.luoke.app.ui;
 
+import net.jcip.annotations.NotThreadSafe;
+import com.luoke.app.config.BuildConfig;
 import com.luoke.app.config.CaptureConfig;
 import com.luoke.app.config.ConfigPersistence;
 import com.luoke.app.config.PathConfig;
@@ -48,6 +50,7 @@ import lombok.extern.slf4j.Slf4j;
  *   <li>{@link CaptureServiceManager} — 截图服务生命周期</li>
  * </ul>
  */
+@NotThreadSafe
 @Slf4j
 public class ModernCanvasApp extends Application {
 
@@ -95,7 +98,7 @@ public class ModernCanvasApp extends Application {
         try {
             Image icon = SvgManager.createImage(PathConfig.ICON, 256);
             if (icon != null) primaryStage.getIcons().add(icon);
-        } catch (Exception e) {
+        } catch (Exception e) { // JavaFX SvgManager.createImage 可能抛出多种异常
             log.warn("程序图标加载失败", e);
         }
         primaryStage.setTitle(CaptureConfig.APP_MAIN_TITLE);
@@ -180,7 +183,7 @@ public class ModernCanvasApp extends Application {
                 Platform.runLater(() ->
                         DialogUtils.showUpdateDialog(rootStack,
                                 "发现新版本 " + info.version(),
-                                com.luoke.app.config.BuildConfig.APP_VERSION,
+                                BuildConfig.APP_VERSION,
                                 info.version(),
                                 info.releaseNotes(),
                                 () -> UpdateManager.getInstance().startDownload(info),

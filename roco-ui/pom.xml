@@ -162,9 +162,9 @@
                             <buildArgs>
                                 <!-- =====调试时需要将这两项注释掉，有些错误不会被记录在日志中====== -->
                                 <!-- 指定链接器子系统为 WINDOWS -->
-                                <arg>-H:NativeLinkerOption=/SUBSYSTEM:WINDOWS</arg>
+<!--                                <arg>-H:NativeLinkerOption=/SUBSYSTEM:WINDOWS</arg>-->
                                 <!-- 指定入口点，确保在无控制台模式下正确启动 -->
-                                <arg>-H:NativeLinkerOption=/ENTRY:mainCRTStartup</arg>
+<!--                                <arg>-H:NativeLinkerOption=/ENTRY:mainCRTStartup</arg>-->
                                 <!-- ==================================================== -->
                                 <buildArg>-R:MaxHeapSize=512M</buildArg>
                                 <buildArg>-R:MinHeapSize=128M</buildArg>
@@ -178,10 +178,9 @@
                                 <buildArg>-Djava.awt.headless=false</buildArg>
                                 <buildArg>-H:+InstallExitHandlers</buildArg>
                                 <buildArg>-Djdk.nio.maxCachedBufferSize=262144</buildArg>
+                                <buildArg>-Djdk.virtualThread.carrierStackSize=2097152</buildArg>
                                 <buildArg>-O3</buildArg>
                                 <buildArg>-march=x86-64-v3</buildArg>
-                                <buildArg>-H:+StripDebugInfo</buildArg>
-                                <buildArg>--pgo=${pgo.file}</buildArg>
                                 <buildArg>--initialize-at-run-time=com.sun.prism.**</buildArg>
                                 <buildArg>--initialize-at-run-time=com.sun.glass.ui.**</buildArg>
                                 <buildArg>--initialize-at-run-time=javafx.**</buildArg>
@@ -199,6 +198,7 @@
                                 <buildArg>--enable-url-protocols=http,https</buildArg>
                                 <buildArg>-H:+JNI</buildArg>
                                 <buildArg>-H:NativeLinkerOption=${project.build.directory}/rmt.res</buildArg>
+                                <buildArg>-H:+StripDebugInfo</buildArg>
                             </buildArgs>
                         </configuration>
                     </plugin>
@@ -270,6 +270,7 @@
                                 <buildArg>-Djava.awt.headless=false</buildArg>
                                 <buildArg>-H:+InstallExitHandlers</buildArg>
                                 <buildArg>-Djdk.nio.maxCachedBufferSize=262144</buildArg>
+                                <buildArg>-Djdk.virtualThread.carrierStackSize=2097152</buildArg>
                                 <buildArg>-H:+JNI</buildArg>
                                 <buildArg>-H:+ReportExceptionStackTraces</buildArg>
                                 <buildArg>--enable-url-protocols=http,https</buildArg>
@@ -346,6 +347,7 @@
                                 <buildArg>-Djava.awt.headless=false</buildArg>
                                 <buildArg>-H:+InstallExitHandlers</buildArg>
                                 <buildArg>-Djdk.nio.maxCachedBufferSize=262144</buildArg>
+                                <buildArg>-Djdk.virtualThread.carrierStackSize=2097152</buildArg>
 
                                 <buildArg>-H:+JNI</buildArg>
                                 <buildArg>-H:+ReportExceptionStackTraces</buildArg>

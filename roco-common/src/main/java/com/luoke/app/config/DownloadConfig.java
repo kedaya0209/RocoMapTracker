@@ -1,5 +1,6 @@
 package com.luoke.app.config;
 
+import net.jcip.annotations.NotThreadSafe;
 import java.util.Arrays;
 import java.util.Properties;
 import java.util.stream.Collectors;
@@ -7,6 +8,7 @@ import java.util.stream.Collectors;
 /**
  * 下载与远程资源配置持久化 
  */
+@NotThreadSafe
 public final class DownloadConfig {
 
     // ============================================================

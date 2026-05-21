@@ -1,5 +1,6 @@
 package com.luoke.app.ui.service;
 
+import net.jcip.annotations.NotThreadSafe;
 import com.luoke.app.config.RenderConfig;
 import com.luoke.app.context.ResourceConfigContext;
 import com.luoke.app.utils.ResourceUtils;
@@ -12,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
+import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -22,6 +24,7 @@ import java.util.concurrent.Executors;
  * 独立于渲染循环，仅负责瓦片的生命周期和层级选择。
  */
 @Slf4j
+@NotThreadSafe
 public class TileManager {
 
     private static final int TILE_SIZE = RenderConfig.TILE_SIZE;
@@ -201,7 +204,7 @@ public class TileManager {
         String resourcePath = ResourceConfigContext.getTilesDir() + "/" + relativePath;
         try (InputStream in = ResourceUtils.getResourceStream(resourcePath)) {
             return in.readAllBytes();
-        } catch (Exception e) {
+        } catch (IOException e) {
             log.warn("瓦片缺失: {}", resourcePath);
             return null;
         }

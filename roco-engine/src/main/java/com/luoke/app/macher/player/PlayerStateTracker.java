@@ -1,5 +1,6 @@
 package com.luoke.app.macher.player;
 
+import net.jcip.annotations.NotThreadSafe;
 import com.luoke.app.config.PlayerConfig;
 import com.luoke.app.context.MapContext;
 import lombok.extern.slf4j.Slf4j;
@@ -8,6 +9,7 @@ import lombok.extern.slf4j.Slf4j;
  * 玩家状态追踪器：负责位置平滑、方向修正、速度预测（用于 SIFT hint）。
  * <p>不再包含瞬移检测/地图切换/丢失恢复逻辑。</p>
  */
+@NotThreadSafe
 @Slf4j
 public class PlayerStateTracker {
 

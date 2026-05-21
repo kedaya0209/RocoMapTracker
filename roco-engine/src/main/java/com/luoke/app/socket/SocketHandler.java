@@ -1,5 +1,6 @@
 package com.luoke.app.socket;
 
+import net.jcip.annotations.ThreadSafe;
 import java.util.Set;
 
 /**
@@ -10,6 +11,7 @@ import java.util.Set;
  * onMessage(type, body, session)  →  收到注册类型的消息
  * onDisconnect(session, reason)  →  客户端断开
  */
+@ThreadSafe
 public interface SocketHandler {
 
     /**

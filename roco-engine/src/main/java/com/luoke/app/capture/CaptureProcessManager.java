@@ -6,7 +6,9 @@ import com.luoke.app.process.NativeProcessFactory;
 import com.luoke.app.socket.SocketServer;
 import lombok.extern.slf4j.Slf4j;
 
+import net.jcip.annotations.NotThreadSafe;
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.concurrent.TimeUnit;
 
@@ -14,6 +16,7 @@ import java.util.concurrent.TimeUnit;
  * capture.exe 子进程生命周期管理器 — 单一职责：启动、停止、销毁截图子进程。
  * <p>不持有任何 SocketSession 引用，与会话管理完全解耦。</p>
  */
+@NotThreadSafe
 @Slf4j
 public class CaptureProcessManager {
 
@@ -98,7 +101,8 @@ public class CaptureProcessManager {
     }
 
     private void startReaderThread() {
-        Thread.ofVirtual()
+        Thread.ofPlatform()
+                .daemon(true)
                 .name("capture-stdout")
                 .start(() -> {
                     try (BufferedReader r = new BufferedReader(
@@ -107,7 +111,7 @@ public class CaptureProcessManager {
                         while ((line = r.readLine()) != null) {
                             log.debug("[capture.exe] {}", line);
                         }
-                    } catch (Exception ignored) {
+                    } catch (IOException ignored) {
                     }
                 });
     }

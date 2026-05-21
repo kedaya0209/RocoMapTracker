@@ -1,5 +1,7 @@
 package com.luoke.app.model;
 
+import net.jcip.annotations.NotThreadSafe;
+
 import ai.djl.inference.Predictor;
 import ai.djl.ndarray.NDList;
 import ai.djl.ndarray.NDManager;
@@ -17,6 +19,7 @@ import java.nio.file.Path;
  * 子类只需实现 {@link #configureCriteria} 提供各自优化参数。
  */
 @Getter
+@NotThreadSafe
 public abstract class BaseOnnxManager implements AutoCloseable {
 
     protected final String modelName;

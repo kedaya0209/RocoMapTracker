@@ -2,6 +2,7 @@ package com.luoke.app.config;
 
 import com.luoke.app.utils.ResourceUtils;
 import lombok.extern.slf4j.Slf4j;
+import net.jcip.annotations.ThreadSafe;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -14,6 +15,7 @@ import java.util.Properties;
  * 并在启动时从磁盘加载覆盖默认值。
  */
 @Slf4j
+@ThreadSafe
 public final class ConfigPersistence {
 
     private static final String CONFIG_FILE_NAME = "app_config.properties";
@@ -63,7 +65,7 @@ public final class ConfigPersistence {
                 osw.write(sb.toString());
             }
             log.info("配置文件已保存至: {}", configFile.getAbsolutePath());
-        } catch (Exception e) {
+        } catch (IOException e) {
             log.error("配置文件保存失败", e);
         }
     }
@@ -81,7 +83,7 @@ public final class ConfigPersistence {
             } else {
                 save();
             }
-        } catch (Exception e) {
+        } catch (IOException e) {
             log.error("加载配置异常，使用默认值", e);
         }
     }

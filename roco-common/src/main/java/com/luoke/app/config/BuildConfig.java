@@ -2,16 +2,20 @@ package com.luoke.app.config;
 
 import com.luoke.app.utils.ResourceUtils;
 import lombok.extern.slf4j.Slf4j;
+import net.jcip.annotations.ThreadSafe;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.Properties;
 
 /**
  * 构建时版本信息 — 读取 Maven 过滤后的 version.properties。
  */
 @Slf4j
+@ThreadSafe
 public final class BuildConfig {
 
     /** 应用版本号，如 "1.1.1" */
@@ -31,7 +35,7 @@ public final class BuildConfig {
             v = prop.getProperty("app.version", v);
             n = prop.getProperty("app.name", n);
             t = prop.getProperty("app.buildTimestamp", t);
-        } catch (Exception e) {
+        } catch (IOException e) {
             log.error("Failed to load version.properties", e);
         }
         APP_VERSION = v;
@@ -41,7 +45,7 @@ public final class BuildConfig {
             try {
                 t = OffsetDateTime.parse(t)
                         .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-            } catch (Exception e) {
+            } catch (DateTimeParseException e) {
                 // 保留原始值
             }
         }

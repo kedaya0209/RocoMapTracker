@@ -6,11 +6,13 @@ import com.luoke.app.map.MapResourceUpdater;
 import com.luoke.app.map.dto.MapCategoryItem;
 import com.luoke.app.map.dto.MapPointItem;
 import com.luoke.app.map.model.ResourceConfig;
-import com.luoke.app.utils.FileUtil;
+import com.luoke.app.utils.FilePathUtil;
 import com.luoke.app.utils.JsonUtils;
 import lombok.extern.slf4j.Slf4j;
+import net.jcip.annotations.NotThreadSafe;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -21,6 +23,7 @@ import java.util.Map;
  * 从地图分类和点位数据构建资源配置文件
  */
 @Slf4j
+@NotThreadSafe
 public class ResourceConfigBuilder {
     private static final ObjectMapper om = JsonUtils.getMapper();
 
@@ -47,12 +50,12 @@ public class ResourceConfigBuilder {
                 list.add(cfg);
             }
 
-            File out = FileUtil.getRelativeFile(MapResourceUpdater.DOWNLOAD_POINT_DIR, "resource_config.json");
+            File out = FilePathUtil.getRelativeFile(MapResourceUpdater.DOWNLOAD_POINT_DIR, "resource_config.json");
             om.writerWithDefaultPrettyPrinter().writeValue(out, list);
 
             log.info("✅ 配置生成完成：{} 条", list.size());
 
-        } catch (Exception e) {
+        } catch (IOException e) {
             log.error("❌ 生成配置失败", e);
         }
     }

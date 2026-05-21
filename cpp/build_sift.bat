@@ -13,8 +13,8 @@ if %_VC_ERR% neq 0 (
     exit /b 1
 )
 
-set "OPENCV_ROOT=D:\Documents\environment\vcpkg-2026.03.18\packages\opencv4_x64-windows"
-set "ZLIB_ROOT=D:\Documents\environment\vcpkg-2026.03.18\packages\zlib_x64-windows"
+set "OPENCV_ROOT=D:\Documents\environment\opencv-4.10.0\opencv\build"
+set "ZLIB_ROOT=D:\Documents\environment\zlib-1.3.1"
 set "OUTPUT=RocoMapTracker-sift_match.exe"
 
 echo.
@@ -26,16 +26,14 @@ echo.
 rc /nologo /fo resource.res resource.rc
 
 cl /std:c++17 /utf-8 /O2 /EHsc /arch:AVX2 ^
-   /I"%OPENCV_ROOT%\include\opencv4" ^
+   /I"%OPENCV_ROOT%\include" ^
    /I"%ZLIB_ROOT%\include" ^
    /Fe:"%OUTPUT%" ^
    sift_match_main.cpp resource.res ^
    /link ^
-   /LIBPATH:"%OPENCV_ROOT%\lib" ^
+   /LIBPATH:"%OPENCV_ROOT%\x64\vc16\lib" ^
    /LIBPATH:"%ZLIB_ROOT%\lib" ^
-   opencv_core4.lib opencv_imgproc4.lib ^
-   opencv_features2d4.lib opencv_xfeatures2d4.lib ^
-   opencv_calib3d4.lib opencv_flann4.lib ^
+   opencv_world4100.lib ^
    zlib.lib ^
    ws2_32.lib ^
    /SUBSYSTEM:CONSOLE
@@ -47,6 +45,7 @@ if %ERRORLEVEL% equ 0 (
     echo ========================================
     echo Copying to resources...
     copy /y "%OUTPUT%" "..\roco-ui\src\main\resources\sift\%OUTPUT%" >nul
+    copy /y "%OPENCV_ROOT%\x64\vc16\bin\opencv_world4100.dll" "..\roco-ui\src\main\resources\sift\opencv_world4100.dll" >nul
     echo Done.
     echo ========================================
     exit /b 0

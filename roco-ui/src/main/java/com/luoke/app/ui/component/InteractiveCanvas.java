@@ -1,5 +1,6 @@
 package com.luoke.app.ui.component;
 
+import net.jcip.annotations.NotThreadSafe;
 import com.luoke.app.config.UiConfig;
 import com.luoke.app.config.ViewConfig;
 import com.luoke.app.context.CameraContext;
@@ -23,6 +24,7 @@ import lombok.extern.slf4j.Slf4j;
  *   <li>{@link ContextMenuManager} — 右键菜单</li>
  * </ul>
  */
+@NotThreadSafe
 @Slf4j
 public class InteractiveCanvas extends Canvas {
 
@@ -84,9 +86,10 @@ public class InteractiveCanvas extends Canvas {
     // ================================================================
 
     private void onMouseMoved(MouseEvent e) {
-        pathContext.setMouseLogicX(toLogicX(e.getX()));
-        pathContext.setMouseLogicY(toLogicY(e.getY()));
-        if (hoverManager.onMouseMoved(e.getX(), e.getY(), e.getSceneX(), e.getSceneY())) {
+        double[] logic = toLogic(e.getX(), e.getY());
+        pathContext.setMouseLogicX(logic[0]);
+        pathContext.setMouseLogicY(logic[1]);
+        if (hoverManager.onMouseMoved(logic[0], logic[1], e.getScreenX(), e.getScreenY())) {
             // hoveredPoint 发生变化，同步到 MapRenderer
             if (mapRenderer != null) {
                 mapRenderer.setHoveredPoint(hoverManager.getHoveredPoint());
@@ -109,7 +112,8 @@ public class InteractiveCanvas extends Canvas {
         if (e.getButton() == MouseButton.PRIMARY) {
             pathEditor.onMousePressed(e.getX(), e.getY());
         } else if (e.getButton() == MouseButton.SECONDARY) {
-            contextMenuManager.setClickPoint(toLogicX(e.getX()), toLogicY(e.getY()));
+            double[] logic = toLogic(e.getX(), e.getY());
+            contextMenuManager.setClickPoint(logic[0], logic[1]);
         }
     }
 
@@ -200,31 +204,35 @@ public class InteractiveCanvas extends Canvas {
     // 坐标转换
     // ================================================================
 
-    public double toLogicX(double canvasX) {
+    /**
+     * 屏幕 Canvas 坐标 → 地图逻辑坐标（同时处理 X/Y，导航旋转时需要两个值）。
+     */
+    public double[] toLogic(double canvasX, double canvasY) {
         double ox = mapManager.getOffsetX();
         double oy = mapManager.getOffsetY();
         double scale = mapManager.getScale();
         if (cameraManager.isNavMode() && cameraManager.getNavAngle() != 0) {
             double pivotX = getWidth() / 2;
             double pivotY = getHeight() / 2;
-            double[] world = CoordinateUtil.screenToWorld(canvasX, pivotY, ox, oy, scale,
+            return CoordinateUtil.screenToWorld(canvasX, canvasY, ox, oy, scale,
                     cameraManager.getNavAngle(), pivotX, pivotY);
-            return world[0];
         }
-        return (canvasX - ox) / scale;
+        return new double[]{(canvasX - ox) / scale, (canvasY - oy) / scale};
     }
 
+    /**
+     * @deprecated 仅保留给外部非 nav 场景使用；有 nav 模式请用 {@link #toLogic(double, double)}。
+     */
+    @Deprecated
+    public double toLogicX(double canvasX) {
+        return (canvasX - mapManager.getOffsetX()) / mapManager.getScale();
+    }
+
+    /**
+     * @deprecated 仅保留给外部非 nav 场景使用；有 nav 模式请用 {@link #toLogic(double, double)}。
+     */
+    @Deprecated
     public double toLogicY(double canvasY) {
-        double ox = mapManager.getOffsetX();
-        double oy = mapManager.getOffsetY();
-        double scale = mapManager.getScale();
-        if (cameraManager.isNavMode() && cameraManager.getNavAngle() != 0) {
-            double pivotX = getWidth() / 2;
-            double pivotY = getHeight() / 2;
-            double[] world = CoordinateUtil.screenToWorld(pivotX, canvasY, ox, oy, scale,
-                    cameraManager.getNavAngle(), pivotX, pivotY);
-            return world[1];
-        }
-        return (canvasY - oy) / scale;
+        return (canvasY - mapManager.getOffsetY()) / mapManager.getScale();
     }
 }

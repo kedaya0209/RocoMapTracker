@@ -1,6 +1,8 @@
 package com.luoke.app.ui.util;
 
+import net.jcip.annotations.ThreadSafe;
 import atlantafx.base.theme.Styles;
+import java.io.IOException;
 import javafx.animation.FadeTransition;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
@@ -20,7 +22,10 @@ import javafx.scene.shape.SVGPath;
 import javafx.scene.text.TextAlignment;
 import javafx.util.Duration;
 
-import com.luoke.app.ui.service.SvgManager;public class DialogUtils {
+import com.luoke.app.ui.service.SvgManager;
+
+@ThreadSafe
+public class DialogUtils {
 
     /**
      * 简易文本弹窗
@@ -262,7 +267,7 @@ import com.luoke.app.ui.service.SvgManager;public class DialogUtils {
             link.setOnAction(e -> {
                 try {
                     new ProcessBuilder("cmd", "/c", "start", repoUrl).start();
-                } catch (Exception ex) {
+                } catch (IOException ex) {
                     // ignore
                 }
             });

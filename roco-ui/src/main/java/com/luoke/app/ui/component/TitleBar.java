@@ -1,5 +1,6 @@
 package com.luoke.app.ui.component;
 
+import net.jcip.annotations.NotThreadSafe;
 import atlantafx.base.theme.Styles;
 import com.luoke.app.config.CaptureConfig;
 import com.luoke.app.config.ConfigPersistence;
@@ -36,6 +37,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.util.Set;
 
+@NotThreadSafe
 @Slf4j
 
 public class TitleBar extends HBox implements IHook<Object> {

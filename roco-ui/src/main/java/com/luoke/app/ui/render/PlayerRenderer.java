@@ -1,5 +1,6 @@
 package com.luoke.app.ui.render;
 
+import net.jcip.annotations.NotThreadSafe;
 import com.luoke.app.config.RenderConfig;
 import com.luoke.app.config.ViewConfig;
 import com.luoke.app.context.CameraContext;
@@ -19,15 +20,16 @@ import javafx.scene.transform.Translate;
  * 维护独立的 playerGroup，应用世界 Scale/Translate 变换，
  * 确保玩家与地图使用相同坐标空间。
  */
+@NotThreadSafe
 public class PlayerRenderer implements RenderLayer {
 
     private final Group playerGroup;
     private final ImageView playerView;
-    private final Circle[] ripples;
+    private Circle[] ripples;
     private final Circle pickupHalo;
     private final Scale playerScale;
     private final Translate playerTranslate;
-    private final double[] rippleProgress;
+    private double[] rippleProgress;
     /** 帧计数器，用于装饰效果节流 */
     private int frameCount;
     /** 装饰效果（波纹+光晕）更新间隔：每 N 帧更新一次，位置/旋转每帧更新 */
@@ -82,6 +84,34 @@ public class PlayerRenderer implements RenderLayer {
         playerView.setImage(image);
     }
 
+    /**
+     * 动态重建波纹圈，当设置中 RIPPLE_COUNT 变更时调用。
+     */
+    private void rebuildRipples() {
+        int n = RenderConfig.RIPPLE_COUNT;
+        if (n == ripples.length) return;
+        // 移除旧波纹
+        for (Circle r : ripples) {
+            playerGroup.getChildren().remove(r);
+        }
+        // 在 pickupHalo 之前插入新波纹
+        int insertIdx = Math.max(0, playerGroup.getChildren().indexOf(pickupHalo));
+        Circle[] newRipples = new Circle[n];
+        double[] newProgress = new double[n];
+        for (int i = 0; i < n; i++) {
+            newProgress[i] = (double) i / n;
+            Circle r = new Circle(0);
+            r.setFill(Color.TRANSPARENT);
+            r.setStroke(Color.rgb(255, 255, 200, RenderConfig.RIPPLE_ALPHA));
+            r.setStrokeWidth(RenderConfig.RIPPLE_STROKE_WIDTH);
+            r.setMouseTransparent(true);
+            playerGroup.getChildren().add(insertIdx + i, r);
+            newRipples[i] = r;
+        }
+        ripples = newRipples;
+        rippleProgress = newProgress;
+    }
+
     @Override
     public void onFrame() {
         frameCount++;
@@ -98,6 +128,14 @@ public class PlayerRenderer implements RenderLayer {
 
         if (mm.isPlayerInitialized() && playerView.getImage() != null) {
             playerView.setVisible(true);
+            // 每帧同步显示尺寸，确保设置中修改 PLAYER_VIEW_SIZE 实时生效
+            playerView.setFitWidth(RenderConfig.PLAYER_VIEW_SIZE);
+            playerView.setFitHeight(RenderConfig.PLAYER_VIEW_SIZE);
+
+            // 动态重建波纹圈（RIPPLE_COUNT 变化时）
+            if (RenderConfig.RIPPLE_COUNT != ripples.length) {
+                rebuildRipples();
+            }
             double half = playerView.getFitWidth() / 2.0;
             double px = mm.getPlayerX();
             double py = mm.getPlayerY();

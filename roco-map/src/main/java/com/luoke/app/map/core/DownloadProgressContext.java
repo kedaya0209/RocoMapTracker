@@ -3,6 +3,8 @@ package com.luoke.app.map.core;
 import lombok.Getter;
 import lombok.Setter;
 
+import net.jcip.annotations.ThreadSafe;
+
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 
@@ -10,6 +12,7 @@ import java.util.function.BiConsumer;
  * 下载进度上下文 - 单例模式
  * 用于实时统计 BFS 探测下载的进度，解决界面黑屏问题
  */
+@ThreadSafe
 public final class DownloadProgressContext {
     private static final DownloadProgressContext INSTANCE = new DownloadProgressContext();
     @Getter

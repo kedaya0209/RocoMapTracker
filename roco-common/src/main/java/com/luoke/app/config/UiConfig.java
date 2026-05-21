@@ -1,10 +1,12 @@
 package com.luoke.app.config;
 
+import net.jcip.annotations.NotThreadSafe;
 import java.util.Properties;
 
 /**
  * UI 与交互配置持久化 
  */
+@NotThreadSafe
 public final class UiConfig {
 
     private UiConfig() {

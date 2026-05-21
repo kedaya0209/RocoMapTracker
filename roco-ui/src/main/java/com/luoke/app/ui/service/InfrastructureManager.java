@@ -1,5 +1,6 @@
 package com.luoke.app.ui.service;
 
+import net.jcip.annotations.ThreadSafe;
 import com.luoke.app.process.JobObjectManager;
 import com.luoke.app.socket.SocketServer;
 import lombok.extern.slf4j.Slf4j;
@@ -9,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
  * 静态工具类，与应用同生命周期。
  */
 @Slf4j
+@ThreadSafe
 public class InfrastructureManager {
 
     private InfrastructureManager() {

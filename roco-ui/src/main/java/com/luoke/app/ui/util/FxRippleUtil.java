@@ -1,5 +1,6 @@
 package com.luoke.app.ui.util;
 
+import net.jcip.annotations.ThreadSafe;
 import javafx.animation.Interpolator;
 import javafx.animation.KeyFrame;
 import javafx.animation.KeyValue;
@@ -22,6 +23,7 @@ import javafx.util.Duration;
  * 完全脱离按钮父容器的布局链，避免 layout 闪烁。
  * 不修改 Button 本身，不破坏 CSS、pseudo class、accent theme。
  */
+@ThreadSafe
 public final class FxRippleUtil {
 
     private FxRippleUtil() {

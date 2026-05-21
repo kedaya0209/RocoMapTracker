@@ -4,11 +4,13 @@ import com.luoke.app.map.dto.LayerOption;
 import com.luoke.app.map.dto.MapConfig;
 import com.luoke.app.map.dto.MapLayer;
 import lombok.extern.slf4j.Slf4j;
+import net.jcip.annotations.ThreadSafe;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.io.IOException;
 
 /**
  * JavaScript地图配置解析器
@@ -17,6 +19,7 @@ import java.util.regex.Pattern;
  * @since 1.0
  */
 @Slf4j
+@ThreadSafe
 public class JsMapConfigParser {
 
     public static MapConfig parse(String jsContent) {
@@ -90,7 +93,7 @@ public class JsMapConfigParser {
             log.info("✅ 地图配置解析完成，图层数量：{}", layers.size());
 
             return config;
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
             // 捕获所有异常，记录错误日志
             // 返回null表示解析失败
             log.error("❌ 地图JS解析失败", e);

@@ -62,3 +62,36 @@
 - **maven-assembly-plugin** — 构建 fat jar (jar-with-dependencies)
 - **javafx-maven-plugin** — JavaFX 运行/打包
 - **native-maven-plugin** — GraalVM Native Image 编译 (3 个 profile: native / native-instrument / native-pgo)
+
+## GraalVM Native Image 元数据维护规则 (重要)
+
+当在 `roco-ui` 或任何其他模块中 **添加新的静态资源**（如 `dll/` 下的新 `.dll`、`icon/` 下的新 `.svg`、配置文件等）或者 **需要反射/JNI 访问的 Java 类**时，**必须同步修改** 以下文件：
+
+- `META-INF/native-image/reachability-metadata.json`
+
+### 何时需要更新
+
+- 新增或删除一个 DLL 文件 → 更新 `"resources"` 或 `"bundles"` 中的路径。
+- 新增一个通过 `MethodHandle`、`反射`（如 `Class.forName`、`method.invoke`）或 `JNI` 访问的类 → 在 `"reflection"` 或 `"jni"` 节中添加对应配置。
+- 新增一个通过 `ServiceLoader` 加载的服务 → 在 `"resources"` 中添加 `META-INF/services/` 条目。
+- 新增一个需要序列化/反序列化的类（Jackson、JSON 等）→ 添加反射配置。
+
+### 配置示例
+
+```json
+{
+  "reflection": [
+    {
+      "name": "com.example.NewClass",
+      "methods": [
+        { "name": "newMethod", "parameterTypes": [] }
+      ]
+    }
+  ],
+  "resources": [
+    {
+      "pattern": "dll/newlib\\.dll$"
+    }
+  ]
+}
+```

@@ -1,5 +1,8 @@
 package com.luoke.app.capture;
 
+import net.jcip.annotations.ThreadSafe;
+
+@ThreadSafe
 public interface RoiProcessor {
 
     /**

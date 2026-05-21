@@ -3,10 +3,12 @@ package com.luoke.app.map.model;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import net.jcip.annotations.NotThreadSafe;
 
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@NotThreadSafe
 public class Point {
     private double x;
     private double y;

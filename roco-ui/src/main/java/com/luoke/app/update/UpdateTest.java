@@ -1,11 +1,13 @@
 package com.luoke.app.update;
 
+import net.jcip.annotations.ThreadSafe;
 import com.luoke.app.config.BuildConfig;
 
 /**
  * 快速测试更新检测 — 不依赖 JavaFX 环境。
  * 直接运行 main 方法即可。
  */
+@ThreadSafe
 public class UpdateTest {
     public static void main(String[] args) throws Exception {
         System.out.println("当前版本: " + BuildConfig.APP_VERSION);

@@ -1,5 +1,6 @@
 package com.luoke.app.context;
 
+import net.jcip.annotations.ThreadSafe;
 import com.luoke.app.config.UiConfig;
 import com.luoke.app.config.ViewConfig;
 import lombok.Getter;
@@ -10,6 +11,7 @@ import lombok.Setter;
  * 地图上下文管理：负责视口状态（缩放/偏移）及玩家位置的维护与转换。
  * 瓦片金字塔模式下不再持有全图，仅管理元数据与运行时状态。
  */
+@ThreadSafe
 @Getter
 @Setter
 public class MapContext {

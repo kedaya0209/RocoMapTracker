@@ -1,5 +1,6 @@
 package com.luoke.app.ui.util;
 
+import net.jcip.annotations.ThreadSafe;
 import com.luoke.app.Main;
 import javafx.application.Platform;
 import lombok.extern.slf4j.Slf4j;
@@ -10,6 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Slf4j
+@ThreadSafe
 public class RestartUtils {
 
     public static void restart() {
