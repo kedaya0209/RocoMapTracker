@@ -32,8 +32,6 @@ public final class UiConfig {
     public static double HOVER_DETECT_RADIUS = 16.0;
     /** 地图最大视觉缩放比例 */
     public static double MAP_VIEW_MAX_SCALE = 15.0;
-    /** 侧边栏宽度 */
-    public static double SIDEBAR_WIDTH = 240;
     /** 侧边栏列表视图宽度 */
     public static double SIDEBAR_LIST_WIDTH = 210;
     /** 统计面板字体名称 */
@@ -62,7 +60,6 @@ public final class UiConfig {
         MIN_WINDOW_HEIGHT = ConfigHelper.getDouble(prop, "min.window.height", MIN_WINDOW_HEIGHT);
         INTERACTIVE_ZOOM_FACTOR = ConfigHelper.getDouble(prop, "interactive.zoom.factor", INTERACTIVE_ZOOM_FACTOR);
         HOVER_DETECT_RADIUS = ConfigHelper.getDouble(prop, "hover.detect.radius", HOVER_DETECT_RADIUS);
-        SIDEBAR_WIDTH = ConfigHelper.getDouble(prop, "sidebar.width", SIDEBAR_WIDTH);
         STATS_FONT_SIZE = ConfigHelper.getInt(prop, "stats.font.size", STATS_FONT_SIZE);
     }
 
@@ -83,8 +80,6 @@ public final class UiConfig {
         sb.append("interactive.zoom.factor=").append(INTERACTIVE_ZOOM_FACTOR).append("\n");
         sb.append("# 资源点鼠标悬停检测半径（逻辑像素）\n");
         sb.append("hover.detect.radius=").append(HOVER_DETECT_RADIUS).append("\n");
-        sb.append("# 侧边栏宽度\n");
-        sb.append("sidebar.width=").append(SIDEBAR_WIDTH).append("\n");
         sb.append("# 统计面板字号\n");
         sb.append("stats.font.size=").append(STATS_FONT_SIZE).append("\n\n");
     }

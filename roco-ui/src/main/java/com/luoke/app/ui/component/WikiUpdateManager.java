@@ -66,6 +66,7 @@ public class WikiUpdateManager {
                     root,
                     "确认更新",
                     "确认同步最新WIKI数据？下载过程中请保持网络畅通。",
+                    "立即更新",
                     () -> {
                         switchToLoadingState();
                         startDownloadTask();

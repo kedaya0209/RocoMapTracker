@@ -492,6 +492,7 @@ public class SettingsStage extends Stage {
             if (ownerRoot != null) {
                 DialogUtils.showConfirmDialog(rootStackPane, "未保存的更改",
                         "有未保存的更改，是否放弃？",
+                        "放弃",
                         this::hide, () -> {
                         });
             } else {
