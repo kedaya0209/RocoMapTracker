@@ -142,20 +142,6 @@ jobs:
       - name: Build Native Image
         run: mvn -Pnative clean package -pl roco-ui -am --no-transfer-progress "-Dapp.version=${{ github.event.inputs.version }}"
 
-      - name: Download previous EXE from previous Release
-        continue-on-error: true
-        shell: bash
-        run: |
-          PREV_TAG="${{ steps.prev_tag.outputs.prev_tag }}"
-          if [ -n "$PREV_TAG" ]; then
-            echo "Downloading previous exe from $PREV_TAG ..."
-            gh release download "$PREV_TAG" --pattern "RocoMapTracker.exe" --repo kedaya0209/RocoMapTracker --skip-existing 2>/dev/null || echo "No exe asset found in $PREV_TAG"
-          else
-            echo "No previous release tag found, skipping"
-          fi
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Get previous release tag
         id: prev_tag
         continue-on-error: true
@@ -170,6 +156,20 @@ jobs:
             fi
           done
           echo "prev_tag=$PREV_TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Download previous EXE from previous Release
+        continue-on-error: true
+        shell: bash
+        run: |
+          PREV_TAG="${{ steps.prev_tag.outputs.prev_tag }}"
+          if [ -n "$PREV_TAG" ]; then
+            echo "Downloading previous exe from $PREV_TAG ..."
+            gh release download "$PREV_TAG" --pattern "RocoMapTracker.exe" --repo kedaya0209/RocoMapTracker --skip-existing 2>/dev/null || echo "No exe asset found in $PREV_TAG"
+          else
+            echo "No previous release tag found, skipping"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Generate HDiffPatch
         run: |
