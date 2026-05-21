@@ -25,7 +25,7 @@ public final class BuildConfig {
         String v = "unknown";
         String n = "RocoMapTracker";
         String t = "unknown";
-        try (InputStream is = ResourceUtils.getResourceStream("version.properties")) {
+        try (InputStream is = ResourceUtils.getResourceStream("/version.properties")) {
             Properties prop = new Properties();
             prop.load(is);
             v = prop.getProperty("app.version", v);
