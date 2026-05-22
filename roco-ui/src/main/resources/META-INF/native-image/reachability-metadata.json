@@ -1046,8 +1046,17 @@
     },
     {
       "type": "com.sun.glass.ui.Window",
+      "reflectionAccessible": true,
       "jniAccessible": true,
       "methods": [
+        {
+          "name": "getWindows",
+          "parameterTypes": []
+        },
+        {
+          "name": "getNativeWindow",
+          "parameterTypes": []
+        },
         {
           "name": "notifyClose",
           "parameterTypes": []
@@ -13220,6 +13229,41 @@
       {
         "returnType": "jint",
         "parameterTypes": []
+      },
+      {
+        "returnType": "jlong",
+        "parameterTypes": [
+          "void*",
+          "void*"
+        ]
+      },
+      {
+        "returnType": "jlong",
+        "parameterTypes": [
+          "jlong",
+          "void*",
+          "jint",
+          "jint",
+          "jint",
+          "jint"
+        ]
+      },
+      {
+        "returnType": "jlong",
+        "parameterTypes": [
+          "jlong",
+          "jint",
+          "jlong",
+          "jlong"
+        ]
+      },
+      {
+        "returnType": "jlong",
+        "parameterTypes": [
+          "jlong",
+          "jint",
+          "jlong"
+        ]
       },
       {
         "returnType": "jlong",

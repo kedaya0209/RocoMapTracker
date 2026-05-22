@@ -70,6 +70,7 @@ public class ModernCanvasApp extends Application {
     private StackPane rootStack;
     private Stage primaryStage;
     private Sidebar sidebar;
+    private String iconFilePath;
 
     public static void main(String[] args) {
         launch(args);
@@ -81,60 +82,13 @@ public class ModernCanvasApp extends Application {
         this.primaryStage = primaryStage;
 
         // ---- 1. 场景骨架 ----
-        StackPane wrapper = new StackPane();
-        wrapper.setBackground(Background.EMPTY);
+        initScene();
 
-        rootStack = new StackPane();
-        rootStack.setStyle("-fx-background-color: -color-bg-default; -fx-background-radius: 12px;");
-        Rectangle rootClip = new Rectangle();
-        rootClip.widthProperty().bind(rootStack.widthProperty());
-        rootClip.heightProperty().bind(rootStack.heightProperty());
-        rootClip.setArcWidth(24);
-        rootClip.setArcHeight(24);
-        rootStack.setClip(rootClip);
-        wrapper.getChildren().add(rootStack);
-
-        LoadingOverlay globalLoading = new LoadingOverlay(null);
-        rootStack.getChildren().add(globalLoading);
-        HookRegistry.INSTANCE.register(new UiResponseHook(rootStack, globalLoading));
-
-        Scene scene = new Scene(wrapper, ViewConfig.INITIAL_WINDOW_WIDTH, ViewConfig.INITIAL_WINDOW_HEIGHT);
-        scene.setFill(Color.TRANSPARENT);
-        primaryStage.initStyle(StageStyle.TRANSPARENT);
-        primaryStage.setScene(scene);
-
-        // 程序图标
-        try {
-            Image icon = new Image(ResourceUtils.getResourceStream(PathConfig.ICON_PNG));
-            if (!icon.isError()) {
-                primaryStage.getIcons().add(icon);
-            }
-        } catch (Exception e) {
-            log.warn("程序图标加载失败", e);
-        }
         primaryStage.setTitle(CaptureConfig.APP_MAIN_TITLE);
         primaryStage.show();
 
-        // Native Image 下 StageStyle.TRANSPARENT 导致任务栏图标不生效，通过 Win32 API 补设
-        try {
-            File iconFile = FilePathUtil.getExternalFile("icon", "/rmt.ico");
-            if (!iconFile.exists()) {
-                // 释放到程序根目录（Native Image 下资源嵌入在 exe 中）
-                File appDir = FilePathUtil.getAppRootDir().toFile();
-                iconFile = new File(appDir, "rmt.ico");
-                if (!iconFile.exists()) {
-                    try (InputStream is = ResourceUtils.getResourceStream(PathConfig.ICON_ICO)) {
-                        Files.copy(is, iconFile.toPath(),
-                                StandardCopyOption.REPLACE_EXISTING);
-                    }
-                }
-            }
-            if (iconFile.exists()) {
-                TaskbarIconHelper.setIcon(primaryStage, iconFile.getAbsolutePath());
-            }
-        } catch (Exception e) {
-            log.debug("Win32 任务栏图标设置跳过", e);
-        }
+        // 提取 .ico 图标文件并立即设置任务栏图标（尽早设置，避免窗口出现时无图标）
+        initTaskbarIcon();
 
         // ---- 2. 基础设施 ----
         InfrastructureManager.init();
@@ -183,6 +137,76 @@ public class ModernCanvasApp extends Application {
         };
 
         return new ResourceInitService(uiDelegate);
+    }
+
+    /**
+     * 初始化场景骨架：透明圆角窗口 + 根容器 + 全局加载遮罩。
+     */
+    private void initScene() {
+        StackPane wrapper = new StackPane();
+        wrapper.setBackground(Background.EMPTY);
+
+        rootStack = new StackPane();
+        rootStack.setStyle("-fx-background-color: -color-bg-default; -fx-background-radius: 12px;");
+        Rectangle rootClip = new Rectangle();
+        rootClip.widthProperty().bind(rootStack.widthProperty());
+        rootClip.heightProperty().bind(rootStack.heightProperty());
+        rootClip.setArcWidth(24);
+        rootClip.setArcHeight(24);
+        rootStack.setClip(rootClip);
+        wrapper.getChildren().add(rootStack);
+
+        LoadingOverlay globalLoading = new LoadingOverlay(null);
+        rootStack.getChildren().add(globalLoading);
+        HookRegistry.INSTANCE.register(new UiResponseHook(rootStack, globalLoading));
+
+        Scene scene = new Scene(wrapper, ViewConfig.INITIAL_WINDOW_WIDTH, ViewConfig.INITIAL_WINDOW_HEIGHT);
+        scene.setFill(Color.TRANSPARENT);
+        primaryStage.initStyle(StageStyle.TRANSPARENT);
+        primaryStage.setScene(scene);
+    }
+
+    /**
+     * 加载程序图标（JavaFX 窗口装饰图标）。
+     */
+    private void loadStageIcons() {
+        try {
+            Image icon = new Image(ResourceUtils.getResourceStream(PathConfig.ICON_PNG));
+            if (!icon.isError()) {
+                primaryStage.getIcons().add(icon);
+            }
+        } catch (Exception e) {
+            log.warn("程序图标加载失败", e);
+        }
+    }
+
+    /**
+     * 提取 .ico 图标到外部目录并通过 Win32 API 设置任务栏图标。
+     * 在 primaryStage.show() 后立即调用，确保窗口出现时即有图标。
+     */
+    private void initTaskbarIcon() {
+        try {
+            File iconFile = FilePathUtil.getExternalFile("icon", "/rmt.ico");
+            if (!iconFile.exists()) {
+                File appDir = FilePathUtil.getAppRootDir().toFile();
+                iconFile = new File(appDir, "rmt.ico");
+                if (!iconFile.exists()) {
+                    try (InputStream is = ResourceUtils.getResourceStream(PathConfig.ICON_ICO)) {
+                        Files.copy(is, iconFile.toPath(),
+                                StandardCopyOption.REPLACE_EXISTING);
+                        log.info("ico 图标已释放到: {}", iconFile.getAbsolutePath());
+                    }
+                }
+            }
+            if (iconFile.exists()) {
+                iconFilePath = iconFile.getAbsolutePath();
+                TaskbarIconHelper.setIcon(primaryStage, iconFilePath);
+            } else {
+                log.warn("ico 图标文件不存在");
+            }
+        } catch (Exception e) {
+            log.warn("ico 图标处理失败", e);
+        }
     }
 
     /**
