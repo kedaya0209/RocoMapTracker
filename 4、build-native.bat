@@ -6,7 +6,7 @@ echo  RocoMapTracker Native Image 构建脚本
 echo ============================================
 
 :: 设置 Visual Studio 环境
-set "VS_DIR=C:\Program Files\Microsoft Visual Studio\18\Insiders"
+set "VS_DIR=C:\Program Files\Microsoft Visual Studio\18\Community"
 set "VCVARSALL=%VS_DIR%\VC\Auxiliary\Build\vcvarsall.bat"
 
 if not exist "%VCVARSALL%" (
