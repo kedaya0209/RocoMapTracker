@@ -59,6 +59,7 @@ public final class PathConfig {
     public static final String INTERNAL_PATHS = "/source/internal_map_paths.json";
     public static final String ICON = "/icon/rmt.svg";
     public static final String ICON_PNG = "/icon/rmt.png";
+    public static final String ICON_ICO = "/icon/rmt.ico";
     public static final String GHOST = "/icon/ghost.svg";
     public static final String NAVIGATION = "/icon/navigation.svg";
     public static final String MATCH_TOGGLE = "/icon/match_toggle.svg";
