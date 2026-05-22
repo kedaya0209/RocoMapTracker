@@ -236,11 +236,6 @@ public class ModernCanvasApp extends Application {
             @Override
             public void restartApplication() {
                 Platform.runLater(() -> {
-                    // 短暂延迟确保 updater 脚本已启动
-                    try {
-                        Thread.sleep(500);
-                    } catch (InterruptedException ignored) {
-                    }
                     Platform.exit();
                     System.exit(0);
                 });

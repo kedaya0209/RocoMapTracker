@@ -5,6 +5,7 @@ import net.jcip.annotations.ThreadSafe;
 import com.luoke.app.config.BuildConfig;
 import com.luoke.app.config.UpdateConfig;
 import com.luoke.app.hook.event.NotificationType;
+import com.luoke.app.utils.FilePathUtil;
 import com.luoke.app.utils.HashUtil;
 import lombok.extern.slf4j.Slf4j;
 
@@ -16,9 +17,14 @@ import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
@@ -38,13 +44,23 @@ public class UpdateManager {
      */
     private static final String CDN_BASE = "https://cdn.jsdelivr.net/gh/kedaya0209/RocoMapTracker@patches/updates/";
 
+    /**
+     * gh-proxy.org 加速前缀（代理 GitHub 原始链接）
+     */
+    private static final String GHPROXY_PREFIX = "https://gh-proxy.org/";
+
+    /**
+     * 通过 schtasks 创建一次性计划任务启动脚本，进程独立于当前 JobObject。
+     * 任务在当前用户会话中立即执行，杀毒软件不会将其标记为可疑行为。
+     */
+    private static final String UPDATE_TASK_NAME = "RocoMapTracker_Update";
+
     private final UpdateChecker checker;
     private final HttpClient httpClient;
     private final AtomicBoolean checking = new AtomicBoolean(false);
     private final AtomicBoolean downloading = new AtomicBoolean(false);
 
     private final AtomicReference<VersionInfo> pendingUpdate = new AtomicReference<>(null);
-    private volatile String appDir;
     @Setter
     private volatile UpdateUiDelegate uiDelegate;
 
@@ -71,7 +87,6 @@ public class UpdateManager {
      * 启动周期性更新检查（后台虚拟线程）
      */
     public void startPeriodicCheck(int intervalHours) {
-        this.appDir = detectAppDir();
         Thread.ofPlatform().daemon(true).name("update-checker").start(() -> {
             try {
                 Thread.sleep(10_000);
@@ -142,10 +157,14 @@ public class UpdateManager {
         final Path[] downloadPath = {null};
         Thread.ofPlatform().daemon(true).name("update-download").start(() -> {
             try {
-                String exeDir = detectAppDir();
+                String exeDir = FilePathUtil.getAppRootDir().toString();
 
-                // ── 按下载源优先级顺序（github / jsdelivr） ──
-                boolean githubFirst = !"jsdelivr".equals(UpdateConfig.DOWNLOAD_SOURCE);
+                // ── 三源竞速 5 秒，选出最快下载源 ──
+                String raceUrl = info.exeDownloadUrl() != null
+                        ? info.exeDownloadUrl() : info.patchDownloadUrl();
+                List<String> sources = raceUrl != null
+                        ? raceSources(raceUrl)
+                        : List.of("gh-proxy", "jsdelivr", "github");
 
                 // ── 尝试补丁下载 ──
                 if (info.patchDownloadUrl() != null && isPatchVersionMatch(info)) {
@@ -153,20 +172,8 @@ public class UpdateManager {
                     try {
                         uiDelegate.showDownloadProgress(info.version(), 0);
 
-                        String primaryPatch = githubFirst ? info.patchDownloadUrl() : toCdnUrl(info.patchDownloadUrl());
-                        String secondaryPatch = githubFirst ? toCdnUrl(info.patchDownloadUrl()) : info.patchDownloadUrl();
-                        try {
-                            downloadFile(primaryPatch, patchPath, p ->
-                                    uiDelegate.showDownloadProgress(info.version(), p));
-                        } catch (IOException | InterruptedException e) {
-                            log.warn("首选源补丁下载失败，降级: {}", e.getMessage());
-                            Files.deleteIfExists(patchPath);
-                            if (secondaryPatch != null) {
-                                downloadFile(secondaryPatch, patchPath, p ->
-                                        uiDelegate.showDownloadProgress(info.version(), p));
-                            } else {
-                                throw e;
-                            }
+                        if (!downloadWithFallback(info.patchDownloadUrl(), sources, patchPath, info.version())) {
+                            throw new IOException("所有下载源均失败");
                         }
                         if (info.patchSha256Url() != null) {
                             verifySha256(patchPath, info.patchSha256Url());
@@ -191,20 +198,8 @@ public class UpdateManager {
                     Path exePath = Path.of(exeDir, "RocoMapTracker_" + info.version() + ".exe");
                     uiDelegate.showDownloadProgress(info.version(), 0);
 
-                    String primaryExe = githubFirst ? info.exeDownloadUrl() : toCdnUrl(info.exeDownloadUrl());
-                    String secondaryExe = githubFirst ? toCdnUrl(info.exeDownloadUrl()) : info.exeDownloadUrl();
-                    try {
-                        downloadFile(primaryExe, exePath, p ->
-                                uiDelegate.showDownloadProgress(info.version(), p));
-                    } catch (IOException | InterruptedException e) {
-                        log.warn("首选源 exe 下载失败，降级: {}", e.getMessage());
-                        Files.deleteIfExists(exePath);
-                        if (secondaryExe != null) {
-                            downloadFile(secondaryExe, exePath, p ->
-                                    uiDelegate.showDownloadProgress(info.version(), p));
-                        } else {
-                            throw e;
-                        }
+                    if (!downloadWithFallback(info.exeDownloadUrl(), sources, exePath, info.version())) {
+                        throw new IOException("所有下载源均失败");
                     }
                     if (info.exeSha256Url() != null) {
                         verifySha256(exePath, info.exeSha256Url());
@@ -239,7 +234,7 @@ public class UpdateManager {
     }
 
     private void installAndRestart(Path patchPath) {
-        String exeDir = detectAppDir();
+        String exeDir = FilePathUtil.getAppRootDir().toString();
         String exeName = "RocoMapTracker.exe";
         String exePath = exeDir + File.separator + exeName;
         String hpatchzPath = exeDir + File.separator + "update" + File.separator + "hpatchz.exe";
@@ -255,11 +250,6 @@ public class UpdateManager {
             Files.writeString(scriptPath, script);
             log.info("Starting updater script: {}", scriptPath);
             startScriptDetached(scriptPath.toString(), exeDir);
-            // 等待 updater 初始化完成再退出（确保 WMI 已创建独立进程）
-            try {
-                Thread.sleep(2000);
-            } catch (InterruptedException ignored) {
-            }
             if (uiDelegate != null) uiDelegate.restartApplication();
         } catch (IOException e) {
             log.error("Failed to start updater script", e);
@@ -268,7 +258,7 @@ public class UpdateManager {
     }
 
     private void installAndRestartExe(Path newExePath) {
-        String exeDir = detectAppDir();
+        String exeDir = FilePathUtil.getAppRootDir().toString();
         String exeName = "RocoMapTracker.exe";
         String targetExe = exeDir + File.separator + exeName;
 
@@ -319,59 +309,50 @@ public class UpdateManager {
         }
     }
 
-    /**
-     * 通过 schtasks 创建一次性计划任务启动脚本，进程独立于当前 JobObject。
-     * 任务在当前用户会话中立即执行，杀毒软件不会将其标记为可疑行为。
-     */
-    private boolean startViaSchtasks(String scriptPath, String workDir) throws IOException, InterruptedException {
-        String taskName = "RocoMapTracker_Update_" + System.currentTimeMillis();
 
-        // schtasks /create 一次性任务，/RI 1 延迟 1 分钟（单位分钟），实际用 /ST 设为当前时间+几秒
-        // 更简单的方案：用 ONCE + /ST 稍后的时间
+    private boolean startViaSchtasks(String scriptPath, String workDir) throws IOException, InterruptedException {
+        // 1. 创建一次性任务（/f 覆盖同名任务，不会累积）
+        LocalDateTime future = LocalDateTime.now().plusSeconds(5);
+        String startTime = String.format("%02d:%02d", future.getHour(), future.getMinute());
+
         ProcessBuilder createPb = new ProcessBuilder(
                 "schtasks.exe", "/create",
-                "/tn", taskName,
+                "/tn", UPDATE_TASK_NAME,
                 "/tr", "cmd.exe /c \"" + scriptPath + "\"",
                 "/sc", "once",
-                "/st", "00:00",
+                "/st", startTime,
                 "/f",
                 "/rl", "LIMITED"
         );
         if (workDir != null) {
             createPb.directory(new File(workDir));
         }
-        Process createProc = createPb.start();
-        int createExit = createProc.waitFor();
-        if (createExit != 0) {
-            log.warn("schtasks /create failed with exit code: {}", createExit);
+        if (createPb.start().waitFor() != 0) {
+            log.warn("schtasks /create 失败");
             return false;
         }
 
-        // 立即运行任务
-        ProcessBuilder runPb = new ProcessBuilder(
-                "schtasks.exe", "/run", "/tn", taskName
-        );
-        Process runProc = runPb.start();
-        int runExit = runProc.waitFor();
-        if (runExit != 0) {
-            log.warn("schtasks /run failed with exit code: {}", runExit);
-        }
-
-        // 删除任务定义（任务已启动，删除不影响运行中的进程）
-        new ProcessBuilder("schtasks.exe", "/delete", "/tn", taskName, "/f")
+        // 2. 立即触发任务（一次性任务执行完自动失效，不主动删除）
+        new ProcessBuilder("schtasks.exe", "/run", "/tn", UPDATE_TASK_NAME)
                 .start().waitFor();
-
-        return runExit == 0;
+        return true;
     }
 
     private String generateUpdaterScript(String exePath, String patchPath, String hpatchzPath, String exeName) {
         String backupPath = exePath + ".bak";
         String newExePath = exePath + ".new";
+        String logPath = exePath + ".update.log";
 
         return "@echo off\r\n"
                 + "setlocal enabledelayedexpansion\r\n"
                 + "title RocoMapTracker Updater\r\n"
+                + "set LOG=\"" + logPath + "\"\r\n"
+                + "echo [%date% %time%] 脚本启动 > %LOG%\r\n"
+                + "echo exePath=" + exePath + " >> %LOG%\r\n"
+                + "echo patchPath=" + patchPath + " >> %LOG%\r\n"
+                + "echo hpatchzPath=" + hpatchzPath + " >> %LOG%\r\n"
                 + "cd /D \"%~dp0\"\r\n"
+                + "echo [%date% %time%] 工作目录=%cd% >> %LOG%\r\n"
                 + "\r\n"
                 + ":WAIT\r\n"
                 + "tasklist /FI \"IMAGENAME eq " + exeName + "\" 2>nul | find /I \"" + exeName + "\" >nul\r\n"
@@ -379,15 +360,20 @@ public class UpdateManager {
                 + "    timeout /t 2 /nobreak >nul\r\n"
                 + "    goto WAIT\r\n"
                 + ")\r\n"
+                + "echo [%date% %time%] 主程序已退出 >> %LOG%\r\n"
                 + "\r\n"
                 + ":: 备份原 exe\r\n"
                 + "copy /Y \"" + exePath + "\" \"" + backupPath + "\" >nul\r\n"
-                + "if errorlevel 1 goto FAIL\r\n"
+                + "if errorlevel 1 (\r\n"
+                + "    echo [%date% %time%] 备份失败 >> %LOG%\r\n"
+                + "    goto FAIL\r\n"
+                + ")\r\n"
                 + "\r\n"
                 + ":: 打补丁\r\n"
+                + "echo [%date% %time%] 开始打补丁... >> %LOG%\r\n"
                 + "\"" + hpatchzPath + "\" \"" + exePath + "\" \"" + patchPath + "\" \"" + newExePath + "\"\r\n"
+                + "echo [%date% %time%] hpatchz 退出码=%errorlevel% >> %LOG%\r\n"
                 + "if errorlevel 1 (\r\n"
-                + "    :: 补丁失败，回滚\r\n"
                 + "    copy /Y \"" + backupPath + "\" \"" + exePath + "\" >nul\r\n"
                 + "    goto FAIL\r\n"
                 + ")\r\n"
@@ -402,6 +388,7 @@ public class UpdateManager {
                 + ":: 清理\r\n"
                 + "del \"" + patchPath + "\" 2>nul\r\n"
                 + "del \"" + backupPath + "\" 2>nul\r\n"
+                + "echo [%date% %time%] 更新成功 >> %LOG%\r\n"
                 + "\r\n"
                 + ":: 启动新版本\r\n"
                 + "start \"\" \"" + exePath + "\"\r\n"
@@ -409,9 +396,10 @@ public class UpdateManager {
                 + "exit /b 0\r\n"
                 + "\r\n"
                 + ":FAIL\r\n"
+                + "echo [%date% %time%] 更新失败 >> %LOG%\r\n"
                 + "del \"" + newExePath + "\" 2>nul\r\n"
                 + "del \"" + backupPath + "\" 2>nul\r\n"
-                + "msg \"RocoMapTracker\" \"更新失败，请手动下载新版本\"\r\n"
+                + "pause\r\n"
                 + "del \"%~f0\"\r\n"
                 + "exit /b 1\r\n";
     }
@@ -555,12 +543,117 @@ public class UpdateManager {
     }
 
     /**
-     * 下载 SHA256 校验文件并验证文件完整性
+     * 将 GitHub Release 下载 URL 转换为 gh-proxy.org 代理 URL
+     */
+    private String toGhProxyUrl(String githubUrl) {
+        if (githubUrl == null) return null;
+        return GHPROXY_PREFIX + githubUrl;
+    }
+
+    /**
+     * 三源同时下载 5 秒竞速，选出吞吐量最高的源，按速度降序返回。
+     * 若所有源均失败，返回默认顺序。
+     */
+    private List<String> raceSources(String githubUrl) {
+        List<String> allSources = List.of("gh-proxy", "jsdelivr", "github");
+        String[] urls = {
+                toGhProxyUrl(githubUrl),
+                toCdnUrl(githubUrl),
+                githubUrl
+        };
+        AtomicLong[] downloaded = {new AtomicLong(), new AtomicLong(), new AtomicLong()};
+        Future<?>[] futures = new Future[3];
+
+        ExecutorService pool = Executors.newFixedThreadPool(3);
+        for (int i = 0; i < 3; i++) {
+            final int idx = i;
+            futures[i] = pool.submit(() -> {
+                try {
+                    HttpRequest req = HttpRequest.newBuilder()
+                            .uri(URI.create(urls[idx]))
+                            .timeout(Duration.ofSeconds(10))
+                            .GET()
+                            .build();
+                    HttpResponse<InputStream> resp = httpClient.send(req,
+                            HttpResponse.BodyHandlers.ofInputStream());
+                    if (resp.statusCode() / 100 != 2) return;
+                    try (InputStream is = resp.body()) {
+                        byte[] buf = new byte[8192];
+                        int n;
+                        while ((n = is.read(buf)) != -1) {
+                            downloaded[idx].addAndGet(n);
+                        }
+                    }
+                } catch (Exception ignored) {
+                }
+            });
+        }
+
+        try {
+            Thread.sleep(1000);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+
+        // 取消所有下载
+        for (Future<?> f : futures) {
+            f.cancel(true);
+        }
+        pool.shutdownNow();
+
+        // 按已下载字节数降序排列
+        List<String> sorted = new ArrayList<>();
+        List<int[]> indexed = new ArrayList<>();
+        for (int i = 0; i < 3; i++) {
+            indexed.add(new int[]{i, (int) downloaded[i].get()});
+        }
+        indexed.sort((a, b) -> Integer.compare(b[1], a[1]));
+        for (int[] entry : indexed) {
+            sorted.add(allSources.get(entry[0]));
+            log.info("测速结果: {} — {}KB/5s", allSources.get(entry[0]), entry[1] / 1024);
+        }
+        return sorted;
+    }
+
+    /**
+     * 竞速选出最快源后依次尝试下载，任一成功即返回 true。
+     */
+    private boolean downloadWithFallback(String githubUrl, List<String> sources,
+            Path target, String version) throws IOException, InterruptedException {
+        for (String source : sources) {
+            String url = switch (source) {
+                case "gh-proxy" -> toGhProxyUrl(githubUrl);
+                case "jsdelivr" -> toCdnUrl(githubUrl);
+                default -> githubUrl;
+            };
+            if (url == null) continue;
+            try {
+                log.info("尝试下载源 {}: {}", source, url);
+                downloadFile(url, target, p ->
+                        uiDelegate.showDownloadProgress(version, p));
+                return true;
+            } catch (IOException | InterruptedException e) {
+                log.warn("下载源 {} 失败: {}", source, e.getMessage());
+                Files.deleteIfExists(target);
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 下载 SHA256 校验文件并验证文件完整性（通过代理加速）
      */
     private void verifySha256(Path filePath, String sha256Url) throws IOException, InterruptedException {
         Path sha256Path = Path.of(filePath + ".sha256");
         try {
-            downloadFile(sha256Url, sha256Path);
+            String proxyUrl = toGhProxyUrl(sha256Url);
+            try {
+                downloadFile(proxyUrl, sha256Path);
+            } catch (IOException e) {
+                log.warn("SHA256 通过 gh-proxy 下载失败，降级直连: {}", e.getMessage());
+                Files.deleteIfExists(sha256Path);
+                downloadFile(sha256Url, sha256Path);
+            }
             String expected = Files.readString(sha256Path).trim();
             String actual = HashUtil.computeFileSHA256(filePath.toFile());
             if (!expected.equalsIgnoreCase(actual)) {
@@ -571,20 +664,6 @@ public class UpdateManager {
         } finally {
             Files.deleteIfExists(sha256Path);
         }
-    }
-
-    private String detectAppDir() {
-        if (appDir != null) return appDir;
-        try {
-            String path = UpdateManager.class.getProtectionDomain()
-                    .getCodeSource().getLocation().getPath();
-            File jarFile = new File(path);
-            appDir = jarFile.getParent();
-            if (appDir == null) appDir = ".";
-        } catch (Exception e) { // getProtectionDomain().getCodeSource() 可能因环境不同抛出多种异常
-            appDir = ".";
-        }
-        return appDir;
     }
 
     private void notify(String message, NotificationType type) {
