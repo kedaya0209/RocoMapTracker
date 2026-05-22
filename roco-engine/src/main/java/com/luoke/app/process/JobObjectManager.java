@@ -37,6 +37,7 @@ public class JobObjectManager {
 
     // ---- 常量 ----
     private static final int JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x2000;
+    private static final int JOB_OBJECT_LIMIT_BREAKAWAY_OK = 0x0800;
     private static final int JOB_INFO_CLASS_EXTENDED_LIMIT = 9;
     /**
      * PROCESS_SET_QUOTA | PROCESS_TERMINATE | PROCESS_CREATE_PROCESS | PROCESS_QUERY_LIMITED_INFORMATION
@@ -123,11 +124,11 @@ public class JobObjectManager {
                 return;
             }
 
-            // 2. 配置 KILL_ON_JOB_CLOSE
+            // 2. 配置 KILL_ON_JOB_CLOSE + BREAKAWAY_OK（允许更新脚本脱离 JobObject）
             try (Arena arena = Arena.ofConfined()) {
                 MemorySegment info = arena.allocate(EXTENDED_LIMIT_INFO_SIZE);
                 info.set(ValueLayout.JAVA_INT, LIMIT_FLAGS_OFFSET,
-                        JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE);
+                        JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE | JOB_OBJECT_LIMIT_BREAKAWAY_OK);
 
                 int result = (int) SET_INFORMATION_JOB_OBJECT.invoke(
                         hJob, JOB_INFO_CLASS_EXTENDED_LIMIT, info, EXTENDED_LIMIT_INFO_SIZE);

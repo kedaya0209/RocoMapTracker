@@ -9,6 +9,8 @@ import com.luoke.app.utils.HashUtil;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.*;
+import java.lang.foreign.*;
+import java.lang.invoke.MethodHandle;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -278,29 +280,76 @@ public class UpdateManager {
      * 降级使用 cmd /c start /min。
      */
     private void startScriptDetached(String scriptPath, String workDir) {
-        // 优先尝试 wmic（创建独立进程，脱离 JobObject）
-        String wmicCmd = "wmic process call create \"cmd.exe /c " + scriptPath + "\"";
+        // 使用 FFM CreateProcessW 并设置 CREATE_BREAKAWAY_FROM_JOB
         try {
-            Process p = new ProcessBuilder("cmd.exe", "/c", wmicCmd)
-                    .directory(new File(workDir))
-                    .start();
-            // wmic 启动较慢，最多等 5 秒让脚本启动
-            p.waitFor(5, java.util.concurrent.TimeUnit.SECONDS);
-            log.info("Updater script started via wmic");
-            return;
-        } catch (IOException | InterruptedException e) {
-            log.warn("wmic start failed, fallback to start /min", e);
+            if (startViaCreateProcess(scriptPath, workDir)) {
+                log.info("Updater script started via CreateProcessW (breakaway)");
+                return;
+            }
+        } catch (Throwable e) {
+            log.warn("CreateProcessW failed, fallback", e);
         }
 
-        // 降级：start /min 可能在 JobObject 内被终止，但仍有几率成功
+        // 降级：start /min（可能被 JobObject 终止，但仍有几率成功）
         try {
-            new ProcessBuilder("cmd.exe", "/c", "start", "/min", scriptPath)
+            new ProcessBuilder("cmd.exe", "/c", "start", "/min", "\"\"", scriptPath)
                     .directory(new File(workDir))
                     .start();
             log.info("Updater script started via start /min (fallback)");
         } catch (IOException e) {
             log.error("Failed to start updater script (fallback)", e);
         }
+    }
+
+    /**
+     * 使用 CreateProcessW 启动进程，设置 CREATE_BREAKAWAY_FROM_JOB 脱离 JobObject。
+     */
+    private boolean startViaCreateProcess(String scriptPath, String workDir) throws Throwable {
+        Linker linker = Linker.nativeLinker();
+        SymbolLookup kernel32 = SymbolLookup.libraryLookup("kernel32", Arena.global());
+        MethodHandle createProcessW = linker.downcallHandle(
+                kernel32.find("CreateProcessW").orElseThrow(),
+                FunctionDescriptor.of(
+                        ValueLayout.JAVA_INT,
+                        ValueLayout.ADDRESS,  // lpApplicationName
+                        ValueLayout.ADDRESS,  // lpCommandLine
+                        ValueLayout.ADDRESS,  // lpProcessAttributes
+                        ValueLayout.ADDRESS,  // lpThreadAttributes
+                        ValueLayout.JAVA_INT, // bInheritHandles
+                        ValueLayout.JAVA_INT, // dwCreationFlags
+                        ValueLayout.ADDRESS,  // lpEnvironment
+                        ValueLayout.ADDRESS,  // lpCurrentDirectory
+                        ValueLayout.ADDRESS,  // lpStartupInfo
+                        ValueLayout.ADDRESS   // lpProcessInformation
+                ));
+
+        // CREATE_BREAKAWAY_FROM_JOB = 0x01000000, CREATE_NO_WINDOW = 0x08000000
+        int flags = 0x01000000 | 0x08000000;
+        String cmdLine = "cmd.exe /c \"" + scriptPath + "\"";
+
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment cmdLineSeg = arena.allocateFrom(cmdLine);
+            MemorySegment workDirSeg = workDir != null ? arena.allocateFrom(workDir) : MemorySegment.NULL;
+
+            // STARTUPINFOW (72 bytes) + PROCESS_INFORMATION (24 bytes)
+            MemorySegment si = arena.allocate(72);
+            si.set(ValueLayout.JAVA_INT, 0, 72); // cb
+            MemorySegment pi = arena.allocate(24);
+
+            int result = (int) createProcessW.invoke(
+                    MemorySegment.NULL, cmdLineSeg, MemorySegment.NULL, MemorySegment.NULL,
+                    0, flags, MemorySegment.NULL, workDirSeg, si, pi);
+
+            if (result != 0) {
+                MethodHandle closeHandle = linker.downcallHandle(
+                        kernel32.find("CloseHandle").orElseThrow(),
+                        FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG));
+                closeHandle.invoke(pi.get(ValueLayout.JAVA_LONG, 0)); // hProcess
+                closeHandle.invoke(pi.get(ValueLayout.JAVA_LONG, 8)); // hThread
+                return true;
+            }
+        }
+        return false;
     }
 
     private String generateUpdaterScript(String exePath, String patchPath, String hpatchzPath, String exeName) {
