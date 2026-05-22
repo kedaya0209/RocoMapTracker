@@ -6,7 +6,7 @@
 |---------------|--------------------------------|
 | GraalVM       | 25.0.2+10.1 (企业版)              |
 | Maven         | 3.8+                           |
-| Visual Studio | 18 (Insiders) + Windows 11 SDK |
+| Visual Studio | 18 (Community) + Windows 11 SDK |
 | JDK           | 25                             |
 
 ## 构建管线总览
