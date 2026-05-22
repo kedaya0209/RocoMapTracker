@@ -1,5 +1,6 @@
 package com.luoke.app.ui;
 
+import com.luoke.app.utils.ResourceUtils;
 import net.jcip.annotations.NotThreadSafe;
 import com.luoke.app.config.BuildConfig;
 import com.luoke.app.config.CaptureConfig;
@@ -96,9 +97,11 @@ public class ModernCanvasApp extends Application {
 
         // 程序图标
         try {
-            Image icon = SvgManager.createImage(PathConfig.ICON, 256);
-            if (icon != null) primaryStage.getIcons().add(icon);
-        } catch (Exception e) { // JavaFX SvgManager.createImage 可能抛出多种异常
+            Image icon = new Image(ResourceUtils.getResourceStream(PathConfig.ICON_PNG));
+            if (!icon.isError()) {
+                primaryStage.getIcons().add(icon);
+            }
+        } catch (Exception e) {
             log.warn("程序图标加载失败", e);
         }
         primaryStage.setTitle(CaptureConfig.APP_MAIN_TITLE);
