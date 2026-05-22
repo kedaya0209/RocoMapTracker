@@ -23,9 +23,9 @@ public final class UpdateConfig {
      */
     public static boolean AUTO_DOWNLOAD;
     /**
-     * 下载源：github / jsdelivr
+     * 下载源：gh-proxy（默认）/ jsdelivr / github
      */
-    public static String DOWNLOAD_SOURCE = "jsdelivr";
+    public static String DOWNLOAD_SOURCE = "gh-proxy";
 
     private UpdateConfig() {
         throw new AssertionError("禁止实例化配置类");
@@ -35,7 +35,7 @@ public final class UpdateConfig {
         CHECK_ENABLED = ConfigHelper.getBool(prop, "update.check.enabled", true);
         CHECK_INTERVAL_HOURS = ConfigHelper.getInt(prop, "update.check.interval.hours", 24);
         AUTO_DOWNLOAD = ConfigHelper.getBool(prop, "update.auto.download", false);
-        DOWNLOAD_SOURCE = ConfigHelper.getStr(prop, "update.download.source", "jsdelivr");
+        DOWNLOAD_SOURCE = ConfigHelper.getStr(prop, "update.download.source", "gh-proxy");
     }
 
     public static void save(StringBuilder sb) {
@@ -45,7 +45,7 @@ public final class UpdateConfig {
         sb.append("update.check.interval.hours=").append(CHECK_INTERVAL_HOURS).append("\n");
         sb.append("# 发现更新时自动下载\n");
         sb.append("update.auto.download=").append(AUTO_DOWNLOAD).append("\n");
-        sb.append("# 下载源：github / jsdelivr\n");
+        sb.append("# 下载源：gh-proxy / jsdelivr / github\n");
         sb.append("update.download.source=").append(DOWNLOAD_SOURCE).append("\n\n");
     }
 }

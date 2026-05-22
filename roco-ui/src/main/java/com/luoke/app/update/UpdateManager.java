@@ -16,6 +16,8 @@ import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -37,6 +39,11 @@ public class UpdateManager {
      * jsDelivr CDN 加速前缀（对应 patches 分支上的 updates/ 目录）
      */
     private static final String CDN_BASE = "https://cdn.jsdelivr.net/gh/kedaya0209/RocoMapTracker@patches/updates/";
+
+    /**
+     * gh-proxy.org 加速前缀（代理 GitHub 原始链接）
+     */
+    private static final String GHPROXY_PREFIX = "https://gh-proxy.org/";
 
     private final UpdateChecker checker;
     private final HttpClient httpClient;
@@ -144,8 +151,11 @@ public class UpdateManager {
             try {
                 String exeDir = detectAppDir();
 
-                // ── 按下载源优先级顺序（github / jsdelivr） ──
-                boolean githubFirst = !"jsdelivr".equals(UpdateConfig.DOWNLOAD_SOURCE);
+                // ── 构建下载源优先级列表 ──
+                // gh-proxy.org 代理 GitHub 原始链接，国内访问最快
+                // jsDelivr CDN，文件有缓存延迟
+                // GitHub 直连，国内可能较慢
+                List<String> sources = buildDownloadSources();
 
                 // ── 尝试补丁下载 ──
                 if (info.patchDownloadUrl() != null && isPatchVersionMatch(info)) {
@@ -153,20 +163,8 @@ public class UpdateManager {
                     try {
                         uiDelegate.showDownloadProgress(info.version(), 0);
 
-                        String primaryPatch = githubFirst ? info.patchDownloadUrl() : toCdnUrl(info.patchDownloadUrl());
-                        String secondaryPatch = githubFirst ? toCdnUrl(info.patchDownloadUrl()) : info.patchDownloadUrl();
-                        try {
-                            downloadFile(primaryPatch, patchPath, p ->
-                                    uiDelegate.showDownloadProgress(info.version(), p));
-                        } catch (IOException | InterruptedException e) {
-                            log.warn("首选源补丁下载失败，降级: {}", e.getMessage());
-                            Files.deleteIfExists(patchPath);
-                            if (secondaryPatch != null) {
-                                downloadFile(secondaryPatch, patchPath, p ->
-                                        uiDelegate.showDownloadProgress(info.version(), p));
-                            } else {
-                                throw e;
-                            }
+                        if (!downloadWithFallback(info.patchDownloadUrl(), sources, patchPath, info.version())) {
+                            throw new IOException("所有下载源均失败");
                         }
                         if (info.patchSha256Url() != null) {
                             verifySha256(patchPath, info.patchSha256Url());
@@ -191,20 +189,8 @@ public class UpdateManager {
                     Path exePath = Path.of(exeDir, "RocoMapTracker_" + info.version() + ".exe");
                     uiDelegate.showDownloadProgress(info.version(), 0);
 
-                    String primaryExe = githubFirst ? info.exeDownloadUrl() : toCdnUrl(info.exeDownloadUrl());
-                    String secondaryExe = githubFirst ? toCdnUrl(info.exeDownloadUrl()) : info.exeDownloadUrl();
-                    try {
-                        downloadFile(primaryExe, exePath, p ->
-                                uiDelegate.showDownloadProgress(info.version(), p));
-                    } catch (IOException | InterruptedException e) {
-                        log.warn("首选源 exe 下载失败，降级: {}", e.getMessage());
-                        Files.deleteIfExists(exePath);
-                        if (secondaryExe != null) {
-                            downloadFile(secondaryExe, exePath, p ->
-                                    uiDelegate.showDownloadProgress(info.version(), p));
-                        } else {
-                            throw e;
-                        }
+                    if (!downloadWithFallback(info.exeDownloadUrl(), sources, exePath, info.version())) {
+                        throw new IOException("所有下载源均失败");
                     }
                     if (info.exeSha256Url() != null) {
                         verifySha256(exePath, info.exeSha256Url());
@@ -555,12 +541,77 @@ public class UpdateManager {
     }
 
     /**
-     * 下载 SHA256 校验文件并验证文件完整性
+     * 将 GitHub Release 下载 URL 转换为 gh-proxy.org 代理 URL
+     */
+    private String toGhProxyUrl(String githubUrl) {
+        if (githubUrl == null) return null;
+        return GHPROXY_PREFIX + githubUrl;
+    }
+
+    /**
+     * 按配置构建下载源优先级列表。
+     * 支持的源：gh-proxy（默认）/ jsdelivr / github
+     */
+    private List<String> buildDownloadSources() {
+        List<String> sources = new ArrayList<>();
+        String config = UpdateConfig.DOWNLOAD_SOURCE;
+        // 按配置决定首选源
+        if ("jsdelivr".equals(config)) {
+            sources.add("jsdelivr");
+            sources.add("gh-proxy");
+            sources.add("github");
+        } else if ("github".equals(config)) {
+            sources.add("github");
+            sources.add("gh-proxy");
+            sources.add("jsdelivr");
+        } else {
+            // 默认 gh-proxy
+            sources.add("gh-proxy");
+            sources.add("jsdelivr");
+            sources.add("github");
+        }
+        return sources;
+    }
+
+    /**
+     * 按源优先级依次尝试下载，任一成功即返回 true。
+     */
+    private boolean downloadWithFallback(String githubUrl, List<String> sources,
+            Path target, String version) throws IOException, InterruptedException {
+        for (String source : sources) {
+            String url = switch (source) {
+                case "gh-proxy" -> toGhProxyUrl(githubUrl);
+                case "jsdelivr" -> toCdnUrl(githubUrl);
+                default -> githubUrl;
+            };
+            if (url == null) continue;
+            try {
+                log.info("尝试下载源 {}: {}", source, url);
+                downloadFile(url, target, p ->
+                        uiDelegate.showDownloadProgress(version, p));
+                return true;
+            } catch (IOException | InterruptedException e) {
+                log.warn("下载源 {} 失败: {}", source, e.getMessage());
+                Files.deleteIfExists(target);
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 下载 SHA256 校验文件并验证文件完整性（通过代理加速）
      */
     private void verifySha256(Path filePath, String sha256Url) throws IOException, InterruptedException {
         Path sha256Path = Path.of(filePath + ".sha256");
         try {
-            downloadFile(sha256Url, sha256Path);
+            String proxyUrl = toGhProxyUrl(sha256Url);
+            try {
+                downloadFile(proxyUrl, sha256Path);
+            } catch (IOException e) {
+                log.warn("SHA256 通过 gh-proxy 下载失败，降级直连: {}", e.getMessage());
+                Files.deleteIfExists(sha256Path);
+                downloadFile(sha256Url, sha256Path);
+            }
             String expected = Files.readString(sha256Path).trim();
             String actual = HashUtil.computeFileSHA256(filePath.toFile());
             if (!expected.equalsIgnoreCase(actual)) {
