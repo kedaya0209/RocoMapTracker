@@ -1,6 +1,7 @@
 package com.luoke.app.config;
 
 import net.jcip.annotations.NotThreadSafe;
+
 import java.util.Properties;
 
 /**
@@ -9,14 +10,22 @@ import java.util.Properties;
 @NotThreadSafe
 public final class UpdateConfig {
 
-    /** 自动检查更新开关 */
+    /**
+     * 自动检查更新开关
+     */
     public static boolean CHECK_ENABLED = true;
-    /** 检查间隔（小时） */
+    /**
+     * 检查间隔（小时）
+     */
     public static int CHECK_INTERVAL_HOURS = 24;
-    /** 发现更新时自动下载 */
+    /**
+     * 发现更新时自动下载
+     */
     public static boolean AUTO_DOWNLOAD;
-    /** 下载源：github / jsdelivr */
-    public static String DOWNLOAD_SOURCE = "github";
+    /**
+     * 下载源：github / jsdelivr
+     */
+    public static String DOWNLOAD_SOURCE = "jsdelivr";
 
     private UpdateConfig() {
         throw new AssertionError("禁止实例化配置类");
@@ -26,7 +35,7 @@ public final class UpdateConfig {
         CHECK_ENABLED = ConfigHelper.getBool(prop, "update.check.enabled", true);
         CHECK_INTERVAL_HOURS = ConfigHelper.getInt(prop, "update.check.interval.hours", 24);
         AUTO_DOWNLOAD = ConfigHelper.getBool(prop, "update.auto.download", false);
-        DOWNLOAD_SOURCE = ConfigHelper.getStr(prop, "update.download.source", "github");
+        DOWNLOAD_SOURCE = ConfigHelper.getStr(prop, "update.download.source", "jsdelivr");
     }
 
     public static void save(StringBuilder sb) {

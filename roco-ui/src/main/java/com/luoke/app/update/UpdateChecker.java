@@ -41,7 +41,7 @@ public class UpdateChecker {
                     .uri(URI.create(GITHUB_API))
                     .timeout(TIMEOUT)
                     .header("Accept", "application/vnd.github.v3+json")
-                    .header("User-Agent", "RocoMapTracker")
+                    .header("User-Agent", "RocoMapTracker/1.0")
                     .GET()
                     .build();
 

@@ -35,7 +35,9 @@ public class UpdateManager {
 
     private static volatile UpdateManager instance;
 
-    /** jsDelivr CDN 加速前缀（对应 patches 分支上的 updates/ 目录） */
+    /**
+     * jsDelivr CDN 加速前缀（对应 patches 分支上的 updates/ 目录）
+     */
     private static final String CDN_BASE = "https://cdn.jsdelivr.net/gh/kedaya0209/RocoMapTracker@patches/updates/";
 
     private final UpdateChecker checker;
@@ -73,10 +75,22 @@ public class UpdateManager {
     public void startPeriodicCheck(int intervalHours) {
         this.appDir = detectAppDir();
         Thread.ofPlatform().daemon(true).name("update-checker").start(() -> {
-            try { Thread.sleep(10_000); } catch (InterruptedException ignored) { return; }
+            try {
+                Thread.sleep(10_000);
+            } catch (InterruptedException ignored) {
+                return;
+            }
             while (!Thread.currentThread().isInterrupted()) {
-                try { checkAndNotify(); } catch (Exception e) { log.warn("Periodic update check failed", e); } // 后台周期性检查，捕获所有异常避免线程终止
-                try { Thread.sleep(intervalHours * 3600_000L); } catch (InterruptedException ignored) { break; }
+                try {
+                    checkAndNotify();
+                } catch (Exception e) {
+                    log.warn("Periodic update check failed", e);
+                } // 后台周期性检查，捕获所有异常避免线程终止
+                try {
+                    Thread.sleep(intervalHours * 3600_000L);
+                } catch (InterruptedException ignored) {
+                    break;
+                }
             }
         });
     }
@@ -244,7 +258,10 @@ public class UpdateManager {
             log.info("Starting updater script: {}", scriptPath);
             startScriptDetached(scriptPath.toString(), exeDir);
             // 等待 updater 初始化完成再退出（确保 WMI 已创建独立进程）
-            try { Thread.sleep(2000); } catch (InterruptedException ignored) {}
+            try {
+                Thread.sleep(2000);
+            } catch (InterruptedException ignored) {
+            }
             if (uiDelegate != null) uiDelegate.restartApplication();
         } catch (IOException e) {
             log.error("Failed to start updater script", e);
@@ -264,7 +281,10 @@ public class UpdateManager {
             log.info("Starting updater script: {}", scriptPath);
             startScriptDetached(scriptPath.toString(), exeDir);
             // 等待 updater 初始化完成再退出（确保 WMI 已创建独立进程）
-            try { Thread.sleep(2000); } catch (InterruptedException ignored) {}
+            try {
+                Thread.sleep(2000);
+            } catch (InterruptedException ignored) {
+            }
             if (uiDelegate != null) uiDelegate.restartApplication();
         } catch (IOException e) {
             log.error("Failed to start updater script", e);
@@ -442,7 +462,9 @@ public class UpdateManager {
         downloadFile(url, targetPath, null);
     }
 
-    /** 最大重试次数（瞬态网络错误时自动重试） */
+    /**
+     * 最大重试次数（瞬态网络错误时自动重试）
+     */
     private static final int MAX_DOWNLOAD_RETRIES = 3;
 
     private void downloadFile(String url, Path targetPath, Consumer<Double> progressCallback) throws IOException, InterruptedException {
@@ -452,7 +474,18 @@ public class UpdateManager {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
                 .timeout(Duration.ofMinutes(30))
-                .header("User-Agent", "RocoMapTracker")
+                // 完整的浏览器 User-Agent
+                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                // 通用的 Accept
+                .header("Accept", "*/*")
+                // 支持压缩（服务器可能会拒绝不支持的客户端）
+                .header("Accept-Encoding", "gzip, deflate, br")
+                // 支持的语言
+                .header("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8")
+                // 保持连接
+                .header("Connection", "keep-alive")
+                // 不缓存（下载大文件时推荐）
+                .header("Cache-Control", "no-cache")
                 .GET()
                 .build();
 
@@ -476,7 +509,11 @@ public class UpdateManager {
                 if (attempt < MAX_DOWNLOAD_RETRIES) {
                     long delay = (long) Math.pow(2, attempt) * 1000L; // 2s, 4s
                     log.warn("下载失败（第 {}/{} 次），{} 秒后重试: {}", attempt, MAX_DOWNLOAD_RETRIES, delay / 1000, e.getMessage());
-                    try { Thread.sleep(delay); } catch (InterruptedException ie) { throw ie; }
+                    try {
+                        Thread.sleep(delay);
+                    } catch (InterruptedException ie) {
+                        throw ie;
+                    }
                 } else {
                     throw e; // 最后一次仍失败，向上抛
                 }
@@ -509,13 +546,17 @@ public class UpdateManager {
         }
     }
 
-    /** 检查补丁的源版本号是否匹配当前本地版本 */
+    /**
+     * 检查补丁的源版本号是否匹配当前本地版本
+     */
     private boolean isPatchVersionMatch(VersionInfo info) {
         return info.patchFromVersion() != null
                 && info.patchFromVersion().equals(BuildConfig.APP_VERSION);
     }
 
-    /** 将 GitHub Release 下载 URL 转换为 jsDelivr CDN URL */
+    /**
+     * 将 GitHub Release 下载 URL 转换为 jsDelivr CDN URL
+     */
     private String toCdnUrl(String githubUrl) {
         if (githubUrl == null) return null;
         int lastSlash = githubUrl.lastIndexOf('/');
@@ -523,7 +564,9 @@ public class UpdateManager {
         return CDN_BASE + githubUrl.substring(lastSlash + 1);
     }
 
-    /** 下载 SHA256 校验文件并验证文件完整性 */
+    /**
+     * 下载 SHA256 校验文件并验证文件完整性
+     */
     private void verifySha256(Path filePath, String sha256Url) throws IOException, InterruptedException {
         Path sha256Path = Path.of(filePath + ".sha256");
         try {
