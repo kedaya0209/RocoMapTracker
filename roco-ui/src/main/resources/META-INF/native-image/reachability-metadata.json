@@ -8762,6 +8762,9 @@
       "glob": "icon/rmt.svg"
     },
     {
+      "glob": "icon/rmt.png"
+    },
+    {
       "glob": "icon/route.svg"
     },
     {
