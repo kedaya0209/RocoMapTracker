@@ -157,9 +157,12 @@ public class UpdateManager {
         final Path[] downloadPath = {null};
         Thread.ofPlatform().daemon(true).name("update-download").start(() -> {
             try {
+                // 立即显示进度弹框，避免竞速/下载异常时用户看不到任何反馈
+                uiDelegate.showDownloadProgress(info.version(), 0);
+
                 String exeDir = FilePathUtil.getAppRootDir().toString();
 
-                // ── 三源竞速 5 秒，选出最快下载源 ──
+                // ── 三源竞速，选出最快下载源 ──
                 String raceUrl = info.exeDownloadUrl() != null
                         ? info.exeDownloadUrl() : info.patchDownloadUrl();
                 List<String> sources = raceUrl != null
@@ -170,8 +173,6 @@ public class UpdateManager {
                 if (info.patchDownloadUrl() != null && isPatchVersionMatch(info)) {
                     Path patchPath = Path.of(exeDir, "update_" + info.version() + ".hdiff");
                     try {
-                        uiDelegate.showDownloadProgress(info.version(), 0);
-
                         if (!downloadWithFallback(info.patchDownloadUrl(), sources, patchPath, info.version())) {
                             throw new IOException("所有下载源均失败");
                         }
