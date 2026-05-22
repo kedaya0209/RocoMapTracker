@@ -59,6 +59,7 @@ public class UpdateManager {
     private final HttpClient httpClient;
     private final AtomicBoolean checking = new AtomicBoolean(false);
     private final AtomicBoolean downloading = new AtomicBoolean(false);
+    private final AtomicBoolean updateDialogShowing = new AtomicBoolean(false);
 
     private final AtomicReference<VersionInfo> pendingUpdate = new AtomicReference<>(null);
     @Setter
@@ -136,7 +137,7 @@ public class UpdateManager {
                 notify("发现新版本 " + latest.version() + "，开始自动下载", NotificationType.INFO);
                 startDownload(latest);
             } else {
-                if (uiDelegate != null) {
+                if (uiDelegate != null && updateDialogShowing.compareAndSet(false, true)) {
                     uiDelegate.showUpdateAvailable(latest);
                 }
             }
@@ -149,6 +150,7 @@ public class UpdateManager {
      * 开始下载更新 — 带进度条 + 下载完毕弹窗（立即更新 / 下次再说）
      */
     public void startDownload(VersionInfo info) {
+        updateDialogShowing.set(false);
         if (!downloading.compareAndSet(false, true)) {
             notify("正在下载中，请稍候", NotificationType.INFO);
             return;
@@ -681,5 +683,9 @@ public class UpdateManager {
 
     public boolean hasPendingUpdate() {
         return pendingUpdate.get() != null;
+    }
+
+    public void resetUpdateDialogShowing() {
+        updateDialogShowing.set(false);
     }
 }

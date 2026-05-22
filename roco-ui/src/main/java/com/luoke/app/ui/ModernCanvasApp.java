@@ -190,7 +190,7 @@ public class ModernCanvasApp extends Application {
                                 info.version(),
                                 info.releaseNotes(),
                                 () -> UpdateManager.getInstance().startDownload(info),
-                                () -> {}));
+                                () -> UpdateManager.getInstance().resetUpdateDialogShowing()));
             }
 
             @Override

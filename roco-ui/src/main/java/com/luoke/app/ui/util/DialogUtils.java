@@ -152,7 +152,10 @@ public class DialogUtils {
         confirmBtn.getStyleClass().addAll(Styles.BUTTON_OUTLINED, confirmBtnStyleClass);
         confirmBtn.setPrefWidth(120);
         FxRippleUtil.install(confirmBtn);
-        confirmBtn.setOnAction(e -> fadeOutAndRemove(rootStack, mask, onConfirm));
+        confirmBtn.setOnAction(e -> {
+            rootStack.getChildren().remove(mask);
+            if (onConfirm != null) onConfirm.run();
+        });
 
         btnBox.getChildren().add(confirmBtn);
 
