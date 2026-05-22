@@ -9,8 +9,6 @@ import com.luoke.app.utils.HashUtil;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.*;
-import java.lang.foreign.*;
-import java.lang.invoke.MethodHandle;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -296,18 +294,18 @@ public class UpdateManager {
      * 以脱离 JobObject 的方式启动 updater 脚本，防止 Java 进程退出时
      * JobObject 的 KILL_ON_JOB_CLOSE 将脚本一同终止。
      * <p>
-     * 策略：优先通过 WMI (wmic) 创建独立进程（不在 JobObject 内），
+     * 策略：通过 schtasks 创建一次性计划任务（独立于 JobObject），
      * 降级使用 cmd /c start /min。
      */
     private void startScriptDetached(String scriptPath, String workDir) {
-        // 使用 FFM CreateProcessW 并设置 CREATE_BREAKAWAY_FROM_JOB
+        // 通过 schtasks 创建一次性任务，进程独立于 JobObject
         try {
-            if (startViaCreateProcess(scriptPath, workDir)) {
-                log.info("Updater script started via CreateProcessW (breakaway)");
+            if (startViaSchtasks(scriptPath, workDir)) {
+                log.info("Updater script started via schtasks (independent process)");
                 return;
             }
-        } catch (Throwable e) {
-            log.warn("CreateProcessW failed, fallback", e);
+        } catch (Exception e) {
+            log.warn("schtasks failed, fallback", e);
         }
 
         // 降级：start /min（可能被 JobObject 终止，但仍有几率成功）
@@ -322,54 +320,48 @@ public class UpdateManager {
     }
 
     /**
-     * 使用 CreateProcessW 启动进程，设置 CREATE_BREAKAWAY_FROM_JOB 脱离 JobObject。
+     * 通过 schtasks 创建一次性计划任务启动脚本，进程独立于当前 JobObject。
+     * 任务在当前用户会话中立即执行，杀毒软件不会将其标记为可疑行为。
      */
-    private boolean startViaCreateProcess(String scriptPath, String workDir) throws Throwable {
-        Linker linker = Linker.nativeLinker();
-        SymbolLookup kernel32 = SymbolLookup.libraryLookup("kernel32", Arena.global());
-        MethodHandle createProcessW = linker.downcallHandle(
-                kernel32.find("CreateProcessW").orElseThrow(),
-                FunctionDescriptor.of(
-                        ValueLayout.JAVA_INT,
-                        ValueLayout.ADDRESS,  // lpApplicationName
-                        ValueLayout.ADDRESS,  // lpCommandLine
-                        ValueLayout.ADDRESS,  // lpProcessAttributes
-                        ValueLayout.ADDRESS,  // lpThreadAttributes
-                        ValueLayout.JAVA_INT, // bInheritHandles
-                        ValueLayout.JAVA_INT, // dwCreationFlags
-                        ValueLayout.ADDRESS,  // lpEnvironment
-                        ValueLayout.ADDRESS,  // lpCurrentDirectory
-                        ValueLayout.ADDRESS,  // lpStartupInfo
-                        ValueLayout.ADDRESS   // lpProcessInformation
-                ));
+    private boolean startViaSchtasks(String scriptPath, String workDir) throws IOException, InterruptedException {
+        String taskName = "RocoMapTracker_Update_" + System.currentTimeMillis();
 
-        // CREATE_BREAKAWAY_FROM_JOB = 0x01000000, CREATE_NO_WINDOW = 0x08000000
-        int flags = 0x01000000 | 0x08000000;
-        String cmdLine = "cmd.exe /c \"" + scriptPath + "\"";
-
-        try (Arena arena = Arena.ofConfined()) {
-            MemorySegment cmdLineSeg = arena.allocateFrom(cmdLine);
-            MemorySegment workDirSeg = workDir != null ? arena.allocateFrom(workDir) : MemorySegment.NULL;
-
-            // STARTUPINFOW (72 bytes) + PROCESS_INFORMATION (24 bytes)
-            MemorySegment si = arena.allocate(72);
-            si.set(ValueLayout.JAVA_INT, 0, 72); // cb
-            MemorySegment pi = arena.allocate(24);
-
-            int result = (int) createProcessW.invoke(
-                    MemorySegment.NULL, cmdLineSeg, MemorySegment.NULL, MemorySegment.NULL,
-                    0, flags, MemorySegment.NULL, workDirSeg, si, pi);
-
-            if (result != 0) {
-                MethodHandle closeHandle = linker.downcallHandle(
-                        kernel32.find("CloseHandle").orElseThrow(),
-                        FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG));
-                closeHandle.invoke(pi.get(ValueLayout.JAVA_LONG, 0)); // hProcess
-                closeHandle.invoke(pi.get(ValueLayout.JAVA_LONG, 8)); // hThread
-                return true;
-            }
+        // schtasks /create 一次性任务，/RI 1 延迟 1 分钟（单位分钟），实际用 /ST 设为当前时间+几秒
+        // 更简单的方案：用 ONCE + /ST 稍后的时间
+        ProcessBuilder createPb = new ProcessBuilder(
+                "schtasks.exe", "/create",
+                "/tn", taskName,
+                "/tr", "cmd.exe /c \"" + scriptPath + "\"",
+                "/sc", "once",
+                "/st", "00:00",
+                "/f",
+                "/rl", "LIMITED"
+        );
+        if (workDir != null) {
+            createPb.directory(new File(workDir));
         }
-        return false;
+        Process createProc = createPb.start();
+        int createExit = createProc.waitFor();
+        if (createExit != 0) {
+            log.warn("schtasks /create failed with exit code: {}", createExit);
+            return false;
+        }
+
+        // 立即运行任务
+        ProcessBuilder runPb = new ProcessBuilder(
+                "schtasks.exe", "/run", "/tn", taskName
+        );
+        Process runProc = runPb.start();
+        int runExit = runProc.waitFor();
+        if (runExit != 0) {
+            log.warn("schtasks /run failed with exit code: {}", runExit);
+        }
+
+        // 删除任务定义（任务已启动，删除不影响运行中的进程）
+        new ProcessBuilder("schtasks.exe", "/delete", "/tn", taskName, "/f")
+                .start().waitFor();
+
+        return runExit == 0;
     }
 
     private String generateUpdaterScript(String exePath, String patchPath, String hpatchzPath, String exeName) {
