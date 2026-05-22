@@ -474,8 +474,6 @@ public class UpdateManager {
                 .header("Accept-Encoding", "gzip, deflate, br")
                 // 支持的语言
                 .header("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8")
-                // 保持连接
-                .header("Connection", "keep-alive")
                 // 不缓存（下载大文件时推荐）
                 .header("Cache-Control", "no-cache")
                 .GET()
