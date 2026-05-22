@@ -23,18 +23,13 @@ public class UiAnimator {
         this.sidebarNode = sidebar;
         this.floatNode = floatContainer;
 
-        // 核心修正：确保在界面渲染后，动态计算宽度并初始化位置
+        // 布局完成后用真实宽度校正初始位置（prefWidth 在未布局时可能不准确）
         Platform.runLater(() -> {
-            // 获取侧边栏渲染后的真实宽度
             double width = sidebar.getLayoutBounds().getWidth();
             if (width <= 0) {
-                // 如果是PrefWidth设置的，尝试获取预设宽度
                 width = sidebar.prefWidth(-1);
             }
-
-            // 初始状态：将侧边栏向左偏移自身宽度的距离，实现完全隐藏
             sidebar.setTranslateX(-width);
-            log.debug("侧边栏初始化完成，动态宽度: {}", width);
         });
 
         menuBtn.setOnAction(_ -> toggleSidebar());
@@ -44,18 +39,21 @@ public class UiAnimator {
         if (sidebarNode == null) return;
         double currentWidth = sidebarNode.getLayoutBounds().getWidth();
 
+        // 根据实际 translateX 判断当前是否可见，避免初始位置计算不准确导致第一次点击行为错误
+        boolean effectivelyVisible = sidebarNode.getTranslateX() >= -1;
+
         TranslateTransition st = new TranslateTransition(Duration.millis(RenderConfig.SIDEBAR_ANIM_MS), sidebarNode);
         TranslateTransition ft = new TranslateTransition(Duration.millis(RenderConfig.SIDEBAR_ANIM_MS), floatNode);
 
-        double targetX = sidebarVisible ? -currentWidth : 0;
-        double floatTargetX = sidebarVisible ? 0 : currentWidth;
+        double targetX = effectivelyVisible ? -currentWidth : 0;
+        double floatTargetX = effectivelyVisible ? 0 : currentWidth;
 
         st.setToX(targetX);
         ft.setToX(floatTargetX);
         st.play();
         ft.play();
 
-        sidebarVisible = !sidebarVisible;
+        sidebarVisible = !effectivelyVisible;
     }
 
     /**
