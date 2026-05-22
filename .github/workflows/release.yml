@@ -63,14 +63,16 @@ jobs:
 
       - name: Build capture.exe
         run: |
-          cl /std:c++17 /O2 /EHsc /arch:AVX2 /Fe:capture.exe capture_main.cpp d3d11.lib dxgi.lib windowsapp.lib runtimeobject.lib user32.lib ws2_32.lib winmm.lib
+          rc /nologo /fo resource.res resource.rc
+          cl /std:c++17 /O2 /EHsc /arch:AVX2 /Fe:capture.exe capture_main.cpp resource.res d3d11.lib dxgi.lib windowsapp.lib runtimeobject.lib user32.lib ws2_32.lib winmm.lib
         working-directory: cpp
 
       - name: Build sift_match.exe
         run: |
           set "INCLUDE=D:\a\opencv\opencv\build\include;D:\a\zlib\include;%INCLUDE%"
           set "LIB=D:\a\opencv\opencv\build\x64\vc16\lib;D:\a\zlib\lib;%LIB%"
-          cl /std:c++17 /O2 /EHsc /arch:AVX2 /Fe:sift_match.exe sift_match_main.cpp ws2_32.lib opencv_world4100.lib
+          rc /nologo /fo resource.res resource.rc
+          cl /std:c++17 /O2 /EHsc /arch:AVX2 /Fe:sift_match.exe sift_match_main.cpp resource.res ws2_32.lib opencv_world4100.lib zlib.lib
           copy /Y "D:\a\opencv\opencv\build\x64\vc16\bin\opencv_world4100.dll" .
         working-directory: cpp
         shell: cmd

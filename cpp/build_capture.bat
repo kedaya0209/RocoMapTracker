@@ -4,6 +4,9 @@ echo ========================================
 echo   Building capture.exe (Socket Mode)
 echo ========================================
 
+:: Ensure vswhere.exe is on PATH (needed by vcvars64.bat)
+set "PATH=%PATH%;C:\Program Files (x86)\Microsoft Visual Studio\Installer"
+
 :: Setup MSVC environment
 call "C:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvars64.bat" >nul
 set _VC_ERR=%ERRORLEVEL%
@@ -32,6 +35,10 @@ if %ERRORLEVEL% equ 0 (
     echo.
     echo ========================================
     echo   BUILD SUCCESS
+    echo ========================================
+    echo Copying to resources...
+    copy /y "%OUTPUT%" "..\roco-ui\src\main\resources\capture\%OUTPUT%" >nul
+    echo Done.
     echo ========================================
 ) else (
     echo.

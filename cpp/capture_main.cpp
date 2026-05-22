@@ -55,6 +55,8 @@
 #include <cstdlib>
 #include <cstring>
 
+#include "socket_common.h"
+
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "windowsapp.lib")
@@ -85,7 +87,7 @@ constexpr DXGI_FORMAT kFormat = static_cast<DXGI_FORMAT>(87); // DXGI_FORMAT_B8G
 // Message types
 // ============================================================================
 enum MsgType : int32_t {
-    HELLO            = 1,    // C++ -> Java (handshake: body="capture" or "sift")
+    // HELLO = 1  — defined in socket_common.h (CommonMsgType)
     REQUEST_ROI      = 100,  // C++ -> Java
     RETURN_ROI       = 101,  // Java -> C++
     CAPTURE_READY    = 102,  // C++ -> Java
@@ -107,45 +109,6 @@ struct ROI {
 #pragma pack(pop)
 
 // ============================================================================
-// Big-endian read/write helpers
-// ============================================================================
-static inline void write_be16(uint8_t* buf, uint16_t v) {
-    buf[0] = (uint8_t)((v >> 8) & 0xFF);
-    buf[1] = (uint8_t)(v & 0xFF);
-}
-static inline void write_be32(uint8_t* buf, uint32_t v) {
-    buf[0] = (uint8_t)((v >> 24) & 0xFF);
-    buf[1] = (uint8_t)((v >> 16) & 0xFF);
-    buf[2] = (uint8_t)((v >> 8) & 0xFF);
-    buf[3] = (uint8_t)(v & 0xFF);
-}
-static inline uint16_t read_be16(const uint8_t* buf) {
-    return ((uint16_t)buf[0] << 8) | (uint16_t)buf[1];
-}
-static inline uint32_t read_be32(const uint8_t* buf) {
-    return ((uint32_t)buf[0] << 24) | ((uint32_t)buf[1] << 16)
-         | ((uint32_t)buf[2] << 8)  |  (uint32_t)buf[3];
-}
-
-// ============================================================================
-// Build HELLO body: [2B]clientTypeLen [NB]clientType [2B]msgTypeCount [N*4B]msgTypes
-// ============================================================================
-static std::vector<uint8_t> build_hello(const char* clientType,
-                                         const int32_t* msgTypes, uint16_t count) {
-    size_t nameLen = strlen(clientType);
-    std::vector<uint8_t> buf(2 + nameLen + 2 + (size_t)count * 4);
-    size_t off = 0;
-    write_be16(buf.data() + off, (uint16_t)nameLen); off += 2;
-    memcpy(buf.data() + off, clientType, nameLen);    off += nameLen;
-    write_be16(buf.data() + off, count);               off += 2;
-    for (uint16_t i = 0; i < count; i++) {
-        write_be32(buf.data() + off, (uint32_t)msgTypes[i]);
-        off += 4;
-    }
-    return buf;
-}
-
-// ============================================================================
 // Process memory query
 // ============================================================================
 static SIZE_T get_process_ws() {
@@ -153,52 +116,6 @@ static SIZE_T get_process_ws() {
     if (GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS*)&pmc, sizeof(pmc)))
         return pmc.PrivateUsage;
     return 0;
-}
-
-// ============================================================================
-// Socket helpers (blocking, handle partial send/recv)
-// ============================================================================
-static bool send_all(SOCKET sock, const void* data, size_t len) {
-    const char* p = (const char*)data;
-    while (len > 0) {
-        int sent = send(sock, p, (int)len, 0);
-        if (sent <= 0) return false;
-        p += sent;
-        len -= sent;
-    }
-    return true;
-}
-
-static bool recv_all(SOCKET sock, void* buf, size_t len) {
-    char* p = (char*)buf;
-    while (len > 0) {
-        int rcvd = recv(sock, p, (int)len, 0);
-        if (rcvd <= 0) return false;
-        p += rcvd;
-        len -= rcvd;
-    }
-    return true;
-}
-
-// Send a message: [4B msgType BE] [4B bodyLen BE] [body]
-static bool send_message(SOCKET sock, MsgType type, const void* body, uint32_t body_len) {
-    uint8_t header[8];
-    write_be32(header, (uint32_t)type);
-    write_be32(header + 4, body_len);
-    if (!send_all(sock, header, 8)) return false;
-    if (body_len > 0 && !send_all(sock, body, body_len)) return false;
-    return true;
-}
-
-// Receive a message, returns msgType (or -1 on error), body stored in out param
-static int32_t recv_message(SOCKET sock, std::vector<uint8_t>& body) {
-    uint8_t header[8];
-    if (!recv_all(sock, header, 8)) return -1;
-    int32_t type = (int32_t)read_be32(header);
-    uint32_t len = read_be32(header + 4);
-    body.resize(len);
-    if (len > 0 && !recv_all(sock, body.data(), len)) return -1;
-    return type;
 }
 
 // ============================================================================
