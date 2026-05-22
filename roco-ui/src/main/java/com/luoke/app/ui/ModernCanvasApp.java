@@ -1,5 +1,7 @@
 package com.luoke.app.ui;
 
+import com.luoke.app.ui.util.TaskbarIconHelper;
+import com.luoke.app.utils.FilePathUtil;
 import com.luoke.app.utils.ResourceUtils;
 import net.jcip.annotations.NotThreadSafe;
 import com.luoke.app.config.BuildConfig;
@@ -26,6 +28,12 @@ import com.luoke.app.ui.util.DialogUtils.ProgressControl;
 import com.luoke.app.update.UpdateManager;
 import com.luoke.app.update.UpdateUiDelegate;
 import com.luoke.app.update.VersionInfo;
+
+import java.io.File;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
+
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.scene.Scene;
@@ -106,6 +114,27 @@ public class ModernCanvasApp extends Application {
         }
         primaryStage.setTitle(CaptureConfig.APP_MAIN_TITLE);
         primaryStage.show();
+
+        // Native Image 下 StageStyle.TRANSPARENT 导致任务栏图标不生效，通过 Win32 API 补设
+        try {
+            File iconFile = FilePathUtil.getExternalFile("icon", "/rmt.ico");
+            if (!iconFile.exists()) {
+                // 释放到程序根目录（Native Image 下资源嵌入在 exe 中）
+                File appDir = FilePathUtil.getAppRootDir().toFile();
+                iconFile = new File(appDir, "rmt.ico");
+                if (!iconFile.exists()) {
+                    try (InputStream is = ResourceUtils.getResourceStream(PathConfig.ICON_ICO)) {
+                        Files.copy(is, iconFile.toPath(),
+                                StandardCopyOption.REPLACE_EXISTING);
+                    }
+                }
+            }
+            if (iconFile.exists()) {
+                TaskbarIconHelper.setIcon(primaryStage, iconFile.getAbsolutePath());
+            }
+        } catch (Exception e) {
+            log.debug("Win32 任务栏图标设置跳过", e);
+        }
 
         // ---- 2. 基础设施 ----
         InfrastructureManager.init();
