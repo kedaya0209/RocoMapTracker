@@ -26,10 +26,10 @@ public class UiAnimator {
         // 布局完成后用真实宽度校正初始位置（prefWidth 在未布局时可能不准确）
         Platform.runLater(() -> {
             double width = sidebar.getLayoutBounds().getWidth();
-            if (width <= 0) {
-                width = sidebar.prefWidth(-1);
+            if (width > 0) {
+                sidebar.setTranslateX(-width);
             }
-            sidebar.setTranslateX(-width);
+            // width <= 0 说明布局尚未完成，保持 MainUiComposer 设置的 -1000 初始值
         });
 
         menuBtn.setOnAction(_ -> toggleSidebar());
@@ -39,7 +39,12 @@ public class UiAnimator {
         if (sidebarNode == null) return;
         double currentWidth = sidebarNode.getLayoutBounds().getWidth();
 
-        // 根据实际 translateX 判断当前是否可见，避免初始位置计算不准确导致第一次点击行为错误
+        // 如果 Platform.runLater 校正未生效（translateX 远超 -width），先校正起始位置
+        if (sidebarNode.getTranslateX() < -currentWidth - 10) {
+            sidebarNode.setTranslateX(-currentWidth);
+        }
+
+        // 根据实际 translateX 判断当前是否可见，避免首次点击行为错误
         boolean effectivelyVisible = sidebarNode.getTranslateX() >= -1;
 
         TranslateTransition st = new TranslateTransition(Duration.millis(RenderConfig.SIDEBAR_ANIM_MS), sidebarNode);

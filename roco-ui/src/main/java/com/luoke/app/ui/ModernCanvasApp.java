@@ -223,7 +223,21 @@ public class ModernCanvasApp extends Application {
         this.sidebar = result.sidebar();
 
         // 设置更新 UI 回调
-        UpdateManager.getInstance().setUiDelegate(new UpdateUiDelegate() {
+        UpdateManager.getInstance().setUiDelegate(createUpdateUiDelegate());
+
+        // 启动定时更新检查
+        if (UpdateConfig.CHECK_ENABLED) {
+            UpdateManager.getInstance().startPeriodicCheck(UpdateConfig.CHECK_INTERVAL_HOURS);
+        }
+
+        // UI 完全就绪后补设任务栏图标（start() 阶段 HWND 可能未就绪）
+        initTaskbarIcon();
+
+        log.info("主界面构建完成");
+    }
+
+    private UpdateUiDelegate createUpdateUiDelegate() {
+        return new UpdateUiDelegate() {
             private volatile ProgressControl downloadProgress;
             private volatile boolean backgroundMode;
 
@@ -255,7 +269,6 @@ public class ModernCanvasApp extends Application {
                     }
                     if (downloadProgress == null) {
                         downloadProgress = DialogUtils.showDownloadProgressDialog(rootStack, version, () -> {
-                            // 后台下载按钮回调：切到侧边栏显示进度
                             backgroundMode = true;
                             sidebar.setDownloadProgress(0);
                         });
@@ -293,14 +306,7 @@ public class ModernCanvasApp extends Application {
                     System.exit(0);
                 });
             }
-        });
-
-        // 启动定时更新检查
-        if (UpdateConfig.CHECK_ENABLED) {
-            UpdateManager.getInstance().startPeriodicCheck(UpdateConfig.CHECK_INTERVAL_HOURS);
-        }
-
-        log.info("主界面构建完成");
+        };
     }
 
     @Override
