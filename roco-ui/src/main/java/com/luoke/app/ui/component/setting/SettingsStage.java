@@ -141,6 +141,7 @@ public class SettingsStage extends Stage {
         FxRippleUtil.install(okBtn);
         okBtn.setOnAction(_ -> {
             doApply();
+            cleanupPreview();
             hide();
         });
 
@@ -224,6 +225,13 @@ public class SettingsStage extends Stage {
             int idx = findCategoryIndex(selectCategoryName);
             if (idx >= 0) {
                 categoryList.getSelectionModel().select(idx);
+            }
+        } else {
+            // 重新打开面板时强制刷新当前分类，重建 RoiPreview 等动态组件
+            SettingCategory current = categoryList.getSelectionModel().getSelectedItem();
+            if (current != null) {
+                categoryList.getSelectionModel().clearSelection();
+                Platform.runLater(() -> categoryList.getSelectionModel().select(current));
             }
         }
     }
@@ -491,8 +499,7 @@ public class SettingsStage extends Stage {
         }
     }
 
-    private void handleClose() {
-        // 退出全帧模式
+    private void cleanupPreview() {
         if (currentRoiPreview != null) {
             currentRoiPreview.stop();
             currentRoiPreview = null;
@@ -500,9 +507,11 @@ public class SettingsStage extends Stage {
         if (captureService != null) {
             captureService.setFullFrameMode(false);
         }
-
-        // 提示 GC 回收全帧池化缓冲，使堆可收缩
         System.gc();
+    }
+
+    private void handleClose() {
+        cleanupPreview();
 
         if (configManager.isModified()) {
             if (ownerRoot != null) {

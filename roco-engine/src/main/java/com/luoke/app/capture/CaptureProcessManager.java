@@ -4,6 +4,7 @@ import com.luoke.app.process.JobObjectManager;
 import com.luoke.app.process.NativeProcess;
 import com.luoke.app.process.NativeProcessFactory;
 import com.luoke.app.socket.SocketServer;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
 import net.jcip.annotations.NotThreadSafe;
@@ -20,6 +21,7 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 public class CaptureProcessManager {
 
+    @Getter
     private NativeProcess process;
     private final NativeProcessFactory processFactory;
 
@@ -96,11 +98,8 @@ public class CaptureProcessManager {
         return process != null && process.isAlive();
     }
 
-    public NativeProcess getProcess() {
-        return process;
-    }
-
     private void startReaderThread() {
+        log.info("capture.exe 日志读取线程已启动 pid={}", process.pid());
         Thread.ofPlatform()
                 .daemon(true)
                 .name("capture-stdout")
@@ -109,9 +108,11 @@ public class CaptureProcessManager {
                             new InputStreamReader(process.getInputStream()))) {
                         String line;
                         while ((line = r.readLine()) != null) {
-                            log.debug("[capture.exe] {}", line);
+                            log.info("[capture.exe] {}", line);
                         }
-                    } catch (IOException ignored) {
+                        log.info("capture.exe 日志流已结束");
+                    } catch (IOException e) {
+                        log.warn("capture.exe 日志读取异常: {}", e.getMessage());
                     }
                 });
     }

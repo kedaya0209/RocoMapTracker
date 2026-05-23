@@ -799,6 +799,7 @@ public class RoiPreview {
         timer.stop();
         closeZoomPopup();
         zoomBtn.setText("放大");
+        imageView.setImage(null);
         cachedImage = null;
         argbBuffer = null;
     }
