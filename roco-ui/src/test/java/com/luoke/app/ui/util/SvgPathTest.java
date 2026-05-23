@@ -2,8 +2,12 @@ package com.luoke.app.ui.util;
 
 import com.luoke.app.ui.service.SvgManager;
 import javafx.scene.shape.SVGPath;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.NodeList;
 
 import javax.xml.parsers.DocumentBuilderFactory;
+import java.io.ByteArrayInputStream;
 
 /**
  * 快速测试 SvgManager 路径长度计算是否正确。
@@ -49,11 +53,11 @@ public class SvgPathTest {
                 dbf.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
                 dbf.setFeature("http://xml.org/sax/features/external-general-entities", false);
                 dbf.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
-                org.w3c.dom.Document doc = dbf.newDocumentBuilder().parse(new java.io.ByteArrayInputStream(raw));
-                org.w3c.dom.NodeList pathNodes = doc.getDocumentElement().getElementsByTagName("path");
+                Document doc = dbf.newDocumentBuilder().parse(new ByteArrayInputStream(raw));
+                NodeList pathNodes = doc.getDocumentElement().getElementsByTagName("path");
                 double totalLen = 0;
                 for (int i = 0; i < pathNodes.getLength(); i++) {
-                    String d = ((org.w3c.dom.Element) pathNodes.item(i)).getAttribute("d");
+                    String d = ((Element) pathNodes.item(i)).getAttribute("d");
                     SVGPath sp = new SVGPath();
                     sp.setContent(d);
                     double len = SvgManager.computePathLength(sp);

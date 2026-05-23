@@ -1,6 +1,7 @@
 package com.luoke.app.socket;
 
 import net.jcip.annotations.NotThreadSafe;
+import net.jcip.annotations.ThreadSafe;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.*;
@@ -96,6 +97,7 @@ public class SocketSession implements AutoCloseable {
     /**
      * 一条消息
      */
+    @ThreadSafe
     public record Message(int type, byte[] body) {
     }
 }

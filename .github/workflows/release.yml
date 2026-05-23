@@ -149,13 +149,10 @@ jobs:
         continue-on-error: true
         shell: bash
         run: |
-          # 直接从远端查询 tag，不依赖本地 fetch
-          PREV_TAG=$(git ls-remote --tags origin 2>/dev/null | \
-            sed 's|.*refs/tags/||' | \
-            grep -v '\^{}' | \
-            sort -V | \
-            grep -v -x "v${{ github.event.inputs.version }}" | \
-            tail -1)
+          # fetch 远端 tags 到本地
+          git fetch origin --tags --force 2>/dev/null || true
+          # 从本地 tags 查询上一个版本
+          PREV_TAG=$(git tag -l 'v*' | sort -V | grep -v -x "v${{ github.event.inputs.version }}" | tail -1)
           echo "prev_tag=$PREV_TAG" >> "$GITHUB_OUTPUT"
 
       - name: Download previous EXE from previous Release
@@ -249,7 +246,11 @@ jobs:
             echo "首次发版，使用全部 commit 日志" >&2
             git log --no-merges --oneline --format="- %s" > releasenotes.md
           else
-            git log "$PREV_TAG..HEAD" --no-merges --oneline --format="- %s" > releasenotes.md
+            echo "生成从 $PREV_TAG 到 HEAD 的 release notes" >&2
+            git log "$PREV_TAG..HEAD" --no-merges --oneline --format="- %s" > releasenotes.md 2>/dev/null || {
+              echo "无法使用 $PREV_TAG 生成日志，使用全部 commit" >&2
+              git log --no-merges --oneline --format="- %s" > releasenotes.md
+            }
           fi
           echo "" >> releasenotes.md
           echo "**SHA256**: 见附件 \`.sha256\` 文件" >> releasenotes.md

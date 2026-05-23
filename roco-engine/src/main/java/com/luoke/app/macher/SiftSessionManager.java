@@ -1,6 +1,7 @@
 package com.luoke.app.macher;
 
 import net.jcip.annotations.NotThreadSafe;
+import net.jcip.annotations.ThreadSafe;
 import com.luoke.app.socket.SocketSession;
 import lombok.extern.slf4j.Slf4j;
 
@@ -194,6 +195,7 @@ public class SiftSessionManager {
      * @param oldActiveSession 旧的 active 会话（调用方负责关闭）
      * @param featureCount     SIFT 特征点数
      */
+    @ThreadSafe
     public record SwapResult(SocketSession oldActiveSession, int featureCount) {
     }
 }

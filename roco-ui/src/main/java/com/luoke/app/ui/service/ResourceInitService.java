@@ -1,6 +1,7 @@
 package com.luoke.app.ui.service;
 
 import net.jcip.annotations.NotThreadSafe;
+import net.jcip.annotations.ThreadSafe;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.luoke.app.config.ConfigPersistence;
 import com.luoke.app.config.PathConfig;
@@ -357,8 +358,10 @@ public class ResourceInitService {
         HookRegistry.INSTANCE.publish(HookEventType.INIT_PROGRESS, new ProgressEvent(progress, message));
     }
 
+    @ThreadSafe
     enum ResourceType {MAP, ICON, CONFIG}
 
+    @ThreadSafe
     record MissingEntry(String path, String url, ResourceType type) {
     }
 }

@@ -1,6 +1,7 @@
 package com.luoke.app.ui.component;
 
 import net.jcip.annotations.NotThreadSafe;
+import net.jcip.annotations.ThreadSafe;
 import atlantafx.base.theme.Styles;
 import com.luoke.app.config.CaptureConfig;
 import com.luoke.app.config.ConfigPersistence;
@@ -491,6 +492,7 @@ public class TitleBar extends HBox implements IHook<Object> {
         }
     }
 
+    @ThreadSafe
     private static class Holder {
         private static volatile TitleBar INSTANCE;
 

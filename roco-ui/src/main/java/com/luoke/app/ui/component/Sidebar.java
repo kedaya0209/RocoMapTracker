@@ -1,6 +1,7 @@
 package com.luoke.app.ui.component;
 
 import net.jcip.annotations.NotThreadSafe;
+import net.jcip.annotations.ThreadSafe;
 import atlantafx.base.controls.ToggleSwitch;
 import atlantafx.base.theme.Styles;
 import com.luoke.app.config.ConfigPersistence;
@@ -25,6 +26,7 @@ import com.luoke.app.ui.util.FxRippleUtil;
 import com.luoke.app.ui.util.RestartUtils;
 import java.io.IOException;
 import javafx.animation.FadeTransition;
+import javafx.animation.Interpolator;
 import javafx.animation.KeyFrame;
 import javafx.animation.KeyValue;
 import javafx.animation.Timeline;
@@ -385,6 +387,7 @@ public class Sidebar extends VBox {
 
     // ========== Item Model ==========
 
+    @ThreadSafe
     public record SidebarItem(Type type, String title, Category category, String currentValue,
                               WikiUpdateManager wikiUpdater, boolean selected, String iconSvg, Runnable onAction,
                               double progress) {
@@ -403,13 +406,16 @@ public class Sidebar extends VBox {
             this(type, title, category, currentValue, wikiUpdater, selected, null, null, -1);
         }
 
+        @ThreadSafe
         enum Type {HEADER, OPTION, ACTION, WIKI}
 
+        @ThreadSafe
         enum Category {ALGORITHM, RESOURCE, THEME, NAVIGATION, MATCH}
     }
 
     // ========== Cell ==========
 
+    @NotThreadSafe
     private class SidebarCell extends ListCell<SidebarItem> {
         private static final String BG_STYLE = "-fx-background-color: -color-bg-subtle; -fx-background-radius: 6;";
         private static final String BG_HOVER = "-fx-background-color: -color-bg-inset; -fx-background-radius: 6;";
@@ -639,7 +645,7 @@ public class Sidebar extends VBox {
             double to = wasExpanded ? 0 : 180;
             Timeline tl = new Timeline(
                     new KeyFrame(Duration.millis(200),
-                            new KeyValue(arrow.rotateProperty(), to, javafx.animation.Interpolator.EASE_BOTH))
+                            new KeyValue(arrow.rotateProperty(), to, Interpolator.EASE_BOTH))
             );
             tl.play();
         }

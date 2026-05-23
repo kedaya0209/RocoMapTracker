@@ -204,6 +204,7 @@ public class IconCache {
     /**
      * 图集中的图标坐标
      */
+    @ThreadSafe
     public record AtlasSlot(int sx, int sy) {
     }
 }

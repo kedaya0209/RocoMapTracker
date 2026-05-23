@@ -1,6 +1,7 @@
 package com.luoke.app.capture;
 
 import net.jcip.annotations.NotThreadSafe;
+import net.jcip.annotations.ThreadSafe;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -18,6 +19,7 @@ import java.util.List;
 @NotThreadSafe
 public class FrameDeserializer {
 
+    @ThreadSafe
     public record FrameSlot(int index, byte[] pixels, int w, int h, int stride) {
     }
 

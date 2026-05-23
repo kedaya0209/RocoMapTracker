@@ -62,10 +62,6 @@
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-engine</artifactId>
         </dependency>
-        <dependency>
-            <groupId>com.luoke</groupId>
-            <artifactId>roco-macher</artifactId>
-        </dependency>
     </dependencies>
 
     <build>
@@ -104,25 +100,57 @@
 
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-assembly-plugin</artifactId>
-                <version>3.8.0</version>
-                <configuration>
-                    <archive>
-                        <manifest>
-                            <mainClass>com.luoke.app.Main</mainClass>
-                        </manifest>
-                    </archive>
-                    <descriptorRefs>
-                        <descriptorRef>jar-with-dependencies</descriptorRef>
-                    </descriptorRefs>
-                </configuration>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>3.6.0</version>
                 <executions>
                     <execution>
-                        <id>make-assembly</id>
                         <phase>package</phase>
                         <goals>
-                            <goal>single</goal>
+                            <goal>shade</goal>
                         </goals>
+                        <configuration>
+                            <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <transformers>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                    <mainClass>com.luoke.app.Main</mainClass>
+                                </transformer>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                            </transformers>
+                            <filters>
+                                <!-- 排除非 Windows 平台的原生库 -->
+                                <filter>
+                                    <artifact>com.github.luben:zstd-jni</artifact>
+                                    <excludes>
+                                        <exclude>aix/**</exclude>
+                                        <exclude>darwin/**</exclude>
+                                        <exclude>freebsd/**</exclude>
+                                        <exclude>linux/**</exclude>
+                                        <exclude>netbsd/**</exclude>
+                                        <exclude>openbsd/**</exclude>
+                                        <exclude>sunos/**</exclude>
+                                    </excludes>
+                                </filter>
+                                <filter>
+                                    <artifact>com.microsoft.onnxruntime:onnxruntime</artifact>
+                                    <excludes>
+                                        <exclude>ai/onnxruntime/native/linux-*/**</exclude>
+                                        <exclude>ai/onnxruntime/native/osx-*/**</exclude>
+                                        <exclude>ai/onnxruntime/native/osx-*/**</exclude>
+                                    </excludes>
+                                </filter>
+                                <!-- 排除不需要的元数据文件 -->
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/maven/**</exclude>
+                                        <exclude>META-INF/NOTICE</exclude>
+                                        <exclude>META-INF/LICENSE</exclude>
+                                        <exclude>META-INF/README.md</exclude>
+                                        <exclude>META-INF/*.txt</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>
@@ -162,9 +190,9 @@
                             <buildArgs>
                                 <!-- =====调试时需要将这两项注释掉，有些错误不会被记录在日志中====== -->
                                 <!-- 指定链接器子系统为 WINDOWS -->
-                                <arg>-H:NativeLinkerOption=/SUBSYSTEM:WINDOWS</arg>
+                                <buildArg>-H:NativeLinkerOption=/SUBSYSTEM:WINDOWS</buildArg>
                                 <!-- 指定入口点，确保在无控制台模式下正确启动 -->
-                                <arg>-H:NativeLinkerOption=/ENTRY:mainCRTStartup</arg>
+                                <buildArg>-H:NativeLinkerOption=/ENTRY:mainCRTStartup</buildArg>
                                 <!-- ==================================================== -->
                                 <buildArg>-R:MaxHeapSize=512M</buildArg>
                                 <buildArg>-R:MinHeapSize=128M</buildArg>
@@ -326,9 +354,9 @@
                             <buildArgs>
                                 <!-- =====调试时需要将这两项注释掉，有些错误不会被记录在日志中====== -->
                                 <!-- 指定链接器子系统为 WINDOWS -->
-                                <arg>-H:NativeLinkerOption=/SUBSYSTEM:WINDOWS</arg>
+                                <buildArg>-H:NativeLinkerOption=/SUBSYSTEM:WINDOWS</buildArg>
                                 <!-- 指定入口点，确保在无控制台模式下正确启动 -->
-                                <arg>-H:NativeLinkerOption=/ENTRY:mainCRTStartup</arg>
+                                <buildArg>-H:NativeLinkerOption=/ENTRY:mainCRTStartup</buildArg>
                                 <!-- ==================================================== -->
                                 <buildArg>-R:MaxHeapSize=512M</buildArg>
                                 <buildArg>-R:MinHeapSize=128M</buildArg>

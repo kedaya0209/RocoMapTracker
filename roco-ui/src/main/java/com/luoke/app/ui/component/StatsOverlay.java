@@ -1,6 +1,7 @@
 package com.luoke.app.ui.component;
 
 import net.jcip.annotations.NotThreadSafe;
+import net.jcip.annotations.ThreadSafe;
 import com.luoke.app.config.StatsConfig;
 import com.luoke.app.config.UiConfig;
 import com.luoke.app.context.StatsContext;
@@ -84,6 +85,7 @@ public class StatsOverlay extends StackPane {
         statsLabel.setText(sb.toString().trim());
     }
 
+    @ThreadSafe
     private static class Holder {
         private static final StatsOverlay INSTANCE = new StatsOverlay();
     }

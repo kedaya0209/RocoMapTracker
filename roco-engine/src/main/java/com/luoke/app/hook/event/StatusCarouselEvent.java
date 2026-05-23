@@ -130,6 +130,7 @@ public record StatusCarouselEvent(String key, String text, Type type) {
 
     // ======================== 类型枚举 ========================
 
+    @ThreadSafe
     public enum Type {
         /** 加载中 / 进行中 */
         LOADING,

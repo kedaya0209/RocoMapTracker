@@ -285,7 +285,7 @@ public class RoiPreview {
         HBox titleBar = new HBox();
         titleBar.setAlignment(Pos.CENTER_LEFT);
         titleBar.setCursor(Cursor.MOVE);
-        titleBar.setPadding(new javafx.geometry.Insets(12, 15, 8, 18));
+        titleBar.setPadding(new Insets(12, 15, 8, 18));
         // 拖拽移动窗口
         titleBar.setOnMousePressed(e -> {
             dragDialogStartX = e.getScreenX() - zoomStage.getX();

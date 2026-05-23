@@ -6,6 +6,7 @@ import com.luoke.app.map.model.ResourcePoint;
 import com.luoke.app.ui.util.DialogUtils;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.geometry.Point2D;
 import javafx.geometry.Pos;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
@@ -73,7 +74,7 @@ public class AddPointDialog {
                 suggestionList.setItems(matches);
                 suggestionList.getSelectionModel().select(0);
                 if (!popup.isShowing()) {
-                    javafx.geometry.Point2D anchor = input.localToScreen(0, input.getHeight());
+                    Point2D anchor = input.localToScreen(0, input.getHeight());
                     popup.show(input, anchor.getX(), anchor.getY());
                 }
                 suggestionList.setPrefWidth(input.getWidth());

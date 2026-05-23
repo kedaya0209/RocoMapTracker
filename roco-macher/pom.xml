@@ -33,24 +33,29 @@
         <dependency>
             <groupId>org.bytedeco</groupId>
             <artifactId>javacpp</artifactId>
+            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>org.bytedeco</groupId>
             <artifactId>opencv</artifactId>
+            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>org.bytedeco</groupId>
             <artifactId>opencv</artifactId>
             <classifier>windows-x86_64</classifier>
+            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>org.bytedeco</groupId>
             <artifactId>openblas</artifactId>
+            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>org.bytedeco</groupId>
             <artifactId>openblas</artifactId>
             <classifier>windows-x86_64</classifier>
+            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>org.slf4j</groupId>

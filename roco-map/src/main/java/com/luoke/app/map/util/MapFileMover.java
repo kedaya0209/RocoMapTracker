@@ -10,6 +10,7 @@ import net.jcip.annotations.ThreadSafe;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.nio.file.StandardCopyOption;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Map;
@@ -147,7 +148,7 @@ public class MapFileMover {
                 // 移动文件，REPLACE_EXISTING覆盖已存在文件
                 // 使用Files.move进行原子性移动
                 // 这种方法比复制-删除更高效
-                Files.move(f.toPath(), to.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                Files.move(f.toPath(), to.toPath(), StandardCopyOption.REPLACE_EXISTING);
 
                 // 记录移动成功的日志
                 log.info("✅ 移动：{} → {}", f.getName(), dstDir);

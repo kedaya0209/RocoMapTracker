@@ -58,6 +58,7 @@ public class ResourceConfigContext {
      * 定义不同的资源套件
      */
     @Getter
+    @ThreadSafe
     public enum ResourceProfile {
         INTERNAL(
                 "内置资源",

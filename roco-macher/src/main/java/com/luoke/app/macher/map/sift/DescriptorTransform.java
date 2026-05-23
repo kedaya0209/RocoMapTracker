@@ -9,6 +9,7 @@ import org.bytedeco.opencv.opencv_core.Mat;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.util.function.BiConsumer;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
@@ -172,7 +173,7 @@ public class DescriptorTransform {
         }
     }
 
-    void loadFromCache(DataInputStream dis, java.util.function.BiConsumer<ByteBuffer, Integer> keyPointsSetter) throws IOException {
+    void loadFromCache(DataInputStream dis, BiConsumer<ByteBuffer, Integer> keyPointsSetter) throws IOException {
         if (variant.usePca) {
             readMat(dis).copyTo(pcaEigenvectors);
             readMat(dis).copyTo(projectedMean);
@@ -184,7 +185,7 @@ public class DescriptorTransform {
         }
         int mapPointsCount = dis.readInt();
         ByteBuffer buf = ByteBuffer.allocateDirect(mapPointsCount * 2 * 4).order(ByteOrder.nativeOrder());
-        java.nio.FloatBuffer fb = buf.asFloatBuffer();
+        FloatBuffer fb = buf.asFloatBuffer();
         for (int i = 0; i < mapPointsCount * 2; i++) {
             fb.put(i, dis.readFloat());
         }

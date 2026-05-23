@@ -9,10 +9,13 @@ import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 
+import lombok.extern.slf4j.Slf4j;
+
 import static org.bytedeco.opencv.global.opencv_core.*;
 import static org.bytedeco.opencv.global.opencv_imgcodecs.*;
 import static org.bytedeco.opencv.global.opencv_imgproc.*;
 
+@Slf4j
 public class PCARecalibrator {
 
     private static final String BASE_PATH = "C:\\Users\\tangh\\Desktop\\dataset\\";
@@ -25,7 +28,7 @@ public class PCARecalibrator {
         File[] files = trainDir.listFiles((dir, name) -> name.endsWith(".png"));
         if (files == null) return;
 
-        System.out.println("开始处理，共 " + files.length + " 张图片...");
+        log.info("开始处理，共 {} 张图片...", files.length);
 
         for (File file : files) {
             Mat src = imread(file.getAbsolutePath());
@@ -52,14 +55,14 @@ public class PCARecalibrator {
             }
 
             if (target == null || maxArea < 20) {
-                System.out.println("未检测到有效轮廓，跳过：" + file.getName());
+                log.info("未检测到有效轮廓，跳过：{}", file.getName());
                 continue;
             }
 
             // 2. 使用 fitLine 计算轮廓主方向
             double[] lineResult = fitLineToContourOptimized(target);
             if (lineResult == null) {
-                System.out.println("拟合失败，跳过：" + file.getName());
+                log.info("拟合失败，跳过：{}", file.getName());
                 continue;
             }
             double angle = lineResult[0];
@@ -81,7 +84,7 @@ public class PCARecalibrator {
             String newName = (int) angle + "_" + file.getName().split("_")[1];
             imwrite(valPcaPath + "\\" + newName, debug);
         }
-        System.out.println("处理完成！结果已保存至 validation_pca");
+        log.info("处理完成！结果已保存至 validation_pca");
     }
 
     /**

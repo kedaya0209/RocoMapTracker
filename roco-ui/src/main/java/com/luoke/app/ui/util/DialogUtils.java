@@ -1,5 +1,6 @@
 package com.luoke.app.ui.util;
 
+import net.jcip.annotations.NotThreadSafe;
 import net.jcip.annotations.ThreadSafe;
 import atlantafx.base.theme.Styles;
 import java.io.IOException;
@@ -15,6 +16,7 @@ import javafx.scene.control.ProgressBar;
 import javafx.scene.control.TextArea;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
@@ -142,7 +144,7 @@ public class DialogUtils {
         StackPane contentContainer = new StackPane();
         contentContainer.setAlignment(Pos.CENTER);
         contentContainer.getChildren().add(content);
-        VBox.setVgrow(contentContainer, javafx.scene.layout.Priority.ALWAYS);
+        VBox.setVgrow(contentContainer, Priority.ALWAYS);
 
         // 按钮组
         HBox btnBox = new HBox(15);
@@ -293,6 +295,7 @@ public class DialogUtils {
     /**
      * 下载进度控制 — 可在任意线程调用 update/close，自动切换到 JavaFX 线程
      */
+    @NotThreadSafe
     public static class ProgressControl {
         private final StackPane mask;
         private final ProgressBar progressBar;

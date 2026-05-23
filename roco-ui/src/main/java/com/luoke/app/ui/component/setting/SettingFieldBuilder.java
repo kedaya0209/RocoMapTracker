@@ -14,6 +14,8 @@ import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
 import javafx.util.Duration;
+import java.awt.Desktop;
+import java.net.URI;
 import java.util.Map;
 
 /**
@@ -99,7 +101,7 @@ public class SettingFieldBuilder {
                     link.setStyle("-fx-font-size: 12px;");
                     link.setOnAction(_ -> {
                         try {
-                            java.awt.Desktop.getDesktop().browse(java.net.URI.create(url));
+                            Desktop.getDesktop().browse(URI.create(url));
                         } catch (Exception ignored) {
                         }
                     });

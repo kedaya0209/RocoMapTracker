@@ -24,6 +24,7 @@ import javafx.scene.shape.StrokeLineJoin;
 import javafx.scene.transform.Scale;
 import javafx.scene.transform.Transform;
 import javafx.scene.transform.Translate;
+import javafx.geometry.Bounds;
 import javafx.util.Duration;
 
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -31,7 +32,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.w3c.dom.Document;
@@ -286,10 +289,10 @@ public class SvgManager {
             dbf.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
             dbf.setFeature("http://xml.org/sax/features/external-general-entities", false);
             dbf.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
-            Document doc = dbf.newDocumentBuilder().parse(new java.io.ByteArrayInputStream(raw));
+            Document doc = dbf.newDocumentBuilder().parse(new ByteArrayInputStream(raw));
             NodeList pathNodes = doc.getDocumentElement().getElementsByTagName("path");
             if (pathNodes.getLength() == 0) return "";
-            return ((org.w3c.dom.Element) pathNodes.item(0)).getAttribute("d");
+            return ((Element) pathNodes.item(0)).getAttribute("d");
         } catch (Exception e) {
             return "";
         }
@@ -332,7 +335,7 @@ public class SvgManager {
      */
     private static byte[] loadRaw(String resourcePath) {
         return svgCache.computeIfAbsent(resourcePath, path -> {
-            try (java.io.InputStream is = SvgManager.class.getResourceAsStream(path)) {
+            try (InputStream is = SvgManager.class.getResourceAsStream(path)) {
                 if (is == null) throw new RuntimeException("SVG not found: " + path);
                 return is.readAllBytes();
             } catch (IOException e) {
@@ -366,7 +369,7 @@ public class SvgManager {
         dbf.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
         dbf.setFeature("http://xml.org/sax/features/external-general-entities", false);
         dbf.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
-        Document doc = dbf.newDocumentBuilder().parse(new java.io.ByteArrayInputStream(raw));
+        Document doc = dbf.newDocumentBuilder().parse(new ByteArrayInputStream(raw));
         Element svgRoot = doc.getDocumentElement();
         NodeList pathNodes = svgRoot.getElementsByTagName("path");
 
@@ -388,12 +391,12 @@ public class SvgManager {
                 if (!fillOpacityStr.isEmpty()) {
                     fillOpacity = Double.parseDouble(fillOpacityStr);
                 }
-                sp.setFill(javafx.scene.paint.Color.web(fill, fillOpacity));
+                sp.setFill(Color.web(fill, fillOpacity));
             }
 
             paths[i] = sp;
 
-            javafx.geometry.Bounds b = sp.getBoundsInLocal();
+            Bounds b = sp.getBoundsInLocal();
             minX = Math.min(minX, b.getMinX());
             minY = Math.min(minY, b.getMinY());
             maxX = Math.max(maxX, b.getMaxX());
@@ -901,5 +904,6 @@ public class SvgManager {
     /**
      * SVG path 命令枚举
      */
+    @ThreadSafe
     private enum Cmd {M, L, C, Q, A, Z, H, V, S, T}
 }

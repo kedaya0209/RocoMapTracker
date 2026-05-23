@@ -1,6 +1,7 @@
 package com.luoke.app.ui.service;
 
 import net.jcip.annotations.NotThreadSafe;
+import net.jcip.annotations.ThreadSafe;
 import com.luoke.app.config.RenderConfig;
 import com.luoke.app.context.MapContext;
 import com.luoke.app.context.ResourceConfigContext;
@@ -9,13 +10,18 @@ import lombok.extern.slf4j.Slf4j;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 /**
  * 瓦片生成服务 — 多分辨率金字塔瓦片的校验与生成。
@@ -63,7 +69,7 @@ public class TileGeneratorService {
 
         int threads = Runtime.getRuntime().availableProcessors();
         try (ExecutorService executor = Executors.newFixedThreadPool(threads)) {
-            List<java.util.concurrent.Future<?>> futures = new ArrayList<>();
+            List<Future<?>> futures = new ArrayList<>();
 
             for (LevelInfo li : levels) {
                 // 2. 对该级别缩放一次
@@ -75,9 +81,9 @@ public class TileGeneratorService {
                     int lw = (int) Math.ceil(srcW * factor);
                     int lh = (int) Math.ceil(srcH * factor);
                     levelImage = new BufferedImage(lw, lh, BufferedImage.TYPE_INT_ARGB);
-                    java.awt.Graphics2D g = levelImage.createGraphics();
-                    g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION,
-                            java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                    Graphics2D g = levelImage.createGraphics();
+                    g.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+                            RenderingHints.VALUE_INTERPOLATION_BILINEAR);
                     g.drawImage(sourceImage, 0, 0, lw, lh, null);
                     g.dispose();
                 }
@@ -115,10 +121,10 @@ public class TileGeneratorService {
                 }
             }
 
-            for (java.util.concurrent.Future<?> f : futures) {
+            for (Future<?> f : futures) {
                 try {
                     f.get();
-                } catch (InterruptedException | java.util.concurrent.ExecutionException ignored) {
+                } catch (InterruptedException | ExecutionException ignored) {
                 }
             }
         }
@@ -166,13 +172,14 @@ public class TileGeneratorService {
         }
         sb.append("  ]\n");
         sb.append("}\n");
-        java.nio.file.Files.writeString(metaFile.toPath(), sb.toString());
+        Files.writeString(metaFile.toPath(), sb.toString());
         log.info("瓦片元数据已写入: {}", metaFile);
     }
 
     /**
      * 瓦片层级元数据
      */
+    @ThreadSafe
     private record LevelInfo(int level, int cols, int rows, int total) {
     }
 }

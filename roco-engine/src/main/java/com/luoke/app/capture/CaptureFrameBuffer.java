@@ -74,6 +74,7 @@ public class CaptureFrameBuffer {
     /**
      * ROI 帧数据记录
      */
+    @ThreadSafe
     public record RoiFrame(byte[] pixels, int width, int height, long timestamp) {
     }
 }

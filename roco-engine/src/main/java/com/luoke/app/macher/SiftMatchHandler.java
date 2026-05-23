@@ -1,6 +1,7 @@
 package com.luoke.app.macher;
 
 import net.jcip.annotations.NotThreadSafe;
+import net.jcip.annotations.ThreadSafe;
 import com.luoke.app.config.SiftConfig;
 import com.luoke.app.config.SocketConfig;
 import com.luoke.app.hook.HookEventType;
@@ -387,6 +388,7 @@ public class SiftMatchHandler implements SocketHandler {
         void onStateChange(boolean ready, String detail);
     }
 
+    @ThreadSafe
     public record MatchResult(boolean success, double x, double y, double angle,
                                float tMinimapMs, float tExtractMs, float tFlannMs, float tArrowMs) {
         public static final MatchResult FAIL = new MatchResult(false, 0, 0, 0, 0, 0, 0, 0);

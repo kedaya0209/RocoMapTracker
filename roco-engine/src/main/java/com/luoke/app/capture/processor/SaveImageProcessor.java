@@ -97,7 +97,7 @@ public class SaveImageProcessor implements RoiProcessor {
             if (e instanceof InterruptedException) {
                 Thread.currentThread().interrupt();
             }
-            log.error("HTTP 上传异常: {}", e.getMessage());
+            log.error("HTTP 上传异常", e);
         }
     }
 

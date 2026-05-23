@@ -7,6 +7,8 @@ import com.luoke.app.utils.FilePathUtil;
 import com.luoke.app.utils.ResourceUtils;
 
 import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -162,12 +164,12 @@ public class SiftMatchProtocol {
      */
     public static MapImageData loadMapGray() throws Exception {
         String mapPath = ResourceConfigContext.getSiftMap();
-        java.awt.image.BufferedImage img;
+        BufferedImage img;
         try (InputStream is = ResourceUtils.getResourceStream(mapPath)) {
             img = ImageIO.read(is);
         }
         if (img == null) {
-            throw new java.io.IOException("Failed to decode map image");
+            throw new IOException("Failed to decode map image");
         }
 
         int w = img.getWidth();
@@ -188,6 +190,7 @@ public class SiftMatchProtocol {
     /**
      * 地图灰度数据值对象
      */
+    @ThreadSafe
     public record MapImageData(int width, int height, byte[] grayPixels) {
     }
 }
