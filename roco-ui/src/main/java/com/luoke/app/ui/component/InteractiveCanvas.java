@@ -95,6 +95,10 @@ public class InteractiveCanvas extends Canvas {
                 mapRenderer.setHoveredPoint(hoverManager.getHoveredPoint());
             }
         }
+        // 绘制模式下鼠标移动需重绘路线层，使橡皮筋跟随光标
+        if (pathContext.getCurrentMode() == PathContext.Mode.DRAWING && mapRenderer != null) {
+            mapRenderer.markDirty();
+        }
     }
 
     private void onMouseExited(MouseEvent _e) {
@@ -160,6 +164,14 @@ public class InteractiveCanvas extends Canvas {
         mapManager.ensureBounds();
         lastMouseX = e.getX();
         lastMouseY = e.getY();
+
+        // 绘制模式下拖拽地图后，鼠标的世界坐标已变化，需同步更新并重绘橡皮筋
+        if (pathContext.getCurrentMode() == PathContext.Mode.DRAWING) {
+            double[] logic = toLogic(e.getX(), e.getY());
+            pathContext.setMouseLogicX(logic[0]);
+            pathContext.setMouseLogicY(logic[1]);
+            if (mapRenderer != null) mapRenderer.markDirty();
+        }
     }
 
     private void onScroll(ScrollEvent e) {
@@ -216,13 +228,17 @@ public class InteractiveCanvas extends Canvas {
         double ox = mapManager.getOffsetX();
         double oy = mapManager.getOffsetY();
         double scale = mapManager.getScale();
+        double[] out = new double[2];
         if (cameraManager.isNavMode() && cameraManager.getNavAngle() != 0) {
             double pivotX = getWidth() / 2;
             double pivotY = getHeight() / 2;
-            return CoordinateUtil.screenToWorld(canvasX, canvasY, ox, oy, scale,
+            CoordinateUtil.screenToWorldInto(out, canvasX, canvasY, ox, oy, scale,
                     cameraManager.getNavAngle(), pivotX, pivotY);
+        } else {
+            out[0] = (canvasX - ox) / scale;
+            out[1] = (canvasY - oy) / scale;
         }
-        return new double[]{(canvasX - ox) / scale, (canvasY - oy) / scale};
+        return out;
     }
 
     /**

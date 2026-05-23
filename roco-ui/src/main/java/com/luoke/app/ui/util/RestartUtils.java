@@ -1,12 +1,12 @@
 package com.luoke.app.ui.util;
 
 import net.jcip.annotations.ThreadSafe;
-import com.luoke.app.Main;
+import com.luoke.app.utils.FilePathUtil;
 import javafx.application.Platform;
 import lombok.extern.slf4j.Slf4j;
 
-import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.time.LocalDateTime;
 
 @Slf4j
@@ -16,11 +16,12 @@ public class RestartUtils {
     private static final String RESTART_TASK_NAME = "RocoMapTracker-Restart";
 
     public static void restart() {
-        File exeFile = new File(Main.class.getProtectionDomain()
-                .getCodeSource()
-                .getLocation()
-                .getPath());
-        String exePath = exeFile.getAbsolutePath();
+        Path exePathObj = FilePathUtil.getExePath();
+        if (exePathObj == null) {
+            log.error("无法获取当前可执行文件路径");
+            return;
+        }
+        String exePath = exePathObj.toString();
 
         // 通过 schtasks 启动新进程，脱离 JobObject 防止被一起杀死
         if (startViaSchtasks(exePath)) {

@@ -60,7 +60,7 @@ public class SwitchMapMatcher {
             return;
         }
 
-        log.info("Switching MapMatcher variant from {} to {}", SiftConfig.MAP_MATCHAER, type);
+        log.info("切换 MapMatcher 变体: {} → {}", SiftConfig.MAP_MATCHAER, type);
 
         SiftConfig.MAP_MATCHAER = type;
         ConfigPersistence.save();

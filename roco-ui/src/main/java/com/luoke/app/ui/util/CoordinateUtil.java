@@ -31,36 +31,52 @@ public final class CoordinateUtil {
     }
 
     /**
-     * 世界坐标 → 屏幕坐标（含导航模式旋转补偿）
+     * 世界坐标 → 屏幕坐标（含导航模式旋转补偿），结果写入 out[0]=x, out[1]=y。
      */
-    public static double[] worldToScreen(double worldX, double worldY,
+    public static void worldToScreenInto(double[] out, double worldX, double worldY,
                                           double ox, double oy, double scale,
                                           double navAngleDeg, double pivotX, double pivotY) {
         double sx = worldX * scale + ox;
         double sy = worldY * scale + oy;
-        if (navAngleDeg == 0) return new double[]{sx, sy};
-
+        if (navAngleDeg == 0) {
+            out[0] = sx;
+            out[1] = sy;
+            return;
+        }
         double rad = Math.toRadians(-navAngleDeg);
         double cos = Math.cos(rad);
         double sin = Math.sin(rad);
         double dx = sx - pivotX;
         double dy = sy - pivotY;
-        return new double[]{
-                dx * cos - dy * sin + pivotX,
-                dx * sin + dy * cos + pivotY
-        };
+        out[0] = dx * cos - dy * sin + pivotX;
+        out[1] = dx * sin + dy * cos + pivotY;
     }
 
     /**
-     * 屏幕坐标 → 世界坐标（含导航模式逆旋转补偿）
+     * 世界坐标 → 屏幕坐标（含导航模式旋转补偿）。
+     *
+     * @deprecated 热路径中请使用 {@link #worldToScreenInto} 避免数组分配
      */
-    public static double[] screenToWorld(double screenX, double screenY,
+    @Deprecated
+    public static double[] worldToScreen(double worldX, double worldY,
+                                          double ox, double oy, double scale,
+                                          double navAngleDeg, double pivotX, double pivotY) {
+        double[] out = new double[2];
+        worldToScreenInto(out, worldX, worldY, ox, oy, scale, navAngleDeg, pivotX, pivotY);
+        return out;
+    }
+
+    /**
+     * 屏幕坐标 → 世界坐标（含导航模式逆旋转补偿），结果写入 out[0]=x, out[1]=y。
+     */
+    public static void screenToWorldInto(double[] out, double screenX, double screenY,
                                           double ox, double oy, double scale,
                                           double navAngleDeg, double pivotX, double pivotY) {
         if (navAngleDeg == 0) {
-            return new double[]{(screenX - ox) / scale, (screenY - oy) / scale};
+            out[0] = (screenX - ox) / scale;
+            out[1] = (screenY - oy) / scale;
+            return;
         }
-
         double rad = Math.toRadians(navAngleDeg);
         double cos = Math.cos(rad);
         double sin = Math.sin(rad);
@@ -68,6 +84,21 @@ public final class CoordinateUtil {
         double dy = screenY - pivotY;
         double ux = dx * cos - dy * sin + pivotX;
         double uy = dx * sin + dy * cos + pivotY;
-        return new double[]{(ux - ox) / scale, (uy - oy) / scale};
+        out[0] = (ux - ox) / scale;
+        out[1] = (uy - oy) / scale;
+    }
+
+    /**
+     * 屏幕坐标 → 世界坐标（含导航模式逆旋转补偿）。
+     *
+     * @deprecated 热路径中请使用 {@link #screenToWorldInto} 避免数组分配
+     */
+    @Deprecated
+    public static double[] screenToWorld(double screenX, double screenY,
+                                          double ox, double oy, double scale,
+                                          double navAngleDeg, double pivotX, double pivotY) {
+        double[] out = new double[2];
+        screenToWorldInto(out, screenX, screenY, ox, oy, scale, navAngleDeg, pivotX, pivotY);
+        return out;
     }
 }

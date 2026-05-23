@@ -16,8 +16,10 @@ import java.io.InputStream;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 /**
  * 瓦片管理器 — 多分辨率金字塔瓦片的加载、缓存与视图管理。
@@ -32,6 +34,10 @@ public class TileManager {
     private final Group worldGroup;
     private final int mapW, mapH;
     private final Map<String, ImageView> activeTiles = new HashMap<>();
+    private final Set<String> needed = new HashSet<>();
+    private final List<String> missingKeys = new ArrayList<>();
+    private final Map<String, byte[]> loadedBytes = new ConcurrentHashMap<>();
+    private final ExecutorService tileExecutor = Executors.newVirtualThreadPerTaskExecutor();
 
     @Setter
     @Getter
@@ -44,6 +50,10 @@ public class TileManager {
         this.worldGroup = worldGroup;
         this.mapW = mapW;
         this.mapH = mapH;
+    }
+
+    public void dispose() {
+        tileExecutor.shutdownNow();
     }
 
     private static String key(int level, int row, int col) {
@@ -140,7 +150,7 @@ public class TileManager {
                 (int) Math.ceil((double) mapH / worldTileSize) - 1,
                 (int) Math.ceil(maxWorldY / worldTileSize));
 
-        Set<String> needed = new HashSet<>();
+        needed.clear();
         for (int row = minRow; row <= maxRow; row++) {
             for (int col = minCol; col <= maxCol; col++) {
                 needed.add(key(level, row, col));
@@ -161,7 +171,7 @@ public class TileManager {
 
         // 加载新瓦片（并行 I/O — 虚拟线程读磁盘，FX 线程解码 + 场景图插入）
         int loaded = 0, missed = 0;
-        List<String> missingKeys = new ArrayList<>();
+        missingKeys.clear();
         for (String k : needed) {
             if (!activeTiles.containsKey(k)) {
                 missingKeys.add(k);
@@ -169,13 +179,19 @@ public class TileManager {
         }
 
         if (!missingKeys.isEmpty()) {
-            Map<String, byte[]> loadedBytes = new ConcurrentHashMap<>();
-            try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
-                for (String key : missingKeys) {
-                    executor.submit(() -> {
-                        byte[] data = loadTileBytes(level, key);
-                        if (data != null) loadedBytes.put(key, data);
-                    });
+            loadedBytes.clear();
+            List<Future<?>> futures = new ArrayList<>();
+            for (String key : missingKeys) {
+                futures.add(tileExecutor.submit(() -> {
+                    byte[] data = loadTileBytes(level, key);
+                    if (data != null) loadedBytes.put(key, data);
+                }));
+            }
+            for (Future<?> f : futures) {
+                try {
+                    f.get();
+                } catch (InterruptedException | ExecutionException e) {
+                    log.warn("瓦片加载任务异常", e);
                 }
             }
             for (String key : missingKeys) {
@@ -191,8 +207,8 @@ public class TileManager {
             }
         }
         if (loaded > 0 || missed > 0) {
-            log.debug("L{} tiles: loaded={} missed={} active={} needed={}",
-                    level, loaded, missed, activeTiles.size(), needed.size());
+            log.debug("L{} 瓦片: 已加载={} 未命中={} 活跃={}",
+                    level, loaded, missed, activeTiles.size());
         }
     }
 

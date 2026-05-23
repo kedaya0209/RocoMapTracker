@@ -134,7 +134,10 @@ public class ResourcePointContext {
     }
 
     public boolean isCollect(String... names) {
-        return collectSet.containsAll(Arrays.stream(names).toList());
+        for (String name : names) {
+            if (!collectSet.contains(name)) return false;
+        }
+        return true;
     }
 
     public List<ResourcePoint> getAllPoints() {

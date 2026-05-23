@@ -50,7 +50,7 @@ public class UpdateChecker {
                     HttpResponse.BodyHandlers.ofString());
 
             if (response.statusCode() != 200) {
-                log.warn("GitHub API returned status: {}", response.statusCode());
+                log.warn("GitHub API 返回状态码: {}", response.statusCode());
                 return Optional.empty();
             }
 
@@ -58,11 +58,11 @@ public class UpdateChecker {
             return Optional.of(parseRelease(root));
 
         } catch (IOException e) {
-            log.warn("Failed to check for updates", e);
+            log.warn("检查更新失败", e);
             return Optional.empty();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            log.warn("Update check interrupted", e);
+            log.warn("更新检查被中断", e);
             return Optional.empty();
         }
     }
@@ -78,7 +78,7 @@ public class UpdateChecker {
             try {
                 dateTime = LocalDateTime.parse(publishedAt, DateTimeFormatter.ISO_DATE_TIME);
             } catch (DateTimeParseException e) {
-                log.warn("Failed to parse published_at: {}", publishedAt, e);
+                log.warn("解析 published_at 失败: {}", publishedAt, e);
             }
         }
 

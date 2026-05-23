@@ -46,7 +46,7 @@ public class RoiPreview {
 
     private static final double PREVIEW_HEIGHT = 180;
     private static final double PADDING = 12;
-    private static final long FRAME_INTERVAL_NS = 125_000_000; // 8fps
+    private static final long FRAME_INTERVAL_NS = 33_000_000; // 30fps
     private static final double HANDLE_SIZE = 8;
     private static final double MIN_ROI_PX = 10;
 
@@ -54,7 +54,6 @@ public class RoiPreview {
     private final Pane root;
     private final ImageView imageView;
     private final Rectangle roiRect;
-    private final Text label;
     private final AnimationTimer timer;
 
     // ---- 全帧模式 ----
@@ -64,10 +63,7 @@ public class RoiPreview {
 
     // ---- 布局状态 ----
     private final Pane imageArea;
-    private final Group contentGroup;
-    private final Group roiGroup;
     private final Button zoomBtn;
-    private double currentScale;
     private double currentFw;
     private double currentFh;
 
@@ -149,8 +145,8 @@ public class RoiPreview {
         roiRect.setMouseTransparent(true);
         roiRect.setVisible(false);
 
-        roiGroup = new Group(roiRect);
-        contentGroup = new Group(imageView, roiGroup);
+        Group roiGroup = new Group(roiRect);
+        Group contentGroup = new Group(imageView, roiGroup);
         imageArea.getChildren().add(contentGroup);
 
         // --- 放大按钮（SvgManager 图标） ---
@@ -166,7 +162,7 @@ public class RoiPreview {
         zoomBtn.setOnAction(_ -> toggleZoom());
 
         // --- 顶部栏（标签 + 放大按钮，HBox 自动对齐） ---
-        label = new Text(labelText);
+        Text label = new Text(labelText);
         label.setStyle("-fx-fill: -color-fg-default; -fx-font-weight: bold; -fx-font-size: 12px;");
 
         Region spacer = new Region();
@@ -464,15 +460,7 @@ public class RoiPreview {
             zoomCachedImage = new WritableImage((int) fw, (int) fh);
         }
 
-        // BGRA → ARGB
-        int maxByteIdx = Math.min(pxCount * 4, pixels.length);
-        for (int i = 0, off = 0; i < pxCount && off + 3 < maxByteIdx; i++, off += 4) {
-            int b = pixels[off] & 0xFF;
-            int g = pixels[off + 1] & 0xFF;
-            int r = pixels[off + 2] & 0xFF;
-            int a = pixels[off + 3] & 0xFF;
-            zoomArgbBuffer[i] = (a << 24) | (r << 16) | (g << 8) | b;
-        }
+        bgra2argb(pixels, pxCount, zoomArgbBuffer);
 
         zoomCachedImage.getPixelWriter().setPixels(0, 0, (int) fw, (int) fh,
                 PixelFormat.getIntArgbPreInstance(), zoomArgbBuffer, 0, (int) fw);
@@ -495,20 +483,7 @@ public class RoiPreview {
 
         // ROI 矩形框
         if (roiPrefix != null) {
-            int roiX = getRoiField(roiPrefix + "X", 8900);
-            int roiY = getRoiField(roiPrefix + "Y", 300);
-            int roiW = getRoiField(roiPrefix + "W", 1000);
-            int roiH = getRoiField(roiPrefix + "H", 0);
-
-            double rrX = roiX * fw / 10000.0;
-            double rrY = roiY * fh / 10000.0;
-            double rrW = roiW * fw / 10000.0;
-            double rrH = (roiH == 0) ? rrW : roiH * fh / 10000.0;
-
-            zoomRoiRect.setX(rrX * scale);
-            zoomRoiRect.setY(rrY * scale);
-            zoomRoiRect.setWidth(rrW * scale);
-            zoomRoiRect.setHeight(rrH * scale);
+            setRect(fw, fh, scale, zoomRoiRect);
 
             // 更新手柄位置
             double hw = HANDLE_SIZE / 2;
@@ -524,6 +499,34 @@ public class RoiPreview {
             zoomHandles[2].setY(ry + rh - hw);
             zoomHandles[3].setX(rx + rw - hw);
             zoomHandles[3].setY(ry + rh - hw);
+        }
+    }
+
+    private void setRect(double fw, double fh, double scale, Rectangle zoomRoiRect) {
+        int roiX = getRoiField(roiPrefix + "X", 8900);
+        int roiY = getRoiField(roiPrefix + "Y", 300);
+        int roiW = getRoiField(roiPrefix + "W", 1000);
+        int roiH = getRoiField(roiPrefix + "H", 0);
+
+        double rrX = roiX * fw / 10000.0;
+        double rrY = roiY * fh / 10000.0;
+        double rrW = roiW * fw / 10000.0;
+        double rrH = (roiH == 0) ? rrW : roiH * fh / 10000.0;
+
+        zoomRoiRect.setX(rrX * scale);
+        zoomRoiRect.setY(rrY * scale);
+        zoomRoiRect.setWidth(rrW * scale);
+        zoomRoiRect.setHeight(rrH * scale);
+    }
+
+    private void bgra2argb(byte[] pixels, int pxCount, int[] zoomArgbBuffer) {
+        int maxByteIdx = Math.min(pxCount * 4, pixels.length);
+        for (int i = 0, off = 0; i < pxCount && off + 3 < maxByteIdx; i++, off += 4) {
+            int b = pixels[off] & 0xFF;
+            int g = pixels[off + 1] & 0xFF;
+            int r = pixels[off + 2] & 0xFF;
+            int a = pixels[off + 3] & 0xFF;
+            zoomArgbBuffer[i] = (a << 24) | (r << 16) | (g << 8) | b;
         }
     }
 
@@ -716,19 +719,12 @@ public class RoiPreview {
         ensureBuffers((int) currentFw, (int) currentFh);
 
         int pxCount = (int) (currentFw * currentFh);
-        int maxByteIdx = Math.min(pxCount * 4, pixels.length);
-        for (int i = 0, off = 0; i < pxCount && off + 3 < maxByteIdx; i++, off += 4) {
-            int b = pixels[off] & 0xFF;
-            int g = pixels[off + 1] & 0xFF;
-            int r = pixels[off + 2] & 0xFF;
-            int a = pixels[off + 3] & 0xFF;
-            argbBuffer[i] = (a << 24) | (r << 16) | (g << 8) | b;
-        }
+        bgra2argb(pixels, pxCount, argbBuffer);
 
         // 缩放适配
         double availW = w - PADDING * 2;
         double availH = h - PADDING * 2 - 16;
-        currentScale = Math.min(1.0, Math.min(availW / currentFw, availH / currentFh));
+        double currentScale = Math.min(1.0, Math.min(availW / currentFw, availH / currentFh));
         double dw = currentFw * currentScale;
         double dh = currentFh * currentScale;
         double imgX = (w - dw) / 2.0;
@@ -749,20 +745,7 @@ public class RoiPreview {
 
         // ROI 矩形框（仅显示）
         if (roiPrefix != null) {
-            int roiX = getRoiField(roiPrefix + "X", 8900);
-            int roiY = getRoiField(roiPrefix + "Y", 300);
-            int roiW = getRoiField(roiPrefix + "W", 1000);
-            int roiH = getRoiField(roiPrefix + "H", 0);
-
-            double rrX = roiX * currentFw / 10000.0;
-            double rrY = roiY * currentFh / 10000.0;
-            double rrW = roiW * currentFw / 10000.0;
-            double rrH = (roiH == 0) ? rrW : roiH * currentFh / 10000.0;
-
-            roiRect.setX(rrX * currentScale);
-            roiRect.setY(rrY * currentScale);
-            roiRect.setWidth(rrW * currentScale);
-            roiRect.setHeight(rrH * currentScale);
+            setRect(currentFw, currentFh, currentScale, roiRect);
             roiRect.setVisible(true);
         }
     }

@@ -247,7 +247,7 @@ public class NativeProcess {
                 createFlags |= EXTENDED_STARTUPINFO_PRESENT;
             }
 
-            log.info("CreateProcessW: cmd={} flags=0x{}", commandLine, Integer.toHexString(createFlags));
+            log.info("CreateProcessW: 命令行={} 标志=0x{}", commandLine, Integer.toHexString(createFlags));
 
             MemorySegment capturedState = arena.allocate(CAPTURE_STATE_LAYOUT);
             int ok = (int) CREATE_PROCESS_W.invoke(
@@ -271,7 +271,7 @@ public class NativeProcess {
                 long hProcFail = procInfo.get(ValueLayout.JAVA_LONG, 0);
                 long hThrdFail = procInfo.get(ValueLayout.JAVA_LONG, 8);
                 int pidFail = procInfo.get(ValueLayout.JAVA_INT, 16);
-                log.error("CreateProcessW 失败 err={} (0x{}) cmd={} procInfo(h={} t={} pid={})",
+                log.error("CreateProcessW 失败 错误码={} (0x{}) 命令行={} 进程信息(h={} t={} pid={})",
                         savedError, Integer.toHexString(savedError), commandLine,
                         Long.toHexString(hProcFail), Long.toHexString(hThrdFail), pidFail);
                 if (attrList != null) DELETE_PROC_THREAD_ATTRIBUTE_LIST.invoke(attrList);
@@ -309,7 +309,7 @@ public class NativeProcess {
                 log.warn("SetPriorityClass 调用异常 pid={}: {}", pid, e.toString());
             }
 
-            log.info("NativeProcess created: pid={}", pid);
+            log.info("NativeProcess 已创建: pid={}", pid);
             return new NativeProcess(hProc, hThrd, pid, hRead);
         } catch (Throwable e) {
             log.error("NativeProcess.create 异常: {}", e.toString());

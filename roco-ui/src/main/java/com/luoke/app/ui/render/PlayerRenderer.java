@@ -28,6 +28,7 @@ public class PlayerRenderer implements RenderLayer {
     private Circle[] ripples;
     private final Circle pickupHalo;
     private final Scale playerScale;
+    private double lastPlayerSize = -1;
     private final Translate playerTranslate;
     private double[] rippleProgress;
     /** 帧计数器，用于装饰效果节流 */
@@ -128,9 +129,11 @@ public class PlayerRenderer implements RenderLayer {
 
         if (mm.isPlayerInitialized() && playerView.getImage() != null) {
             playerView.setVisible(true);
-            // 每帧同步显示尺寸，确保设置中修改 PLAYER_VIEW_SIZE 实时生效
-            playerView.setFitWidth(RenderConfig.PLAYER_VIEW_SIZE);
-            playerView.setFitHeight(RenderConfig.PLAYER_VIEW_SIZE);
+            if (lastPlayerSize != RenderConfig.PLAYER_VIEW_SIZE) {
+                lastPlayerSize = RenderConfig.PLAYER_VIEW_SIZE;
+                playerView.setFitWidth(RenderConfig.PLAYER_VIEW_SIZE);
+                playerView.setFitHeight(RenderConfig.PLAYER_VIEW_SIZE);
+            }
 
             // 动态重建波纹圈（RIPPLE_COUNT 变化时）
             if (RenderConfig.RIPPLE_COUNT != ripples.length) {

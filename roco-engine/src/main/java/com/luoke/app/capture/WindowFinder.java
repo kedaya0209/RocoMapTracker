@@ -154,7 +154,7 @@ public class WindowFinder {
             return ctx.get(ValueLayout.JAVA_LONG, RESULT_OFFSET);
         } catch (Throwable e) {
             // FFM 调用可能抛出多种异常，保留通用捕获
-            log.error("EnumWindows FFM call failed", e);
+            log.error("EnumWindows FFM 调用失败", e);
             return 0;
         }
     }

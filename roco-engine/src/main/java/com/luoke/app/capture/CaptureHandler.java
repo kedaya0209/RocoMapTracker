@@ -6,6 +6,7 @@ import com.luoke.app.config.SocketConfig;
 import com.luoke.app.socket.SocketHandler;
 import com.luoke.app.socket.SocketServer;
 import com.luoke.app.socket.SocketSession;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 
 import net.jcip.annotations.NotThreadSafe;
@@ -14,6 +15,7 @@ import java.nio.ByteOrder;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -72,6 +74,11 @@ public class CaptureHandler implements SocketHandler {
     private String launchExePath;
     private long totalBytes;
     private long lastStatsTime;
+    /**
+     * -- SETTER --
+     *  设置全帧 ROI 索引
+     */
+    @Setter
     private volatile int fullFrameRoiIndex = -1;
 
     // ==================== 消息路由 ====================
@@ -119,13 +126,13 @@ public class CaptureHandler implements SocketHandler {
         if (handler != null) {
             handler.handle(body, session);
         } else {
-            log.warn("Unknown capture message type: {}", type);
+            log.warn("未知截图消息类型: {}", type);
         }
     }
 
     @Override
     public void onDisconnect(SocketSession session, String reason) {
-        log.warn("CaptureHandler disconnected: {}", reason);
+        log.warn("CaptureHandler 断开连接: {}", reason);
         sessionManager.onDisconnect();
         if (stateCallback != null) {
             stateCallback.onStateChange(false, reason);
@@ -140,14 +147,14 @@ public class CaptureHandler implements SocketHandler {
     // ==================== 握手 ====================
 
     private void handleRequestRoi(SocketSession session) {
-        log.info("Received REQUEST_ROI");
+        log.info("收到 REQUEST_ROI");
         ROIData[] rois = pendingRois != null ? pendingRois : new ROIData[0];
         session.send(MSG_RETURN_ROI, serializeRois(rois));
-        log.debug("Sent ROI list: {} ROIs", rois.length);
+        log.debug("已发送 ROI 列表: {} 个 ROI", rois.length);
     }
 
     private void handleCaptureReady(SocketSession session) {
-        log.info("Received CAPTURE_READY");
+        log.info("收到 CAPTURE_READY");
         sessionManager.setHandshakeDone(true);
 
         if (stateCallback != null) {
@@ -162,7 +169,7 @@ public class CaptureHandler implements SocketHandler {
 
     /**
      * 帧数据解析与并行分发。
-     * 帧内 ROI 使用 CountDownLatch 并行处理, 全部完成后回发 PROCESSING_DONE (背压)
+     * 帧内 ROI 使用虚拟线程并行处理, 全部完成后回发 PROCESSING_DONE (背压)
      */
     private void handleFrameData(byte[] body, SocketSession session) {
         if (body == null || body.length < 2) return;
@@ -179,8 +186,8 @@ public class CaptureHandler implements SocketHandler {
         List<FrameDeserializer.FrameSlot> slots = frameDeserializer.deserialize(buf, roiCount, fullFrameRoiIndex);
 
         // 更新统计
+        frameCount.incrementAndGet();
         for (FrameDeserializer.FrameSlot slot : slots) {
-            frameCount.incrementAndGet();
             totalBytes += slot.pixels().length;
         }
 
@@ -191,8 +198,7 @@ public class CaptureHandler implements SocketHandler {
                 try {
                     cb.onFrame(slot.index(), slot.pixels(), slot.w(), slot.h(), slot.stride());
                 } catch (Exception e) {
-                    // 回调接口可能抛出多种异常，保留通用捕获以防 latch 死锁
-                    log.error("Frame callback error ROI[{}]", slot.index(), e);
+                    log.error("帧回调异常 ROI[{}]", slot.index(), e);
                 } finally {
                     latch.countDown();
                 }
@@ -213,7 +219,7 @@ public class CaptureHandler implements SocketHandler {
         if (lastStatsTime == 0) lastStatsTime = now;
         if (now - lastStatsTime > 10000) {
             double mbps = totalBytes / (1024.0 * 1024.0) / ((now - lastStatsTime) / 1000.0);
-            log.debug("Frames: {}, Rate: {} MB/s", frameCount.get(),
+            log.debug("帧数: {}, 速率: {} MB/s", frameCount.get(),
                     String.format("%.1f", mbps));
             totalBytes = 0;
             lastStatsTime = now;
@@ -223,7 +229,7 @@ public class CaptureHandler implements SocketHandler {
     // ==================== 窗口事件 ====================
 
     private void handleWindowClosed() {
-        log.warn("capture.exe reports window closed");
+        log.warn("capture.exe 报告窗口已关闭");
         if (stateCallback != null) {
             stateCallback.onStateChange(false, "Window closed");
         }
@@ -231,7 +237,7 @@ public class CaptureHandler implements SocketHandler {
 
     private void handleWindowState(byte[] body) {
         if (body != null && body.length >= 1) {
-            log.info("Window {}", body[0] == 0 ? "minimized" : "restored");
+            log.info("窗口 {}", body[0] == 0 ? "已最小化" : "已恢复");
         }
     }
 
@@ -255,7 +261,7 @@ public class CaptureHandler implements SocketHandler {
             return false;
         }
 
-        log.info("capture.exe launched (pid={}), hwnd=0x{}",
+        log.info("capture.exe 已启动 (pid={}), hwnd=0x{}",
                 processManager.getProcess().pid(), Long.toHexString(hwnd));
         return true;
     }
@@ -273,7 +279,7 @@ public class CaptureHandler implements SocketHandler {
         processManager.stopProcess();
         sessionManager.reset();
 
-        log.info("CaptureHandler stopped");
+        log.info("CaptureHandler 已停止");
     }
 
     public boolean isRunning() {
@@ -287,14 +293,7 @@ public class CaptureHandler implements SocketHandler {
      */
     public void sendSwitchMode(boolean fullFrame) {
         sessionManager.send(MSG_SWITCH_MODE, new byte[]{(byte) (fullFrame ? 1 : 0)});
-        log.info("Sent SWITCH_MODE: {}", fullFrame ? "FULL_FRAME" : "ROI");
-    }
-
-    /**
-     * 设置全帧 ROI 索引
-     */
-    public void setFullFrameRoiIndex(int index) {
-        this.fullFrameRoiIndex = index;
+        log.info("已发送 SWITCH_MODE: {}", fullFrame ? "全帧模式" : "ROI 模式");
     }
 
     /**

@@ -75,7 +75,7 @@ public class SocketSession implements AutoCloseable {
             return true;
         } catch (IOException e) {
             closed = true;
-            log.error("Send failed on session#{}", id, e);
+            log.error("发送失败 session#{}", id, e);
             return false;
         }
     }

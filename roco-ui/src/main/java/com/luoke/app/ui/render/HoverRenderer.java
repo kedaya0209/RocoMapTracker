@@ -88,8 +88,9 @@ public class HoverRenderer implements RenderLayer {
         double pivotY = hoverCanvas.getHeight() / 2;
 
         Point pos = hoveredPoint.getScreenPosition();
-        double[] screen = CoordinateUtil.worldToScreen(pos.getX(), pos.getY(), ox, oy, scale, navAngle, pivotX, pivotY);
-        double sx = screen[0], sy = screen[1];
+        double[] screenBuf = new double[2];
+        CoordinateUtil.worldToScreenInto(screenBuf, pos.getX(), pos.getY(), ox, oy, scale, navAngle, pivotX, pivotY);
+        double sx = screenBuf[0], sy = screenBuf[1];
 
         // 光环
         double hoverSize = RenderConfig.HOVER_ICON_SIZE;

@@ -1,10 +1,13 @@
 package com.luoke.app.macher.miniMap;
 
+import net.jcip.annotations.ThreadSafe;
+
 import java.util.Arrays;
 
 /**
  * 圆形遮罩工具：将图像中圆形区域外的像素置零。
  */
+@ThreadSafe
 public final class CircleMaskApplier {
 
     private CircleMaskApplier() {

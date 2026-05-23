@@ -16,21 +16,21 @@ import lombok.Setter;
 @Setter
 public class MapContext {
 
-    private double mapWidth, mapHeight; // 原始地图尺寸
-    private boolean initialized = false;
+    private volatile double mapWidth, mapHeight; // 原始地图尺寸
+    private volatile boolean initialized = false;
 
     /**
      * 视口状态：scale(缩放), offsetX/Y(相对于地图左上角的屏幕偏移)
      * 计算公式：CanvasX = offsetX + WorldX * scale
      */
-    private double scale = 1.0, offsetX = 0, offsetY = 0;
+    private volatile double scale = 1.0, offsetX = 0, offsetY = 0;
 
-    private double viewWidth, viewHeight; // 窗口/视口可视尺寸
+    private volatile double viewWidth, viewHeight; // 窗口/视口可视尺寸
 
-    private double playerX = -1, playerY = -1; // 玩家世界坐标
-    private double playerAngle = 0;             // 玩家朝向
-    private boolean hasAngle = false;           // 是否有有效朝向数据
-    private boolean playerInitialized = false;  // 是否已定位
+    private volatile double playerX = -1, playerY = -1; // 玩家世界坐标
+    private volatile double playerAngle = 0;             // 玩家朝向
+    private volatile boolean hasAngle = false;           // 是否有有效朝向数据
+    private volatile boolean playerInitialized = false;  // 是否已定位
 
     private String currentMapKey; // 当前地图唯一标识
 

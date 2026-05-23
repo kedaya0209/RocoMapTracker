@@ -78,7 +78,7 @@ public class SocketServer {
         acceptThread.start();
 
         int port = serverSocket.getLocalPort();
-        log.info("SocketServer started on port {}", port);
+        log.info("SocketServer 已启动，端口: {}", port);
         return port;
     }
 
@@ -112,7 +112,7 @@ public class SocketServer {
         sessionMsgTypes.clear();
         clientHandlers.clear();
 
-        log.info("SocketServer stopped");
+        log.info("SocketServer 已停止");
     }
 
     public int getPort() {
@@ -144,7 +144,7 @@ public class SocketServer {
         if (ct != null && !ct.isBlank()) {
             clientHandlers.put(ct, handler);
         }
-        log.debug("Registered handler {} clientType={} for types {}", handler.getClass().getSimpleName(),
+        log.debug("已注册处理器 {} clientType={} 消息类型 {}", handler.getClass().getSimpleName(),
                 ct, handler.messageTypes());
     }
 
@@ -169,7 +169,7 @@ public class SocketServer {
                 SocketSession session = new SocketSession(sock);
                 sessions.put(session.id(), session);
 
-                log.info("Accepted connection #{} from {}", session.id(),
+                log.info("接受连接 #{} 来自 {}", session.id(),
                         sock.getInetAddress());
 
                 // 不在此处广播 onConnect — 由 recvLoop 收到第一条消息后，
@@ -179,7 +179,7 @@ public class SocketServer {
                 Thread.ofPlatform().daemon(true).name("socket-recv-" + session.id())
                         .start(() -> recvLoop(session));
             } catch (IOException e) {
-                if (running.get()) log.error("Accept error", e);
+                if (running.get()) log.error("接受连接异常", e);
                 break;
             }
         }
@@ -200,14 +200,14 @@ public class SocketServer {
                     firstMessage = false;
 
                     if (msg.type() != MSG_HELLO) {
-                        log.warn("Session #{} first msg is not HELLO (type={}), closing",
+                        log.warn("会话 #{} 首条消息不是 HELLO (type={})，关闭连接",
                                 session.id(), msg.type());
                         session.close();
                         break;
                     }
 
                     if (msg.body() == null || msg.body().length < 4) {
-                        log.warn("Session #{} HELLO body too short, closing", session.id());
+                        log.warn("会话 #{} HELLO 包体过短，关闭连接", session.id());
                         session.close();
                         break;
                     }
@@ -216,7 +216,7 @@ public class SocketServer {
 
                     int nameLen = helloBuf.getShort() & 0xFFFF;
                     if (helloBuf.remaining() < nameLen + 2) {
-                        log.warn("Session #{} HELLO truncated at name, closing", session.id());
+                        log.warn("会话 #{} HELLO 名称截断，关闭连接", session.id());
                         session.close();
                         break;
                     }
@@ -226,7 +226,7 @@ public class SocketServer {
 
                     int typeCount = helloBuf.getShort() & 0xFFFF;
                     if (helloBuf.remaining() < typeCount * 4) {
-                        log.warn("Session #{} HELLO truncated at types, closing", session.id());
+                        log.warn("会话 #{} HELLO 类型列表截断，关闭连接", session.id());
                         session.close();
                         break;
                     }
@@ -238,7 +238,7 @@ public class SocketServer {
 
                     SocketHandler handler = clientHandlers.get(clientType);
                     if (handler == null) {
-                        log.warn("Session #{} unknown clientType='{}', closing",
+                        log.warn("会话 #{} 未知客户端类型='{}'，关闭连接",
                                 session.id(), clientType);
                         session.close();
                         break;
@@ -252,10 +252,10 @@ public class SocketServer {
                         handler.onConnect(session);
                     } catch (Exception e) {
                         // handler 回调可能抛出多种异常，保留通用捕获
-                        log.error("onConnect error in {}", handler.getClass().getSimpleName(), e);
+                        log.error("onConnect 回调异常 {}", handler.getClass().getSimpleName(), e);
                     }
 
-                    log.info("Session #{} bound to {} (clientType='{}', types={})",
+                    log.info("会话 #{} 绑定到 {} (clientType='{}', types={})",
                             session.id(), handler.getClass().getSimpleName(), clientType, supportedTypes);
                     continue; // HELLO 被消费，不分发到 onMessage
                 }
@@ -269,12 +269,12 @@ public class SocketServer {
                             h.onMessage(msg.type(), msg.body(), session);
                         } catch (Exception e) {
                             // handler 回调可能抛出多种异常，保留通用捕获
-                            log.error("onMessage error in {} for type={}",
+                            log.error("onMessage 回调异常 {} type={}",
                                     h.getClass().getSimpleName(), msg.type(), e);
                         }
                     }
                 } else {
-                    log.debug("No handler for msgType={}", msg.type());
+                    log.debug("无处理器处理 msgType={}", msg.type());
                 }
 
             } catch (IOException e) {
@@ -295,11 +295,11 @@ public class SocketServer {
                     h.onDisconnect(session, "Connection closed");
                 } catch (Exception e) {
                     // handler 回调可能抛出多种异常，保留通用捕获
-                    log.error("onDisconnect error in {}", h.getClass().getSimpleName(), e);
+                    log.error("onDisconnect 回调异常 {}", h.getClass().getSimpleName(), e);
                 }
             }
         }
 
-        log.info("Session #{} closed", session.id());
+        log.info("会话 #{} 已关闭", session.id());
     }
 }

@@ -3,6 +3,7 @@ package com.luoke.app;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
+import net.jcip.annotations.ThreadSafe;
 import org.bytedeco.javacpp.indexer.Indexer;
 import org.bytedeco.opencv.opencv_core.*;
 import org.bytedeco.opencv.opencv_imgproc.*;
@@ -19,6 +20,7 @@ import static org.bytedeco.opencv.global.opencv_core.*;
 import static org.bytedeco.opencv.global.opencv_imgcodecs.*;
 import static org.bytedeco.opencv.global.opencv_imgproc.*;
 
+@ThreadSafe
 @Slf4j
 public class DatasetGeneratorServer {
 

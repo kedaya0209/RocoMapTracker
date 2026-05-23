@@ -1,5 +1,6 @@
 package com.luoke.app;
 
+import net.jcip.annotations.ThreadSafe;
 import org.bytedeco.opencv.opencv_core.*;
 
 import lombok.extern.slf4j.Slf4j;
@@ -74,6 +75,7 @@ import static org.bytedeco.opencv.global.opencv_imgcodecs.*;
  * <p>角度约定：0° = 正右，90° = 正下，180° = 正左，270° = 正上，
  * 与标准数学坐标系一致（atan2(y, x)）。</p>
  */
+@ThreadSafe
 @Slf4j
 public class ArrowAngleDrawer {
 

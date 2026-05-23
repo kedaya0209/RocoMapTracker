@@ -10,11 +10,13 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 
 import lombok.extern.slf4j.Slf4j;
+import net.jcip.annotations.ThreadSafe;
 
 import static org.bytedeco.opencv.global.opencv_core.*;
 import static org.bytedeco.opencv.global.opencv_imgcodecs.*;
 import static org.bytedeco.opencv.global.opencv_imgproc.*;
 
+@ThreadSafe
 @Slf4j
 public class PCARecalibrator {
 

@@ -35,7 +35,7 @@ public class CaptureProcessManager {
     public boolean launchProcess(SocketServer server, String exePath, long hwnd, int maxFps) {
         int port = server.getPort();
         if (port <= 0) {
-            log.error("SocketServer is not running");
+            log.error("SocketServer 未运行");
             return false;
         }
 
@@ -48,12 +48,12 @@ public class CaptureProcessManager {
         String cmdLine = "\"" + exePath + "\" " + hwnd + " " + port + " " + maxFps;
         process = processFactory.create(cmdLine, JobObjectManager.getJobHandle(), true);
         if (process == null) {
-            log.error("Failed to launch capture.exe via NativeProcess");
+            log.error("通过 NativeProcess 启动 capture.exe 失败");
             return false;
         }
 
         startReaderThread();
-        log.info("capture.exe launched (pid={}), hwnd=0x{}", process.pid(), Long.toHexString(hwnd));
+        log.info("capture.exe 已启动 (pid={}), hwnd=0x{}", process.pid(), Long.toHexString(hwnd));
         return true;
     }
 
@@ -77,7 +77,7 @@ public class CaptureProcessManager {
         if (process != null && process.isAlive()) {
             process.destroy();
             if (!process.waitFor(3, TimeUnit.SECONDS)) {
-                log.warn("capture.exe pid={} did not stop within 3s, force killing", process.pid());
+                log.warn("capture.exe pid={} 未在 3 秒内停止，强制终止", process.pid());
                 process.destroyForcibly();
             }
         }

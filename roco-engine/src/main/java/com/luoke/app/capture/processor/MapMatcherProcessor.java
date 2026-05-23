@@ -184,6 +184,6 @@ public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
     @Override
     public void close() {
         executor.shutdownNow();
-        log.info("MapMatcherProcessor closed");
+        log.info("MapMatcherProcessor 已关闭");
     }
 }

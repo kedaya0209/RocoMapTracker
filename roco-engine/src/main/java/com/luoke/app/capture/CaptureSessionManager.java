@@ -21,7 +21,7 @@ public class CaptureSessionManager {
     public void onConnect(SocketSession session) {
         this.session = session;
         this.handshakeDone = false;
-        log.debug("CaptureHandler connected on session#{}", session.id());
+        log.debug("CaptureHandler 已连接 session#{}", session.id());
     }
 
     /**
