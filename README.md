@@ -70,7 +70,7 @@ mvn clean package
 
 # 编译 C++ 子进程 (Visual Studio Developer Command Prompt)
 cd cpp && build_capture.bat              # 产物 → capture.exe
-cd cpp && build_sift.bat                 # 产物 → sift_match.exe + opencv_world4100.dll
+cd cpp && build_sift.bat                 # 产物 → sift_match.exe + opencv_*.dll
 
 # 编译 C JNI 库 (jniframe.dll)
 cl /LD /Fe:jniframe.dll c/jniframe.c /I"%JAVA_HOME%\include" /I"%JAVA_HOME%\include\win32"

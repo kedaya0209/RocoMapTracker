@@ -16,32 +16,69 @@ if %_VC_ERR% neq 0 (
     exit /b 1
 )
 
-:: Dependencies: use local copies, auto-download if missing
-set "OPENCV_ROOT=%~dp0opencv-4.10.0\opencv\build"
+:: Dependencies: use local copies, auto-download and build from source if missing
+set "OPENCV_VERSION=4.10.0"
+set "OPENCV_SRC=%~dp0opencv-%OPENCV_VERSION%"
+set "OPENCV_ROOT=%~dp0opencv-%OPENCV_VERSION%\install"
 set "ZLIB_ROOT=%~dp0zlib-1.3.1"
 set "OUTPUT=RocoMapTracker-sift_match.exe"
 
-:: ---- OpenCV ----
+:: ---- OpenCV (build from source) ----
 if exist "%OPENCV_ROOT%\include\opencv2\opencv.hpp" (
     echo OpenCV found: %OPENCV_ROOT%
     goto :opencv_ok
 )
-echo [Auto] OpenCV not found, downloading opencv-4.10.0-windows.exe ...
-curl -fSL --ssl-no-revoke -o "%~dp0opencv-4.10.0-windows.exe" "https://ghfast.top/https://github.com/opencv/opencv/releases/download/4.10.0/opencv-4.10.0-windows.exe"
-if not exist "%~dp0opencv-4.10.0-windows.exe" (
+echo [Auto] OpenCV not found, downloading opencv-%OPENCV_VERSION% source ...
+curl -fSL --ssl-no-revoke -o "%~dp0opencv-%OPENCV_VERSION%.zip" "https://ghfast.top/https://github.com/opencv/opencv/archive/refs/tags/%OPENCV_VERSION%.zip"
+if not exist "%~dp0opencv-%OPENCV_VERSION%.zip" (
     echo [ERROR] Download failed. Please download manually:
-    echo   https://github.com/opencv/opencv/releases/download/4.10.0/opencv-4.10.0-windows.exe
-    echo   and extract to: %~dp0opencv-4.10.0
+    echo   https://github.com/opencv/opencv/archive/refs/tags/%OPENCV_VERSION%.zip
+    echo   and extract to: %OPENCV_SRC%
     exit /b 1
 )
-echo [Auto] Extracting OpenCV (this may take a moment) ...
-"%~dp0opencv-4.10.0-windows.exe" -o"%~dp0opencv-4.10.0" -y >nul
-del /q "%~dp0opencv-4.10.0-windows.exe" 2>nul
+echo [Auto] Extracting OpenCV source ...
+powershell -Command "Expand-Archive -Path '%~dp0opencv-%OPENCV_VERSION%.zip' -DestinationPath '%~dp0' -Force" >nul
+del /q "%~dp0opencv-%OPENCV_VERSION%.zip" 2>nul
+
+echo [Auto] Building OpenCV with CMake + NMake (this takes 5-10 minutes) ...
+pushd "%OPENCV_SRC%"
+if not exist build mkdir build
+cd build
+cmake -G "NMake Makefiles" -DCMAKE_BUILD_TYPE=Release ^
+    -DCMAKE_INSTALL_PREFIX="%OPENCV_ROOT%" ^
+    -DBUILD_SHARED_LIBS=ON ^
+    -DBUILD_LIST=core,imgproc,features2d,flann,calib3d ^
+    -DBUILD_opencv_python2=OFF -DBUILD_opencv_python3=OFF ^
+    -DBUILD_TESTS=OFF -DBUILD_PERF_TESTS=OFF -DBUILD_EXAMPLES=OFF ^
+    -DBUILD_DOCS=OFF -DBUILD_opencv_apps=OFF ^
+    -DWITH_FFMPEG=OFF -DWITH_GTK=OFF -DWITH_V4L=OFF ^
+    -DWITH_CUDA=OFF -DWITH_OPENCL=OFF -DWITH_QUIRC=OFF -DWITH_IPP=OFF ^
+    -DBUILD_PNG=OFF -DBUILD_JPEG=OFF -DBUILD_TIFF=OFF -DBUILD_WEBP=OFF ^
+    -DBUILD_OPENJPEG=OFF -DBUILD_ZLIB=OFF ^
+    ..
+if errorlevel 1 (
+    echo [ERROR] CMake configure failed
+    popd
+    exit /b 1
+)
+nmake /NOLOGO
+if errorlevel 1 (
+    echo [ERROR] OpenCV build failed
+    popd
+    exit /b 1
+)
+nmake install
+if errorlevel 1 (
+    echo [ERROR] OpenCV install failed
+    popd
+    exit /b 1
+)
+popd
 if not exist "%OPENCV_ROOT%\include\opencv2\opencv.hpp" (
-    echo [ERROR] Extraction failed: %OPENCV_ROOT%
+    echo [ERROR] Build succeeded but install failed: %OPENCV_ROOT%
     exit /b 1
 )
-echo [Auto] OpenCV ready.
+echo [Auto] OpenCV ready: %OPENCV_ROOT%
 :opencv_ok
 
 :: ---- zlib ----
@@ -95,9 +132,14 @@ cl /std:c++17 /utf-8 /O2 /EHsc /arch:AVX2 ^
    /Fe:"%OUTPUT%" ^
    sift_match_main.cpp resource.res ^
    /link ^
-   /LIBPATH:"%OPENCV_ROOT%\x64\vc16\lib" ^
+   /OPT:REF ^
+   /LIBPATH:"%OPENCV_ROOT%\lib" ^
    /LIBPATH:"%ZLIB_ROOT%\lib" ^
-   opencv_world4100.lib ^
+   opencv_core4100.lib ^
+   opencv_imgproc4100.lib ^
+   opencv_features2d4100.lib ^
+   opencv_flann4100.lib ^
+   opencv_calib3d4100.lib ^
    zlib.lib ^
    ws2_32.lib ^
    /SUBSYSTEM:CONSOLE
@@ -109,7 +151,9 @@ if %ERRORLEVEL% equ 0 (
     echo ========================================
     echo Copying to resources...
     copy /y "%OUTPUT%" "..\roco-ui\src\main\resources\sift\%OUTPUT%" >nul
-    copy /y "%OPENCV_ROOT%\x64\vc16\bin\opencv_world4100.dll" "..\roco-ui\src\main\resources\sift\opencv_world4100.dll" >nul
+    for %%D in (core imgproc features2d flann calib3d) do (
+        copy /y "%OPENCV_ROOT%\bin\opencv_%%D4100.dll" "..\roco-ui\src\main\resources\sift\opencv_%%D4100.dll" >nul
+    )
     echo Done.
     echo ========================================
     exit /b 0
