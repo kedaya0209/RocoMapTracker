@@ -19,6 +19,10 @@
 
     <dependencies>
         <dependency>
+            <groupId>net.jcip</groupId>
+            <artifactId>jcip-annotations</artifactId>
+        </dependency>
+        <dependency>
             <groupId>com.luoke</groupId>
             <artifactId>roco-engine</artifactId>
         </dependency>
@@ -33,10 +37,6 @@
         <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-base</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.openjfx</groupId>
-            <artifactId>javafx-fxml</artifactId>
         </dependency>
         <dependency>
             <groupId>io.github.mkpaz</groupId>
@@ -117,19 +117,6 @@
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                             </transformers>
                             <filters>
-                                <!-- 排除非 Windows 平台的原生库 -->
-                                <filter>
-                                    <artifact>com.github.luben:zstd-jni</artifact>
-                                    <excludes>
-                                        <exclude>aix/**</exclude>
-                                        <exclude>darwin/**</exclude>
-                                        <exclude>freebsd/**</exclude>
-                                        <exclude>linux/**</exclude>
-                                        <exclude>netbsd/**</exclude>
-                                        <exclude>openbsd/**</exclude>
-                                        <exclude>sunos/**</exclude>
-                                    </excludes>
-                                </filter>
                                 <filter>
                                     <artifact>com.microsoft.onnxruntime:onnxruntime</artifact>
                                     <excludes>

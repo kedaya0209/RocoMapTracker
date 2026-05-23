@@ -25,7 +25,6 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
         <javafx.version>25.0.3</javafx.version>
-        <zstd.version>1.5.7-8</zstd.version>
         <jackson.version>2.21.3</jackson.version>
         <jsoup.version>1.22.2</jsoup.version>
         <sl4j.version>2.0.18</sl4j.version>
@@ -119,13 +118,6 @@
                 <scope>runtime</scope>
             </dependency>
 
-            <!-- Zstd -->
-            <dependency>
-                <groupId>com.github.luben</groupId>
-                <artifactId>zstd-jni</artifactId>
-                <version>${zstd.version}</version>
-            </dependency>
-
             <!-- JavaFX -->
             <dependency>
                 <groupId>org.openjfx</groupId>
@@ -140,11 +132,6 @@
             <dependency>
                 <groupId>org.openjfx</groupId>
                 <artifactId>javafx-base</artifactId>
-                <version>${javafx.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.openjfx</groupId>
-                <artifactId>javafx-fxml</artifactId>
                 <version>${javafx.version}</version>
             </dependency>
 
@@ -205,13 +192,6 @@
             </dependency>
         </dependencies>
     </dependencyManagement>
-
-    <dependencies>
-        <dependency>
-            <groupId>net.jcip</groupId>
-            <artifactId>jcip-annotations</artifactId>
-        </dependency>
-    </dependencies>
 
     <build>
         <pluginManagement>
