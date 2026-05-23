@@ -82,7 +82,7 @@ public final class MainUiComposer {
 
         // 侧边栏（初始偏移量足够大，确保 Platform.runLater 修正前不会露出来）
         Sidebar sidebar = new Sidebar();
-        sidebar.setTranslateX(-400);
+        sidebar.setTranslateX(-1000);
         AnchorPane sidebarContainer = new AnchorPane(sidebar);
         sidebarContainer.setPickOnBounds(false);
         AnchorPane.setTopAnchor(sidebar, 45.0);
