@@ -4,6 +4,7 @@ import com.luoke.app.config.SiftConfig;
 import com.luoke.app.macher.map.MapMatcher;
 import com.luoke.app.utils.ResourceUtils;
 import lombok.extern.slf4j.Slf4j;
+import net.jcip.annotations.NotThreadSafe;
 import org.bytedeco.javacpp.FloatPointer;
 import org.bytedeco.javacpp.PointerScope;
 import org.bytedeco.opencv.global.opencv_calib3d;
@@ -39,6 +40,7 @@ import java.util.List;
  * nopointergc=true: 显式内存管理，零 GC 追踪开销。
  * KDTreeIndexParams(1): 单树 + checks=24，适配 33W 特征点。
  */
+@NotThreadSafe
 @Slf4j
 public class SiftMapMatcher implements MapMatcher {
 

@@ -2,6 +2,7 @@ package com.luoke.app.macher.miniMap;
 
 import com.luoke.app.config.MiniMapConfig;
 import lombok.extern.slf4j.Slf4j;
+import net.jcip.annotations.NotThreadSafe;
 import org.bytedeco.javacpp.PointerScope;
 import org.bytedeco.opencv.global.opencv_core;
 import org.bytedeco.opencv.global.opencv_imgproc;
@@ -13,6 +14,7 @@ import org.bytedeco.opencv.opencv_imgproc.Vec3fVector;
  * 小地图检测器：从灰度图像中定位小地图的圆心坐标与半径。
  * 内部复用 Mat 缓存，提升性能。
  */
+@NotThreadSafe
 @Slf4j
 public class MiniMapDetector implements AutoCloseable {
 

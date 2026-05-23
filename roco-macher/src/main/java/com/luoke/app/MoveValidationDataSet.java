@@ -1,5 +1,7 @@
 package com.luoke.app;
 
+import net.jcip.annotations.ThreadSafe;
+
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -7,6 +9,7 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.Collectors;
 
+@ThreadSafe
 public class MoveValidationDataSet {
 
     static void main() throws IOException {

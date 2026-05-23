@@ -1,6 +1,7 @@
 package com.luoke.app.macher.map.sift;
 
 import com.github.luben.zstd.Zstd;
+import net.jcip.annotations.NotThreadSafe;
 import org.bytedeco.javacpp.DoublePointer;
 import org.bytedeco.javacpp.FloatPointer;
 import org.bytedeco.opencv.global.opencv_core;
@@ -24,6 +25,7 @@ import java.nio.FloatBuffer;
  *   PCA_ULTRA: raw → PCA投影 64维 → 8-bit 量化 CV_8U → 存储
  * </pre>
  */
+@NotThreadSafe
 public class DescriptorTransform {
 
     // PCA 状态
