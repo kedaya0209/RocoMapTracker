@@ -133,6 +133,9 @@ public class UpdateManager {
                 return;
             }
             pendingUpdate.set(latest);
+            if (downloading.get()) {
+                return;
+            }
             if (UpdateConfig.AUTO_DOWNLOAD) {
                 notify("发现新版本 " + latest.version() + "，开始自动下载", NotificationType.INFO);
                 startDownload(latest);
