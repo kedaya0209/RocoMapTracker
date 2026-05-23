@@ -233,6 +233,9 @@ public:
     std::vector<int> roi_buf_w;
     std::vector<int> roi_buf_h;
 
+    // 全帧模式状态追踪（用于检测 ON→OFF 转换，执行一次性内存清理）
+    bool was_ff_mode = false;
+
     // Diagnostics
     int64_t frame_count = 0;
     int64_t close_success = 0;
@@ -644,6 +647,22 @@ private:
         roi_buf_w.resize(total);
         roi_buf_h.resize(total);
 
+        // 全帧模式 ON→OFF 转换时，一次性释放全帧 staging 纹理 + 缓冲区
+        if (!ff_mode && was_ff_mode) {
+            for (size_t i = nrois; i < roi_stagings.size(); i++) {
+                roi_stagings[i].tex.Reset();
+            }
+            roi_stagings.resize(nrois);
+
+            decltype(roi_buffers)().swap(roi_buffers);
+            roi_buffers.resize(nrois);
+            decltype(roi_buf_w)().swap(roi_buf_w);
+            roi_buf_w.resize(nrois);
+            decltype(roi_buf_h)().swap(roi_buf_h);
+            roi_buf_h.resize(nrois);
+        }
+        was_ff_mode = ff_mode;
+
         for (size_t i = 0; i < nrois; i++) {
             const ROI& r = roi_snap[i];
 
@@ -938,6 +957,8 @@ static bool parse_roi_body(const std::vector<uint8_t>& body, std::vector<ROI>& o
 // main()
 // ============================================================================
 int main(int argc, char* argv[]) {
+    setvbuf(stdout, NULL, _IONBF, 0);
+    setvbuf(stderr, NULL, _IONBF, 0);
     LOG("============================================================");
     LOG("  WGC Capture Process (Socket Mode)");
     LOG("============================================================");

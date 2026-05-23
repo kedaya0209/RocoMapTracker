@@ -37,6 +37,7 @@ public class NativeProcess {
     private static final MethodHandle READ_FILE;
     private static final MethodHandle OPEN_PROCESS;
     private static final MethodHandle SET_PRIORITY_CLASS;
+    private static final MethodHandle SET_HANDLE_INFORMATION;
 
     // ---- 常量 ----
     /** PROC_THREAD_ATTRIBUTE_JOB_LIST: 将子进程在创建时归入 JobObject，使任务管理器"进程"页签下归组 */
@@ -49,6 +50,7 @@ public class NativeProcess {
     private static final int STARTF_USESTDHANDLES = 0x00000100;
     private static final int STILL_ACTIVE = 259;
     private static final int HIGH_PRIORITY_CLASS = 0x00000080;
+    private static final int HANDLE_FLAG_INHERIT = 0x00000001;
 
     // STARTUPINFOEXW layout (x64, 自然对齐)
     private static final int STARTUPINFOEX_SIZE = 112;
@@ -131,6 +133,11 @@ public class NativeProcess {
                     FunctionDescriptor.of(ValueLayout.JAVA_INT,
                             ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT));
 
+            SET_HANDLE_INFORMATION = LINKER.downcallHandle(
+                    KERNEL32.find("SetHandleInformation").orElseThrow(),
+                    FunctionDescriptor.of(ValueLayout.JAVA_INT,
+                            ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT));
+
             READ_FILE = LINKER.downcallHandle(
                     KERNEL32.find("ReadFile").orElseThrow(),
                     FunctionDescriptor.of(ValueLayout.JAVA_INT,
@@ -169,16 +176,24 @@ public class NativeProcess {
             // 1. 创建 stdout pipe (同时重定向 stderr 到同一 pipe)
             long hRead = 0, hWrite = 0;
             if (redirectStdout) {
+                // SECURITY_ATTRIBUTES: nLength(4) + pad(4) + lpSecurityDescriptor(8) + bInheritHandle(4) + pad(4) = 24
+                MemorySegment sa = arena.allocate(24);
+                sa.set(ValueLayout.JAVA_INT, 0, 24);          // nLength = sizeof(SECURITY_ATTRIBUTES)
+                sa.set(ValueLayout.JAVA_LONG, 8, 0L);         // lpSecurityDescriptor = NULL
+                sa.set(ValueLayout.JAVA_INT, 16, 1);           // bInheritHandle = TRUE
+
                 MemorySegment pRead = arena.allocate(8);
                 MemorySegment pWrite = arena.allocate(8);
-                int pipeOk = (int) CREATE_PIPE.invoke(pRead, pWrite,
-                        MemorySegment.NULL, 0);
+                int pipeOk = (int) CREATE_PIPE.invoke(pRead, pWrite, sa, 0);
                 if (pipeOk == 0) {
                     log.error("CreatePipe 失败 err={}", lastError());
                     return null;
                 }
                 hRead = pRead.get(ValueLayout.JAVA_LONG, 0);
                 hWrite = pWrite.get(ValueLayout.JAVA_LONG, 0);
+
+                // read 端不需要被子进程继承，清除继承标志防止泄漏
+                SET_HANDLE_INFORMATION.invoke(hRead, (int) HANDLE_FLAG_INHERIT, 0);
             }
 
             // 2. 构建 STARTUPINFOEXW
