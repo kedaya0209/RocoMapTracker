@@ -1,6 +1,7 @@
 package com.luoke.app.ui;
 
 import com.luoke.app.ui.util.TaskbarIconHelper;
+import com.luoke.app.utils.EnvironmentUtil;
 import com.luoke.app.utils.FilePathUtil;
 import com.luoke.app.utils.ResourceUtils;
 import net.jcip.annotations.NotThreadSafe;
@@ -225,8 +226,8 @@ public class ModernCanvasApp extends Application {
         // 设置更新 UI 回调
         UpdateManager.getInstance().setUiDelegate(createUpdateUiDelegate());
 
-        // 启动定时更新检查
-        if (UpdateConfig.CHECK_ENABLED) {
+        // 启动定时更新检查（仅 Native Image 环境）
+        if (EnvironmentUtil.isNative() && UpdateConfig.CHECK_ENABLED) {
             UpdateManager.getInstance().startPeriodicCheck(UpdateConfig.CHECK_INTERVAL_HOURS);
         }
 

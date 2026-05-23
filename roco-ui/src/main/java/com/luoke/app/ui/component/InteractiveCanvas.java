@@ -167,15 +167,20 @@ public class InteractiveCanvas extends Canvas {
                 ? UiConfig.INTERACTIVE_ZOOM_FACTOR
                 : (2 - UiConfig.INTERACTIVE_ZOOM_FACTOR);
 
-        if (cameraManager.isFollowMode() && cameraManager.hasValidPlayerPosition()) {
-            double newScale = cameraManager.getFollowScale() * factor;
-            cameraManager.setFollowScale(Math.clamp(newScale,
+        if (cameraManager.isFollowMode()) {
+            // follow 模式：绕玩家缩放，偏移立即居中
+            double oldScale = mapManager.getScale();
+            double newScale = Math.clamp(oldScale * factor,
                     ViewConfig.INTERACTIVE_FOLLOW_MIN_SCALE,
-                    ViewConfig.INTERACTIVE_FOLLOW_MAX_SCALE));
+                    ViewConfig.INTERACTIVE_FOLLOW_MAX_SCALE);
+            mapManager.setScale(newScale);
+            double cx = mapManager.getViewWidth() / 2;
+            double cy = mapManager.getViewHeight() / 2;
+            mapManager.setOffsetX(cx - mapManager.getPlayerX() * newScale);
+            mapManager.setOffsetY(cy - mapManager.getPlayerY() * newScale);
+            mapManager.ensureBounds();
+            cameraManager.setFollowScale(newScale);
         } else {
-            if (cameraManager.isFollowMode()) {
-                cameraManager.setFollowScale(mapManager.getScale());
-            }
             mapManager.zoom(factor, e.getX(), e.getY());
         }
     }

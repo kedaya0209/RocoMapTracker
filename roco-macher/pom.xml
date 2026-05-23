@@ -17,6 +17,8 @@
         <dependency>
             <groupId>com.github.luben</groupId>
             <artifactId>zstd-jni</artifactId>
+            <version>1.5.7-8</version>
+            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>com.luoke</groupId>
