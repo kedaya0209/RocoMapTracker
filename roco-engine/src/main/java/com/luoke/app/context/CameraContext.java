@@ -80,7 +80,8 @@ public class CameraContext {
 
     /**
      * 更新摄像机视口
-     * 启用跟随模式时，自动计算视口偏移量使玩家位于中心
+     * 启用跟随模式时，自动计算视口偏移量使玩家位于中心。
+     * 不覆盖 scale，缩放由 {@link MapContext#zoom} 统一管理。
      */
     public void updateViewport() {
         MapContext mm = MapContext.getInstance();
@@ -88,8 +89,6 @@ public class CameraContext {
         if (!mm.isInitialized() || !isFollowMode() || !hasValidPlayerPosition()) {
             return;
         }
-
-        mm.setScale(followScale);
 
         double cx = mm.getViewWidth() / 2;
         double cy = mm.getViewHeight() / 2;
