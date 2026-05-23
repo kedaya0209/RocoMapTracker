@@ -84,7 +84,7 @@ public class SettingConfigManager {
         if (def == null) return readField(key);
 
         // 可编辑 Spinner：从编辑器文本解析，反映未提交的输入
-        if (control instanceof Spinner sp && sp.isEditable()) {
+        if (control instanceof Spinner<?> sp && sp.isEditable()) {
             try {
                 String text = sp.getEditor().getText();
                 if (text == null || text.isBlank()) return sp.getValue();
@@ -128,14 +128,15 @@ public class SettingConfigManager {
         syncControl(prefix + "H");
     }
 
+    @SuppressWarnings("unchecked")
     private void syncControl(String key) {
         Control control = controlMap.get(key);
         if (control == null) return;
         SettingDef def = SettingDefinitions.findDef(key);
         if (def == null || def.getter() == null) return;
         Object value = def.getter().get();
-        if (control instanceof Spinner sp) {
-            sp.getValueFactory().setValue(value);
+        if (control instanceof Spinner<?> sp) {
+            ((SpinnerValueFactory<Object>) sp.getValueFactory()).setValue(value);
         }
     }
 

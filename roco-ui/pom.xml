@@ -81,6 +81,8 @@
                         <option>-XX:MaxHeapFreeRatio=25</option>
                         <option>-XX:MinHeapFreeRatio=10</option>
                         <option>-Dprism.maxvram=134217728</option>
+                        <option>--add-reads=javafx.graphics=ALL-UNNAMED</option>
+                        <option>--enable-native-access=ALL-UNNAMED</option>
                     </options>
                 </configuration>
             </plugin>

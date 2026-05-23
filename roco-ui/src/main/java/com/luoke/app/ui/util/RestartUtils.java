@@ -7,34 +7,64 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
+import java.time.LocalDateTime;
 
 @Slf4j
 @ThreadSafe
 public class RestartUtils {
 
+    private static final String RESTART_TASK_NAME = "RocoMapTracker-Restart";
+
     public static void restart() {
+        File exeFile = new File(Main.class.getProtectionDomain()
+                .getCodeSource()
+                .getLocation()
+                .getPath());
+        String exePath = exeFile.getAbsolutePath();
+
+        // 通过 schtasks 启动新进程，脱离 JobObject 防止被一起杀死
+        if (startViaSchtasks(exePath)) {
+            log.info("重启任务已通过 schtasks 创建");
+        } else {
+            // 降级：直接启动（可能被 JobObject 终止）
+            log.warn("schtasks 失败，降级使用 ProcessBuilder");
+            try {
+                new ProcessBuilder(exePath).start();
+            } catch (IOException e) {
+                log.error("程序重启发生异常", e);
+                return;
+            }
+        }
+
+        Platform.exit();
+        System.exit(0);
+    }
+
+    private static boolean startViaSchtasks(String exePath) {
         try {
-            List<String> command = new ArrayList<>();
+            LocalDateTime future = LocalDateTime.now().plusSeconds(2);
+            String startTime = String.format("%02d:%02d", future.getHour(), future.getMinute());
 
-            // 兼容 GraalVM Native Image
-            // 获取当前运行的 exe 绝对路径
-            String nativeImage = new File(Main.class.getProtectionDomain()
-                    .getCodeSource()
-                    .getLocation()
-                    .getPath())
-                    .getName();
+            Process create = new ProcessBuilder(
+                    "schtasks.exe", "/create",
+                    "/tn", RESTART_TASK_NAME,
+                    "/tr", "\"" + exePath + "\"",
+                    "/sc", "once",
+                    "/st", startTime,
+                    "/f",
+                    "/rl", "LIMITED"
+            ).start();
+            if (create.waitFor() != 0) {
+                log.warn("schtasks /create 失败");
+                return false;
+            }
 
-            command.add(nativeImage);
-
-            ProcessBuilder pb = new ProcessBuilder(command);
-            pb.start();
-
-            Platform.exit();
-            System.exit(0);
-        } catch (IOException e) {
-            log.error("程序重启发生异常,e:", e);
+            new ProcessBuilder("schtasks.exe", "/run", "/tn", RESTART_TASK_NAME)
+                    .start().waitFor();
+            return true;
+        } catch (Exception e) {
+            log.warn("schtasks 启动失败", e);
+            return false;
         }
     }
 }
