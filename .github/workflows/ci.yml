@@ -51,7 +51,7 @@ jobs:
         run: mvn test -pl roco-ui -am --no-transfer-progress
 
   # ================================================================
-  # C++ 子进程编译（预编译 OpenCV + 快速 zlib）
+  # C++ 子进程编译（OpenCV 源码编译 + zlib 源码编译）
   # ================================================================
   build-cpp:
     name: Build C++ Subprocesses
@@ -62,18 +62,23 @@ jobs:
       - name: Setup Visual Studio (MSVC)
         uses: ilammy/msvc-dev-cmd@v1
 
-      - name: Cache OpenCV
+      - name: Cache OpenCV (built from source)
         id: cache-opencv
         uses: actions/cache@v4
         with:
-          path: D:\a\opencv
-          key: ${{ runner.os }}-opencv-${{ env.OPENCV_VERSION }}-v2
+          path: D:\a\opencv-install
+          key: ${{ runner.os }}-opencv-src-${{ env.OPENCV_VERSION }}-core-imgproc-features2d-flann-calib3d-noipp-v1
 
-      - name: Download and extract pre-built OpenCV
+      - name: Build OpenCV from source
         if: steps.cache-opencv.outputs.cache-hit != 'true'
         run: |
-          curl.exe -L -o opencv.exe "https://github.com/opencv/opencv/releases/download/${{ env.OPENCV_VERSION }}/opencv-${{ env.OPENCV_VERSION }}-windows.exe"
-          7z x opencv.exe -oD:\a\opencv -y > nul
+          curl.exe -L -o opencv.zip "https://github.com/opencv/opencv/archive/refs/tags/${{ env.OPENCV_VERSION }}.zip"
+          powershell -Command "Expand-Archive -Path 'opencv.zip' -DestinationPath '.' -Force"
+          cd opencv-${{ env.OPENCV_VERSION }}
+          mkdir build && cd build
+          cmake -G "NMake Makefiles" -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=D:\a\opencv-install -DBUILD_SHARED_LIBS=ON -DBUILD_LIST=core,imgproc,features2d,flann,calib3d -DBUILD_opencv_python2=OFF -DBUILD_opencv_python3=OFF -DBUILD_TESTS=OFF -DBUILD_PERF_TESTS=OFF -DBUILD_EXAMPLES=OFF -DBUILD_DOCS=OFF -DBUILD_opencv_apps=OFF -DWITH_FFMPEG=OFF -DWITH_GTK=OFF -DWITH_V4L=OFF -DWITH_CUDA=OFF -DWITH_OPENCL=OFF -DWITH_QUIRC=OFF -DWITH_IPP=OFF -DBUILD_PNG=OFF -DBUILD_JPEG=OFF -DBUILD_TIFF=OFF -DBUILD_WEBP=OFF -DBUILD_OPENJPEG=OFF -DBUILD_ZLIB=OFF ..
+          nmake /NOLOGO
+          nmake install
         shell: cmd
 
       - name: Cache zlib
@@ -100,15 +105,16 @@ jobs:
 
       - name: Build capture.exe (DirectX only, no OpenCV)
         run: |
-          cl /std:c++17 /O2 /EHsc /arch:AVX2 /Fe:capture.exe capture_main.cpp d3d11.lib dxgi.lib windowsapp.lib runtimeobject.lib user32.lib ws2_32.lib winmm.lib
+          rc /nologo /fo resource.res resource.rc
+          cl /std:c++17 /O2 /EHsc /arch:AVX2 /Fe:capture.exe capture_main.cpp resource.res d3d11.lib dxgi.lib windowsapp.lib runtimeobject.lib user32.lib ws2_32.lib winmm.lib
         working-directory: cpp
 
-      - name: Build sift_match.exe (with pre-built OpenCV)
+      - name: Build sift_match.exe (with source-built OpenCV)
         run: |
-          set "INCLUDE=D:\a\opencv\opencv\build\include;D:\a\zlib\include;%INCLUDE%"
-          set "LIB=D:\a\opencv\opencv\build\x64\vc16\lib;D:\a\zlib\lib;%LIB%"
-          cl /std:c++17 /O2 /EHsc /arch:AVX2 /Fe:sift_match.exe sift_match_main.cpp ws2_32.lib opencv_world4100.lib
-          copy /Y "D:\a\opencv\opencv\build\x64\vc16\bin\opencv_world4100.dll" .
+          set "INCLUDE=D:\a\opencv-install\include;D:\a\zlib\include;%INCLUDE%"
+          set "LIB=D:\a\opencv-install\lib;D:\a\zlib\lib;%LIB%"
+          cl /std:c++17 /O2 /EHsc /arch:AVX2 /OPT:REF /Fe:sift_match.exe sift_match_main.cpp ws2_32.lib opencv_core4100.lib opencv_imgproc4100.lib opencv_features2d4100.lib opencv_flann4100.lib opencv_calib3d4100.lib zlib.lib
+          for %D in (core imgproc features2d flann calib3d) do copy /Y "D:\a\opencv-install\bin\opencv_%D4100.dll" .
         working-directory: cpp
         shell: cmd
 
@@ -119,7 +125,11 @@ jobs:
           path: |
             cpp/capture.exe
             cpp/sift_match.exe
-            cpp/opencv_world4100.dll
+            cpp/opencv_core4100.dll
+            cpp/opencv_imgproc4100.dll
+            cpp/opencv_features2d4100.dll
+            cpp/opencv_flann4100.dll
+            cpp/opencv_calib3d4100.dll
           compression-level: 0
 
   # ================================================================
@@ -161,7 +171,7 @@ jobs:
         run: |
           copy /Y cpp\capture.exe roco-ui\src\main\resources\capture\RocoMapTracker-capture.exe
           copy /Y cpp\sift_match.exe roco-ui\src\main\resources\sift\RocoMapTracker-sift_match.exe
-          copy /Y cpp\opencv_world4100.dll roco-ui\src\main\resources\sift\opencv_world4100.dll
+          for %D in (core imgproc features2d flann calib3d) do copy /Y cpp\opencv_%D4100.dll roco-ui\src\main\resources\sift\opencv_%D4100.dll
 
       - name: Download private assets
         env:
