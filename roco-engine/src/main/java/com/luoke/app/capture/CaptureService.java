@@ -204,14 +204,14 @@ public class CaptureService {
             fullFrameIndex = cachedRois.length;
             handler.setFullFrameRoiIndex(fullFrameIndex);
             handler.sendSwitchMode(true);
-            log.info("Full-frame mode enabled, index={}", fullFrameIndex);
+            log.info("全帧模式已启用，索引={}", fullFrameIndex);
         } else {
             fullFrameIndex = -1;
             handler.setFullFrameRoiIndex(-1);
             handler.releaseFullFrameBuffer();
             handler.sendSwitchMode(false);
             CaptureFrameBuffer.getInstance().clear();
-            log.info("Full-frame mode disabled");
+            log.info("全帧模式已禁用");
         }
     }
 

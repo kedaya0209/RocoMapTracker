@@ -269,8 +269,8 @@ public class ModernCanvasApp extends Application {
             @Override
             public void showDownloadProgress(String version, double progress) {
                 Platform.runLater(() -> {
+                    sidebar.setDownloadProgress(progress);
                     if (backgroundMode) {
-                        sidebar.setDownloadProgress(progress);
                         return;
                     }
                     if (downloadProgress == null) {
@@ -287,13 +287,13 @@ public class ModernCanvasApp extends Application {
             @Override
             public void hideDownloadProgress() {
                 Platform.runLater(() -> {
+                    sidebar.setDownloadProgress(-1);
                     if (downloadProgress != null) {
                         downloadProgress.close();
                         downloadProgress = null;
                     }
                     if (backgroundMode) {
                         backgroundMode = false;
-                        sidebar.setDownloadProgress(-1);
                     }
                 });
             }
@@ -319,6 +319,7 @@ public class ModernCanvasApp extends Application {
     public void stop() {
         log.info("正在关闭程序...");
 
+        UpdateManager.getInstance().shutdown();
         captureServiceManager.stop();
         siftClientManager.stop();
         InfrastructureManager.destroy();

@@ -109,7 +109,7 @@ public class SiftMatchHandler implements SocketHandler {
         if (handler != null) {
             handler.handle(body, session);
         } else {
-            log.warn("Unknown SIFT message type: {}", type);
+            log.warn("未知 SIFT 消息类型: {}", type);
         }
     }
 
@@ -122,7 +122,7 @@ public class SiftMatchHandler implements SocketHandler {
 
         // ── Pending 进程断开 — 取消热切换，不影响 active ──
         if (sessionManager.isFromPending(session)) {
-            log.warn("Pending sift_match.exe #{} disconnected during switch: {}", session.id(), reason);
+            log.warn("待命 sift_match.exe #{} 在切换期间断开: {}", session.id(), reason);
             sessionManager.cancelPendingCleanup();
             processManager.clearPending();
             return;
@@ -133,7 +133,7 @@ public class SiftMatchHandler implements SocketHandler {
     }
 
     private void handleActiveDisconnect(SocketSession session, String reason) {
-        log.warn("SiftMatchHandler active session #{} disconnected: {}", session.id(), reason);
+        log.warn("SiftMatchHandler 活跃会话 #{} 断开: {}", session.id(), reason);
         sessionManager.handleActiveDisconnect();
         HookRegistry.INSTANCE.publish(HookEventType.STATUS_CAROUSEL,
                 StatusCarouselEvent.siftDisconnected());
@@ -145,7 +145,7 @@ public class SiftMatchHandler implements SocketHandler {
         }
 
         if (sessionManager.isSwitching()) {
-            log.info("Active disconnected during switch, waiting for pending to take over");
+            log.info("活跃会话在切换期间断开，等待待命会话接管");
             return;
         }
 
@@ -160,14 +160,14 @@ public class SiftMatchHandler implements SocketHandler {
     // ==================== 握手协议 ====================
 
     private void handleRequestConfig(SocketSession session) {
-        log.info("Received REQUEST_CONFIG, sending parameters...");
+        log.info("收到 REQUEST_CONFIG，发送参数...");
         try {
             SiftVariant variant = activeVariant != null ? activeVariant : SiftVariant.PCA_ULTRA;
             byte[] body = encodeConfig(variant.variantOrdinal(), variant.cacheSuffix());
             session.send(MSG_CONFIG_DATA, body);
-            log.info("CONFIG_DATA sent ({} bytes)", body.length);
+            log.info("CONFIG_DATA 已发送 ({} 字节)", body.length);
         } catch (RuntimeException e) {
-            log.error("Failed to serialize CONFIG_DATA", e);
+            log.error("序列化 CONFIG_DATA 失败", e);
             byte[] errBody = ("Config error: " + e.getMessage())
                     .getBytes(StandardCharsets.UTF_8);
             session.send(MSG_INIT_FAILED, errBody);
@@ -175,15 +175,15 @@ public class SiftMatchHandler implements SocketHandler {
     }
 
     private void handleRequestMap(SocketSession session) {
-        log.info("Received REQUEST_MAP, loading map...");
+        log.info("收到 REQUEST_MAP，加载地图...");
         try {
             MapImageData mapData = loadMapGray();
             byte[] body = encodeMapData(mapData.grayPixels(), mapData.width(), mapData.height());
             session.send(MSG_MAP_DATA, body);
-            log.info("Map data sent: {}x{} ({} gray pixels)",
+            log.info("地图数据已发送: {}x{} ({} 灰度像素)",
                     mapData.width(), mapData.height(), mapData.grayPixels().length);
         } catch (Exception e) {
-            log.error("Failed to load map data", e);
+            log.error("加载地图数据失败", e);
             byte[] errBody = ("Map load error: " + e.getMessage())
                     .getBytes(StandardCharsets.UTF_8);
             session.send(MSG_INIT_FAILED, errBody);
@@ -227,7 +227,7 @@ public class SiftMatchHandler implements SocketHandler {
         NativeProcess oldProcess = processManager.promotePending();
         processManager.stopProcess(oldProcess);
 
-        log.info("Seamless switch complete, variant={}, {} features",
+        log.info("无缝切换完成，变体={}, {} 特征点",
                 activeVariant, swap.featureCount());
         if (stateCallback != null) {
             stateCallback.onStateChange(true, "SIFT ready (" + swap.featureCount() + " features)");
@@ -270,9 +270,9 @@ public class SiftMatchHandler implements SocketHandler {
         SocketSession s = sessionManager.getActiveSession();
         if (s == null || !sessionManager.isReady()) {
             if (s == null) {
-                log.warn("sendFrameAndWait skipped: activeSession is null");
+                log.warn("sendFrameAndWait 跳过: activeSession 为空");
             } else if (!sessionManager.isReady()) {
-                log.warn("sendFrameAndWait skipped: activeSession={} init={} ready={} closed={}",
+                log.warn("sendFrameAndWait 跳过: activeSession={} init={} ready={} closed={}",
                         s, sessionManager.isActiveInitialized(),
                         sessionManager.isActiveReady(), s.isClosed());
             }
@@ -296,7 +296,7 @@ public class SiftMatchHandler implements SocketHandler {
             }
         }
 
-        log.warn("Match result timeout after {}ms", timeoutMs);
+        log.warn("匹配结果超时 {}ms", timeoutMs);
         return MatchResult.FAIL;
     }
 
@@ -342,7 +342,7 @@ public class SiftMatchHandler implements SocketHandler {
         sessionManager.enterSwitching();
 
         if (processManager.launchPendingProcess(server) == null) {
-            log.error("Failed to launch pending process, keeping current active");
+            log.error("启动待命进程失败，保留当前活跃会话");
             sessionManager.resetSwitching();
             if (stateCallback != null) {
                 stateCallback.onStateChange(false, "Failed to launch new process");
@@ -371,7 +371,7 @@ public class SiftMatchHandler implements SocketHandler {
         processManager.stopProcess(processManager.getActiveProcess());
         sessionManager.reset();
 
-        log.info("SiftMatchHandler stopped");
+        log.info("SiftMatchHandler 已停止");
     }
 
     /**

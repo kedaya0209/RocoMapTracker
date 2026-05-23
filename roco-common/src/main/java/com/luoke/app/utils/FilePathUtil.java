@@ -33,25 +33,41 @@ public final class FilePathUtil {
      * </ol>
      */
     public static Path getAppRootDir() {
-        String nativeImagePath = null;
-        if (EnvironmentUtil.isNative()) {
-            nativeImagePath = ProcessProperties.getExecutableName();
+        Path exePath = getExePath();
+        if (exePath != null) {
+            return exePath.getParent().toAbsolutePath();
         }
-        if (nativeImagePath != null && !nativeImagePath.isEmpty()) {
-            return Paths.get(nativeImagePath).getParent().toAbsolutePath();
+
+        return Paths.get(System.getProperty("user.dir")).toAbsolutePath();
+    }
+
+    /**
+     * 获取当前运行的可执行文件（exe / jar）的完整路径。
+     * <ol>
+     *   <li>Native Image 环境：{@code ProcessProperties.getExecutableName()}</li>
+     *   <li>JAR 环境：JAR 文件路径</li>
+     *   <li>IDE 开发环境：返回 null</li>
+     * </ol>
+     */
+    public static Path getExePath() {
+        if (EnvironmentUtil.isNative()) {
+            String nativeImagePath = ProcessProperties.getExecutableName();
+            if (nativeImagePath != null && !nativeImagePath.isEmpty()) {
+                return Paths.get(nativeImagePath).toAbsolutePath();
+            }
         }
 
         try {
             URI uri = FilePathUtil.class.getProtectionDomain().getCodeSource().getLocation().toURI();
             String path = uri.getPath();
             if (path != null && path.toLowerCase().endsWith(".jar")) {
-                return new File(uri).getParentFile().toPath().toAbsolutePath();
+                return new File(uri).toPath().toAbsolutePath();
             }
         } catch (URISyntaxException e) {
             log.warn("无法通过 CodeSource 识别环境路径", e);
         }
 
-        return Paths.get(System.getProperty("user.dir")).toAbsolutePath();
+        return null;
     }
 
     // ==================== 相对路径解析 ====================

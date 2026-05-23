@@ -33,10 +33,10 @@ public class SiftSessionManager {
     public void onConnect(SocketSession session) {
         if (switching && pendingSession == null) {
             this.pendingSession = session;
-            log.info("SiftMatchHandler bound pending session #{}", session.id());
+            log.info("SiftMatchHandler 绑定待命会话 #{}", session.id());
         } else if (activeSession == null || activeSession.isClosed()) {
             this.activeSession = session;
-            log.info("SiftMatchHandler bound active session #{}", session.id());
+            log.info("SiftMatchHandler 绑定活跃会话 #{}", session.id());
         }
     }
 
@@ -57,7 +57,7 @@ public class SiftSessionManager {
     public int handleInitComplete(byte[] body) {
         int featureCount = SiftMatchProtocol.decodeInitComplete(body);
         this.activeInitialized = true;
-        log.info("SIFT ready, {} features", featureCount);
+        log.info("SIFT 就绪，{} 特征点", featureCount);
         return featureCount;
     }
 
@@ -68,7 +68,7 @@ public class SiftSessionManager {
      */
     public String handleInitFailed(byte[] body) {
         String msg = SiftMatchProtocol.decodeInitFailed(body);
-        log.error("SIFT init failed: {}", msg);
+        log.error("SIFT 初始化失败: {}", msg);
         return msg;
     }
 
@@ -90,7 +90,7 @@ public class SiftSessionManager {
         this.pendingInitialized = false;
         this.switching = false;
 
-        log.info("Seamless switch complete, {} features", featureCount);
+        log.info("无缝切换完成，{} 特征点", featureCount);
         return new SwapResult(oldActive, featureCount);
     }
 
@@ -101,7 +101,7 @@ public class SiftSessionManager {
      */
     public String handlePendingInitFailed(byte[] body) {
         String msg = SiftMatchProtocol.decodeInitFailed(body);
-        log.error("Pending SIFT init failed: {}, keeping current active", msg);
+        log.error("待命 SIFT 初始化失败: {}，保留当前活跃会话", msg);
         cancelPendingCleanup();
         return msg;
     }
@@ -112,7 +112,7 @@ public class SiftSessionManager {
      * Active 会话断开 — 清理 active 状态
      */
     public void handleActiveDisconnect() {
-        log.warn("SiftMatchHandler active session disconnected");
+        log.warn("SiftMatchHandler 活跃会话已断开");
         this.activeSession = null;
         this.activeInitialized = false;
         this.activeReady = false;

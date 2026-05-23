@@ -119,13 +119,13 @@ public class CaptureHandler implements SocketHandler {
         if (handler != null) {
             handler.handle(body, session);
         } else {
-            log.warn("Unknown capture message type: {}", type);
+            log.warn("未知截图消息类型: {}", type);
         }
     }
 
     @Override
     public void onDisconnect(SocketSession session, String reason) {
-        log.warn("CaptureHandler disconnected: {}", reason);
+        log.warn("CaptureHandler 断开连接: {}", reason);
         sessionManager.onDisconnect();
         if (stateCallback != null) {
             stateCallback.onStateChange(false, reason);
@@ -140,14 +140,14 @@ public class CaptureHandler implements SocketHandler {
     // ==================== 握手 ====================
 
     private void handleRequestRoi(SocketSession session) {
-        log.info("Received REQUEST_ROI");
+        log.info("收到 REQUEST_ROI");
         ROIData[] rois = pendingRois != null ? pendingRois : new ROIData[0];
         session.send(MSG_RETURN_ROI, serializeRois(rois));
-        log.debug("Sent ROI list: {} ROIs", rois.length);
+        log.debug("已发送 ROI 列表: {} 个 ROI", rois.length);
     }
 
     private void handleCaptureReady(SocketSession session) {
-        log.info("Received CAPTURE_READY");
+        log.info("收到 CAPTURE_READY");
         sessionManager.setHandshakeDone(true);
 
         if (stateCallback != null) {
@@ -192,7 +192,7 @@ public class CaptureHandler implements SocketHandler {
                     cb.onFrame(slot.index(), slot.pixels(), slot.w(), slot.h(), slot.stride());
                 } catch (Exception e) {
                     // 回调接口可能抛出多种异常，保留通用捕获以防 latch 死锁
-                    log.error("Frame callback error ROI[{}]", slot.index(), e);
+                    log.error("帧回调异常 ROI[{}]", slot.index(), e);
                 } finally {
                     latch.countDown();
                 }
@@ -213,7 +213,7 @@ public class CaptureHandler implements SocketHandler {
         if (lastStatsTime == 0) lastStatsTime = now;
         if (now - lastStatsTime > 10000) {
             double mbps = totalBytes / (1024.0 * 1024.0) / ((now - lastStatsTime) / 1000.0);
-            log.debug("Frames: {}, Rate: {} MB/s", frameCount.get(),
+            log.debug("帧数: {}, 速率: {} MB/s", frameCount.get(),
                     String.format("%.1f", mbps));
             totalBytes = 0;
             lastStatsTime = now;
@@ -223,7 +223,7 @@ public class CaptureHandler implements SocketHandler {
     // ==================== 窗口事件 ====================
 
     private void handleWindowClosed() {
-        log.warn("capture.exe reports window closed");
+        log.warn("capture.exe 报告窗口已关闭");
         if (stateCallback != null) {
             stateCallback.onStateChange(false, "Window closed");
         }
@@ -231,7 +231,7 @@ public class CaptureHandler implements SocketHandler {
 
     private void handleWindowState(byte[] body) {
         if (body != null && body.length >= 1) {
-            log.info("Window {}", body[0] == 0 ? "minimized" : "restored");
+            log.info("窗口 {}", body[0] == 0 ? "已最小化" : "已恢复");
         }
     }
 
@@ -255,7 +255,7 @@ public class CaptureHandler implements SocketHandler {
             return false;
         }
 
-        log.info("capture.exe launched (pid={}), hwnd=0x{}",
+        log.info("capture.exe 已启动 (pid={}), hwnd=0x{}",
                 processManager.getProcess().pid(), Long.toHexString(hwnd));
         return true;
     }
@@ -273,7 +273,7 @@ public class CaptureHandler implements SocketHandler {
         processManager.stopProcess();
         sessionManager.reset();
 
-        log.info("CaptureHandler stopped");
+        log.info("CaptureHandler 已停止");
     }
 
     public boolean isRunning() {
@@ -287,7 +287,7 @@ public class CaptureHandler implements SocketHandler {
      */
     public void sendSwitchMode(boolean fullFrame) {
         sessionManager.send(MSG_SWITCH_MODE, new byte[]{(byte) (fullFrame ? 1 : 0)});
-        log.info("Sent SWITCH_MODE: {}", fullFrame ? "FULL_FRAME" : "ROI");
+        log.info("已发送 SWITCH_MODE: {}", fullFrame ? "全帧模式" : "ROI 模式");
     }
 
     /**

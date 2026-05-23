@@ -36,7 +36,7 @@ public final class BuildConfig {
             n = prop.getProperty("app.name", n);
             t = prop.getProperty("app.buildTimestamp", t);
         } catch (IOException e) {
-            log.error("Failed to load version.properties", e);
+            log.error("加载 version.properties 失败", e);
         }
         APP_VERSION = v;
         APP_NAME = n;

@@ -57,6 +57,7 @@ public class UpdateManager {
 
     private final UpdateChecker checker;
     private final HttpClient httpClient;
+    private final ScheduledExecutorService scheduler;
     private final AtomicBoolean checking = new AtomicBoolean(false);
     private final AtomicBoolean downloading = new AtomicBoolean(false);
     private final AtomicBoolean updateDialogShowing = new AtomicBoolean(false);
@@ -71,6 +72,8 @@ public class UpdateManager {
                 .connectTimeout(Duration.ofSeconds(15))
                 .followRedirects(HttpClient.Redirect.NORMAL)
                 .build();
+        this.scheduler = Executors.newSingleThreadScheduledExecutor(
+                r -> Thread.ofPlatform().daemon(true).name("update-checker").unstarted(r));
     }
 
     public static UpdateManager getInstance() {
@@ -88,25 +91,15 @@ public class UpdateManager {
      * 启动周期性更新检查（后台虚拟线程）
      */
     public void startPeriodicCheck(int intervalHours) {
-        Thread.ofPlatform().daemon(true).name("update-checker").start(() -> {
-            try {
-                Thread.sleep(10_000);
-            } catch (InterruptedException ignored) {
-                return;
-            }
-            while (!Thread.currentThread().isInterrupted()) {
-                try {
-                    checkAndNotify();
-                } catch (Exception e) {
-                    log.warn("Periodic update check failed", e);
-                } // 后台周期性检查，捕获所有异常避免线程终止
-                try {
-                    Thread.sleep(intervalHours * 3600_000L);
-                } catch (InterruptedException ignored) {
-                    break;
-                }
-            }
-        });
+        scheduler.scheduleWithFixedDelay(
+                () -> {
+                    try {
+                        checkAndNotify(true);
+                    } catch (Exception e) {
+                        log.warn("定时更新检查失败", e);
+                    }
+                },
+                10, intervalHours * 3600L, TimeUnit.SECONDS);
     }
 
     /**
@@ -114,12 +107,12 @@ public class UpdateManager {
      */
     public void manualCheck(Runnable onResult) {
         Thread.ofPlatform().daemon(true).name("update-manual-check").start(() -> {
-            checkAndNotify();
+            checkAndNotify(false);
             if (onResult != null) onResult.run();
         });
     }
 
-    private void checkAndNotify() {
+    private void checkAndNotify(boolean silent) {
         if (!checking.compareAndSet(false, true)) return;
         try {
             Optional<VersionInfo> result = checker.checkLatest();
@@ -129,7 +122,9 @@ public class UpdateManager {
             }
             VersionInfo latest = result.get();
             if (!UpdateChecker.isNewer(BuildConfig.APP_VERSION, latest.version())) {
-                notify("当前已是最新版本 (" + BuildConfig.APP_VERSION + ")", NotificationType.INFO);
+                if (!silent) {
+                    notify("当前已是最新版本 (" + BuildConfig.APP_VERSION + ")", NotificationType.INFO);
+                }
                 return;
             }
             pendingUpdate.set(latest);
@@ -231,7 +226,7 @@ public class UpdateManager {
                 }
             } catch (IOException | InterruptedException e) {
                 uiDelegate.hideDownloadProgress();
-                log.error("Download failed", e);
+                log.error("下载失败", e);
                 notify("下载更新失败：" + e.getMessage(), NotificationType.ERROR);
             } finally {
                 downloading.set(false);
@@ -240,8 +235,9 @@ public class UpdateManager {
     }
 
     private void installAndRestart(Path patchPath) {
+        Path currentExe = FilePathUtil.getExePath();
         String exeDir = FilePathUtil.getAppRootDir().toString();
-        String exeName = "RocoMapTracker.exe";
+        String exeName = currentExe != null ? currentExe.getFileName().toString() : "RocoMapTracker.exe";
         String exePath = exeDir + File.separator + exeName;
         String hpatchzPath = exeDir + File.separator + "update" + File.separator + "hpatchz.exe";
 
@@ -254,25 +250,26 @@ public class UpdateManager {
         try {
             Path scriptPath = Path.of(exeDir, "updater_" + UUID.randomUUID().toString().substring(0, 8) + ".bat");
             Files.writeString(scriptPath, script);
-            log.info("Starting updater script: {}", scriptPath);
+            log.info("启动更新脚本: {}", scriptPath);
             startScriptDetached(scriptPath.toString(), exeDir);
             if (uiDelegate != null) uiDelegate.restartApplication();
         } catch (IOException e) {
-            log.error("Failed to start updater script", e);
+            log.error("启动更新脚本失败", e);
             notify("启动更新程序失败：" + e.getMessage(), NotificationType.ERROR);
         }
     }
 
     private void installAndRestartExe(Path newExePath) {
+        Path currentExe = FilePathUtil.getExePath();
         String exeDir = FilePathUtil.getAppRootDir().toString();
-        String exeName = "RocoMapTracker.exe";
+        String exeName = currentExe != null ? currentExe.getFileName().toString() : "RocoMapTracker.exe";
         String targetExe = exeDir + File.separator + exeName;
 
         String script = generateReplaceScript(newExePath.toString(), targetExe, exeName);
         try {
             Path scriptPath = Path.of(exeDir, "updater_" + UUID.randomUUID().toString().substring(0, 8) + ".bat");
             Files.writeString(scriptPath, script);
-            log.info("Starting updater script: {}", scriptPath);
+            log.info("启动更新脚本: {}", scriptPath);
             startScriptDetached(scriptPath.toString(), exeDir);
             // 等待 updater 初始化完成再退出（确保 WMI 已创建独立进程）
             try {
@@ -281,7 +278,7 @@ public class UpdateManager {
             }
             if (uiDelegate != null) uiDelegate.restartApplication();
         } catch (IOException e) {
-            log.error("Failed to start updater script", e);
+            log.error("启动更新脚本失败", e);
             notify("启动更新程序失败：" + e.getMessage(), NotificationType.ERROR);
         }
     }
@@ -297,11 +294,11 @@ public class UpdateManager {
         // 通过 schtasks 创建一次性任务，进程独立于 JobObject
         try {
             if (startViaSchtasks(scriptPath, workDir)) {
-                log.info("Updater script started via schtasks (independent process)");
+                log.info("更新脚本已通过 schtasks 启动（独立进程）");
                 return;
             }
         } catch (Exception e) {
-            log.warn("schtasks failed, fallback", e);
+            log.warn("schtasks 失败，降级启动", e);
         }
 
         // 降级：start /min（可能被 JobObject 终止，但仍有几率成功）
@@ -309,9 +306,9 @@ public class UpdateManager {
             new ProcessBuilder("cmd.exe", "/c", "start", "/min", "\"\"", scriptPath)
                     .directory(new File(workDir))
                     .start();
-            log.info("Updater script started via start /min (fallback)");
+            log.info("更新脚本已通过 start /min 启动（降级）");
         } catch (IOException e) {
-            log.error("Failed to start updater script (fallback)", e);
+            log.error("启动更新脚本失败（降级）", e);
         }
     }
 
@@ -475,7 +472,6 @@ public class UpdateManager {
 
         // 对瞬态网络错误（Connection reset / SocketException 等）自动重试
         HttpResponse<InputStream> response = null;
-        IOException lastException = null;
         for (int attempt = 1; attempt <= MAX_DOWNLOAD_RETRIES; attempt++) {
             try {
                 response = httpClient.send(request,
@@ -484,26 +480,17 @@ public class UpdateManager {
                 if (response.statusCode() != 200) {
                     throw new IOException("Download failed with status: " + response.statusCode());
                 }
-
-                // 成功
-                lastException = null;
                 break;
             } catch (IOException e) {
-                lastException = e;
                 if (attempt < MAX_DOWNLOAD_RETRIES) {
                     long delay = (long) Math.pow(2, attempt) * 1000L; // 2s, 4s
                     log.warn("下载失败（第 {}/{} 次），{} 秒后重试: {}", attempt, MAX_DOWNLOAD_RETRIES, delay / 1000, e.getMessage(), e);
-                    try {
-                        Thread.sleep(delay);
-                    } catch (InterruptedException ie) {
-                        throw ie;
-                    }
+                    Thread.sleep(delay);
                 } else {
-                    throw e; // 最后一次仍失败，向上抛
+                    throw e;
                 }
             }
         }
-        if (lastException != null) throw lastException;
 
         long totalBytes = response.headers().firstValueAsLong("Content-Length").orElse(-1L);
         long bytesReadSoFar = 0;
@@ -690,5 +677,9 @@ public class UpdateManager {
 
     public void resetUpdateDialogShowing() {
         updateDialogShowing.set(false);
+    }
+
+    public void shutdown() {
+        scheduler.shutdownNow();
     }
 }

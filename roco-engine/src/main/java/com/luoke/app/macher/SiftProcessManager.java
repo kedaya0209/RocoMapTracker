@@ -46,7 +46,7 @@ public class SiftProcessManager {
     public NativeProcess launchProcess(SocketServer server, String threadName) {
         int port = server.getPort();
         if (port <= 0) {
-            log.error("SocketServer is not running");
+            log.error("SocketServer 未运行");
             return null;
         }
 
@@ -54,12 +54,12 @@ public class SiftProcessManager {
         String cmdLine = "\"" + exePath + "\" " + port;
         NativeProcess proc = processFactory.create(cmdLine, JobObjectManager.getJobHandle(), true);
         if (proc == null) {
-            log.error("Failed to launch sift_match.exe via NativeProcess");
+            log.error("通过 NativeProcess 启动 sift_match.exe 失败");
             return null;
         }
 
         startReaderThread(proc, threadName);
-        log.info("sift_match.exe launched (pid={}), port={}", proc.pid(), port);
+        log.info("sift_match.exe 已启动 (pid={}), 端口={}", proc.pid(), port);
         return proc;
     }
 
@@ -82,7 +82,7 @@ public class SiftProcessManager {
     public boolean restartAfterCrash(SocketServer server) {
         long now = System.currentTimeMillis();
         if (now - lastRestartTime < SocketConfig.SIFT_RESTART_MIN_INTERVAL) {
-            log.warn("Skipping sift_match.exe restart due to rate limit ({}ms < {}ms)",
+            log.warn("跳过 sift_match.exe 重启，触发速率限制 ({}ms < {}ms)",
                     now - lastRestartTime, SocketConfig.SIFT_RESTART_MIN_INTERVAL);
             return false;
         }
@@ -157,7 +157,7 @@ public class SiftProcessManager {
         if (process == null || !process.isAlive()) return true;
         process.destroy();
         if (!process.waitFor(SocketConfig.SIFT_PROCESS_STOP_TIMEOUT, TimeUnit.SECONDS)) {
-            log.warn("sift_match.exe pid={} did not stop within {}s, force killing",
+            log.warn("sift_match.exe pid={} 未在 {} 秒内停止，强制终止",
                     process.pid(), SocketConfig.SIFT_PROCESS_STOP_TIMEOUT);
             process.destroyForcibly();
             return false;

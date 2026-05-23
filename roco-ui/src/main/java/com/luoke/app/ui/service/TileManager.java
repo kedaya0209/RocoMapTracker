@@ -191,8 +191,8 @@ public class TileManager {
             }
         }
         if (loaded > 0 || missed > 0) {
-            log.debug("L{} tiles: loaded={} missed={} active={} needed={}",
-                    level, loaded, missed, activeTiles.size(), needed.size());
+            log.debug("L{} 瓦片: 已加载={} 未命中={} 活跃={}",
+                    level, loaded, missed, activeTiles.size());
         }
     }
 
