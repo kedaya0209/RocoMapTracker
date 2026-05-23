@@ -8,11 +8,13 @@ import javafx.application.Application;
 
 /**
  * 主题管理器 — 主题列表、应用、切换。
- * 纯静态工具类，无内部状态。
  * 从 ModernCanvasApp 拆分，遵循单一职责原则。
  */
 @ThreadSafe
 public class ThemeManager {
+
+    /** 当前主题的样式表 URL，供 Scene 添加以确保 inline style 的 CSS 变量能正确解析 */
+    private static volatile String currentStylesheetUrl;
 
     public static String[] getAvailableThemes() {
         return new String[]{"PrimerDark", "PrimerLight", "NordDark", "NordLight",
@@ -29,7 +31,12 @@ public class ThemeManager {
             case "Dracula" -> new Dracula();
             default -> new PrimerDark();
         };
-        Application.setUserAgentStylesheet(theme.getUserAgentStylesheet());
+        currentStylesheetUrl = theme.getUserAgentStylesheet();
+        Application.setUserAgentStylesheet(currentStylesheetUrl);
+    }
+
+    public static String getCurrentStylesheetUrl() {
+        return currentStylesheetUrl;
     }
 
     public static void switchTheme(String name) {

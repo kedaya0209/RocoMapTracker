@@ -163,6 +163,11 @@ public class ModernCanvasApp extends Application {
 
         Scene scene = new Scene(wrapper, ViewConfig.INITIAL_WINDOW_WIDTH, ViewConfig.INITIAL_WINDOW_HEIGHT);
         scene.setFill(Color.TRANSPARENT);
+        // 确保 inline style 中的 CSS 变量（如 -color-bg-default）能被正确解析
+        String css = ThemeManager.getCurrentStylesheetUrl();
+        if (css != null) {
+            scene.getStylesheets().add(css);
+        }
         primaryStage.initStyle(StageStyle.TRANSPARENT);
         primaryStage.setScene(scene);
     }
