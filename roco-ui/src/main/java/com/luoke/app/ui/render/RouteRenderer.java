@@ -17,26 +17,15 @@ import javafx.scene.paint.Color;
 import java.util.List;
 
 /**
- * 路线渲染器 — Canvas 屏幕坐标绘制 + 脏检测 + 平移补偿。
+ * 路线渲染器 — Canvas 屏幕坐标每帧直接绘制。
  * <p>
- * 缩放变化时全量重绘，纯平移时通过 GPU translate 补偿避免重绘。
- * 通过 PathContext / CameraContext 单例自动检测状态变化。
+ * 通过 PathContext / CameraContext 单例自动读取状态。
  */
 @NotThreadSafe
 public class RouteRenderer implements RenderLayer {
 
     private final Canvas routeCanvas;
     private final GraphicsContext routeGc;
-
-    // 路线状态跟踪
-    private RoutePath lastActiveRoute;
-    private PathContext.Mode lastMode;
-    private boolean followWasOn;
-    private double routeDrawOx;
-    private double routeDrawOy;
-    private double lastScale;
-    private double lastNavAngle;
-    private boolean routeDirty = true;
 
     public RouteRenderer(Pane parent) {
         routeCanvas = new Canvas();
@@ -52,66 +41,18 @@ public class RouteRenderer implements RenderLayer {
         return routeCanvas;
     }
 
-    public void markDirty() {
-        routeDirty = true;
-    }
-
     @Override
     public void onFrame() {
         MapContext mm = MapContext.getInstance();
         CameraContext cam = CameraContext.getInstance();
-        double scale = mm.getScale();
         double ox = mm.getOffsetX();
         double oy = mm.getOffsetY();
-        boolean scaleChanged = Math.abs(scale - lastScale) > 1e-9;
-
-        // 导航模式旋转参数
+        double scale = mm.getScale();
         double navAngle = cam.isNavMode() ? cam.getNavAngle() : 0;
         double pivotX = routeCanvas.getWidth() / 2;
         double pivotY = routeCanvas.getHeight() / 2;
 
-        PathContext pc = PathContext.getInstance();
-
-        // 路线状态变化检测
-        RoutePath activeRoute = pc.getActiveRoute();
-        PathContext.Mode mode = pc.getCurrentMode();
-        if (activeRoute != lastActiveRoute || mode != lastMode) {
-            lastActiveRoute = activeRoute;
-            lastMode = mode;
-            routeDirty = true;
-        }
-
-        // 跟随模式切换 → 路线重绘
-        if (cam.isFollowMode() != followWasOn) {
-            followWasOn = cam.isFollowMode();
-            routeDirty = true;
-        }
-
-        // 导航模式角度变化 → 路线重绘
-        if (Math.abs(navAngle - lastNavAngle) > 1e-6) {
-            lastNavAngle = navAngle;
-            routeDirty = true;
-        }
-
-        // 缩放 → 路线全量重绘；平移 → GPU translate 补偿
-        if (scaleChanged) {
-            routeCanvas.setTranslateX(0);
-            routeCanvas.setTranslateY(0);
-            routeDirty = true;
-        } else {
-            routeCanvas.setTranslateX(ox - routeDrawOx);
-            routeCanvas.setTranslateY(oy - routeDrawOy);
-        }
-
-        if (routeDirty) {
-            redrawRoutes(ox, oy, scale, navAngle, pivotX, pivotY);
-            routeDrawOx = ox;
-            routeDrawOy = oy;
-            routeCanvas.setTranslateX(0);
-            routeDirty = false;
-        }
-
-        lastScale = scale;
+        redrawRoutes(ox, oy, scale, navAngle, pivotX, pivotY);
     }
 
     /**
@@ -141,28 +82,30 @@ public class RouteRenderer implements RenderLayer {
         routeGc.setLineWidth(RenderConfig.ROUTE_ACTIVE_WIDTH);
         renderPathScreen(routeGc, active.getNodes(), ox, oy, scale, navAngle, pivotX, pivotY);
 
-        // 3. UI 叠加（绘图/编辑模式）
-        if (pc.getCurrentMode() != PathContext.Mode.VIEW) {
-            // 预览虚线（橡皮筋）
-            if (pc.getCurrentMode() == PathContext.Mode.DRAWING && !active.getNodes().isEmpty()) {
-                Point lastNode = active.getNodes().getLast();
-                double[] p1 = CoordinateUtil.worldToScreen(lastNode.getX(), lastNode.getY(), ox, oy, scale, navAngle, pivotX, pivotY);
-                double[] p2 = CoordinateUtil.worldToScreen(pc.getMouseLogicX(), pc.getMouseLogicY(), ox, oy, scale, navAngle, pivotX, pivotY);
-                routeGc.setStroke(Color.web("#FFFFFF", 0.7));
-                routeGc.setLineDashes(RenderConfig.ROUTE_DASH_LENGTH);
-                routeGc.strokeLine(p1[0], p1[1], p2[0], p2[1]);
-                routeGc.setLineDashes(null);
-            }
-
-            // 节点锚点圆
+        // 3. 节点锚点圆（所有模式都展示）
+        {
+            double[] buf = new double[2];
             routeGc.setFill(Color.WHITE);
             routeGc.setStroke(Color.BLUE);
             double r = RenderConfig.ROUTE_NODE_RADIUS;
             for (Point node : active.getNodes()) {
-                double[] p = CoordinateUtil.worldToScreen(node.getX(), node.getY(), ox, oy, scale, navAngle, pivotX, pivotY);
-                routeGc.fillOval(p[0] - r, p[1] - r, r * 2, r * 2);
-                routeGc.strokeOval(p[0] - r, p[1] - r, r * 2, r * 2);
+                CoordinateUtil.worldToScreenInto(buf, node.getX(), node.getY(), ox, oy, scale, navAngle, pivotX, pivotY);
+                routeGc.fillOval(buf[0] - r, buf[1] - r, r * 2, r * 2);
+                routeGc.strokeOval(buf[0] - r, buf[1] - r, r * 2, r * 2);
             }
+        }
+
+        // 4. 橡皮筋（仅绘制模式）
+        if (pc.getCurrentMode() == PathContext.Mode.DRAWING && !active.getNodes().isEmpty()) {
+            double[] buf = new double[2];
+            Point lastNode = active.getNodes().getLast();
+            CoordinateUtil.worldToScreenInto(buf, lastNode.getX(), lastNode.getY(), ox, oy, scale, navAngle, pivotX, pivotY);
+            double p1x = buf[0], p1y = buf[1];
+            CoordinateUtil.worldToScreenInto(buf, pc.getMouseLogicX(), pc.getMouseLogicY(), ox, oy, scale, navAngle, pivotX, pivotY);
+            routeGc.setStroke(Color.web("#FFFFFF", 0.7));
+            routeGc.setLineDashes(RenderConfig.ROUTE_DASH_LENGTH);
+            routeGc.strokeLine(p1x, p1y, buf[0], buf[1]);
+            routeGc.setLineDashes(null);
         }
     }
 
@@ -173,12 +116,13 @@ public class RouteRenderer implements RenderLayer {
                                           double ox, double oy, double scale,
                                           double navAngle, double pivotX, double pivotY) {
         if (nodes.size() < 2) return;
-        double[] first = CoordinateUtil.worldToScreen(nodes.getFirst().getX(), nodes.getFirst().getY(), ox, oy, scale, navAngle, pivotX, pivotY);
+        double[] buf = new double[2];
+        CoordinateUtil.worldToScreenInto(buf, nodes.getFirst().getX(), nodes.getFirst().getY(), ox, oy, scale, navAngle, pivotX, pivotY);
         gc.beginPath();
-        gc.moveTo(first[0], first[1]);
+        gc.moveTo(buf[0], buf[1]);
         for (int i = 1; i < nodes.size(); i++) {
-            double[] p = CoordinateUtil.worldToScreen(nodes.get(i).getX(), nodes.get(i).getY(), ox, oy, scale, navAngle, pivotX, pivotY);
-            gc.lineTo(p[0], p[1]);
+            CoordinateUtil.worldToScreenInto(buf, nodes.get(i).getX(), nodes.get(i).getY(), ox, oy, scale, navAngle, pivotX, pivotY);
+            gc.lineTo(buf[0], buf[1]);
         }
         gc.stroke();
     }

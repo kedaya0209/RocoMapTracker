@@ -17,9 +17,9 @@ import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import lombok.extern.slf4j.Slf4j;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 图标管理层 — 资源点 ImageView 构建 + 变灰切换。
@@ -32,7 +32,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class IconLayerManager implements RenderLayer {
 
     private final Group iconGroup;
-    private final Map<ResourcePoint, ImageView> iconViews = new ConcurrentHashMap<>();
+    private final Map<ResourcePoint, ImageView> iconViews = new HashMap<>();
     private double lastGrayCheckX = Double.NaN;
     private double lastGrayCheckY = Double.NaN;
     /** 上次 counter-rotate 角度，用于脏检测 */

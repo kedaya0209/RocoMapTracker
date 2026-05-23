@@ -1,6 +1,7 @@
 package com.luoke.app.context;
 
 import net.jcip.annotations.ThreadSafe;
+import com.luoke.app.config.UiConfig;
 import com.luoke.app.config.ViewConfig;
 import lombok.Getter;
 import lombok.Setter;
@@ -26,18 +27,17 @@ public class CameraContext {
 
     @Getter
     @Setter
-    private double followScale = ViewConfig.DEFAULT_FOLLOW_SCALE;
+    private volatile double followScale = ViewConfig.DEFAULT_FOLLOW_SCALE;
 
     /** 导航模式是否启用 */
+    @Getter
     private volatile boolean navMode;
     /** 导航模式下的地图旋转角度（度） */
+    @Getter
+    @Setter
     private volatile double navAngle;
 
     private CameraContext() {
-    }
-
-    public boolean isNavMode() {
-        return navMode;
     }
 
     public void setNavMode(boolean navMode) {
@@ -45,14 +45,6 @@ public class CameraContext {
         if (!navMode) {
             this.navAngle = 0;
         }
-    }
-
-    public double getNavAngle() {
-        return navAngle;
-    }
-
-    public void setNavAngle(double navAngle) {
-        this.navAngle = navAngle;
     }
 
     public static CameraContext getInstance() {
@@ -72,10 +64,32 @@ public class CameraContext {
 
     public void setFollowMode(boolean followMode) {
         if (this.followMode.compareAndSet(!followMode, followMode)) {
+            if (followMode) {
+                applyFollowViewport();
+            }
             for (Runnable r : followModeListeners) {
                 r.run();
             }
         }
+    }
+
+    /**
+     * 启用跟随模式时，立即缩放至 followScale 并居中玩家。
+     */
+    private void applyFollowViewport() {
+        MapContext mm = MapContext.getInstance();
+        if (!mm.isInitialized() || !hasValidPlayerPosition()) return;
+
+        double newScale = Math.clamp(followScale,
+                Math.max(mm.getViewWidth() / mm.getMapWidth(), mm.getViewHeight() / mm.getMapHeight()),
+                UiConfig.MAP_VIEW_MAX_SCALE);
+        mm.setScale(newScale);
+
+        double cx = mm.getViewWidth() / 2;
+        double cy = mm.getViewHeight() / 2;
+        mm.setOffsetX(cx - mm.getPlayerX() * newScale);
+        mm.setOffsetY(cy - mm.getPlayerY() * newScale);
+        mm.ensureBounds();
     }
 
     /**

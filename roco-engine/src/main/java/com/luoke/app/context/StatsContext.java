@@ -12,37 +12,18 @@ public final class StatsContext {
     private static final StatsContext INSTANCE = new StatsContext();
 
     // ====================== 【性能耗时统计】 ======================
-    // 上次地图检测操作的耗时（毫秒）
-    // 记录地图识别、定位等操作的执行时间
-    // 用于性能分析和优化
-    private long lastMapDetectMs;
-
-    // 上次图像匹配操作的耗时（毫秒）
-    // 记录模板匹配、特征匹配等操作的执行时间
-    // 通常是最耗时的操作之一
-    private long lastMatchMs;
-
-    // 上次圆形遮罩应用的耗时（毫秒）
-    private long lastCircleMaskMs;
-
-    // 上次方向计算操作的耗时（毫秒）
-    // 记录玩家移动方向、朝向计算等操作的执行时间
-    // 用于导航和路径规划的性能监控
-    private long lastDirectionMs;
+    private volatile long lastMapDetectMs;
+    private volatile long lastMatchMs;
+    private volatile long lastCircleMaskMs;
+    private volatile long lastDirectionMs;
 
     // ====================== 【SIFT C++ 分段耗时】 ======================
-    // C++ sift_match.exe 内部的小地图检测耗时（毫秒）
-    private long lastSiftMinimapMs;
-    // C++ sift_match.exe 内部的 SIFT 特征提取耗时（毫秒）
-    private long lastSiftExtractMs;
-    // C++ sift_match.exe 内部的 FLANN 匹配+ RANSAC 耗时（毫秒）
-    private long lastSiftFlannMs;
+    private volatile long lastSiftMinimapMs;
+    private volatile long lastSiftExtractMs;
+    private volatile long lastSiftFlannMs;
 
     // ====================== 【帧率统计】 ======================
-    // 当前帧率（每秒处理的帧数）
-    // 每秒更新一次，反映实时处理能力
-    // 初始值为0，首次onFrameProcessed调用后开始计算
-    private int frequency;
+    private volatile int frequency;
 
     // 当前时间窗口内的帧计数器
     // 在每秒时间窗口内累加帧数

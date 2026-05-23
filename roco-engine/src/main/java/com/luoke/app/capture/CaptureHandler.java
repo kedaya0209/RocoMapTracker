@@ -6,6 +6,7 @@ import com.luoke.app.config.SocketConfig;
 import com.luoke.app.socket.SocketHandler;
 import com.luoke.app.socket.SocketServer;
 import com.luoke.app.socket.SocketSession;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 
 import net.jcip.annotations.NotThreadSafe;
@@ -14,6 +15,7 @@ import java.nio.ByteOrder;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -72,6 +74,11 @@ public class CaptureHandler implements SocketHandler {
     private String launchExePath;
     private long totalBytes;
     private long lastStatsTime;
+    /**
+     * -- SETTER --
+     *  设置全帧 ROI 索引
+     */
+    @Setter
     private volatile int fullFrameRoiIndex = -1;
 
     // ==================== 消息路由 ====================
@@ -162,7 +169,7 @@ public class CaptureHandler implements SocketHandler {
 
     /**
      * 帧数据解析与并行分发。
-     * 帧内 ROI 使用 CountDownLatch 并行处理, 全部完成后回发 PROCESSING_DONE (背压)
+     * 帧内 ROI 使用虚拟线程并行处理, 全部完成后回发 PROCESSING_DONE (背压)
      */
     private void handleFrameData(byte[] body, SocketSession session) {
         if (body == null || body.length < 2) return;
@@ -179,8 +186,8 @@ public class CaptureHandler implements SocketHandler {
         List<FrameDeserializer.FrameSlot> slots = frameDeserializer.deserialize(buf, roiCount, fullFrameRoiIndex);
 
         // 更新统计
+        frameCount.incrementAndGet();
         for (FrameDeserializer.FrameSlot slot : slots) {
-            frameCount.incrementAndGet();
             totalBytes += slot.pixels().length;
         }
 
@@ -191,7 +198,6 @@ public class CaptureHandler implements SocketHandler {
                 try {
                     cb.onFrame(slot.index(), slot.pixels(), slot.w(), slot.h(), slot.stride());
                 } catch (Exception e) {
-                    // 回调接口可能抛出多种异常，保留通用捕获以防 latch 死锁
                     log.error("帧回调异常 ROI[{}]", slot.index(), e);
                 } finally {
                     latch.countDown();
@@ -288,13 +294,6 @@ public class CaptureHandler implements SocketHandler {
     public void sendSwitchMode(boolean fullFrame) {
         sessionManager.send(MSG_SWITCH_MODE, new byte[]{(byte) (fullFrame ? 1 : 0)});
         log.info("已发送 SWITCH_MODE: {}", fullFrame ? "全帧模式" : "ROI 模式");
-    }
-
-    /**
-     * 设置全帧 ROI 索引
-     */
-    public void setFullFrameRoiIndex(int index) {
-        this.fullFrameRoiIndex = index;
     }
 
     /**

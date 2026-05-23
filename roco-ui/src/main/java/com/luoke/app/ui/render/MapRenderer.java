@@ -141,10 +141,9 @@ public class MapRenderer implements IHook<Object> {
     }
 
     /**
-     * 通知路线/资源点变化，触发路线层重绘
+     * 通知路线/资源点变化（路线层已改为每帧重绘，此方法保留兼容调用方）
      */
     public void markDirty() {
-        routeRenderer.markDirty();
     }
 
     private void onFrame() {
@@ -282,6 +281,5 @@ public class MapRenderer implements IHook<Object> {
      */
     public void resetViewport() {
         firstFrame = true;
-        routeRenderer.markDirty();
     }
 }
