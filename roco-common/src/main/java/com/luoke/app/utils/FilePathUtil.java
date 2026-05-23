@@ -2,6 +2,7 @@ package com.luoke.app.utils;
 
 import lombok.extern.slf4j.Slf4j;
 import net.jcip.annotations.ThreadSafe;
+import org.graalvm.nativeimage.ProcessProperties;
 
 import java.io.File;
 import java.net.URI;
@@ -34,7 +35,7 @@ public final class FilePathUtil {
     public static Path getAppRootDir() {
         String nativeImagePath = null;
         if (EnvironmentUtil.isNative()) {
-            nativeImagePath = org.graalvm.nativeimage.ProcessProperties.getExecutableName();
+            nativeImagePath = ProcessProperties.getExecutableName();
         }
         if (nativeImagePath != null && !nativeImagePath.isEmpty()) {
             return Paths.get(nativeImagePath).getParent().toAbsolutePath();
@@ -47,7 +48,7 @@ public final class FilePathUtil {
                 return new File(uri).getParentFile().toPath().toAbsolutePath();
             }
         } catch (URISyntaxException e) {
-            log.warn("无法通过 CodeSource 识别环境路径: {}", e.getMessage());
+            log.warn("无法通过 CodeSource 识别环境路径", e);
         }
 
         return Paths.get(System.getProperty("user.dir")).toAbsolutePath();

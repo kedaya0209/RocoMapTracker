@@ -179,7 +179,7 @@ public class SiftProcessManager {
                             log.info("[{}] {}", name, line);
                         }
                     } catch (IOException e) {
-                        log.warn("[{}] stdout reader exception: {}", name, e.getMessage());
+                        log.warn("[{}] stdout reader exception: {}", name, e.getMessage(), e);
                     }
                     int code = process.exitCode();
                     if (code == 0) {

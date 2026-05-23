@@ -7,6 +7,8 @@ import org.bytedeco.javacpp.indexer.Indexer;
 import org.bytedeco.opencv.opencv_core.*;
 import org.bytedeco.opencv.opencv_imgproc.*;
 
+import lombok.extern.slf4j.Slf4j;
+
 import java.io.*;
 import java.net.InetSocketAddress;
 import java.nio.file.Files;
@@ -17,6 +19,7 @@ import static org.bytedeco.opencv.global.opencv_core.*;
 import static org.bytedeco.opencv.global.opencv_imgcodecs.*;
 import static org.bytedeco.opencv.global.opencv_imgproc.*;
 
+@Slf4j
 public class DatasetGeneratorServer {
 
     private static final String BASE_PATH = "C:\\Users\\tangh\\Desktop\\dataset\\";
@@ -31,7 +34,7 @@ public class DatasetGeneratorServer {
         HttpServer server = HttpServer.create(new InetSocketAddress(PORT), 0);
         server.createContext("/upload", new ImageHandler());
         server.setExecutor(null);
-        System.out.println("数据标注服务端已启动，监听端口: " + PORT);
+        log.info("数据标注服务端已启动，监听端口: {}", PORT);
         server.start();
     }
 

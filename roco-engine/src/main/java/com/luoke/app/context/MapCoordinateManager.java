@@ -65,6 +65,7 @@ public class MapCoordinateManager {
     /**
      * 地图配置信息记录类
      */
+    @ThreadSafe
     public record MapConfig(int jsonZoom, int imageZoom, double width, double height) {
     }
 }

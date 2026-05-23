@@ -104,7 +104,7 @@ public class TaskbarIconHelper {
                 }
             }
         } catch (Throwable e) {
-            log.debug("Glass Window API 不可用: {}", e.getMessage());
+            log.debug("Glass Window API 不可用", e);
         }
 
         // 方法二：FindWindowW 兜底（需 UTF-16LE 编码）

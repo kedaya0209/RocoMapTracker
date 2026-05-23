@@ -108,5 +108,6 @@ public class PathContext {
         return persistence.export(selected, file);
     }
 
+    @ThreadSafe
     public enum Mode {VIEW, DRAWING, EDITING}
 }

@@ -111,6 +111,7 @@ public class CameraContext {
     /**
      * 内部Holder类，实现线程安全的懒加载
      */
+    @ThreadSafe
     private static class Holder {
         private static final CameraContext INSTANCE = new CameraContext();
     }

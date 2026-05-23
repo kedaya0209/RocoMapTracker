@@ -73,6 +73,7 @@ public class LoadingOverlay extends VBox {
     }
 
     // 在 LoadingOverlay 内部定义一个具名的 Hook 实现类
+    @NotThreadSafe
     private class ProgressHook extends AbstractGenericHook<ProgressEvent> {
         @Override
         public void onEvent(HookEventType eventType, ProgressEvent data) {

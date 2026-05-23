@@ -1,6 +1,7 @@
 package com.luoke.app.ui.service;
 
 import net.jcip.annotations.NotThreadSafe;
+import net.jcip.annotations.ThreadSafe;
 import com.luoke.app.config.RenderConfig;
 import com.luoke.app.context.MapContext;
 import com.luoke.app.context.ResourceConfigContext;
@@ -155,6 +156,7 @@ public final class MainUiComposer {
     /**
      * 主界面构建结果
      */
+    @ThreadSafe
     public record UiBuildResult(MapRenderer renderer, Pane canvasContainer, Sidebar sidebar) {
     }
 }

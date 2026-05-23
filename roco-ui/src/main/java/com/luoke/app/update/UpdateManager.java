@@ -492,7 +492,7 @@ public class UpdateManager {
                 lastException = e;
                 if (attempt < MAX_DOWNLOAD_RETRIES) {
                     long delay = (long) Math.pow(2, attempt) * 1000L; // 2s, 4s
-                    log.warn("下载失败（第 {}/{} 次），{} 秒后重试: {}", attempt, MAX_DOWNLOAD_RETRIES, delay / 1000, e.getMessage());
+                    log.warn("下载失败（第 {}/{} 次），{} 秒后重试: {}", attempt, MAX_DOWNLOAD_RETRIES, delay / 1000, e.getMessage(), e);
                     try {
                         Thread.sleep(delay);
                     } catch (InterruptedException ie) {
@@ -639,7 +639,7 @@ public class UpdateManager {
                         uiDelegate.showDownloadProgress(version, p));
                 return true;
             } catch (IOException | InterruptedException e) {
-                log.warn("下载源 {} 失败: {}", source, e.getMessage());
+                log.warn("下载源 {} 失败: {}", source, e.getMessage(), e);
                 Files.deleteIfExists(target);
             }
         }
@@ -656,7 +656,7 @@ public class UpdateManager {
             try {
                 downloadFile(proxyUrl, sha256Path);
             } catch (IOException e) {
-                log.warn("SHA256 通过 gh-proxy 下载失败，降级直连: {}", e.getMessage());
+                log.warn("SHA256 通过 gh-proxy 下载失败，降级直连", e);
                 Files.deleteIfExists(sha256Path);
                 downloadFile(sha256Url, sha256Path);
             }

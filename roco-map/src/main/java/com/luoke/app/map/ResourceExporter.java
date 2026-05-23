@@ -2,6 +2,7 @@ package com.luoke.app.map;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
 import net.jcip.annotations.NotThreadSafe;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -22,6 +23,7 @@ import java.util.Set;
  * 坐标系：图片中心为 (0,0)
  * 功能：自动去重、自动图标复制、脏数据过滤
  */
+@Slf4j
 @NotThreadSafe
 public class ResourceExporter {
 
@@ -144,9 +146,9 @@ public class ResourceExporter {
         // 4. 落地保存
         File outFile = new File(BASE_DIR, "resource_configs.json");
         mapper.writerWithDefaultPrettyPrinter().writeValue(outFile, root);
-        System.out.println("批量导出并去重完成！");
-        System.out.println("生成总点位数: " + root.size());
-        System.out.println("结果文件: " + outFile.getAbsolutePath());
+        log.info("批量导出并去重完成！");
+        log.info("生成总点位数: {}", root.size());
+        log.info("结果文件: {}", outFile.getAbsolutePath());
     }
 
     private String getMatchedName(JsonNode r) {

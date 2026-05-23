@@ -1,5 +1,6 @@
 package com.luoke.app.map;
 
+import lombok.extern.slf4j.Slf4j;
 import net.jcip.annotations.NotThreadSafe;
 
 import javax.imageio.ImageIO;
@@ -17,6 +18,7 @@ import java.util.stream.IntStream;
  * 洛克王国：世界 - 高性能地图合成工具
  * 修复：确保 SIFT 图包含陆地细节，展示图边缘浓郁
  */
+@Slf4j
 @NotThreadSafe
 public class MapAssembler {
     private static final int TILE_SIZE = 2048;
@@ -44,7 +46,7 @@ public class MapAssembler {
             int[] fullColorPixels = new int[FULL_SIZE * FULL_SIZE];
             byte[] fence = new byte[FULL_SIZE * FULL_SIZE];
 
-            System.out.println("1. 加载资源 (并行)...");
+            log.info("1. 加载资源 (并行)...");
             IntStream.range(0, 16).parallel().forEach(i -> {
                 int x = (i % 4) * TILE_SIZE;
                 int y = (i / 4) * TILE_SIZE;
@@ -54,16 +56,16 @@ public class MapAssembler {
                     BufferedImage mask = ImageIO.read(new File(maskDir + String.format("T_BigMap_Mask_%02d.png", i + 1)));
                     generateHardFence(mask, fence, x, y);
                 } catch (IOException e) {
-                    System.err.println("加载瓦片 " + (i + 1) + " 失败: " + e.getMessage());
+                    log.error("加载瓦片 {} 失败", i + 1, e);
                 }
             });
 
-            System.out.println("2. 计算海陆分界与渐变权重...");
+            log.info("2. 计算海陆分界与渐变权重...");
             byte[] outerFogRegion = fastFloodFill(fence, FULL_SIZE, FULL_SIZE);
             float[] smoothAlphaMask = fastBoxBlur(outerFogRegion, FULL_SIZE, FULL_SIZE, SMOOTH_RADIUS);
 
             // --- 任务 A: 生成 SIFT 专用透明陆地图 ---
-            System.out.println("3. 合成 SIFT 专用图 (保留陆地细节)...");
+            log.info("3. 合成 SIFT 专用图 (保留陆地细节)...");
             int[] siftPixels = new int[FULL_SIZE * FULL_SIZE];
             IntStream.range(0, FULL_SIZE * FULL_SIZE).parallel().forEach(i -> {
                 // outerFogRegion 为 0 代表是陆地或靠近陆地的硬围栏内区域
@@ -76,12 +78,12 @@ public class MapAssembler {
             saveImage(siftPixels, basePath + "WorldMap_Transparent_SIFT.png");
 
             // --- 任务 B: 生成带迷雾的展示图 ---
-            System.out.println("4. 准备迷雾层纹理...");
+            log.info("4. 准备迷雾层纹理...");
             BufferedImage texture = ImageIO.read(new File(texturePath));
             BufferedImage fogContent = createDenseStackLayer(texture);
             int[] fogRawPixels = ((DataBufferInt) fogContent.getRaster().getDataBuffer()).getData();
 
-            System.out.println("5. 并行合成展示图：处理迷雾过渡...");
+            log.info("5. 并行合成展示图：处理迷雾过渡...");
             int[] displayPixels = new int[FULL_SIZE * FULL_SIZE];
 
             IntStream.range(0, FULL_SIZE * FULL_SIZE).parallel().forEach(i -> {
@@ -110,10 +112,10 @@ public class MapAssembler {
             });
 
             saveImage(displayPixels, basePath + "Final_WorldMap_Cloudy_Show.png");
-            System.out.println("全部完成！耗时: " + (System.currentTimeMillis() - startTime) / 1000.0 + "s");
+            log.info("全部完成！耗时: {}s", (System.currentTimeMillis() - startTime) / 1000.0);
 
         } catch (IOException e) {
-            e.printStackTrace();
+            log.error("地图合成失败", e);
         }
     }
 

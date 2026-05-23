@@ -15,6 +15,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 /**
  * GitHub Release 更新检查器。
@@ -86,7 +87,7 @@ public class UpdateChecker {
         String patchUrl = null;
         String patchSha256Url = null;
         String patchFromVersion = null;
-        java.util.regex.Pattern patchPattern = java.util.regex.Pattern.compile(
+        Pattern patchPattern = Pattern.compile(
                 "RocoMapTracker-v?([\\d.]+)-to-v[\\d.]+\\.hdiff");
         JsonNode assets = root.get("assets");
         if (assets != null && assets.isArray()) {

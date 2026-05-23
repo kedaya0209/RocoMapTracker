@@ -35,6 +35,7 @@ public final class StatusStateMachine {
 
     // ======================== 状态枚举 ========================
 
+    @ThreadSafe
     public enum State {
         IDLE,
         LOADING,
@@ -51,6 +52,7 @@ public final class StatusStateMachine {
 
     // ======================== 状态键 ========================
 
+    @ThreadSafe
     public enum StatusKey {
         CAPTURE,
         SIFT,
@@ -99,6 +101,7 @@ public final class StatusStateMachine {
         }
     }
 
+    @ThreadSafe
     private static class Holder {
         static final StatusStateMachine INSTANCE = new StatusStateMachine();
     }

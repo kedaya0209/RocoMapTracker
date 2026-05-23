@@ -2,6 +2,7 @@ package com.luoke.app.map;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
 import net.jcip.annotations.NotThreadSafe;
 
 import java.io.File;
@@ -9,6 +10,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+@Slf4j
 @NotThreadSafe
 public class MapTileProcessor {
 
@@ -30,12 +32,12 @@ public class MapTileProcessor {
                     allTiles.add(info);
                 }
             } catch (IOException e) {
-                System.err.println("解析失败: " + file.getName());
+                log.error("解析失败: {}", file.getName(), e);
             }
         }
 
         // 打印结果
-        allTiles.forEach(System.out::println);
+        allTiles.forEach(tile -> log.info("{}", tile));
 
         // 如果需要计算整个大世界的中心，可以对所有 centerX/Y 求平均值
         calculateWorldCenter(allTiles);
@@ -77,11 +79,13 @@ public class MapTileProcessor {
             sumX += t.centerX;
             sumY += t.centerY;
         }
-        System.out.printf("\n>>> 16块瓦片聚合后的世界中心点: (%.2f, %.2f)\n",
-                sumX / tiles.size(), sumY / tiles.size());
+        log.info(">>> 16块瓦片聚合后的世界中心点: ({}, {})",
+                String.format("%.2f", sumX / tiles.size()),
+                String.format("%.2f", sumY / tiles.size()));
     }
 
     // 定义瓦片信息实体
+    @NotThreadSafe
     public static class TileInfo {
         public String fileName;
         public double centerX, centerY, centerZ;

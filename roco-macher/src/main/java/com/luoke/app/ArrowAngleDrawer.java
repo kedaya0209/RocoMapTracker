@@ -2,6 +2,8 @@ package com.luoke.app;
 
 import org.bytedeco.opencv.opencv_core.*;
 
+import lombok.extern.slf4j.Slf4j;
+
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -72,6 +74,7 @@ import static org.bytedeco.opencv.global.opencv_imgcodecs.*;
  * <p>角度约定：0° = 正右，90° = 正下，180° = 正左，270° = 正上，
  * 与标准数学坐标系一致（atan2(y, x)）。</p>
  */
+@Slf4j
 public class ArrowAngleDrawer {
 
     /** 数据集根目录 */
@@ -94,16 +97,16 @@ public class ArrowAngleDrawer {
 
         File[] files = new File(INPUT_DIR).listFiles((dir, name) -> name.endsWith(".png"));
         if (files == null || files.length == 0) {
-            System.out.println("未找到 PNG 文件: " + INPUT_DIR);
+            log.info("未找到 PNG 文件: {}", INPUT_DIR);
             return;
         }
 
-        System.out.println("开始处理，共 " + files.length + " 张图片...");
+        log.info("开始处理，共 {} 张图片...", files.length);
         for (File file : files) {
             String name = file.getName();
             Mat src = imread(file.getAbsolutePath());
             if (src.empty()) {
-                System.out.println("跳过（读取失败）: " + name);
+                log.info("跳过（读取失败）: {}", name);
                 continue;
             }
 
@@ -111,9 +114,9 @@ public class ArrowAngleDrawer {
 
             String outPath = OUTPUT_DIR + "\\" + name;
             imwrite(outPath, src);
-            System.out.printf("%s: %.2f\u00b0%n", name, angle);
+            log.info("{}: {}\u00b0", name, String.format("%.2f", angle));
         }
-        System.out.println("处理完成，结果已输出到: " + OUTPUT_DIR);
+        log.info("处理完成，结果已输出到: {}", OUTPUT_DIR);
     }
 
     /**

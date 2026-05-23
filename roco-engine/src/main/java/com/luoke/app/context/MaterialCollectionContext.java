@@ -77,6 +77,7 @@ public class MaterialCollectionContext {
         log.info("♻️ 采集上下文已重置");
     }
 
+    @ThreadSafe
     public record LootRecord(long timestamp, String name, int amount) {
     }
 }

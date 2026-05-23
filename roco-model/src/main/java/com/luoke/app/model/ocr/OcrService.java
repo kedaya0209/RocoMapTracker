@@ -1,6 +1,7 @@
 package com.luoke.app.model.ocr;
 
 import net.jcip.annotations.NotThreadSafe;
+import net.jcip.annotations.ThreadSafe;
 
 import ai.djl.translate.TranslateException;
 import com.luoke.app.config.PathConfig;
@@ -294,9 +295,11 @@ public class OcrService implements AutoCloseable {
 
     // ================== 内部类型 ==================
 
+    @ThreadSafe
     private record Rect(int x, int y, int width, int height) {
     }
 
+    @NotThreadSafe
     private static class LetterboxInfo {
         int srcNewW, srcNewH, padX, padY;
     }

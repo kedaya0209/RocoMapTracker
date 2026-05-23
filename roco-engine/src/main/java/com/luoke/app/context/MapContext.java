@@ -112,6 +112,7 @@ public class MapContext {
     /**
      * 线程安全的单例持有类
      */
+    @ThreadSafe
     private static class Holder {
         private static final MapContext INSTANCE = new MapContext();
     }

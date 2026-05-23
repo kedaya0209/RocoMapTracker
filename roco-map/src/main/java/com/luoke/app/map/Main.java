@@ -1,9 +1,11 @@
 package com.luoke.app.map;
 
+import lombok.extern.slf4j.Slf4j;
 import net.jcip.annotations.NotThreadSafe;
 
 import java.io.File;
 
+@Slf4j
 @NotThreadSafe
 public class Main {
 
@@ -16,7 +18,7 @@ public class Main {
 
         for (File childDir : dir.listFiles()) {
             for (String filename : childDir.list()) {
-                System.out.println(template.formatted(childDir.getName() + "/" + filename));
+                log.info("{}", template.formatted(childDir.getName() + "/" + filename));
             }
         }
     }
