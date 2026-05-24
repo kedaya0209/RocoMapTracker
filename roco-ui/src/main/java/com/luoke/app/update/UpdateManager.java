@@ -249,7 +249,7 @@ public class UpdateManager {
         String script = generateUpdaterScript(exePath, patchPath.toString(), hpatchzPath, exeName);
         try {
             Path scriptPath = Path.of(exeDir, "updater_" + UUID.randomUUID().toString().substring(0, 8) + ".bat");
-            Files.writeString(scriptPath, script);
+            Files.writeString(scriptPath, "﻿" + script);
             log.info("启动更新脚本: {}", scriptPath);
             startScriptDetached(scriptPath.toString(), exeDir);
             if (uiDelegate != null) uiDelegate.restartApplication();
@@ -268,7 +268,7 @@ public class UpdateManager {
         String script = generateReplaceScript(newExePath.toString(), targetExe, exeName);
         try {
             Path scriptPath = Path.of(exeDir, "updater_" + UUID.randomUUID().toString().substring(0, 8) + ".bat");
-            Files.writeString(scriptPath, script);
+            Files.writeString(scriptPath, "﻿" + script);
             log.info("启动更新脚本: {}", scriptPath);
             startScriptDetached(scriptPath.toString(), exeDir);
             // 等待 updater 初始化完成再退出（确保 WMI 已创建独立进程）
@@ -347,10 +347,10 @@ public class UpdateManager {
         String logPath = exePath + ".update.log";
 
         return "@echo off\r\n"
+                + "chcp 65001 >nul\r\n"
                 + "setlocal enabledelayedexpansion\r\n"
                 + "title RocoMapTracker Updater\r\n"
-                + "for /f \"tokens=2 delims==.\" %%a in ('wmic os get localdatetime /value') do set DT=%%a\r\n"
-                + "set DT=!DT:~0,4!-!DT:~4,2!-!DT:~6,2! !DT:~8,2!:!DT:~10,2!:!DT:~12,2!\r\n"
+                + "for /f %%a in ('powershell -NoProfile -Command \"Get-Date -Format yyyy-MM-dd-HH-mm-ss\"') do set DT=%%a\r\n"
                 + "set LOG=\"" + logPath + "\"\r\n"
                 + "echo [!DT!] 脚本启动 > %LOG%\r\n"
                 + "echo exePath=" + exePath + " >> %LOG%\r\n"
@@ -413,6 +413,7 @@ public class UpdateManager {
         String backupPath = targetExe + ".bak";
 
         return "@echo off\r\n"
+                + "chcp 65001 >nul\r\n"
                 + "setlocal enabledelayedexpansion\r\n"
                 + "title RocoMapTracker Updater\r\n"
                 + "\r\n"
