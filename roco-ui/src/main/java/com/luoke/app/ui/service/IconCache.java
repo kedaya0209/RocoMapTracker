@@ -7,9 +7,13 @@ import javafx.scene.image.*;
 import lombok.Getter;
 
 import java.io.ByteArrayInputStream;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * UI 层图标缓存 — 用 JavaFX 原生解码器将 byte[] 转为 Image，
@@ -74,13 +78,20 @@ public class IconCache {
 
     /**
      * 构建纹理图集。在资源点位加载完成后调用。
+     * 先并行加载图标字节（I/O 密集），再批量解码组装图集。
      *
      * @param iconPaths 所有图标路径的集合 (如 "/source/icon/ore_iron.png")
      */
     public void buildAtlas(Set<String> iconPaths) {
         if (iconPaths == null || iconPaths.isEmpty()) return;
 
-        int count = iconPaths.size();
+        List<String> paths = List.copyOf(iconPaths);
+        int count = paths.size();
+
+        // ---- 阶段 1：并行加载图标字节（I/O 密集，跨线程加速）----
+        List<byte[]> iconBytes = parallelLoadBytes(paths);
+
+        // ---- 阶段 2：解码 + 组装图集 ----
         int cols = (int) Math.ceil(Math.sqrt(count));
         int rows = (int) Math.ceil((double) count / cols);
 
@@ -92,13 +103,9 @@ public class IconCache {
         Map<String, AtlasSlot> map = new ConcurrentHashMap<>();
         int[] rowBuf = new int[SIZE];
 
-        int idx = 0;
-        for (String path : iconPaths) {
-            byte[] bytes = ImageLoader.getInstance().loadIconBytes(path);
-            if (bytes == null) {
-                idx++;
-                continue;
-            }
+        for (int idx = 0; idx < count; idx++) {
+            byte[] bytes = iconBytes.get(idx);
+            if (bytes == null) continue;
 
             Image icon = new Image(new ByteArrayInputStream(bytes), SIZE, SIZE, false, true);
             PixelReader reader = icon.getPixelReader();
@@ -109,11 +116,9 @@ public class IconCache {
             int baseY = (idx / cols) * SIZE;
 
             for (int y = 0; y < ih; y++) {
-                // 彩色像素行
                 reader.getPixels(0, y, iw, 1, PixelFormat.getIntArgbPreInstance(), rowBuf, 0, iw);
                 colorWriter.setPixels(baseX, baseY + y, iw, 1, PixelFormat.getIntArgbPreInstance(), rowBuf, 0, iw);
 
-                // 灰度：逐像素计算亮度后写入
                 for (int x = 0; x < iw; x++) {
                     int argb = rowBuf[x];
                     int a = (argb >> 24) & 0xFF;
@@ -126,14 +131,35 @@ public class IconCache {
                 grayWriter.setPixels(baseX, baseY + y, iw, 1, PixelFormat.getIntArgbPreInstance(), rowBuf, 0, iw);
             }
 
-            map.put(path, new AtlasSlot(baseX, baseY));
-            idx++;
+            map.put(paths.get(idx), new AtlasSlot(baseX, baseY));
         }
 
         this.slotMap = map;
         this.colorAtlas = colorImg;
         this.grayAtlas = grayImg;
         this.atlasBuilt = true;
+    }
+
+    /**
+     * 并行加载图标字节。I/O 密集任务使用线程池并发执行。
+     */
+    private List<byte[]> parallelLoadBytes(List<String> paths) {
+        int threads = Math.min(paths.size(), Runtime.getRuntime().availableProcessors());
+        if (threads <= 1) {
+            return paths.stream()
+                    .map(p -> ImageLoader.getInstance().loadIconBytes(p))
+                    .toList();
+        }
+
+        try (ExecutorService pool = Executors.newFixedThreadPool(threads)) {
+            List<CompletableFuture<byte[]>> futures = paths.stream()
+                    .map(p -> CompletableFuture.supplyAsync(
+                            () -> ImageLoader.getInstance().loadIconBytes(p), pool))
+                    .toList();
+            return futures.stream()
+                    .map(CompletableFuture::join)
+                    .toList();
+        }
     }
 
     public boolean isAtlasReady() {

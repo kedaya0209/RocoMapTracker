@@ -15,6 +15,7 @@ import com.luoke.app.config.ViewConfig;
 import com.luoke.app.context.OcrAsyncManager;
 import com.luoke.app.hook.HookEventType;
 import com.luoke.app.hook.event.NotificationType;
+import com.luoke.app.hook.event.ProgressEvent;
 import com.luoke.app.hook.event.StatusEvent;
 import com.luoke.app.hook.impl.UiResponseHook;
 import com.luoke.app.hook.multicast.HookRegistry;
@@ -103,7 +104,12 @@ public class ModernCanvasApp extends Application {
      */
     private void startBackgroundInit() {
         Thread.ofPlatform().daemon(true).name("resource-extractor").start(() -> {
-            ResourceExtractor.extractAll();
+            ResourceExtractor.extractAll((total, done) -> {
+                double progress = 0.15 * done / total;
+                String text = String.format("正在校验&释放内嵌资源 (%d/%d)...", done, total);
+                Platform.runLater(() -> HookRegistry.INSTANCE.publish(
+                        HookEventType.INIT_PROGRESS, new ProgressEvent(progress, text)));
+            });
             Platform.runLater(this::initAfterResourcesReady);
         });
     }
