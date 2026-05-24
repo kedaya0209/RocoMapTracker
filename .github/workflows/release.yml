@@ -77,8 +77,8 @@ jobs:
           set "INCLUDE=D:\a\opencv-install\include;D:\a\zlib\include;%INCLUDE%"
           set "LIB=D:\a\opencv-install\lib;D:\a\zlib\lib;%LIB%"
           rc /nologo /fo resource.res resource.rc
-          cl /std:c++17 /O2 /EHsc /arch:AVX2 /OPT:REF /Fe:sift_match.exe sift_match_main.cpp resource.res ws2_32.lib opencv_core4100.lib opencv_imgproc4100.lib opencv_features2d4100.lib opencv_flann4100.lib opencv_calib3d4100.lib zlib.lib
-          for %D in (core imgproc features2d flann calib3d) do copy /Y "D:\a\opencv-install\bin\opencv_%D4100.dll" .
+          cl /std:c++17 /O2 /EHsc /arch:AVX2 /I"D:\a\opencv-install\include" /I"D:\a\zlib\include" /Fe:sift_match.exe sift_match_main.cpp resource.res /link /OPT:REF /LIBPATH:"D:\a\opencv-install\lib" /LIBPATH:"D:\a\zlib\lib" ws2_32.lib opencv_core4100.lib opencv_imgproc4100.lib opencv_features2d4100.lib opencv_flann4100.lib opencv_calib3d4100.lib zlib.lib
+          for %%D in (core imgproc features2d flann calib3d) do copy /Y "D:\a\opencv-install\bin\opencv_%%D4100.dll" .
         working-directory: cpp
         shell: cmd
 
@@ -136,7 +136,7 @@ jobs:
         run: |
           copy /Y cpp\capture.exe roco-ui\src\main\resources\capture\RocoMapTracker-capture.exe
           copy /Y cpp\sift_match.exe roco-ui\src\main\resources\sift\RocoMapTracker-sift_match.exe
-          for %D in (core imgproc features2d flann calib3d) do copy /Y cpp\opencv_%D4100.dll roco-ui\src\main\resources\sift\opencv_%D4100.dll
+          for %%D in (core imgproc features2d flann calib3d) do copy /Y cpp\opencv_%%D4100.dll roco-ui\src\main\resources\sift\opencv_%%D4100.dll
 
       - name: Download private assets
         env:
