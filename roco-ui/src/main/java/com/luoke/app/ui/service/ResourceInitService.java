@@ -101,12 +101,11 @@ public class ResourceInitService {
     // ================================================================
 
     private void initWithInternalProfile(Runnable onReady) throws Exception {
-        publishInitStep(0.2, "初始化逻辑处理器...");
-        publishInitStep(0.4, "正在载入地图元数据...");
+        publishInitStep(0.2, "正在载入地图元数据...");
         initInternalMapMetadata();
-        publishInitStep(0.7, "构建坐标索引系统...");
+        publishInitStep(0.4, "构建坐标索引系统...");
         ResourcePointContext.getInstance().loadAndInit();
-        publishInitStep(0.85, "合并图标纹理图集...");
+        publishInitStep(0.7, "合并图标纹理图集...");
         buildIconAtlas();
         publishInitStep(1.0, "核心引擎已就绪");
         uiDelegate.onResourceReady(onReady);
@@ -125,19 +124,18 @@ public class ResourceInitService {
                 recoverMissingResources(missing);
             }
 
-            publishInitStep(0.2, "初始化逻辑处理器...");
-            publishInitStep(0.4, "正在载入地图元数据...");
+            publishInitStep(0.2, "正在载入地图元数据...");
             initMapMetadata();
-            publishInitStep(0.5, "正在验证地图瓦片...");
+            publishInitStep(0.4, "正在验证地图瓦片...");
             if (ResourceConfigContext.getCurrentProfile() != ResourceConfigContext.ResourceProfile.INTERNAL) {
                 tileGeneratorService.validateAndGenerateTiles();
                 // 瓦片生成可能加载了 256MB BufferedImage，触发 GC 让堆缩回
                 System.gc();
                 log.info("瓦片验证完成，已触发堆内存回收");
             }
-            publishInitStep(0.7, "构建坐标索引系统...");
+            publishInitStep(0.6, "构建坐标索引系统...");
             ResourcePointContext.getInstance().loadAndInit();
-            publishInitStep(0.85, "合并图标纹理图集...");
+            publishInitStep(0.8, "合并图标纹理图集...");
             buildIconAtlas();
             publishInitStep(1.0, "核心引擎已就绪");
             uiDelegate.onResourceReady(onReady);

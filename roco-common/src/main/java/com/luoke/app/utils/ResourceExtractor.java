@@ -11,9 +11,12 @@ import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BiConsumer;
 
 /**
  * JAR 内嵌资源释放工具 — 根据 extract-list.txt 将内置资源提取到外部文件系统。
@@ -32,6 +35,15 @@ public final class ResourceExtractor {
      * 使用多线程并行提取，充分利用多核 CPU 和 SSD 并发写入。
      */
     public static void extractAll() {
+        extractAll(null);
+    }
+
+    /**
+     * 解析 extract-list.txt 并将所有内嵌资源释放到外部路径。
+     *
+     * @param onFileDone 每个文件处理完成后回调 (total, done)，可为 null
+     */
+    public static void extractAll(BiConsumer<Integer, Integer> onFileDone) {
         List<String[]> entries;
         try (InputStream in = ResourceExtractor.class.getResourceAsStream(EXTRACT_LIST)) {
             if (in == null) {
@@ -62,23 +74,38 @@ public final class ResourceExtractor {
             return;
         }
 
-        int threads = Math.min(entries.size(), Runtime.getRuntime().availableProcessors());
+        int total = entries.size();
+        AtomicInteger done = new AtomicInteger(0);
+
+        int threads = Math.min(total, Runtime.getRuntime().availableProcessors());
         if (threads <= 1) {
-            // 单文件或单核，直接串行
-            entries.forEach(entry -> processEntry(entry[0], entry[1], entry[2]));
+            for (String[] entry : entries) {
+                processEntry(entry[0], entry[1], entry[2]);
+                if (onFileDone != null) onFileDone.accept(total, done.incrementAndGet());
+            }
             return;
         }
 
-        ExecutorService pool = Executors.newFixedThreadPool(threads);
-        for (String[] entry : entries) {
-            pool.submit(() -> processEntry(entry[0], entry[1], entry[2]));
-        }
-        pool.shutdown();
-        try {
-            pool.awaitTermination(5, TimeUnit.MINUTES);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            log.warn("资源释放被中断");
+        try (ExecutorService pool = Executors.newFixedThreadPool(threads)) {
+            CountDownLatch latch = new CountDownLatch(total);
+            for (String[] entry : entries) {
+                pool.submit(() -> {
+                    try {
+                        processEntry(entry[0], entry[1], entry[2]);
+                    } finally {
+                        if (onFileDone != null) onFileDone.accept(total, done.incrementAndGet());
+                        latch.countDown();
+                    }
+                });
+            }
+            try {
+                if (!latch.await(5, TimeUnit.MINUTES)) {
+                    log.warn("资源释放超时");
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                log.warn("资源释放被中断");
+            }
         }
     }
 
