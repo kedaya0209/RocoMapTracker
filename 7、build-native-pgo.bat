@@ -3,8 +3,18 @@ chcp 65001 >nul
 setlocal enabledelayedexpansion
 cls
 
-set VCVARS_PATH="C:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvarsall.bat"
-call %VCVARS_PATH% x64
+set "VCVARS_PATH=C:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvarsall.bat"
+if not exist "%VCVARS_PATH%" (
+    echo [错误] 找不到 vcvarsall.bat: %VCVARS_PATH%
+    pause
+    exit /b 1
+)
+call "%VCVARS_PATH%" x64
+if %ERRORLEVEL% neq 0 (
+    echo [错误] VS 环境初始化失败
+    pause
+    exit /b 1
+)
 
 echo ==============================
 echo Step 7: Build PGO Optimized EXE

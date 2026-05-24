@@ -34,6 +34,7 @@ import java.io.File;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
+import com.luoke.app.utils.ResourceExtractor;
 
 import javafx.application.Application;
 import javafx.application.Platform;
@@ -71,7 +72,6 @@ public class ModernCanvasApp extends Application {
     private StackPane rootStack;
     private Stage primaryStage;
     private Sidebar sidebar;
-    private String iconFilePath;
 
     public static void main(String[] args) {
         launch(args);
@@ -82,7 +82,10 @@ public class ModernCanvasApp extends Application {
         ConfigPersistence.init(); // 配置加载必须在所有 Config 字段读取之前
         this.primaryStage = primaryStage;
 
-        // ---- 1. 场景骨架 ----
+        // ---- 1. 主题（必须在场景创建前，否则 CSS 变量不可用）----
+        ThemeManager.applyTheme(UiConfig.THEME);
+
+        // ---- 2. 场景骨架 ----
         initScene();
 
         primaryStage.setTitle(CaptureConfig.APP_MAIN_TITLE);
@@ -91,19 +94,31 @@ public class ModernCanvasApp extends Application {
         // 提取 .ico 图标文件并立即设置任务栏图标（尽早设置，避免窗口出现时无图标）
         initTaskbarIcon();
 
-        // ---- 2. 基础设施 ----
+        // ---- 3. 后台释放资源 → 基础设施 → 主界面构建 ----
+        startBackgroundInit();
+    }
+
+    /**
+     * 后台线程释放内嵌资源，完成后回到 FX 线程继续初始化。
+     */
+    private void startBackgroundInit() {
+        Thread.ofPlatform().daemon(true).name("resource-extractor").start(() -> {
+            ResourceExtractor.extractAll();
+            Platform.runLater(this::initAfterResourcesReady);
+        });
+    }
+
+    /**
+     * 内嵌资源就绪后，在 FX 线程上完成基础设施、SIFT 回调和主界面构建。
+     */
+    private void initAfterResourcesReady() {
         InfrastructureManager.init();
 
-        // ---- 3. 主题 ----
-        ThemeManager.applyTheme(UiConfig.THEME);
-
-        // ---- 4. SIFT 切换回调 ----
         SwitchMapMatcher.getInstance().setSwitchCallback(newVariant -> {
             log.info("算法变体切换: {}", newVariant);
             siftClientManager.restartClient(newVariant);
         });
 
-        // ---- 5. 资源初始化 → 主界面构建 ----
         ResourceInitService initService = getResourceInitService();
         initService.start(this::buildMainUi);
     }
@@ -205,7 +220,7 @@ public class ModernCanvasApp extends Application {
                 }
             }
             if (iconFile.exists()) {
-                iconFilePath = iconFile.getAbsolutePath();
+                String iconFilePath = iconFile.getAbsolutePath();
                 TaskbarIconHelper.setIcon(primaryStage, iconFilePath);
             } else {
                 log.warn("ico 图标文件不存在");

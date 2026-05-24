@@ -2,7 +2,6 @@ package com.luoke.app;
 
 import net.jcip.annotations.NotThreadSafe;
 import com.luoke.app.ui.ModernCanvasApp;
-import com.luoke.app.utils.ResourceExtractor;
 import javafx.application.Application;
 import lombok.extern.slf4j.Slf4j;
 
@@ -18,7 +17,6 @@ public class Main {
     }
 
     static void main(String[] args) {
-        ResourceExtractor.extractAll();
         Application.launch(ModernCanvasApp.class, args);
     }
 }

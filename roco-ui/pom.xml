@@ -188,6 +188,7 @@
                                 <buildArg>-R:MaxDirectMemorySize=512M</buildArg>
                                 <buildArg>-H:+StaticExecutableWithDynamicLibC</buildArg>
                                 <buildArg>-H:+RemoveUnusedSymbols</buildArg>
+                                <buildArg>-H:+UseCompressedReferences</buildArg>
                                 <buildArg>-H:+AddAllCharsets</buildArg>
                                 <buildArg>-Dfile.encoding=UTF-8</buildArg>
                                 <buildArg>--enable-native-access=ALL-UNNAMED</buildArg>
@@ -280,6 +281,7 @@
                                 <buildArg>--pgo-instrument</buildArg>
                                 <buildArg>-J-Xmx24g</buildArg>
                                 <buildArg>-march=x86-64-v3</buildArg>
+                                <buildArg>-H:+UseCompressedReferences</buildArg>
                                 <buildArg>-H:+AddAllCharsets</buildArg>
                                 <buildArg>-Dfile.encoding=UTF-8</buildArg>
                                 <buildArg>--enable-native-access=ALL-UNNAMED</buildArg>
@@ -357,6 +359,7 @@
                                 <buildArg>-O3</buildArg>
                                 <buildArg>-march=x86-64-v3</buildArg>
                                 <buildArg>-H:+StripDebugInfo</buildArg>
+                                <buildArg>-H:+UseCompressedReferences</buildArg>
                                 <buildArg>-H:+AddAllCharsets</buildArg>
                                 <buildArg>-Dfile.encoding=UTF-8</buildArg>
                                 <buildArg>--enable-native-access=ALL-UNNAMED</buildArg>
