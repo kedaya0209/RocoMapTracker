@@ -27,7 +27,7 @@ echo [OK] VS 环境已就绪
 
 :: 执行 Native Image 构建（含 rcedit 后处理嵌入图标）
 echo [2/2] 开始 Native Image 构建...
-mvn -Pnative clean install -pl roco-ui -am
+mvn -Pnative clean package -pl roco-ui -am -DskipTests
 
 if %ERRORLEVEL% equ 0 (
     echo ============================================

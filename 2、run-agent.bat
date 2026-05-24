@@ -1,5 +1,5 @@
 @echo off
-chcp 65001
+chcp 65001 >nul
 cls
 
 echo 1. 确保输出目录存在
