@@ -20,8 +20,10 @@ import java.util.stream.Collectors;
 public class MaterialCollectionContext {
     private static final MaterialCollectionContext INSTANCE = new MaterialCollectionContext();
 
-    // 存储累计结果
-    private final Map<String, Integer> summaryMap = new ConcurrentHashMap<>();
+    // 存储累计结果（TreeMap 按名称字典序排列，面板固定顺序）
+    private final Map<String, Integer> summaryMap = Collections.synchronizedMap(new TreeMap<>());
+    // 存储背包最新总数
+    private final Map<String, Integer> backpackTotals = new ConcurrentHashMap<>();
     // 存储历史流水
     private final List<LootRecord> historyLog = Collections.synchronizedList(new ArrayList<>());
     private final AtomicLong firstLootTimestamp = new AtomicLong(0);
@@ -59,7 +61,32 @@ public class MaterialCollectionContext {
 
         // 2. 通过事件总线通知 UI 层刷新
         HookRegistry.INSTANCE.publish(HookEventType.MATERIAL_COLLECTION_UPDATED,
-                new MaterialCollectionEvent(new HashMap<>(summaryMap)));
+                new MaterialCollectionEvent(new TreeMap<>(summaryMap), new HashMap<>(backpackTotals)));
+    }
+
+    /**
+     * 从网络拾取事件更新（由 rmt_bridge.py 推送 MSG_ITEM_PICKUP）。
+     * <p>
+     * 数据已在 Python 侧解析完成，包含物品名称、本次拾取数量和背包总数。
+     *
+     * @param itemName      物品名称（已在 Python 侧完成 ID→名称 解析）
+     * @param pickupNum     本次拾取数量
+     * @param backpackTotal 背包最新总数
+     */
+    public void updateFromNetwork(String itemName, int pickupNum, int backpackTotal) {
+        if (itemName == null || itemName.isEmpty()) return;
+
+        long now = System.currentTimeMillis();
+        firstLootTimestamp.compareAndSet(0, now);
+
+        summaryMap.merge(itemName, pickupNum, Integer::sum);
+        backpackTotals.put(itemName, backpackTotal);
+        historyLog.add(new LootRecord(now, itemName, pickupNum));
+
+        log.info("📦 [网络拾取] {} +{}, 背包:{}, 累计:{}", itemName, pickupNum, backpackTotal, summaryMap.get(itemName));
+
+        HookRegistry.INSTANCE.publish(HookEventType.MATERIAL_COLLECTION_UPDATED,
+                new MaterialCollectionEvent(new TreeMap<>(summaryMap), new HashMap<>(backpackTotals)));
     }
 
     /**
@@ -67,6 +94,7 @@ public class MaterialCollectionContext {
      */
     public void reset() {
         summaryMap.clear();
+        backpackTotals.clear();
         historyLog.clear();
         firstLootTimestamp.set(0);
 

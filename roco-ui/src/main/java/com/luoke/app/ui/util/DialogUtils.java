@@ -288,7 +288,18 @@ public class DialogUtils {
         content.setAlignment(Pos.CENTER_LEFT);
         content.getChildren().addAll(iconNode, infoBox);
 
-        buildBaseDialog(rootStack, "关于", content, "确定", Styles.SUCCESS,
+        // 免责声明
+        Label disclaimer = new Label("仅供学习交流使用，一切后果由使用者自行承担。");
+        disclaimer.setStyle("-fx-text-fill: #FF9800; -fx-font-size: 12px;"
+                + "-fx-padding: 10 14; -fx-background-color: rgba(255,152,0,0.1);"
+                + "-fx-background-radius: 6;");
+        disclaimer.setWrapText(true);
+        disclaimer.setMaxWidth(420);
+
+        VBox wrapper = new VBox(14, content, disclaimer);
+        wrapper.setAlignment(Pos.CENTER_LEFT);
+
+        buildBaseDialog(rootStack, "关于", wrapper, "确定", Styles.SUCCESS,
                 "-color-accent-emphasis", () -> {}, null, null);
     }
 

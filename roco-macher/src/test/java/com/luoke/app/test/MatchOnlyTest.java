@@ -2,10 +2,12 @@ package com.luoke.app.test;
 
 import com.luoke.app.context.ResourceConfigContext;
 import com.luoke.app.macher.SiftMatchHandler;
+import com.luoke.app.macher.SiftMatchProtocol;
 import com.luoke.app.process.NativeProcess;
 import com.luoke.app.socket.SocketServer;
 import com.luoke.app.utils.ResourceUtils;
 import lombok.extern.slf4j.Slf4j;
+import net.jcip.annotations.NotThreadSafe;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -13,7 +15,6 @@ import java.io.InputStream;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * 纯 SIFT 匹配测试 — 通过 C++ sift_match.exe 进行 SIFT 匹配，无 JavaCPP 依赖。
@@ -26,6 +27,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * 3. 应用圆形遮罩后通过 Socket 发送给 C++ 进行 SIFT 匹配 + 方向检测
  * 4. 对比匹配坐标与真实截取坐标，检测精度
  */
+@NotThreadSafe
 @Slf4j
 public class MatchOnlyTest {
 
@@ -63,16 +65,15 @@ public class MatchOnlyTest {
         }
 
         // 3. 启动 SIFT 匹配
-        AtomicBoolean matchReady = new AtomicBoolean(false);
         CountDownLatch readyLatch = new CountDownLatch(1);
 
-        client = new SiftMatchHandler(SocketServer.instance(), NativeProcess::create);
-        SocketServer.instance().register(client);
+        client = new SiftMatchHandler(SocketServer.instance(), NativeProcess::create,
+                (type, data) -> {});
+        client.registerToServer(SocketServer.instance());
 
         boolean started = client.start((ready, detail) -> {
             log.info("SIFT 状态: ready={} detail={}", ready, detail);
             if (ready) {
-                matchReady.set(true);
                 readyLatch.countDown();
             }
         });
@@ -108,10 +109,8 @@ public class MatchOnlyTest {
         log.info("开始匹配循环（Ctrl+C 停止）...");
 
         startTime = System.currentTimeMillis();
-        int loopCount = 0;
 
         while (!Thread.currentThread().isInterrupted()) {
-            loopCount++;
             matchCount++;
 
             // 随机截取位置
@@ -159,7 +158,7 @@ public class MatchOnlyTest {
 
             // 执行匹配
             long t0 = System.currentTimeMillis();
-            SiftMatchHandler.MatchResult result;
+            SiftMatchProtocol.MatchResult result;
             try {
                 result = client.sendFrameAndWait(bgraData, CROP_W, CROP_H,
                         Double.NaN, Double.NaN, 500);
@@ -174,29 +173,29 @@ public class MatchOnlyTest {
                 successCount++;
                 double error = Math.hypot(result.x() - trueCenterX, result.y() - trueCenterY);
 
-                if (loopCount % 20 == 0) {
-                    System.out.printf("[匹配 #%d] 耗时=%dms  真实=(%.0f,%.0f)  匹配=(%.1f,%.1f)  误差=%.1fpx  成功率=%d/%d%n",
+                if (matchCount % 20 == 0) {
+                    log.info("[匹配 #{}] 耗时={}ms  真实=({},{})  匹配=({},{})  误差={}px  成功率={}/{}",
                             matchCount, matchMs, trueCenterX, trueCenterY,
                             result.x(), result.y(), error,
                             successCount, matchCount);
                 }
             } else {
-                if (loopCount % 20 == 0) {
-                    System.out.printf("[匹配 #%d] 耗时=%dms  真实=(%.0f,%.0f)  **匹配失败**  成功率=%d/%d%n",
+                if (matchCount % 20 == 0) {
+                    log.info("[匹配 #{}] 耗时={}ms  真实=({},{})  **匹配失败**  成功率={}/{}",
                             matchCount, matchMs, trueCenterX, trueCenterY,
                             successCount, matchCount);
                 }
             }
 
             // 每 100 次输出统计
-            if (loopCount % 100 == 0) {
+            if (matchCount % 100 == 0) {
                 long elapsed = System.currentTimeMillis() - startTime;
                 double avgMs = (double) totalMatchMs / matchCount;
                 double matchRate = (double) successCount / matchCount * 100;
                 Runtime rt = Runtime.getRuntime();
                 long usedMem = (rt.totalMemory() - rt.freeMemory()) / (1024 * 1024);
 
-                System.out.printf("[统计] %d次 | 成功率=%.1f%% | 平均耗时=%.1fms | 总耗时=%ds | 堆内存=%dMB%n",
+                log.info("[统计] {}次 | 成功率={}% | 平均耗时={}ms | 总耗时={}s | 堆内存={}MB",
                         matchCount, matchRate, avgMs, elapsed / 1000, usedMem);
             }
 

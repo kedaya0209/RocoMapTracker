@@ -9,10 +9,10 @@ import com.luoke.app.config.BuildConfig;
 import com.luoke.app.config.CaptureConfig;
 import com.luoke.app.config.ConfigPersistence;
 import com.luoke.app.config.PathConfig;
+import com.luoke.app.config.SiftConfig;
 import com.luoke.app.config.UiConfig;
 import com.luoke.app.config.UpdateConfig;
 import com.luoke.app.config.ViewConfig;
-import com.luoke.app.context.OcrAsyncManager;
 import com.luoke.app.hook.HookEventType;
 import com.luoke.app.hook.event.NotificationType;
 import com.luoke.app.hook.event.ProgressEvent;
@@ -21,12 +21,17 @@ import com.luoke.app.hook.impl.UiResponseHook;
 import com.luoke.app.hook.multicast.HookRegistry;
 import com.luoke.app.macher.map.SwitchMapMatcher;
 import com.luoke.app.socket.SocketServer;
+import com.luoke.app.ui.component.FloatToolbox;
 import com.luoke.app.ui.component.LoadingOverlay;
+import com.luoke.app.ui.component.ResourceCounterPanel;
 import com.luoke.app.ui.component.Sidebar;
+import com.luoke.app.ui.component.TitleBar;
 import com.luoke.app.ui.component.UiAnimator;
+import com.luoke.app.ui.component.VersionMode;
 import com.luoke.app.ui.service.*;
 import com.luoke.app.ui.util.DialogUtils;
 import com.luoke.app.ui.util.DialogUtils.ProgressControl;
+import com.luoke.app.ui.util.TrayManager;
 import com.luoke.app.update.UpdateManager;
 import com.luoke.app.update.UpdateUiDelegate;
 import com.luoke.app.update.VersionInfo;
@@ -60,6 +65,7 @@ import lombok.extern.slf4j.Slf4j;
  *   <li>{@link InfrastructureManager} — JobObject/SocketServer 生命周期</li>
  *   <li>{@link SiftClientManager} — SIFT 客户端生命周期</li>
  *   <li>{@link CaptureServiceManager} — 截图服务生命周期</li>
+ *   <li>{@link PcapBridgeManager} — pcap 桥接器生命周期</li>
  * </ul>
  */
 @NotThreadSafe
@@ -70,6 +76,8 @@ public class ModernCanvasApp extends Application {
     private final UiAnimator uiAnimator = new UiAnimator();
     private final SiftClientManager siftClientManager = new SiftClientManager();
     private final CaptureServiceManager captureServiceManager = new CaptureServiceManager();
+    private final PcapBridgeManager pcapBridgeManager = new PcapBridgeManager();
+    private TrayManager trayManager;
     private StackPane rootStack;
     private Stage primaryStage;
     private Sidebar sidebar;
@@ -82,6 +90,7 @@ public class ModernCanvasApp extends Application {
     public void start(Stage primaryStage) {
         ConfigPersistence.init(); // 配置加载必须在所有 Config 字段读取之前
         this.primaryStage = primaryStage;
+        this.trayManager = new TrayManager(primaryStage);
 
         // ---- 1. 主题（必须在场景创建前，否则 CSS 变量不可用）----
         ThemeManager.applyTheme(UiConfig.THEME);
@@ -176,6 +185,15 @@ public class ModernCanvasApp extends Application {
         rootClip.setArcWidth(24);
         rootClip.setArcHeight(24);
         rootStack.setClip(rootClip);
+
+        // wrapper 也需 clip，防止圆角外露出黑色底色
+        Rectangle wrapperClip = new Rectangle();
+        wrapperClip.widthProperty().bind(wrapper.widthProperty());
+        wrapperClip.heightProperty().bind(wrapper.heightProperty());
+        wrapperClip.setArcWidth(24);
+        wrapperClip.setArcHeight(24);
+        wrapper.setClip(wrapperClip);
+
         wrapper.getChildren().add(rootStack);
 
         LoadingOverlay globalLoading = new LoadingOverlay(null);
@@ -246,6 +264,27 @@ public class ModernCanvasApp extends Application {
         siftClientManager.init();
         captureServiceManager.init(siftClientManager.getClient());
 
+        FloatToolbox floatToolbox = result.floatToolbox();
+
+        // 版本切换回调 — 控制 pcap/物资面板/浮动按钮/匹配
+        VersionManager.getInstance().setOnSwitch(mode -> {
+            if (mode == VersionMode.ADVANCED) {
+                int port = SocketServer.instance().getPort();
+                pcapBridgeManager.init(port, null);
+                ResourceCounterPanel.getInstance().toggle(false);
+                floatToolbox.setCollectButtonVisible(true);
+                SiftConfig.SIFT_MATCHING_ENABLED = true;
+                Platform.runLater(() ->
+                        DialogUtils.showSimpleDialog(rootStack, "提示",
+                                "请手动断开游戏网络连接后重连，以便抓包组件捕获通信密钥。", "确定", true, () -> {}));
+            } else {
+                pcapBridgeManager.stop();
+                ResourceCounterPanel.getInstance().toggle(false);
+                floatToolbox.setCollectButtonVisible(false);
+                SiftConfig.SIFT_MATCHING_ENABLED = false;
+            }
+        });
+
         result.renderer().start();
         this.sidebar = result.sidebar();
 
@@ -259,6 +298,10 @@ public class ModernCanvasApp extends Application {
 
         // UI 完全就绪后补设任务栏图标（start() 阶段 HWND 可能未就绪）
         initTaskbarIcon();
+
+        // 初始化系统托盘并绑定最小化按钮
+        trayManager.init();
+        TitleBar.getInstance().setMinimizeHandler(trayManager::minimizeToTray);
 
         log.info("主界面构建完成");
     }
@@ -340,12 +383,13 @@ public class ModernCanvasApp extends Application {
     public void stop() {
         log.info("正在关闭程序...");
 
+        trayManager.dispose();
         UpdateManager.getInstance().shutdown();
         captureServiceManager.stop();
+        pcapBridgeManager.stop();
         siftClientManager.stop();
         InfrastructureManager.destroy();
         HookRegistry.INSTANCE.destroy();
-        OcrAsyncManager.getInstance().close();
         SocketServer.instance().stop();
 
         Platform.exit();

@@ -1,7 +1,7 @@
 package com.luoke.app.ui.render;
 
 import net.jcip.annotations.NotThreadSafe;
-import com.luoke.app.capture.processor.NavigationController;
+import com.luoke.app.ui.service.NavigationController;
 import com.luoke.app.config.RenderConfig;
 import com.luoke.app.context.CameraContext;
 import com.luoke.app.context.MapContext;
@@ -213,6 +213,14 @@ public class MapRenderer implements IHook<Object> {
         }
 
         // ====== 子渲染器（各层从上下文单例自行读取数据） ======
+        // 写入快照，避免子渲染器多次 volatile 读取引入数据竞争
+        playerRenderer.snapshotScale = scale;
+        playerRenderer.snapshotOx = ox;
+        playerRenderer.snapshotOy = oy;
+        playerRenderer.snapshotPlayerX = mm.getPlayerX();
+        playerRenderer.snapshotPlayerY = mm.getPlayerY();
+        playerRenderer.snapshotPivotX = parent.getWidth() / 2;
+        playerRenderer.snapshotPivotY = parent.getHeight() / 2;
         for (RenderLayer layer : renderLayers) {
             layer.onFrame();
         }

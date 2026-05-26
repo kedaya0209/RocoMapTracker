@@ -179,9 +179,9 @@
                             <buildArgs>
                                 <!-- =====调试时需要将这两项注释掉，有些错误不会被记录在日志中====== -->
                                 <!-- 指定链接器子系统为 WINDOWS -->
-                                <buildArg>-H:NativeLinkerOption=/SUBSYSTEM:WINDOWS</buildArg>
+<!--                                <buildArg>-H:NativeLinkerOption=/SUBSYSTEM:WINDOWS</buildArg>-->
                                 <!-- 指定入口点，确保在无控制台模式下正确启动 -->
-                                <buildArg>-H:NativeLinkerOption=/ENTRY:mainCRTStartup</buildArg>
+<!--                                <buildArg>-H:NativeLinkerOption=/ENTRY:mainCRTStartup</buildArg>-->
                                 <!-- ==================================================== -->
                                 <buildArg>-R:MaxHeapSize=512M</buildArg>
                                 <buildArg>-R:MinHeapSize=128M</buildArg>
@@ -203,7 +203,7 @@
                                 <buildArg>--initialize-at-run-time=com.sun.glass.ui.**</buildArg>
                                 <buildArg>--initialize-at-run-time=javafx.**</buildArg>
                                 <buildArg>
-                                    -H:IncludeResources=(META-INF/services/.*|model/.*|update/.*|com/sun/prism/.*|com/sun/javafx/.*|.*\.(png|properties|json|fxml|xml|dll|txt|css|ttf|woff2|sh|ps|hlsl|cso|svg|ico|exe))$
+                                    -H:IncludeResources=(META-INF/services/.*|model/.*|update/.*|com/sun/prism/.*|com/sun/javafx/.*|.*\.(png|properties|json|fxml|xml|dll|txt|css|ttf|woff2|sh|ps|hlsl|cso|obj|bss|svg|ico|exe))$
                                 </buildArg>
                                 <buildArg>-H:IncludeResourceBundles=ch.qos.logback.*</buildArg>
                                 <buildArg>
@@ -297,7 +297,7 @@
                                 <buildArg>--initialize-at-run-time=com.sun.glass.ui.**</buildArg>
                                 <buildArg>--initialize-at-run-time=javafx.**</buildArg>
                                 <buildArg>
-                                    -H:IncludeResources=(META-INF/services/.*|model/.*|update/.*|com/sun/prism/.*|com/sun/javafx/.*|.*\.(png|properties|json|fxml|xml|dll|txt|css|ttf|woff2|sh|ps|hlsl|cso|svg|ico|exe))$
+                                    -H:IncludeResources=(META-INF/services/.*|model/.*|update/.*|com/sun/prism/.*|com/sun/javafx/.*|.*\.(png|properties|json|fxml|xml|dll|txt|css|ttf|woff2|sh|ps|hlsl|cso|obj|bss|svg|ico|exe))$
                                 </buildArg>
                                 <buildArg>-H:IncludeResourceBundles=ch.qos.logback.*</buildArg>
                                 <buildArg>
@@ -376,7 +376,7 @@
                                 <buildArg>--initialize-at-run-time=com.sun.glass.ui.**</buildArg>
                                 <buildArg>--initialize-at-run-time=javafx.**</buildArg>
                                 <buildArg>
-                                    -H:IncludeResources=(META-INF/services/.*|model/.*|update/.*|com/sun/prism/.*|com/sun/javafx/.*|.*\.(png|properties|json|fxml|xml|dll|txt|css|ttf|woff2|sh|ps|hlsl|cso|svg|ico|exe))$
+                                    -H:IncludeResources=(META-INF/services/.*|model/.*|update/.*|com/sun/prism/.*|com/sun/javafx/.*|.*\.(png|properties|json|fxml|xml|dll|txt|css|ttf|woff2|sh|ps|hlsl|cso|obj|bss|svg|ico|exe))$
                                 </buildArg>
                                 <buildArg>-H:IncludeResourceBundles=ch.qos.logback.*</buildArg>
                                 <buildArg>

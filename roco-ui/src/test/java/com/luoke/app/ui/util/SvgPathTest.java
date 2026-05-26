@@ -38,7 +38,7 @@ public class SvgPathTest {
         // Test all icon SVGs
         String[] resources = {
                 "/icon/settings.svg", "/icon/match.svg", "/icon/resources.svg",
-                "/icon/theme.svg", "/icon/route.svg", "/icon/ocr.svg",
+                "/icon/theme.svg", "/icon/route.svg",
                 "/icon/capture.svg", "/icon/download.svg", "/icon/follow.svg",
                 "/icon/ghost.svg", "/icon/minimap.svg", "/icon/motion.svg",
                 "/icon/player.svg", "/icon/processor.svg", "/icon/render.svg",

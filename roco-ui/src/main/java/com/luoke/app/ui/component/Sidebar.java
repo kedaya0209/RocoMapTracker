@@ -57,6 +57,8 @@ public class Sidebar extends VBox {
     private volatile boolean isAlgorithmLoading = false;
     @Setter
     private UiAnimator animator;
+    @Setter
+    private Runnable onShowVersionSelector;
 
     public Sidebar() {
         super(0);
@@ -96,8 +98,11 @@ public class Sidebar extends VBox {
     private void buildItems() {
         items.clear();
 
-        // 设置按钮（置顶）
+        // 设置按钮
         items.add(new SidebarItem(SidebarItem.Type.ACTION, "设置", null, null, null, false, "/icon/settings.svg", this::openSettings));
+
+        // 版本切换
+        items.add(new SidebarItem(SidebarItem.Type.ACTION, "版本切换", null, null, null, false, "/icon/change.svg", this::onVersionSwitchClick));
 
         // 匹配算法选择
         items.add(new SidebarItem(SidebarItem.Type.HEADER, "匹配算法选择",
@@ -136,6 +141,12 @@ public class Sidebar extends VBox {
         // 关于
         items.add(new SidebarItem(SidebarItem.Type.ACTION, "关于", null, null, null, false, "/icon/about.svg", this::openAboutDialog));
 
+    }
+
+    private void onVersionSwitchClick() {
+        if (onShowVersionSelector != null) {
+            onShowVersionSelector.run();
+        }
     }
 
     private void onHeaderClick(SidebarItem item) {

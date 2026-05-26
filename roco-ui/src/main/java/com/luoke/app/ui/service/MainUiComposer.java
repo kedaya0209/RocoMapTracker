@@ -57,7 +57,7 @@ public final class MainUiComposer {
         try {
             Image playerIcon = new Image(ResourceUtils.getResourceStream(
                     ResourceConfigContext.getPlayerIcon()),
-                    RenderConfig.PLAYER_IMG_SIZE, RenderConfig.PLAYER_IMG_SIZE, true, false);
+                    RenderConfig.PLAYER_IMG_SIZE, RenderConfig.PLAYER_IMG_SIZE, true, true);
             if (!playerIcon.isError()) {
                 renderer.setPlayerImage(playerIcon);
             }
@@ -121,11 +121,15 @@ public final class MainUiComposer {
         rootStack.getChildren().addAll(canvasContainer, sidebarContainer,
                 panelAnchor, floatContainer, uiOverlay, resizeLayer);
 
+        // 版本选择覆盖层
+        VersionSelectorPanel versionPanel = new VersionSelectorPanel(rootStack);
+        sidebar.setOnShowVersionSelector(versionPanel::show);
+
         // 侧边栏切换
         uiAnimator.setupSidebarToggle(menuBtn, sidebar, floatContainer);
         sidebar.setAnimator(uiAnimator);
 
-        return new UiBuildResult(renderer, canvasContainer, sidebar);
+        return new UiBuildResult(renderer, canvasContainer, sidebar, floatToolbox);
     }
 
     private static Button createMenuButton() {
@@ -157,6 +161,6 @@ public final class MainUiComposer {
      * 主界面构建结果
      */
     @ThreadSafe
-    public record UiBuildResult(MapRenderer renderer, Pane canvasContainer, Sidebar sidebar) {
+    public record UiBuildResult(MapRenderer renderer, Pane canvasContainer, Sidebar sidebar, FloatToolbox floatToolbox) {
     }
 }

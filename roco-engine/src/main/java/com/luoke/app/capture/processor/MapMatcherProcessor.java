@@ -9,14 +9,15 @@ import com.luoke.app.config.SiftConfig;
 import com.luoke.app.context.StatsContext;
 import com.luoke.app.hook.HookEventType;
 import com.luoke.app.hook.event.StatusCarouselEvent;
-import com.luoke.app.hook.multicast.HookRegistry;
+import com.luoke.app.hook.event.StatusStateMachine;
 import com.luoke.app.macher.SiftMatchHandler;
+import com.luoke.app.macher.SiftMatchProtocol;
 import com.luoke.app.macher.player.PlayerStateTracker;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BiConsumer;
 
 /**
  * 地图匹配处理器 — 通过独立 C++ 进程 (sift_match.exe) 执行 SIFT 匹配。
@@ -34,12 +35,13 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
 
     private final int targetRoiIndex;
-    //roi h为0, 自动截取正方形
     private final ROIData cachedRoi = new ROIData(SiftConfig.ROI_MAP_X, SiftConfig.ROI_MAP_Y, SiftConfig.ROI_MAP_W, SiftConfig.ROI_MAP_H);
-    // 独立进程匹配客户端
     private final SiftMatchHandler matchClient;
-    // 状态追踪 (纯 Java, 无 native 依赖)
-    private final PlayerStateTracker stateTracker = new PlayerStateTracker();
+    private final PlayerStateTracker stateTracker;
+    private final CaptureFrameBuffer frameBuffer;
+    private final StatsContext stats;
+    private final BiConsumer<HookEventType, Object> hookPublisher;
+    private final MatchingWatchdog watchdog;
 
     // 专用单线程池，避免 Substrate VM 虚拟线程 Continuation bug (RIP=0 DEP)
     private final ExecutorService executor = Executors.newSingleThreadExecutor(r -> {
@@ -49,24 +51,26 @@ public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
     });
     // 频率限制
     private final long delay = 1000L / CaptureConfig.TARGET_CAPTURE_FPS;
-    // 统计
-    private final StatsContext stats = StatsContext.getInstance();
-    // 门控：上一帧匹配未完成时跳过当前帧，防止并发调用超时
-    private final AtomicBoolean matching = new AtomicBoolean(false);
-    /** matching 开始时间戳，用于超时强制复位 */
-    private volatile long matchingSince = 0L;
-    /** matching 强制超时 (ms) — 超过此值仍未完成则复位 */
-    private static final long MATCHING_TIMEOUT = Math.max(3000L, SiftConfig.MATCH_TIMEOUT_MS * 3);
     private long prevTime = 0L;
     /** 帧序列号，用于诊断追踪 */
     private long frameSeq = 0L;
     /** 上次匹配开关状态，用于侦测切换时发布事件 */
     private boolean wasMatchingEnabled = true;
 
-    public MapMatcherProcessor(int targetRoiIndex, SiftMatchHandler matchClient) {
+    public MapMatcherProcessor(int targetRoiIndex, SiftMatchHandler matchClient,
+                                CaptureFrameBuffer frameBuffer,
+                                StatsContext stats,
+                                BiConsumer<HookEventType, Object> hookPublisher,
+                                PlayerStateTracker stateTracker) {
         this.targetRoiIndex = targetRoiIndex;
         this.matchClient = matchClient;
+        this.frameBuffer = frameBuffer;
+        this.stats = stats;
+        this.hookPublisher = hookPublisher;
+        this.stateTracker = stateTracker;
         this.wasMatchingEnabled = SiftConfig.SIFT_MATCHING_ENABLED;
+        long watchdogTimeout = Math.max(3000L, SiftConfig.MATCH_TIMEOUT_MS * 3);
+        this.watchdog = new MatchingWatchdog(watchdogTimeout);
     }
 
     @Override
@@ -76,40 +80,38 @@ public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
 
     @Override
     public void onProcess(byte[] data, int width, int height) {
-        CaptureFrameBuffer.getInstance().putFrame(targetRoiIndex, data, width, height);
+        frameBuffer.putFrame(targetRoiIndex, data, width, height);
         long now = System.currentTimeMillis();
         if (now - prevTime < delay) return;
         prevTime = now;
         frameSeq++;
 
-        // 匹配开关变化时发布轮播事件
+        // 匹配开关变化时发布轮播事件（仅在合法源状态下转换）
         boolean enabled = SiftConfig.SIFT_MATCHING_ENABLED;
         if (enabled != wasMatchingEnabled) {
             wasMatchingEnabled = enabled;
-            HookRegistry.INSTANCE.publish(HookEventType.STATUS_CAROUSEL,
-                    enabled ? StatusCarouselEvent.matchingResumed()
-                            : StatusCarouselEvent.matchingPaused());
+            StatusStateMachine.State matchState = StatusStateMachine.getInstance()
+                    .currentState(StatusStateMachine.StatusKey.MATCH);
+            StatusCarouselEvent event = enabled
+                    ? StatusCarouselEvent.matchingResumed()
+                    : (matchState == StatusStateMachine.State.ACTIVE
+                            ? StatusCarouselEvent.matchingPaused() : null);
+            if (event != null) {
+                hookPublisher.accept(HookEventType.STATUS_CAROUSEL, event);
+            }
         }
         if (!enabled) return;
 
         // 看门狗：matching 卡住超时时强制复位
-        if (matching.get()) {
-            long since = matchingSince;
-            if (since != 0L && now - since > MATCHING_TIMEOUT) {
-                log.warn("matching 卡住超过 {}ms (seq={})，强制复位", MATCHING_TIMEOUT, frameSeq);
-                matching.set(false);
-            }
-        }
+        watchdog.checkTimeout(frameSeq);
 
         executor.submit(() -> executeMatching(data, width, height));
     }
 
     private void executeMatching(byte[] data, int width, int height) {
-        // 门控：上一帧匹配未完成时跳过，防止多帧并发导致超时
-        if (!matching.compareAndSet(false, true)) {
+        if (!watchdog.tryStart()) {
             return;
         }
-        matchingSince = System.currentTimeMillis();
         final long seq = frameSeq;
         if (log.isTraceEnabled()) {
             log.trace("[seq={}] executeMatching enter, size={}x{}", seq, width, height);
@@ -123,7 +125,7 @@ public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
             Double hintY = stateTracker.getPredictedY();
 
             try {
-                SiftMatchHandler.MatchResult result = matchClient.sendFrameAndWait(
+                SiftMatchProtocol.MatchResult result = matchClient.sendFrameAndWait(
                         data, width, height,
                         hintX != null ? hintX : Double.NaN,
                         hintY != null ? hintY : Double.NaN,
@@ -136,11 +138,7 @@ public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
                 stats.recordDirection((long) result.tArrowMs());
 
                 if (result.success()) {
-                    double angle = result.angle();
-                    // OpenCV atan2(Y-down) 0°=右 → JavaFX 0°=上, +90° 转换
-                    if (!Double.isNaN(angle)) {
-                        angle = (angle + 90) % 360;
-                    }
+                    double angle = AngleConverter.toJavaFX(result.angle());
                     stateTracker.onMatchSuccess(result.x(), result.y(),
                         Double.isNaN(angle) ? null : angle);
                     if (log.isTraceEnabled()) {
@@ -166,8 +164,7 @@ public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
             }
 
         } finally {
-            matching.set(false);
-            matchingSince = 0L;
+            watchdog.finish();
         }
     }
 

@@ -8,6 +8,8 @@ import com.luoke.app.process.NativeProcess;
 import com.luoke.app.process.NativeProcessFactory;
 import com.luoke.app.socket.SocketServer;
 import com.luoke.app.utils.FilePathUtil;
+import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.BufferedReader;
@@ -25,7 +27,9 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 public class SiftProcessManager {
 
+    @Getter @Setter
     private NativeProcess activeProcess;
+    @Getter
     private NativeProcess pendingProcess;
     private final NativeProcessFactory processFactory;
     private volatile long lastRestartTime = 0;
@@ -123,20 +127,6 @@ public class SiftProcessManager {
         if (p != null && p.isAlive()) {
             p.destroyForcibly();
         }
-    }
-
-    // ==================== 访问器 ====================
-
-    public NativeProcess getActiveProcess() {
-        return activeProcess;
-    }
-
-    public void setActiveProcess(NativeProcess process) {
-        this.activeProcess = process;
-    }
-
-    public NativeProcess getPendingProcess() {
-        return pendingProcess;
     }
 
     // ==================== 进程销毁 ====================

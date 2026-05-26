@@ -1,12 +1,15 @@
 package com.luoke.app.ui.service;
 
 import net.jcip.annotations.ThreadSafe;
+import com.luoke.app.capture.CaptureFrameBuffer;
 import com.luoke.app.capture.CaptureService;
 import com.luoke.app.capture.ROIData;
 import com.luoke.app.capture.processor.MapMatcherProcessor;
-import com.luoke.app.capture.processor.OcrProcessor;
 import com.luoke.app.config.CaptureConfig;
+import com.luoke.app.context.StatsContext;
+import com.luoke.app.hook.multicast.HookRegistry;
 import com.luoke.app.macher.SiftMatchHandler;
+import com.luoke.app.macher.player.PlayerStateTracker;
 import com.luoke.app.ui.component.setting.SettingsStage;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
@@ -40,13 +43,13 @@ public class CaptureServiceManager {
 
     private void setupCaptureProcessors() {
         if (captureService == null) return;
-        MapMatcherProcessor siftProcessor = new MapMatcherProcessor(0, siftMatchClient);
-        OcrProcessor ocrProcessor = new OcrProcessor(1);
-        captureService.addProcessors(siftProcessor, ocrProcessor);
+        MapMatcherProcessor siftProcessor = new MapMatcherProcessor(0, siftMatchClient,
+                CaptureFrameBuffer.getInstance(), StatsContext.getInstance(),
+                HookRegistry.INSTANCE::publish, new PlayerStateTracker());
+        captureService.addProcessors(siftProcessor);
 
         List<ROIData> rois = new ArrayList<>();
         rois.add(siftProcessor.getRoi());
-        rois.add(ocrProcessor.getRoi());
 
         captureService.setRois(ROIData.createContiguousArray(rois));
         log.info("采集处理器配置完成");

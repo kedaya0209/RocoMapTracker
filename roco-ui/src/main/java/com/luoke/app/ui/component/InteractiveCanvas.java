@@ -159,6 +159,16 @@ public class InteractiveCanvas extends Canvas {
 
         double dx = e.getX() - lastMouseX;
         double dy = e.getY() - lastMouseY;
+        // 导航模式下将屏幕拖拽向量旋转到地图坐标空间，保持拖拽手感与视觉一致
+        if (cameraManager.isNavMode() && cameraManager.getNavAngle() != 0) {
+            double rad = Math.toRadians(cameraManager.getNavAngle());
+            double cos = Math.cos(rad);
+            double sin = Math.sin(rad);
+            double rdx = dx * cos - dy * sin;
+            double rdy = dx * sin + dy * cos;
+            dx = rdx;
+            dy = rdy;
+        }
         mapManager.setOffsetX(mapManager.getOffsetX() + dx);
         mapManager.setOffsetY(mapManager.getOffsetY() + dy);
         mapManager.ensureBounds();

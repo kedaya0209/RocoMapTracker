@@ -46,8 +46,8 @@ public class CaptureService {
     public CaptureService(String windowTitle) {
         this.windowTitle = windowTitle;
 
-        // 注册 handler 到全局 SocketServer
-        SocketServer.instance().register(handler);
+        // 注册 handler 到全局 SocketServer（通过 HandlerSubscriber 订阅 capture.exe 的服务）
+        handler.registerToServer(SocketServer.instance());
 
         frameCallback = (index, data, w, h, stride) -> {
             // 懒加载灰度图: 有处理器需要时才转换
