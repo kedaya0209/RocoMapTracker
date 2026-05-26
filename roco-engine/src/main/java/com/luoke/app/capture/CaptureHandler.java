@@ -3,7 +3,7 @@ package com.luoke.app.capture;
 import com.luoke.app.process.NativeProcessFactory;
 import com.luoke.app.process.ProcessRestartHelper;
 import com.luoke.app.config.SocketConfig;
-import com.luoke.app.socket.SocketHandler;
+import com.luoke.app.socket.HandlerSubscriber;
 import com.luoke.app.socket.SocketServer;
 import com.luoke.app.socket.SocketSession;
 import lombok.Setter;
@@ -17,7 +17,8 @@ import java.util.Map;
 import java.util.Set;
 
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.atomic.AtomicLong;
+
+import static com.luoke.app.capture.CaptureProtocol.*;
 
 /**
  * 截图协调器 — 编排 {@link CaptureProcessManager}（子进程生命周期）和
@@ -30,24 +31,15 @@ import java.util.concurrent.atomic.AtomicLong;
  *   <li>回调管理（FrameCallback / StateCallback）</li>
  *   <li>性能统计（帧率/吞吐量）</li>
  * </ul>
+ *
+ * <p>通过 {@link HandlerSubscriber} 注册到 {@link SocketServer}，订阅 capture.exe 提供的服务。
  */
 @NotThreadSafe
 @Slf4j
-public class CaptureHandler implements SocketHandler {
+public class CaptureHandler {
 
-    // ==================== 协议常量 ====================
-
-    private static final int MSG_REQUEST_ROI = 100;
-    private static final int MSG_RETURN_ROI = 101;
-    private static final int MSG_CAPTURE_READY = 102;
-    private static final int MSG_FRAME_DATA = 103;
-    private static final int MSG_PROCESSING_DONE = 104;
-    private static final int MSG_WINDOW_CLOSED = 105;
-    private static final int MSG_STOP_REQUEST = 106;
-    private static final int MSG_WINDOW_STATE = 107;
-    private static final int MSG_SWITCH_MODE = 108;
-
-    private static final Set<Integer> TYPES = Set.of(
+    /** Java 端需要订阅的消息类型（capture.exe 发出的） */
+    private static final Set<Integer> SUBSCRIBE_TYPES = Set.of(
             MSG_REQUEST_ROI, MSG_CAPTURE_READY, MSG_FRAME_DATA,
             MSG_WINDOW_CLOSED, MSG_WINDOW_STATE);
 
@@ -60,20 +52,15 @@ public class CaptureHandler implements SocketHandler {
     // ==================== 协调器自身字段 ====================
 
     private final FrameDeserializer frameDeserializer = new FrameDeserializer();
-    private final AtomicLong frameCount = new AtomicLong(0);
+    private final ThroughputStats throughputStats = new ThroughputStats();
 
     private volatile FrameCallback frameCallback;
     private volatile StateCallback stateCallback;
     /** 有意停止标记 — true 时 onDisconnect 不触发自动重启 */
     private volatile boolean intentionalStop;
-    private volatile boolean handshakeDone;
     private ROIData[] pendingRois;
     /** 崩溃恢复用 — 保存启动参数 */
-    private long launchHwnd;
-    private int launchMaxFps;
-    private String launchExePath;
-    private long totalBytes;
-    private long lastStatsTime;
+    private CaptureLaunchParams launchParams;
     /**
      * -- SETTER --
      *  设置全帧 ROI 索引
@@ -96,32 +83,38 @@ public class CaptureHandler implements SocketHandler {
             MSG_WINDOW_STATE, (b, s) -> handleWindowState(b)
     );
 
+    private final SocketServer server;
+
     public CaptureHandler(SocketServer server, NativeProcessFactory processFactory) {
+        this.server = server;
         this.processManager = new CaptureProcessManager(processFactory);
         this.sessionManager = new CaptureSessionManager();
         this.restartHelper = new ProcessRestartHelper("capture",
                 SocketConfig.SIFT_RESTART_DELAY);
     }
 
-    // ==================== SocketHandler ====================
+    // ==================== HandlerSubscriber 适配 ====================
 
-    @Override
-    public String clientType() {
-        return "capture";
+    /**
+     * 创建 HandlerSubscriber 并注册到 SocketServer，订阅 capture.exe 提供的服务
+     */
+    public void registerToServer(SocketServer server) {
+        HandlerSubscriber subscriber = new HandlerSubscriber(
+                this::onMessage,
+                this::onConnect,
+                this::onDisconnect,
+                "capture-handler"
+        );
+        server.registerInternal(SUBSCRIBE_TYPES, subscriber);
     }
 
-    @Override
-    public Set<Integer> messageTypes() {
-        return TYPES;
-    }
+    // ==================== 消息处理 ====================
 
-    @Override
-    public void onConnect(SocketSession session) {
+    private void onConnect(SocketSession session) {
         sessionManager.onConnect(session);
     }
 
-    @Override
-    public void onMessage(int type, byte[] body, SocketSession session) {
+    private void onMessage(int type, byte[] body, SocketSession session) {
         MessageHandler handler = handlers.get(type);
         if (handler != null) {
             handler.handle(body, session);
@@ -130,8 +123,7 @@ public class CaptureHandler implements SocketHandler {
         }
     }
 
-    @Override
-    public void onDisconnect(SocketSession session, String reason) {
+    private void onDisconnect(SocketSession session, String reason) {
         log.warn("CaptureHandler 断开连接: {}", reason);
         sessionManager.onDisconnect();
         if (stateCallback != null) {
@@ -139,8 +131,11 @@ public class CaptureHandler implements SocketHandler {
         }
         // 有意停止（黑帧检测/用户手动停止）不触发自动重启，由 watchdog 以 5s 间隔兜底
         if (!intentionalStop) {
-            restartHelper.restartAsync(SocketServer.instance(),
-                    svr -> processManager.restartProcess(svr, launchExePath, launchHwnd, launchMaxFps));
+            CaptureLaunchParams params = launchParams;
+            if (params != null) {
+                restartHelper.restartAsync(server,
+                        svr -> processManager.restartProcess(svr, params.exePath(), params.hwnd(), params.maxFps()));
+            }
         }
     }
 
@@ -149,7 +144,7 @@ public class CaptureHandler implements SocketHandler {
     private void handleRequestRoi(SocketSession session) {
         log.info("收到 REQUEST_ROI");
         ROIData[] rois = pendingRois != null ? pendingRois : new ROIData[0];
-        session.send(MSG_RETURN_ROI, serializeRois(rois));
+        session.send(MSG_RETURN_ROI, CaptureProtocol.serializeRois(rois));
         log.debug("已发送 ROI 列表: {} 个 ROI", rois.length);
     }
 
@@ -186,9 +181,8 @@ public class CaptureHandler implements SocketHandler {
         List<FrameDeserializer.FrameSlot> slots = frameDeserializer.deserialize(buf, roiCount, fullFrameRoiIndex);
 
         // 更新统计
-        frameCount.incrementAndGet();
         for (FrameDeserializer.FrameSlot slot : slots) {
-            totalBytes += slot.pixels().length;
+            throughputStats.recordFrame(slot.pixels().length);
         }
 
         // 第二步: 虚拟线程并行处理各 ROI, CountDownLatch 等待全部完成
@@ -213,17 +207,6 @@ public class CaptureHandler implements SocketHandler {
 
         // 全部 ROI 处理完成, 通知 C++ 发送下一帧
         session.send(MSG_PROCESSING_DONE, null);
-
-        // 每 10s 诊断
-        long now = System.currentTimeMillis();
-        if (lastStatsTime == 0) lastStatsTime = now;
-        if (now - lastStatsTime > 10000) {
-            double mbps = totalBytes / (1024.0 * 1024.0) / ((now - lastStatsTime) / 1000.0);
-            log.debug("帧数: {}, 速率: {} MB/s", frameCount.get(),
-                    String.format("%.1f", mbps));
-            totalBytes = 0;
-            lastStatsTime = now;
-        }
     }
 
     // ==================== 窗口事件 ====================
@@ -252,12 +235,10 @@ public class CaptureHandler implements SocketHandler {
         this.pendingRois = rois;
         this.frameCallback = frameCb;
         this.stateCallback = stateCb;
-        this.launchHwnd = hwnd;
-        this.launchMaxFps = maxFps;
-        this.launchExePath = exePath;
+        this.launchParams = new CaptureLaunchParams(hwnd, maxFps, exePath);
         this.restartHelper.reset();
 
-        if (!processManager.launchProcess(SocketServer.instance(), exePath, hwnd, maxFps)) {
+        if (!processManager.launchProcess(server, exePath, hwnd, maxFps)) {
             return false;
         }
 
@@ -313,25 +294,5 @@ public class CaptureHandler implements SocketHandler {
     @FunctionalInterface
     public interface StateCallback {
         void onStateChange(boolean connected, String detail);
-    }
-
-    // ==================== 序列化 ====================
-
-    /**
-     * msgType=2 body: [2] count + per-ROI [2]x,y,w,h (BE int16)
-     */
-    private static byte[] serializeRois(ROIData[] rois) {
-        int count = (rois != null) ? rois.length : 0;
-        ByteBuffer buf = ByteBuffer.allocate(2 + count * 8).order(ByteOrder.BIG_ENDIAN);
-        buf.putShort((short) count);
-        if (rois != null) {
-            for (ROIData r : rois) {
-                buf.putShort((short) r.x);
-                buf.putShort((short) r.y);
-                buf.putShort((short) r.w);
-                buf.putShort((short) r.h);
-            }
-        }
-        return buf.array();
     }
 }

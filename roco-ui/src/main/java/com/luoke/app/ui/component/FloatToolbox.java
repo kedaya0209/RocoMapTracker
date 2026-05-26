@@ -4,6 +4,7 @@ import net.jcip.annotations.NotThreadSafe;
 import com.luoke.app.config.ViewConfig;
 import com.luoke.app.context.CameraContext;
 import com.luoke.app.ui.service.SvgManager;
+import com.luoke.app.ui.service.VersionManager;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -20,9 +21,12 @@ import javafx.util.Duration;
 @NotThreadSafe
 public class FloatToolbox extends VBox {
     private boolean resourcePanelVisible = false;
+    private final StackPane collectBtn;
+    private final ResourceCounterPanel resourcePanel;
 
     public FloatToolbox(ResourceCounterPanel resourcePanel, String unifiedBlueColor) {
         super(12);
+        this.resourcePanel = resourcePanel;
         setPadding(new Insets(10));
         setAlignment(Pos.TOP_CENTER);
         setPickOnBounds(false);
@@ -31,14 +35,25 @@ public class FloatToolbox extends VBox {
         // 按钮 1：自动跟随（从 follow.svg 加载，1024 规格，需 Group 包裹修正布局尺寸）
         StackPane followBtn = createFollowButton(unifiedBlueColor);
 
-        // 按钮 2：资源计数切换
-        StackPane collectBtn = createVectorIconButton(
+        // 按钮 2：资源计数切换（仅在高级版显示）
+        collectBtn = createVectorIconButton(
                 "资源采集计数",
                 "M9 7V5h6v2h2V5a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2v2h2zm11 8V9a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2zm-11-4h4v2h-4v-2z",
                 false, resourcePanel, unifiedBlueColor
         );
 
-        getChildren().addAll(followBtn, collectBtn);
+        getChildren().add(followBtn);
+        if (VersionManager.getInstance().getCurrentMode() == VersionMode.ADVANCED) {
+            getChildren().add(collectBtn);
+        }
+    }
+
+    public void setCollectButtonVisible(boolean visible) {
+        if (visible && !getChildren().contains(collectBtn)) {
+            getChildren().add(collectBtn);
+        } else if (!visible) {
+            getChildren().remove(collectBtn);
+        }
     }
 
     /**

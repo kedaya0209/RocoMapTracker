@@ -3,6 +3,8 @@ package com.luoke.app.ui.component.setting;
 import net.jcip.annotations.NotThreadSafe;
 import atlantafx.base.theme.Styles;
 import com.luoke.app.capture.CaptureService;
+import com.luoke.app.ui.component.VersionMode;
+import com.luoke.app.ui.service.VersionManager;
 import com.luoke.app.ui.util.DialogUtils;
 import com.luoke.app.ui.util.FxRippleUtil;
 import javafx.application.Platform;
@@ -286,7 +288,11 @@ public class SettingsStage extends Stage {
         lv.setStyle("-fx-background-color: transparent; -fx-border-color: transparent; " +
                 "-fx-selection-bar: transparent; -fx-selection-bar-non-focused: transparent; -fx-hbar-policy: never;");
         lv.setFocusTraversable(false);
-        lv.setItems(FXCollections.observableArrayList(SettingDefinitions.CATEGORIES));
+        lv.setItems(FXCollections.observableArrayList(
+                SettingDefinitions.CATEGORIES.stream()
+                        .filter(c -> VersionManager.getInstance().getCurrentMode() == VersionMode.ADVANCED
+                                || !"物资面板".equals(c.name()))
+                        .toList()));
         lv.setCellFactory(_ -> new SettingCategoryCell());
         return lv;
     }

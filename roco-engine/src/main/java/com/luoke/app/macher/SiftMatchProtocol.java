@@ -4,12 +4,7 @@ import net.jcip.annotations.ThreadSafe;
 import com.luoke.app.config.SiftConfig;
 import com.luoke.app.context.ResourceConfigContext;
 import com.luoke.app.utils.FilePathUtil;
-import com.luoke.app.utils.ResourceUtils;
 
-import javax.imageio.ImageIO;
-import java.awt.image.BufferedImage;
-import java.io.IOException;
-import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
@@ -34,7 +29,7 @@ public class SiftMatchProtocol {
     public static final int MSG_SHUTDOWN = 207;
     public static final int MSG_REQUEST_CONFIG = 208;
     public static final int MSG_CONFIG_DATA = 209;
-    private static final String cachePrefix = "cache/";
+    private static final String CACHE_PREFIX = "cache/";
     private SiftMatchProtocol() {
     }
 
@@ -53,7 +48,7 @@ public class SiftMatchProtocol {
      */
     public static byte[] encodeConfig(int variant, String cacheSuffix) {
         String siftMapPath = ResourceConfigContext.getSiftMap();
-        String cacheFilePath = FilePathUtil.getExternalFile(cachePrefix + siftMapPath + cacheSuffix).getAbsolutePath();
+        String cacheFilePath = FilePathUtil.getExternalFile(CACHE_PREFIX + siftMapPath + cacheSuffix).getAbsolutePath();
         byte[] cachePathBytes = cacheFilePath.getBytes(StandardCharsets.UTF_8);
 
         int bodyLen = 4 + 4 + 4 + 8 + 8 + 8       // variant + SIFT
@@ -143,8 +138,8 @@ public class SiftMatchProtocol {
      *   [1]success [8]x [8]y [8]angle [4]tMinimapMs [4]tExtractMs [4]tFlannMs
      * </pre>
      */
-    public static SiftMatchHandler.MatchResult decodeMatchResult(byte[] body) {
-        if (body == null || body.length < 37) return SiftMatchHandler.MatchResult.FAIL;
+    public static MatchResult decodeMatchResult(byte[] body) {
+        if (body == null || body.length < 37) return MatchResult.FAIL;
         ByteBuffer buf = ByteBuffer.wrap(body).order(ByteOrder.BIG_ENDIAN);
         boolean success = buf.get() == 1;
         double x = buf.getDouble();
@@ -154,43 +149,24 @@ public class SiftMatchProtocol {
         float tExtract = buf.getFloat();
         float tFlann = buf.getFloat();
         float tArrow = body.length >= 41 ? buf.getFloat() : 0;
-        return new SiftMatchHandler.MatchResult(success, x, y, angle, tMinimap, tExtract, tFlann, tArrow);
+        return new MatchResult(success, x, y, angle, tMinimap, tExtract, tFlann, tArrow);
     }
 
-    // ==================== 工具方法 ====================
-
-    /**
-     * 从资源加载地图并转换为灰度像素
-     */
-    public static MapImageData loadMapGray() throws Exception {
-        String mapPath = ResourceConfigContext.getSiftMap();
-        BufferedImage img;
-        try (InputStream is = ResourceUtils.getResourceStream(mapPath)) {
-            img = ImageIO.read(is);
-        }
-        if (img == null) {
-            throw new IOException("Failed to decode map image");
-        }
-
-        int w = img.getWidth();
-        int h = img.getHeight();
-        byte[] grayPixels = new byte[w * h];
-        for (int y = 0; y < h; y++) {
-            for (int x = 0; x < w; x++) {
-                int rgb = img.getRGB(x, y);
-                int r = (rgb >> 16) & 0xFF;
-                int g = (rgb >> 8) & 0xFF;
-                int b = rgb & 0xFF;
-                grayPixels[y * w + x] = (byte) ((r * 299 + g * 587 + b * 114) / 1000);
-            }
-        }
-        return new MapImageData(w, h, grayPixels);
-    }
+    // ==================== 值对象 ====================
 
     /**
      * 地图灰度数据值对象
      */
     @ThreadSafe
     public record MapImageData(int width, int height, byte[] grayPixels) {
+    }
+
+    /**
+     * 匹配结果值对象（含耗时统计）
+     */
+    @ThreadSafe
+    public record MatchResult(boolean success, double x, double y, double angle,
+                               float tMinimapMs, float tExtractMs, float tFlannMs, float tArrowMs) {
+        public static final MatchResult FAIL = new MatchResult(false, 0, 0, 0, 0, 0, 0, 0);
     }
 }

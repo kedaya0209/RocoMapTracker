@@ -1,4 +1,4 @@
-package com.luoke.app.capture.processor;
+package com.luoke.app.ui.service;
 
 import net.jcip.annotations.NotThreadSafe;
 import com.luoke.app.config.NavigConfig;

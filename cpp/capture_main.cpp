@@ -1030,11 +1030,12 @@ int main(int argc, char* argv[]) {
     }
     LOG("Connected to Java");
 
-    // ---- Handshake 1: HELLO (identify + declare supported msg types) ----
+    // ---- Handshake 1: HELLO (identify + declare provides/subscribes) ----
     {
-        const int32_t myTypes[] = { RETURN_ROI, PROCESSING_DONE, STOP_REQUEST, SWITCH_MODE };
-        auto hello = build_hello("capture", myTypes, 4);
-        LOG("Sending HELLO (capture, %d types)...", 4);
+        const int32_t provides[]   = { FRAME_DATA, CAPTURE_READY, WINDOW_CLOSED, WINDOW_STATE };
+        const int32_t subscribes[] = { RETURN_ROI, PROCESSING_DONE, STOP_REQUEST, SWITCH_MODE };
+        auto hello = build_hello("capture", provides, 4, subscribes, 4);
+        LOG("Sending HELLO (capture, provides=%d, subscribes=%d)...", 4, 4);
         if (!send_message(sock, HELLO, hello.data(), (uint32_t)hello.size())) {
             LOGERR("Failed to send HELLO");
             closesocket(sock);

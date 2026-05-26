@@ -26,8 +26,9 @@ public class SiftClientManager {
      * 初始化并启动 SIFT 客户端
      */
     public void init() {
-        client = new SiftMatchHandler(SocketServer.instance(), NativeProcess::create);
-        SocketServer.instance().register(client);
+        client = new SiftMatchHandler(SocketServer.instance(), NativeProcess::create,
+                HookRegistry.INSTANCE::publish);
+        client.registerToServer(SocketServer.instance());
 
         client.start((ready, detail) -> {
             if (ready) {

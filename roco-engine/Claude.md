@@ -17,7 +17,7 @@ AI 协作专用 – 依赖 roco-common + roco-map + roco-model + roco-macher，�
 - 异步 OCR：OcrAsyncManager 管理 OCR 虚拟线程池和任务队列。
 
 
-## 包结构及类清单 (52 个)
+## 包结构及类清单 (58 个)
 
 
 capture 包 – 截图采集 (12 个)：
@@ -76,10 +76,16 @@ NativeProcess            原生进程抽象：创建/读取 stdout/stderr/销毁
 NativeProcessFactory     NativeProcess 平台工厂
 JobObjectManager         Windows Job Object 包装
 
-socket 包 (3 个)：
-SocketServer             TCP Socket 服务端
-SocketHandler            Socket 事件处理器接口
-SocketSession            Socket 会话生命周期管理
+socket 包 (9 个)：
+SocketServer             TCP Socket 注册中心 + 消息路由器（纯路由，无业务逻辑）
+SocketSession            Socket 会话生命周期管理（传输层）
+MessageSubscriber        统一消息订阅者接口（内部/外部平级）
+SocketSubscriber         TCP 外部客户端的订阅者实现
+HandlerSubscriber        Java 内部处理器的订阅者实现（桥接回调）
+ClientInfo               record — 客户端注册信息（clientId, provides, subscribes）
+ServiceRegistry          服务注册中心 — provider/subscriber 映射管理
+ProducerLifecycleManager 进程生命周期管理（内部生产者重启）
+SystemEvents             系统事件 serviceId 常量（连接/断开/注册/取消）
 
 utils 包 (1 个)：
 OcrResultValidator       OCR 结果解析与校验

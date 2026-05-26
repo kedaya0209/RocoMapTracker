@@ -1288,11 +1288,12 @@ int main(int argc, char* argv[]) {
     }
     LOG("Connected to Java");
 
-    // ---- Phase 0: HELLO (identify + declare supported msg types) ----
+    // ---- Phase 0: HELLO (identify + declare provides/subscribes) ----
     {
-        const int32_t myTypes[] = { MAP_DATA, FRAME_DATA, SHUTDOWN, CONFIG_DATA };
-        auto hello = build_hello("sift", myTypes, 4);
-        LOG("Sending HELLO (sift, %d types)...", 4);
+        const int32_t provides[]   = { REQUEST_MAP, REQUEST_CONFIG, INIT_COMPLETE, INIT_FAILED, READY, MATCH_RESULT };
+        const int32_t subscribes[] = { MAP_DATA, FRAME_DATA, SHUTDOWN, CONFIG_DATA };
+        auto hello = build_hello("sift", provides, 6, subscribes, 4);
+        LOG("Sending HELLO (sift, provides=%d, subscribes=%d)...", 6, 4);
         if (!send_message(sock, HELLO, hello.data(), (uint32_t)hello.size())) {
             LOGERR("Failed to send HELLO");
             closesocket(sock);

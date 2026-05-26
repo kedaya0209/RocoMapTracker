@@ -77,18 +77,27 @@ static inline float read_float_be(const uint8_t* buf) {
 }
 
 // ============================================================================
-// Build HELLO body: [2B]clientTypeLen [NB]clientType [2B]msgTypeCount [N*4B]msgTypes
+// Build HELLO body (v2 — registry model):
+//   [2B]clientIdLen [NB]clientId
+//   [2B]providesCount [N*4B]provides
+//   [2B]subscribesCount [N*4B]subscribes
 // ============================================================================
-static inline std::vector<uint8_t> build_hello(const char* clientType,
-                                               const int32_t* msgTypes, uint16_t count) {
-    size_t nameLen = strlen(clientType);
-    std::vector<uint8_t> buf(2 + nameLen + 2 + (size_t)count * 4);
+static inline std::vector<uint8_t> build_hello(const char* clientId,
+                                               const int32_t* provides, uint16_t providesCount,
+                                               const int32_t* subscribes, uint16_t subscribesCount) {
+    size_t nameLen = strlen(clientId);
+    std::vector<uint8_t> buf(2 + nameLen + 2 + (size_t)providesCount * 4 + 2 + (size_t)subscribesCount * 4);
     size_t off = 0;
     write_be16(buf.data() + off, (uint16_t)nameLen); off += 2;
-    memcpy(buf.data() + off, clientType, nameLen);    off += nameLen;
-    write_be16(buf.data() + off, count);               off += 2;
-    for (uint16_t i = 0; i < count; i++) {
-        write_be32(buf.data() + off, (uint32_t)msgTypes[i]);
+    memcpy(buf.data() + off, clientId, nameLen);      off += nameLen;
+    write_be16(buf.data() + off, providesCount);      off += 2;
+    for (uint16_t i = 0; i < providesCount; i++) {
+        write_be32(buf.data() + off, (uint32_t)provides[i]);
+        off += 4;
+    }
+    write_be16(buf.data() + off, subscribesCount);    off += 2;
+    for (uint16_t i = 0; i < subscribesCount; i++) {
+        write_be32(buf.data() + off, (uint32_t)subscribes[i]);
         off += 4;
     }
     return buf;

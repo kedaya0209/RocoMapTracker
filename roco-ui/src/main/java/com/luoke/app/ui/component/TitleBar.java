@@ -1,5 +1,6 @@
 package com.luoke.app.ui.component;
 
+import lombok.Setter;
 import net.jcip.annotations.NotThreadSafe;
 import net.jcip.annotations.ThreadSafe;
 import atlantafx.base.theme.Styles;
@@ -62,6 +63,14 @@ public class TitleBar extends HBox implements IHook<Object> {
     /** 标题栏内联状态轮播标签 */
     private final Label statusLabel = new Label();
     private static final double STATUS_H = 20;
+    /** 最小化按钮 */
+    private final Button minimizeBtn;
+    /** 最小化至托盘回调
+     * -- SETTER --
+     *  设置最小化至托盘回调。
+     */
+    @Setter
+    private Runnable minimizeHandler;
 
     private TitleBar(Stage stage, Button menuBtn, Node... overlayNodes) {
         super(12);
@@ -92,8 +101,8 @@ public class TitleBar extends HBox implements IHook<Object> {
         // --- 1. 进度条（滑块）设置 ---
         opacitySlider = new Slider(0.1, 1.0, 1.0);
         opacitySlider.setPrefWidth(120);
-        // 核心改动：默认完全透明，但不隐藏（Managed保持为true保证占位）
-        opacitySlider.setOpacity(0.0);
+        // 核心改动：默认隐藏，幽灵模式或导航模式下才显示
+        opacitySlider.setVisible(false);
         opacitySlider.setDisable(true); // 非幽灵模式下禁用，防止误触
         opacitySlider.setStyle("-fx-control-inner-background: -color-accent-emphasis;");
         // 滑块值变化 → 设置窗口透明度；导航模式下同步回 NavigConfig
@@ -136,9 +145,9 @@ public class TitleBar extends HBox implements IHook<Object> {
             // 切换状态显示：激活态使用 accent，非激活恢复 fg-muted
             setSvgFill(ghostIcon, ghostMode ? "-color-accent-emphasis" : "-color-fg-muted");
 
-            // --- 核心改动：滑块透明度切换 ---
-            opacitySlider.setOpacity(ghostMode ? 1.0 : 0.0);
-            opacitySlider.setDisable(!ghostMode);
+            // --- 核心改动：滑块显示切换 ---
+            updateSliderVisibility();
+            opacitySlider.setDisable(!ghostMode && !navMode);
 
             stage.setAlwaysOnTop(ghostMode);
             menuBtn.setMouseTransparent(ghostMode);
@@ -220,9 +229,10 @@ public class TitleBar extends HBox implements IHook<Object> {
         });
 
         Button closeBtn = getCloseButton(stage);
+        minimizeBtn = createMinimizeButton();
 
         // --- 4. 调整子组件顺序：滑块在图标左侧，图标靠右锚定 ---
-        getChildren().addAll(menuBtn, titleLabel, statusContainer, spacer, opacitySlider, ghostBtn, matchToggleBtn, navBtn, closeBtn);
+        getChildren().addAll(menuBtn, titleLabel, statusContainer, spacer, opacitySlider, ghostBtn, matchToggleBtn, navBtn, minimizeBtn, closeBtn);
 
         // 窗口移动逻辑保持不变
         setOnMousePressed(e -> {
@@ -328,6 +338,10 @@ public class TitleBar extends HBox implements IHook<Object> {
         cam.setNavMode(navMode);
 
         if (navMode) {
+            // 显示透明度滑块
+            updateSliderVisibility();
+            opacitySlider.setDisable(false);
+
             // 应用导航透明度
             stage.setOpacity(NavigConfig.NAV_WINDOW_OPACITY);
             opacitySlider.setValue(NavigConfig.NAV_WINDOW_OPACITY);
@@ -342,6 +356,8 @@ public class TitleBar extends HBox implements IHook<Object> {
                 stage.setOpacity(1.0);
                 opacitySlider.setValue(1.0);
             }
+            updateSliderVisibility();
+            opacitySlider.setDisable(!ghostMode);
             cam.setNavAngle(0);
         }
     }
@@ -423,6 +439,54 @@ public class TitleBar extends HBox implements IHook<Object> {
         return exit;
     }
 
+    /**
+     * 幽灵模式或导航模式激活时显示透明度滑块，否则隐藏。
+     * 保持 managed=true 确保布局位置不丢失。
+     */
+    private void updateSliderVisibility() {
+        boolean show = ghostMode || navMode;
+        opacitySlider.setVisible(show);
+    }
+
+    private Button createMinimizeButton() {
+        SVGPath minimizeIcon = new SVGPath();
+        minimizeIcon.setContent("M2 10 L14 10");
+        minimizeIcon.setStyle("-fx-stroke: -color-fg-muted; -fx-stroke-width: 2; -fx-stroke-line-cap: round;");
+        StackPane minimizeGraphic = new StackPane(minimizeIcon);
+        minimizeGraphic.setPrefSize(20, 20);
+        minimizeGraphic.setMinSize(20, 20);
+        minimizeGraphic.setMaxSize(20, 20);
+
+        Button btn = new Button();
+        btn.setGraphic(minimizeGraphic);
+        btn.setStyle(
+                "-fx-background-color: transparent;" +
+                        "-fx-border-color: transparent;" +
+                        "-fx-padding: 6px;" +
+                        "-fx-cursor: hand;"
+        );
+        btn.setPrefSize(32, 32);
+        btn.setMinSize(32, 32);
+        btn.setMaxSize(32, 32);
+
+        String baseStyle = btn.getStyle();
+        btn.setOnMouseEntered(_ -> {
+            minimizeIcon.setStyle("-fx-stroke: -color-accent-emphasis; -fx-stroke-width: 2; -fx-stroke-line-cap: round;");
+            btn.setStyle(baseStyle + "-fx-background-color: -color-bg-subtle;" +
+                    "-fx-background-radius: 6px;");
+        });
+        btn.setOnMouseExited(_ -> {
+            minimizeIcon.setStyle("-fx-stroke: -color-fg-muted; -fx-stroke-width: 2; -fx-stroke-line-cap: round;");
+            btn.setStyle(baseStyle);
+        });
+        btn.setOnAction(_ -> {
+            if (minimizeHandler != null) {
+                minimizeHandler.run();
+            }
+        });
+        return btn;
+    }
+
     private Button getCloseButton(Stage stage) {
         // SVG X 图标（与路线管理器一致）
         SVGPath closeIcon = new SVGPath();
@@ -465,14 +529,14 @@ public class TitleBar extends HBox implements IHook<Object> {
                         "确认退出",
                         "确定要关闭程序吗？\n所有识别与渲染服务将会停止运行。",
                         "立即退出",
-                        // 确认：关闭窗口
-                        stage::close,
+                        // 确认：显式退出 JavaFX 应用
+                        () -> Platform.exit(),
                         // 取消：什么都不做，直接关闭弹窗
                         () -> {
                         }
                 );
             } else {
-                stage.close();
+                Platform.exit();
             }
         });
         // ====================================================================

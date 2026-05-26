@@ -11,6 +11,7 @@ import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
+import javafx.scene.transform.Rotate;
 import javafx.scene.transform.Scale;
 import javafx.scene.transform.Translate;
 
@@ -30,11 +31,17 @@ public class PlayerRenderer implements RenderLayer {
     private final Scale playerScale;
     private double lastPlayerSize = -1;
     private final Translate playerTranslate;
+    private final Rotate playerRotate;
     private double[] rippleProgress;
     /** 帧计数器，用于装饰效果节流 */
     private int frameCount;
     /** 装饰效果（波纹+光晕）更新间隔：每 N 帧更新一次，位置/旋转每帧更新 */
     private static final int DECORATION_INTERVAL = 2;
+
+    /** 由 MapRenderer 在每帧开始时写入的快照，避免子渲染器独立读取 MapContext volatile 字段 */
+    double snapshotScale, snapshotOx, snapshotOy;
+    double snapshotPlayerX, snapshotPlayerY;
+    double snapshotPivotX, snapshotPivotY;
 
     public PlayerRenderer() {
         playerGroup = new Group();
@@ -42,7 +49,8 @@ public class PlayerRenderer implements RenderLayer {
         playerGroup.setMouseTransparent(true);
         playerScale = new Scale(1, 1, 0, 0);
         playerTranslate = new Translate(0, 0);
-        playerGroup.getTransforms().addAll(playerTranslate, playerScale);
+        playerRotate = new Rotate(0, 0, 0);
+        playerGroup.getTransforms().addAll(playerRotate, playerTranslate, playerScale);
 
         playerView = new ImageView();
         playerView.setFitWidth(RenderConfig.PLAYER_VIEW_SIZE);
@@ -116,18 +124,29 @@ public class PlayerRenderer implements RenderLayer {
     @Override
     public void onFrame() {
         frameCount++;
-        MapContext mm = MapContext.getInstance();
         CameraContext cam = CameraContext.getInstance();
-        double scale = mm.getScale();
-        double ox = mm.getOffsetX();
-        double oy = mm.getOffsetY();
+        // 使用 MapRenderer 每帧写入的快照，避免独立读取 volatile 字段引入数据竞争
+        double scale = snapshotScale;
+        double ox = snapshotOx;
+        double oy = snapshotOy;
 
         playerScale.setX(scale);
         playerScale.setY(scale);
         playerTranslate.setX(ox);
         playerTranslate.setY(oy);
 
-        if (mm.isPlayerInitialized() && playerView.getImage() != null) {
+        // 导航模式旋转变换（与 worldGroup 的 [Rotate, Translate, Scale] 一致）
+        if (cam.isNavMode() && cam.getNavAngle() != 0) {
+            playerRotate.setPivotX(snapshotPivotX);
+            playerRotate.setPivotY(snapshotPivotY);
+            playerRotate.setAngle(-cam.getNavAngle());
+        } else if (playerRotate.getAngle() != 0) {
+            playerRotate.setAngle(0);
+        }
+
+        // playerInitialized 由 snapshotPlayerX/Y < 0 推断（playerX/Y 初始为 -1）
+        boolean initialized = snapshotPlayerX >= 0 && snapshotPlayerY >= 0;
+        if (initialized && playerView.getImage() != null) {
             playerView.setVisible(true);
             if (lastPlayerSize != RenderConfig.PLAYER_VIEW_SIZE) {
                 lastPlayerSize = RenderConfig.PLAYER_VIEW_SIZE;
@@ -140,14 +159,16 @@ public class PlayerRenderer implements RenderLayer {
                 rebuildRipples();
             }
             double half = playerView.getFitWidth() / 2.0;
-            double px = mm.getPlayerX();
-            double py = mm.getPlayerY();
+            double px = snapshotPlayerX;
+            double py = snapshotPlayerY;
             playerView.setLayoutX(px - half);
             playerView.setLayoutY(py - half);
-            // 导航模式下 counter-rotate 使图标保持指上
-            double playerAngle = mm.getPlayerAngle();
-            if (cam.isNavMode()) {
-                playerAngle -= cam.getNavAngle();
+            // 导航模式下 group 层 Rotate(-navAngle) 已提供逆旋转，
+            // setRotate 只需设置玩家真实朝向，无需再减 navAngle
+            double playerAngle = 0;
+            MapContext mm = MapContext.getInstance();
+            if (mm.isPlayerInitialized()) {
+                playerAngle = mm.getPlayerAngle();
             }
             playerView.setRotate(playerAngle);
 

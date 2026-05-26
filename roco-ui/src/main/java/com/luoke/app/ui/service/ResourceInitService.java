@@ -6,9 +6,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.luoke.app.config.ConfigPersistence;
 import com.luoke.app.config.PathConfig;
 import com.luoke.app.config.DownloadConfig;
-import com.luoke.app.config.OcrConfig;
 import com.luoke.app.context.MapContext;
-import com.luoke.app.context.OcrAsyncManager;
 import com.luoke.app.context.ResourceConfigContext;
 import com.luoke.app.context.ResourcePointContext;
 import com.luoke.app.hook.HookEventType;
@@ -71,8 +69,6 @@ public class ResourceInitService {
      */
     public void start(Runnable onReady) {
         try {
-            OcrAsyncManager.initialize(OcrConfig.OCR_CORE_SIZE);
-
             if (DownloadConfig.INTERNAL_RESOURCE) {
                 // 内置资源全部从 classpath 加载（JAR 解压/PNG 解码），耗时较长。
                 // 在虚拟线程执行以免阻塞 JavaFX Application Thread，确保进度更新能送达 UI。
@@ -80,7 +76,7 @@ public class ResourceInitService {
                 Thread.ofPlatform().daemon(true).name("init-internal-profile").start(() -> {
                     try {
                         initWithInternalProfile(onReady);
-                    } catch (Exception e) { // initWithInternalProfile 声明 throws Exception，包含文件 I/O 和自定义异常
+                    } catch (Exception e) {
                         log.error("内置资源初始化异常: ", e);
                         HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION,
                                 new StatusEvent("内置资源初始化失败: " + e.getMessage(), NotificationType.ERROR));
@@ -89,7 +85,7 @@ public class ResourceInitService {
             } else {
                 initWithExternalProfile(onReady);
             }
-        } catch (Exception e) { // OcrAsyncManager.initialize 和 initWith*Profile 都可能抛出异常
+        } catch (Exception e) {
             log.error("环境初始化致命异常: ", e);
             HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION,
                     new StatusEvent("核心服务启动失败: " + e.getMessage(), NotificationType.ERROR));

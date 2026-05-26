@@ -3,6 +3,7 @@ package com.luoke.app.macher;
 import net.jcip.annotations.NotThreadSafe;
 import net.jcip.annotations.ThreadSafe;
 import com.luoke.app.socket.SocketSession;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -16,13 +17,13 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class SiftSessionManager {
 
-    private volatile SocketSession activeSession;
-    private volatile boolean activeInitialized;
+    @Getter private volatile SocketSession activeSession;
+    @Getter private volatile boolean activeInitialized;
     /** 已收到 C++ 的 READY 信号，表示子进程已进入匹配循环，可安全发送帧数据 */
-    private volatile boolean activeReady;
-    private volatile SocketSession pendingSession;
+    @Getter private volatile boolean activeReady;
+    @Getter private volatile SocketSession pendingSession;
     private volatile boolean pendingInitialized;
-    private volatile boolean switching;
+    @Getter private volatile boolean switching;
 
     // ==================== 连接管理 ====================
 
@@ -135,25 +136,11 @@ public class SiftSessionManager {
         return activeInitialized && activeReady && activeSession != null && !activeSession.isClosed();
     }
 
-    /** 诊断用 — 仅检查初始化标志 */
-    public boolean isActiveInitialized() {
-        return activeInitialized;
-    }
-
-    /** 诊断用 — 仅检查 READY 标志 */
-    public boolean isActiveReady() {
-        return activeReady;
-    }
-
     /**
      * 收到 C++ READY 信号，标记可发送帧数据。
      */
     public void handleReady() {
         this.activeReady = true;
-    }
-
-    public boolean isSwitching() {
-        return switching;
     }
 
     public void enterSwitching() {
@@ -177,14 +164,6 @@ public class SiftSessionManager {
         pendingSession = null;
         pendingInitialized = false;
         switching = false;
-    }
-
-    public SocketSession getActiveSession() {
-        return activeSession;
-    }
-
-    public SocketSession getPendingSession() {
-        return pendingSession;
     }
 
     // ==================== 内嵌值对象 ====================

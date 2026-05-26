@@ -51,7 +51,6 @@ public final class ConfigPersistence {
             RenderConfig.save(sb);
             SiftConfig.save(sb);
             PlayerConfig.save(sb);
-            OcrConfig.save(sb);
             MiniMapConfig.save(sb);
             StatsConfig.save(sb);
             NavigConfig.save(sb);
@@ -97,7 +96,6 @@ public final class ConfigPersistence {
         RenderConfig.load(prop);
         SiftConfig.load(prop);
         PlayerConfig.load(prop);
-        OcrConfig.load(prop);
         MiniMapConfig.load(prop);
         StatsConfig.load(prop);
         NavigConfig.load(prop);
