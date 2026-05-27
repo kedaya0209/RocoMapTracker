@@ -73,6 +73,7 @@ public class MapDownloader {
             }
 
             // 2. 遍历地图配置
+            CountDownLatch latch = new CountDownLatch(DownloadConfig.MAP_REMOTE_URLS.length);
             for (int i = 0; i < DownloadConfig.MAP_REMOTE_URLS.length; i++) {
                 String tag = DownloadConfig.MAP_REMOTE_URL_NAME[i];
                 String urlTpl = DownloadConfig.MAP_REMOTE_URLS[i];
@@ -80,10 +81,11 @@ public class MapDownloader {
 
                 if (targetImg.exists()) {
                     log.info("跳过已存在的地图: {}", tag);
+                    latch.countDown();
                     continue;
                 }
 
-                // 重置状态
+                // 重置状态（下载阶段使用静态字段，拼接阶段使用快照，互不干扰）
                 resetState();
                 progress.reset("正在下载地图: " + tag);
 
@@ -107,21 +109,34 @@ public class MapDownloader {
                 if (isStopRequested.get()) {
                     return;
                 }
-                ArrayList<Tile> clone = new ArrayList<>(validTiles);
-                Thread.ofVirtual().start(() -> {
-                    // 保存剩余分片并持久化元数据
-                    if (!chunkBuffer.isEmpty()) saveChunk(tag);
-                    saveMeta(clone, tag);
 
-                    // 3. 拼接图片
-                    MapStitcher.stitch(clone, tag, tileW, tileH);
+                // 3. 快照拼接所需状态，异步拼接（与下一张地图下载重叠）
+                ArrayList<Tile> clone = new ArrayList<>(validTiles);
+                int fTileW = tileW, fTileH = tileH;
+                ArrayList<byte[]> fChunk = new ArrayList<>(chunkBuffer);
+                chunkBuffer.clear();
+                int fChunkIdx = chunkIndex;
+                String fTag = tag;
+
+                Thread.ofVirtual().start(() -> {
+                    if (!fChunk.isEmpty()) {
+                        File f = FilePathUtil.getRelativeFile(MapResourceUpdater.CHUNK_DIR, fTag + "_" + fChunkIdx + ".chunk");
+                        try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(f))) {
+                            oos.writeObject(fChunk);
+                        } catch (IOException e) {
+                            log.error("分片写入失败", e);
+                        }
+                    }
+                    saveMeta(clone, fTag);
+                    MapStitcher.stitch(clone, fTag, fTileW, fTileH);
+                    latch.countDown();
                 });
             }
-
+            latch.await();
             // 4. 清理
             cleanTempFiles();
             resetState(); // 释放下载过程中积累的集合内存
-        } catch (IOException e) {
+        } catch (IOException | InterruptedException e) {
             log.error("下载流程中断", e);
         }
     }

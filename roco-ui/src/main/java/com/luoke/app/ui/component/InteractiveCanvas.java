@@ -190,6 +190,10 @@ public class InteractiveCanvas extends Canvas {
                 : (2 - UiConfig.INTERACTIVE_ZOOM_FACTOR);
 
         if (cameraManager.isFollowMode()) {
+            if (!cameraManager.hasValidPlayerPosition()) {
+                mapManager.zoom(factor, e.getX(), e.getY());
+                return;
+            }
             // follow 模式：绕玩家缩放，偏移立即居中
             double oldScale = mapManager.getScale();
             double newScale = Math.clamp(oldScale * factor,

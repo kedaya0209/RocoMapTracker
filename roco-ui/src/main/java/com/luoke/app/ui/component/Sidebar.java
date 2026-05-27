@@ -636,7 +636,6 @@ public class Sidebar extends VBox {
 
             StackPane wrapper = new StackPane(item.wikiUpdater().getContainer());
             wrapper.setPadding(new Insets(2, 0, 2, 0));
-            wrapper.setMouseTransparent(true);
             setPadding(new Insets(0));
             setGraphic(wrapper);
         }

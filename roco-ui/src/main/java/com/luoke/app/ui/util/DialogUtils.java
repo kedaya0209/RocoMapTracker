@@ -228,14 +228,19 @@ public class DialogUtils {
     }
 
     /**
-     * 关于弹窗 — 左右布局：图标 | 项目信息
+     * 关于弹窗 — 图标居中在上，无标题，无默认图标
      */
     public static void showAboutDialog(StackPane rootStack,
                                         String appName,
                                         String version,
                                         String buildTimestamp,
                                         String repoUrl) {
-        // 左侧图标
+        StackPane mask = new StackPane();
+        mask.setStyle("-fx-background-color: rgba(0, 0, 0, 0.8);");
+
+        VBox dialogBox = getVBox();
+
+        // 顶部居中图标
         Node iconNode;
         try {
             iconNode = SvgManager.createIcon("/icon/rmt.svg", 64, null);
@@ -246,23 +251,23 @@ public class DialogUtils {
             iconNode = fallback;
         }
 
-        // 右侧信息
-        VBox infoBox = new VBox(6);
-        infoBox.setAlignment(Pos.CENTER_LEFT);
+        VBox body = new VBox(10);
+        body.setAlignment(Pos.CENTER);
+        body.getChildren().add(iconNode);
 
         Label nameLabel = new Label(appName);
         nameLabel.setStyle("-fx-font-size: 20px; -fx-font-weight: bold; -fx-text-fill: -color-fg-default;");
+        body.getChildren().add(nameLabel);
 
         Label versionLabel = new Label("版本: " + version);
         versionLabel.setStyle("-fx-text-fill: -color-fg-muted; -fx-font-size: 13px;");
-
-        infoBox.getChildren().addAll(nameLabel, versionLabel);
+        body.getChildren().add(versionLabel);
 
         if (buildTimestamp != null && !buildTimestamp.isBlank()
                 && !"unknown".equals(buildTimestamp) && !"${maven.build.timestamp}".equals(buildTimestamp)) {
             Label timeLabel = new Label("构建时间: " + buildTimestamp);
             timeLabel.setStyle("-fx-text-fill: -color-fg-subtle; -fx-font-size: 11px;");
-            infoBox.getChildren().add(timeLabel);
+            body.getChildren().add(timeLabel);
         }
 
         if (repoUrl != null && !repoUrl.isBlank()) {
@@ -278,15 +283,10 @@ public class DialogUtils {
                 }
             });
             FlowPane repoRow = new FlowPane(0, 2);
-            repoRow.setAlignment(Pos.CENTER_LEFT);
+            repoRow.setAlignment(Pos.CENTER);
             repoRow.getChildren().addAll(repoPrefix, link);
-            infoBox.getChildren().add(repoRow);
+            body.getChildren().add(repoRow);
         }
-
-        // 左右容器
-        HBox content = new HBox(20);
-        content.setAlignment(Pos.CENTER_LEFT);
-        content.getChildren().addAll(iconNode, infoBox);
 
         // 免责声明
         Label disclaimer = new Label("仅供学习交流使用，一切后果由使用者自行承担。");
@@ -294,13 +294,50 @@ public class DialogUtils {
                 + "-fx-padding: 10 14; -fx-background-color: rgba(255,152,0,0.1);"
                 + "-fx-background-radius: 6;");
         disclaimer.setWrapText(true);
-        disclaimer.setMaxWidth(420);
+        disclaimer.setMaxWidth(380);
 
-        VBox wrapper = new VBox(14, content, disclaimer);
-        wrapper.setAlignment(Pos.CENTER_LEFT);
+        VBox wrapper = new VBox(14, body, disclaimer);
+        wrapper.setAlignment(Pos.CENTER);
 
-        buildBaseDialog(rootStack, "关于", wrapper, "确定", Styles.SUCCESS,
-                "-color-accent-emphasis", () -> {}, null, null);
+        // 内容容器
+        StackPane contentContainer = new StackPane();
+        contentContainer.setAlignment(Pos.CENTER);
+        contentContainer.getChildren().add(wrapper);
+        VBox.setVgrow(contentContainer, Priority.ALWAYS);
+
+        // 按钮
+        HBox btnBox = new HBox(15);
+        btnBox.setAlignment(Pos.CENTER);
+        Button confirmBtn = new Button("确定");
+        confirmBtn.getStyleClass().addAll(Styles.BUTTON_OUTLINED, Styles.SUCCESS);
+        confirmBtn.setPrefWidth(120);
+        FxRippleUtil.install(confirmBtn);
+        confirmBtn.setOnAction(e -> rootStack.getChildren().remove(mask));
+        btnBox.getChildren().add(confirmBtn);
+
+        dialogBox.getChildren().addAll(contentContainer, btnBox);
+        mask.getChildren().add(dialogBox);
+        rootStack.getChildren().add(mask);
+
+        mask.setOpacity(0);
+        FadeTransition ft = new FadeTransition(Duration.millis(200), mask);
+        ft.setToValue(1);
+        ft.play();
+    }
+
+    private static VBox getVBox() {
+        VBox dialogBox = new VBox(25);
+        dialogBox.setMaxSize(420, 320);
+        dialogBox.setPadding(new Insets(30));
+        dialogBox.setAlignment(Pos.CENTER);
+        dialogBox.setStyle(
+                "-fx-background-color: -color-bg-default; " +
+                "-fx-border-color: -color-border-muted; " +
+                "-fx-border-radius: 12; " +
+                "-fx-background-radius: 12; " +
+                "-fx-border-width: 1.5; " +
+                "-fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.5), 20, 0, 0, 10);");
+        return dialogBox;
     }
 
     /**
