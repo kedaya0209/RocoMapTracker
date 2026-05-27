@@ -8,13 +8,11 @@ import com.luoke.app.map.entity.DownloadResult;
 import com.luoke.app.map.entity.Tile;
 import com.luoke.app.map.util.MapFileMover;
 import com.luoke.app.utils.FilePathUtil;
+import com.luoke.app.utils.PngUtil;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
-import javax.imageio.ImageIO;
-import java.awt.image.BufferedImage;
 import java.io.InputStream;
-import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -279,14 +277,11 @@ public class MapDownloader {
 
     private static void detectSize(byte[] data) {
         if (tileW > 0) return;
-        try (ByteArrayInputStream bais = new ByteArrayInputStream(data)) {
-            BufferedImage img = ImageIO.read(bais);
-            if (img != null) {
-                tileW = img.getWidth();
-                tileH = img.getHeight();
-                img.flush();
-            }
-        } catch (IOException ignored) {
+        int[] size = PngUtil.parseSize(data);
+        if (size != null) {
+            tileW = size[0];
+            tileH = size[1];
+        } else {
             tileW = tileH = 256;
         }
     }

@@ -14,8 +14,7 @@ import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
 import javafx.util.Duration;
-import java.awt.Desktop;
-import java.net.URI;
+import com.luoke.app.ui.ModernCanvasApp;
 import java.util.Map;
 
 /**
@@ -100,10 +99,7 @@ public class SettingFieldBuilder {
                     Hyperlink link = new Hyperlink(url);
                     link.setStyle("-fx-font-size: 12px;");
                     link.setOnAction(_ -> {
-                        try {
-                            Desktop.getDesktop().browse(URI.create(url));
-                        } catch (Exception ignored) {
-                        }
+                        ModernCanvasApp.hostServices().showDocument(url);
                     });
                     return link;
                 }
