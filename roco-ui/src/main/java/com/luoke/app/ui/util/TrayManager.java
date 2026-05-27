@@ -4,7 +4,6 @@ import com.luoke.app.config.CaptureConfig;
 import com.luoke.app.config.PathConfig;
 import com.luoke.app.config.SiftConfig;
 import com.luoke.app.ui.service.SvgManager;
-import com.luoke.app.ui.service.ThemeManager;
 import com.luoke.app.utils.FilePathUtil;
 import com.luoke.app.utils.ResourceUtils;
 import javafx.application.Platform;
@@ -170,7 +169,6 @@ public class TrayManager {
         if (e.isPopupTrigger()) {
             int x = e.getXOnScreen();
             int y = e.getYOnScreen();
-            log.info("托盘右键点击: ({}, {})", x, y);
             Platform.runLater(() -> showMenu(x, y));
         }
     }
@@ -225,11 +223,6 @@ public class TrayManager {
                         + " -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.35), 10, 0, 0, 3);");
                 Scene scene = new Scene(root);
                 scene.setFill(null);
-                // 加载主题样式表使 CSS 变量可解析
-                String themeUrl = ThemeManager.getCurrentStylesheetUrl();
-                if (themeUrl != null) {
-                    scene.getStylesheets().add(themeUrl);
-                }
                 menuStage.setScene(scene);
             }
 
@@ -239,14 +232,11 @@ public class TrayManager {
                     createItem("退出", () -> { menuStage.hide(); Platform.runLater(Platform::exit); })
             );
 
-            log.info("菜单定位: click=({},{}), scales=({},{}), fx=({},{}), visual={}, pos=({}, {}), screenBounds={}",
-                    screenX, screenY, scaleX, scaleY, sx, sy, vb, x, y,
-                    Screen.getPrimary().getBounds());
+
             menuStage.setX(x);
             menuStage.setY(y);
             menuStage.show();
             menuStage.toFront();
-            log.info("菜单实际位置: x={}, y={}", menuStage.getX(), menuStage.getY());
         } catch (Exception e) {
             log.error("显示 JavaFX 菜单失败", e);
         }
@@ -277,7 +267,6 @@ public class TrayManager {
         int th = traySize.height;
         if (tw < 1 || th < 1) { tw = 16; th = 16; }
         int size = Math.max(tw, th);
-        log.info("系统托盘图标期望尺寸: {}x{}", tw, th);
 
         // 优先从 SVG 渲染精确像素尺寸，避免 AWT 自动缩放
         try {
@@ -293,7 +282,6 @@ public class TrayManager {
             int[] pixels = new int[tw * th];
             reader.getPixels(0, 0, tw, th, PixelFormat.getIntArgbInstance(), pixels, 0, tw);
             bi.setRGB(0, 0, tw, th, pixels, 0, tw);
-            log.info("托盘图标已从 SVG 渲染: {}x{}", tw, th);
             return Toolkit.getDefaultToolkit().createImage(bi.getSource());
         } catch (Exception e) {
             log.warn("SVG 渲染精确尺寸托盘图标失败", e);
