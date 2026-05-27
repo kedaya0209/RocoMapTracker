@@ -16,7 +16,9 @@ import com.luoke.app.macher.player.PlayerStateTracker;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 
 /**
@@ -43,19 +45,19 @@ public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
     private final BiConsumer<HookEventType, Object> hookPublisher;
     private final MatchingWatchdog watchdog;
 
-    // 专用单线程池，避免 Substrate VM 虚拟线程 Continuation bug (RIP=0 DEP)
-    private final ExecutorService executor = Executors.newSingleThreadExecutor(r -> {
-        Thread t = new Thread(r, "matcher-worker");
-        t.setDaemon(true);
-        return t;
-    });
+    // 专用单线程池：SynchronousQueue 无缓冲，忙时新任务直接丢弃（只保留最新帧）
+    private final ExecutorService executor = new ThreadPoolExecutor(
+            1, 1, 0L, TimeUnit.MILLISECONDS,
+            new SynchronousQueue<>(),
+            r -> { Thread t = new Thread(r, "matcher-worker"); t.setDaemon(true); return t; },
+            new ThreadPoolExecutor.DiscardPolicy());
     // 频率限制
     private final long delay = 1000L / CaptureConfig.TARGET_CAPTURE_FPS;
     private long prevTime = 0L;
     /** 帧序列号，用于诊断追踪 */
     private long frameSeq = 0L;
     /** 上次匹配开关状态，用于侦测切换时发布事件 */
-    private boolean wasMatchingEnabled = true;
+    private boolean wasMatchingEnabled;
 
     public MapMatcherProcessor(int targetRoiIndex, SiftMatchHandler matchClient,
                                 CaptureFrameBuffer frameBuffer,
@@ -105,6 +107,7 @@ public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
         // 看门狗：matching 卡住超时时强制复位
         watchdog.checkTimeout(frameSeq);
 
+        // executor 忙时 SynchronousQueue 拒绝，DiscardPolicy 静默丢弃（跳帧）
         executor.submit(() -> executeMatching(data, width, height));
     }
 
