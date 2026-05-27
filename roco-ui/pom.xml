@@ -196,7 +196,7 @@
                                 <buildArg>-H:+InstallExitHandlers</buildArg>
                                 <buildArg>-Djdk.nio.maxCachedBufferSize=262144</buildArg>
                                 <buildArg>-Djdk.virtualThread.carrierStackSize=2097152</buildArg>
-                                <buildArg>-Os</buildArg>
+                                <buildArg>-O3</buildArg>
                                 <buildArg>-march=x86-64-v3</buildArg>
                                 <buildArg>--initialize-at-run-time=com.sun.prism.**</buildArg>
                                 <buildArg>--initialize-at-run-time=com.sun.glass.ui.**</buildArg>
