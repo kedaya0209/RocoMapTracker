@@ -24,10 +24,6 @@
         </dependency>
         <dependency>
             <groupId>com.luoke</groupId>
-            <artifactId>roco-model</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.luoke</groupId>
             <artifactId>roco-map</artifactId>
         </dependency>
         <dependency>

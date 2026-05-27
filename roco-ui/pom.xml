@@ -189,7 +189,6 @@
                                 <buildArg>-H:+StaticExecutableWithDynamicLibC</buildArg>
                                 <buildArg>-H:+RemoveUnusedSymbols</buildArg>
                                 <buildArg>-H:+UseCompressedReferences</buildArg>
-                                <buildArg>-H:+AddAllCharsets</buildArg>
                                 <buildArg>-Dfile.encoding=UTF-8</buildArg>
                                 <buildArg>--enable-native-access=ALL-UNNAMED</buildArg>
                                 <buildArg>--no-fallback</buildArg>
@@ -282,7 +281,6 @@
                                 <buildArg>-J-Xmx24g</buildArg>
                                 <buildArg>-march=x86-64-v3</buildArg>
                                 <buildArg>-H:+UseCompressedReferences</buildArg>
-                                <buildArg>-H:+AddAllCharsets</buildArg>
                                 <buildArg>-Dfile.encoding=UTF-8</buildArg>
                                 <buildArg>--enable-native-access=ALL-UNNAMED</buildArg>
                                 <buildArg>--no-fallback</buildArg>
@@ -360,7 +358,6 @@
                                 <buildArg>-march=x86-64-v3</buildArg>
                                 <buildArg>-H:+StripDebugInfo</buildArg>
                                 <buildArg>-H:+UseCompressedReferences</buildArg>
-                                <buildArg>-H:+AddAllCharsets</buildArg>
                                 <buildArg>-Dfile.encoding=UTF-8</buildArg>
                                 <buildArg>--enable-native-access=ALL-UNNAMED</buildArg>
                                 <buildArg>--no-fallback</buildArg>
