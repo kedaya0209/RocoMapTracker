@@ -22,6 +22,7 @@ import com.luoke.app.map.loader.ImageLoader;
 import com.luoke.app.map.model.ResourcePoint;
 import com.luoke.app.map.util.MapFileMover;
 import com.luoke.app.utils.JsonUtils;
+import com.luoke.app.utils.PngUtil;
 import com.luoke.app.utils.ResourceUtils;
 import javafx.application.Platform;
 import lombok.extern.slf4j.Slf4j;
@@ -34,12 +35,8 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
-import javax.imageio.ImageIO;
-import javax.imageio.ImageReader;
-import javax.imageio.stream.ImageInputStream;
 
 /**
  * 资源初始化编排服务。
@@ -125,7 +122,7 @@ public class ResourceInitService {
             publishInitStep(0.4, "正在验证地图瓦片...");
             if (ResourceConfigContext.getCurrentProfile() != ResourceConfigContext.ResourceProfile.INTERNAL) {
                 tileGeneratorService.validateAndGenerateTiles();
-                // 瓦片生成可能加载了 256MB BufferedImage，触发 GC 让堆缩回
+                // 瓦片生成消耗了大量堆内存，触发 GC 让堆缩回
                 System.gc();
                 log.info("瓦片验证完成，已触发堆内存回收");
             }
@@ -271,15 +268,14 @@ public class ResourceInitService {
 
     /**
      * 内置资源元数据加载（无需校验，资源打包在 JAR 中）。
-     * 直接从 WorldMap_SIFT.png 头部 IHDR chunk 读取地图尺寸，避免 ImageIO native 栈深度。
+     * 直接从 WorldMap_SIFT.png 头部 IHDR chunk 读取地图尺寸。
      */
     private void initInternalMapMetadata() throws Exception {
         String mapPath = ResourceConfigContext.getSiftMap();
         int imgW, imgH;
 
+        int[] size;
         try (InputStream in = ResourceUtils.getResourceStream(mapPath)) {
-            // PNG 头部结构: 8 bytes signature + IHDR chunk (4 len + 4 type + 13 data + 4 crc)
-            // IHDR data: 4 bytes width + 4 bytes height (big-endian)
             byte[] header = new byte[24];
             int offset = 0;
             while (offset < header.length) {
@@ -290,11 +286,13 @@ public class ResourceInitService {
             if (offset < 24) {
                 throw new Exception("PNG 文件不完整，期望 24 字节头部，实际 " + offset);
             }
-            imgW = ((header[16] & 0xFF) << 24) | ((header[17] & 0xFF) << 16)
-                 | ((header[18] & 0xFF) << 8)  | (header[19] & 0xFF);
-            imgH = ((header[20] & 0xFF) << 24) | ((header[21] & 0xFF) << 16)
-                 | ((header[22] & 0xFF) << 8)  | (header[23] & 0xFF);
+            size = PngUtil.parseSize(header);
+            if (size == null) {
+                throw new Exception("PNG 头部格式无效");
+            }
         }
+        imgW = size[0];
+        imgH = size[1];
         log.info("内置地图元数据从 PNG 头部读取: {}x{}", imgW, imgH);
         MapContext.getInstance().init("G", imgW, imgH);
     }
@@ -310,17 +308,19 @@ public class ResourceInitService {
             imgH = meta.get("mapHeight").asInt();
             log.info("地图元数据从 tiles_meta.json 读取: {}x{}", imgW, imgH);
         } catch (IOException metaEx) {
-            try (InputStream in = ResourceUtils.getResourceStream(mapPath);
-                 ImageInputStream iis = ImageIO.createImageInputStream(in)) {
-                Iterator<ImageReader> readers = ImageIO.getImageReadersBySuffix("png");
-                if (!readers.hasNext()) {
-                    throw new Exception("无可用 PNG ImageReader");
+            try (InputStream in = ResourceUtils.getResourceStream(mapPath)) {
+                byte[] header = new byte[24];
+                int off = 0;
+                while (off < header.length) {
+                    int read = in.read(header, off, header.length - off);
+                    if (read < 0) break;
+                    off += read;
                 }
-                ImageReader reader = readers.next();
-                reader.setInput(iis);
-                imgW = reader.getWidth(0);
-                imgH = reader.getHeight(0);
-                reader.dispose();
+                if (off < 24) throw new Exception("PNG 头部不完整");
+                int[] pngSize = PngUtil.parseSize(header);
+                if (pngSize == null) throw new Exception("PNG 头部格式无效");
+                imgW = pngSize[0];
+                imgH = pngSize[1];
             }
             log.info("地图元数据从 PNG 读取: {}x{}", imgW, imgH);
         }

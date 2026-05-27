@@ -549,10 +549,9 @@ public class VersionSelectorPanel extends StackPane {
     }
 
     private void frame(VBox card, boolean active) {
-        String bg = active ? "-color-accent-subtle" : "-color-bg-default";
-        String fg = active ? "-color-accent-emphasis" : "-color-border-muted";
-        card.setStyle("-fx-background-color: " + bg + "; -fx-background-radius: 14;"
-                + "-fx-border-color: " + fg + "; -fx-border-width: 3; -fx-border-radius: 12;"
+        card.setStyle("-fx-background-color: -color-bg-default; -fx-background-radius: 14;"
+                + "-fx-border-color: " + (active ? "-color-accent-emphasis" : "-color-border-muted")
+                + "; -fx-border-width: 3; -fx-border-radius: 12;"
                 + "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.3), 20, 0, 0, 8);");
     }
 

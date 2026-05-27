@@ -43,6 +43,7 @@ import java.nio.file.StandardCopyOption;
 import com.luoke.app.utils.ResourceExtractor;
 
 import javafx.application.Application;
+import javafx.application.HostServices;
 import javafx.application.Platform;
 import javafx.scene.Scene;
 import javafx.scene.image.Image;
@@ -77,6 +78,7 @@ public class ModernCanvasApp extends Application {
     private final SiftClientManager siftClientManager = new SiftClientManager();
     private final CaptureServiceManager captureServiceManager = new CaptureServiceManager();
     private final PcapBridgeManager pcapBridgeManager = new PcapBridgeManager();
+    private static HostServices appHostServices;
     private TrayManager trayManager;
     private StackPane rootStack;
     private Stage primaryStage;
@@ -86,9 +88,14 @@ public class ModernCanvasApp extends Application {
         launch(args);
     }
 
+    public static HostServices hostServices() {
+        return appHostServices;
+    }
+
     @Override
     public void start(Stage primaryStage) {
         ConfigPersistence.init(); // 配置加载必须在所有 Config 字段读取之前
+        appHostServices = getHostServices();
         this.primaryStage = primaryStage;
         this.trayManager = new TrayManager(primaryStage);
 

@@ -189,7 +189,6 @@
                                 <buildArg>-H:+StaticExecutableWithDynamicLibC</buildArg>
                                 <buildArg>-H:+RemoveUnusedSymbols</buildArg>
                                 <buildArg>-H:+UseCompressedReferences</buildArg>
-                                <buildArg>-H:+AddAllCharsets</buildArg>
                                 <buildArg>-Dfile.encoding=UTF-8</buildArg>
                                 <buildArg>--enable-native-access=ALL-UNNAMED</buildArg>
                                 <buildArg>--no-fallback</buildArg>
@@ -203,7 +202,7 @@
                                 <buildArg>--initialize-at-run-time=com.sun.glass.ui.**</buildArg>
                                 <buildArg>--initialize-at-run-time=javafx.**</buildArg>
                                 <buildArg>
-                                    -H:IncludeResources=(META-INF/services/.*|model/.*|update/.*|com/sun/prism/.*|com/sun/javafx/.*|.*\.(png|properties|json|fxml|xml|dll|txt|css|ttf|woff2|sh|ps|hlsl|cso|obj|bss|svg|ico|exe))$
+                                    -H:IncludeResources=^(com/sun/prism/.*|com/sun/javafx/.*|dll/.*|sift/.*|capture/.*|update/.*|icon/.*|logback\.xml|extract-list\.txt)$
                                 </buildArg>
                                 <buildArg>-H:IncludeResourceBundles=ch.qos.logback.*</buildArg>
                                 <buildArg>
@@ -212,6 +211,7 @@
                                 <buildArg>--add-exports=javafx.graphics/com.sun.prism.shader=ALL-UNNAMED</buildArg>
                                 <buildArg>--add-exports=javafx.graphics/com.sun.glass.ui=ALL-UNNAMED</buildArg>
                                 <buildArg>--add-exports=javafx.graphics/com.sun.prism.d3d=ALL-UNNAMED</buildArg>
+                                <buildArg>--emit build-report</buildArg>
                                 <buildArg>-H:+ReportExceptionStackTraces</buildArg>
                                 <buildArg>--enable-url-protocols=http,https</buildArg>
                                 <buildArg>-H:+JNI</buildArg>
@@ -282,7 +282,6 @@
                                 <buildArg>-J-Xmx24g</buildArg>
                                 <buildArg>-march=x86-64-v3</buildArg>
                                 <buildArg>-H:+UseCompressedReferences</buildArg>
-                                <buildArg>-H:+AddAllCharsets</buildArg>
                                 <buildArg>-Dfile.encoding=UTF-8</buildArg>
                                 <buildArg>--enable-native-access=ALL-UNNAMED</buildArg>
                                 <buildArg>--no-fallback</buildArg>
@@ -297,7 +296,7 @@
                                 <buildArg>--initialize-at-run-time=com.sun.glass.ui.**</buildArg>
                                 <buildArg>--initialize-at-run-time=javafx.**</buildArg>
                                 <buildArg>
-                                    -H:IncludeResources=(META-INF/services/.*|model/.*|update/.*|com/sun/prism/.*|com/sun/javafx/.*|.*\.(png|properties|json|fxml|xml|dll|txt|css|ttf|woff2|sh|ps|hlsl|cso|obj|bss|svg|ico|exe))$
+                                    -H:IncludeResources=^(com/sun/prism/.*|com/sun/javafx/.*|dll/.*|sift/.*|capture/.*|update/.*|icon/.*|logback\.xml|extract-list\.txt)$
                                 </buildArg>
                                 <buildArg>-H:IncludeResourceBundles=ch.qos.logback.*</buildArg>
                                 <buildArg>
@@ -356,11 +355,10 @@
                                 <buildArg>-H:+RemoveUnusedSymbols</buildArg>
                                 <buildArg>--pgo=${pgo.file}</buildArg>
                                 <buildArg>-J-Xmx24g</buildArg>
-                                <buildArg>-O3</buildArg>
+                                <buildArg>-Os</buildArg>
                                 <buildArg>-march=x86-64-v3</buildArg>
                                 <buildArg>-H:+StripDebugInfo</buildArg>
                                 <buildArg>-H:+UseCompressedReferences</buildArg>
-                                <buildArg>-H:+AddAllCharsets</buildArg>
                                 <buildArg>-Dfile.encoding=UTF-8</buildArg>
                                 <buildArg>--enable-native-access=ALL-UNNAMED</buildArg>
                                 <buildArg>--no-fallback</buildArg>
@@ -376,7 +374,7 @@
                                 <buildArg>--initialize-at-run-time=com.sun.glass.ui.**</buildArg>
                                 <buildArg>--initialize-at-run-time=javafx.**</buildArg>
                                 <buildArg>
-                                    -H:IncludeResources=(META-INF/services/.*|model/.*|update/.*|com/sun/prism/.*|com/sun/javafx/.*|.*\.(png|properties|json|fxml|xml|dll|txt|css|ttf|woff2|sh|ps|hlsl|cso|obj|bss|svg|ico|exe))$
+                                    -H:IncludeResources=^(com/sun/prism/.*|com/sun/javafx/.*|dll/.*|sift/.*|capture/.*|update/.*|icon/.*|logback\.xml|extract-list\.txt)$
                                 </buildArg>
                                 <buildArg>-H:IncludeResourceBundles=ch.qos.logback.*</buildArg>
                                 <buildArg>

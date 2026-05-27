@@ -24,11 +24,11 @@
         </dependency>
         <dependency>
             <groupId>com.luoke</groupId>
-            <artifactId>roco-model</artifactId>
+            <artifactId>roco-map</artifactId>
         </dependency>
         <dependency>
-            <groupId>com.luoke</groupId>
-            <artifactId>roco-map</artifactId>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-graphics</artifactId>
         </dependency>
         <dependency>
             <groupId>org.slf4j</groupId>
