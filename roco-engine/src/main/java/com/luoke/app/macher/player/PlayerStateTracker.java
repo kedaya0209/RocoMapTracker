@@ -20,6 +20,8 @@ public class PlayerStateTracker {
 
     private boolean hasSmoothedPosition = false;
     private double smoothedX, smoothedY;
+    private boolean hasSmoothedAngle = false;
+    private double smoothedAngle;
 
     // ROI 预测：基于 EMA 平滑速度预测下一帧位置
     private double prevRawX, prevRawY;
@@ -68,6 +70,18 @@ public class PlayerStateTracker {
             }
         }
 
+        // 角度 EMA 平滑（圆周差值，处理 360° 边界）
+        if (angle != null) {
+            if (!hasSmoothedAngle) {
+                smoothedAngle = angle;
+                hasSmoothedAngle = true;
+            } else {
+                double aDiff = normalizeAngleDiff(angle - smoothedAngle);
+                smoothedAngle = (smoothedAngle + PlayerConfig.PLAYER_EMA_ALPHA * aDiff + 360) % 360;
+            }
+            angle = smoothedAngle;
+        }
+
         MapContext.getInstance().updatePlayerState(smoothedX, smoothedY, angle);
 
         // 速度预测：为 SIFT 匹配提供 hint
@@ -95,9 +109,19 @@ public class PlayerStateTracker {
     public void reset() {
         hasSmoothedPosition = false;
         smoothedX = smoothedY = 0;
+        hasSmoothedAngle = false;
+        smoothedAngle = 0;
         hasPreviousMatch = false;
         predictedX = null;
         predictedY = null;
         velocityX = velocityY = 0;
+    }
+
+    /** 将角度差归一化到 [-180, 180]，处理 360° 环绕 */
+    private static double normalizeAngleDiff(double diff) {
+        diff = diff % 360;
+        if (diff > 180) diff -= 360;
+        if (diff < -180) diff += 360;
+        return diff;
     }
 }
