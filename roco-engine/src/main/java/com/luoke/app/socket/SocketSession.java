@@ -80,6 +80,24 @@ public class SocketSession implements AutoCloseable {
         }
     }
 
+    /**
+     * 流式发送 — 边写边发，避免预先构建完整 byte[] 大缓冲。
+     */
+    public synchronized boolean sendStreaming(int msgType, int bodyLength, StreamingWriter writer) {
+        if (closed) return false;
+        try {
+            out.writeInt(msgType);
+            out.writeInt(bodyLength);
+            writer.writeTo(out);
+            out.flush();
+            return true;
+        } catch (IOException e) {
+            closed = true;
+            log.error("流式发送失败 session#{}", id, e);
+            return false;
+        }
+    }
+
     public boolean isClosed() {
         return closed || socket.isClosed();
     }
@@ -99,5 +117,13 @@ public class SocketSession implements AutoCloseable {
      */
     @ThreadSafe
     public record Message(int type, byte[] body) {
+    }
+
+    /**
+     * 流式写入回调 — 将数据直接写入 OutputStream，避免预先构建完整 byte[]。
+     */
+    @FunctionalInterface
+    public interface StreamingWriter {
+        void writeTo(OutputStream out) throws IOException;
     }
 }

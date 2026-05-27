@@ -537,7 +537,7 @@ static double detect_arrow_angle_hsv(const uint8_t* bgra_data, int w, int h,
     cv::cvtColor(hsv, hsv, cv::COLOR_BGR2HSV);
 
     cv::Mat mask;
-    cv::inRange(hsv, cv::Scalar(10, 200, 200), cv::Scalar(25, 255, 255), mask);
+    cv::inRange(hsv, cv::Scalar(15, 200, 230), cv::Scalar(25, 240, 255), mask);
 
     // 闭运算填充细小孔洞（箭头内部可能因阴影有空洞）
     cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3));

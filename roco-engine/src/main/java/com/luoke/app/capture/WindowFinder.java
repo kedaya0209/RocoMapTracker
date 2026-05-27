@@ -7,7 +7,6 @@ import java.lang.foreign.*;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
@@ -24,7 +23,7 @@ public class WindowFinder {
     // --- user32.dll 函数句柄 ---
     private static final MethodHandle ENUM_WINDOWS;
     private static final MethodHandle IS_WINDOW_VISIBLE;
-    private static final MethodHandle GET_WINDOW_TEXT_A;
+    private static final MethodHandle GET_WINDOW_TEXT_W;
 
     // WNDENUMPROC: BOOL CALLBACK(HWND, LPARAM)
     // HWND=long, LPARAM=ADDRESS (MemorySegment)
@@ -55,8 +54,8 @@ public class WindowFinder {
                     user32.find("IsWindowVisible").orElseThrow(),
                     FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG));
 
-            GET_WINDOW_TEXT_A = LINKER.downcallHandle(
-                    user32.find("GetWindowTextA").orElseThrow(),
+            GET_WINDOW_TEXT_W = LINKER.downcallHandle(
+                    user32.find("GetWindowTextW").orElseThrow(),
                     FunctionDescriptor.of(ValueLayout.JAVA_INT,
                             ValueLayout.JAVA_LONG, ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
 
@@ -94,18 +93,19 @@ public class WindowFinder {
             }
             if (kwLen == 0) return 0;
 
-            // 获取窗口标题
+            // 获取窗口标题 (Unicode)
             try (Arena temp = Arena.ofConfined()) {
-                MemorySegment textBuf = temp.allocate(512);
-                int len = (int) GET_WINDOW_TEXT_A.invoke(hwnd, textBuf, 512);
-                if (len <= 0) return 1;
+                MemorySegment textBuf = temp.allocate(1024);
+                int charCount = (int) GET_WINDOW_TEXT_W.invoke(hwnd, textBuf, 512);
+                if (charCount <= 0) return 1;
 
-                byte[] titleBytes = new byte[len];
-                for (int i = 0; i < len; i++) {
-                    titleBytes[i] = textBuf.get(ValueLayout.JAVA_BYTE, i);
+                // 读取 UTF-16LE 字节（2 字节/字符），以双字节 null 结尾
+                byte[] utf16Bytes = new byte[charCount * 2];
+                for (int i = 0; i < utf16Bytes.length; i++) {
+                    utf16Bytes[i] = textBuf.get(ValueLayout.JAVA_BYTE, i);
                 }
 
-                String title = cleanNativeString(titleBytes);
+                String title = cleanString(new String(utf16Bytes, StandardCharsets.UTF_16LE));
                 String keyword = new String(Arrays.copyOf(kwBytes, kwLen), StandardCharsets.UTF_8);
 
                 if (title.equals(cleanString(keyword))) {
@@ -160,14 +160,6 @@ public class WindowFinder {
     }
 
     // === 字符串工具 ===
-
-    private static String cleanNativeString(byte[] bytes) {
-        try {
-            return cleanString(new String(bytes, "GBK"));
-        } catch (IOException e) {
-            return cleanString(new String(bytes, StandardCharsets.UTF_8));
-        }
-    }
 
     private static String cleanString(String input) {
         if (input == null) return "";
