@@ -1,10 +1,14 @@
 package com.luoke.app.ui.service;
 
+import lombok.Getter;
 import net.jcip.annotations.ThreadSafe;
 import atlantafx.base.theme.*;
 import com.luoke.app.config.ConfigPersistence;
 import com.luoke.app.config.UiConfig;
 import javafx.application.Application;
+import javafx.scene.Scene;
+import javafx.stage.Stage;
+import javafx.stage.Window;
 
 /**
  * 主题管理器 — 主题列表、应用、切换。
@@ -14,6 +18,7 @@ import javafx.application.Application;
 public class ThemeManager {
 
     /** 当前主题的样式表 URL，供 Scene 添加以确保 inline style 的 CSS 变量能正确解析 */
+    @Getter
     private static volatile String currentStylesheetUrl;
 
     public static String[] getAvailableThemes() {
@@ -33,10 +38,16 @@ public class ThemeManager {
         };
         currentStylesheetUrl = theme.getUserAgentStylesheet();
         Application.setUserAgentStylesheet(currentStylesheetUrl);
-    }
-
-    public static String getCurrentStylesheetUrl() {
-        return currentStylesheetUrl;
+        // 强制所有已打开 Stage 重新应用 CSS（设置面板、路线管理等）
+        for (Window window : Window.getWindows()) {
+            if (window instanceof Stage stage && stage.getScene() != null) {
+                Scene scene = stage.getScene();
+                scene.getStylesheets().removeIf(url -> url != null
+                        && (url.contains("atlanfx") || url.contains("theme")));
+                scene.getStylesheets().add(currentStylesheetUrl);
+                scene.getRoot().applyCss();
+            }
+        }
     }
 
     public static void switchTheme(String name) {

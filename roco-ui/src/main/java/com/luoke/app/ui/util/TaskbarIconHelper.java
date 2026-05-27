@@ -80,8 +80,6 @@ public class TaskbarIconHelper {
                 // 同时修改窗口类图标，确保任务栏使用正确的图标
                 setClassLongPtrW.invoke(hwnd, GCLP_HICONSM, hIcon);
                 setClassLongPtrW.invoke(hwnd, GCLP_HICON, hIcon);
-
-                log.info("任务栏图标已设置: {}", iconPath);
             }
         } catch (Throwable e) {
             log.warn("设置任务栏图标失败", e);
@@ -99,7 +97,6 @@ public class TaskbarIconHelper {
                 Method getNativeWindow = first.getClass().getMethod("getNativeWindow");
                 Object result = getNativeWindow.invoke(first);
                 if (result instanceof Long hwndVal && hwndVal != 0) {
-                    log.info("通过 Glass Window 获取 HWND: {}", hwndVal);
                     return hwndVal;
                 }
             }

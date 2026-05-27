@@ -22,7 +22,6 @@ import com.luoke.app.ui.service.SvgManager;
 import com.luoke.app.ui.service.ThemeManager;
 import com.luoke.app.update.UpdateManager;
 import com.luoke.app.ui.util.DialogUtils;
-import com.luoke.app.ui.util.FxRippleUtil;
 import com.luoke.app.ui.util.RestartUtils;
 import java.io.IOException;
 import javafx.animation.FadeTransition;
@@ -482,21 +481,13 @@ public class Sidebar extends VBox {
 
             HBox row = new HBox(6, icon, title, spacer, value, arrow);
             row.setAlignment(Pos.CENTER_LEFT);
-            row.setPrefHeight(38);
+            row.setPrefHeight(36);
             row.setPadding(new Insets(0, 10, 0, 12));
             row.setStyle(BG_STYLE);
             row.setMouseTransparent(true);  // 事件由 Cell 处理，row 只做显示
 
             // hover: 在 cell 上监听 (图标画线 + 行背景)
-            setOnMouseEntered(e -> {
-                row.setStyle(BG_HOVER);
-                SvgManager.animateHoverDrawIcon(icon, true, 400);
-            });
-            setOnMouseExited(e -> {
-                row.setStyle(BG_STYLE);
-                SvgManager.animateHoverDrawIcon(icon, false, 400);
-            });
-            setCursor(Cursor.HAND);
+            addHoverEvent(icon, row);
 
             setOnMouseClicked(e -> {
                 animateArrow(arrow, expandedCategory == item.category());
@@ -508,6 +499,18 @@ public class Sidebar extends VBox {
             wrapper.setMouseTransparent(true);
             setPadding(new Insets(0));
             setGraphic(wrapper);
+        }
+
+        private void addHoverEvent(Node icon, HBox row) {
+            setOnMouseEntered(e -> {
+                row.setStyle(BG_HOVER);
+                SvgManager.animateHoverDrawIcon(icon, true, 400);
+            });
+            setOnMouseExited(e -> {
+                row.setStyle(BG_STYLE);
+                SvgManager.animateHoverDrawIcon(icon, false, 400);
+            });
+            setCursor(Cursor.HAND);
         }
 
         // ── Match Toggle ────────────────────────────────────
@@ -525,7 +528,7 @@ public class Sidebar extends VBox {
 
             HBox row = new HBox(6, icon, title, spacer, toggle);
             row.setAlignment(Pos.CENTER_LEFT);
-            row.setPrefHeight(38);
+            row.setPrefHeight(36);
             row.setPadding(new Insets(0, 12, 0, 12));
             row.setStyle(BG_STYLE);
 
@@ -548,13 +551,15 @@ public class Sidebar extends VBox {
 
         private void renderOption(SidebarItem item) {
             Label title = new Label(item.title());
-            title.setStyle(item.selected()
-                    ? "-fx-text-fill: -color-success-emphasis; -fx-font-size: 12px; -fx-font-weight: bold;"
-                    : "-fx-text-fill: -color-fg-muted; -fx-font-size: 12px;");
+            title.setStyle(String.format(
+                    "-fx-text-fill: %s; -fx-font-size: 12px; -fx-font-weight: %s;",
+                    item.selected() ? "-color-success-emphasis" : "-color-fg-muted",
+                    item.selected() ? "bold" : "normal"
+            ));
 
             HBox row = new HBox(title);
             row.setAlignment(Pos.CENTER_LEFT);
-            row.setPrefHeight(28);
+            row.setPrefHeight(36);
             row.setPadding(new Insets(0, 0, 0, 20));
             row.setMouseTransparent(true);
 
@@ -568,7 +573,7 @@ public class Sidebar extends VBox {
             setOnMouseClicked(e -> onOptionClick(item));
 
             StackPane wrapper = new StackPane(row);
-            wrapper.setPadding(new Insets(1, 0, 1, 0));
+            wrapper.setPadding(new Insets(2, 0, 2, 0));
             wrapper.setMouseTransparent(true);
             setPadding(new Insets(0));
             setGraphic(wrapper);
@@ -593,47 +598,31 @@ public class Sidebar extends VBox {
             Node icon = SvgManager.createHoverDrawIcon(item.iconSvg(), 18, 1.5, 400);
 
             Label text = new Label(item.title());
-            if (isProgress) {
-                text.setStyle("-fx-text-fill: -color-fg-muted; -fx-font-size: 13px;");
-            } else {
-                text.setStyle("-fx-text-fill: -color-fg-default; -fx-font-size: 13px;");
-            }
+            text.setStyle(String.format(
+                    "-fx-text-fill: %s; -fx-font-size: 13px;",
+                    isProgress ? "-color-fg-muted" : "-color-fg-default"
+            ));
 
             HBox content = new HBox(8, icon, text);
             content.setAlignment(Pos.CENTER_LEFT);
-
-            Button btn = new Button();
-            btn.setMaxWidth(Double.MAX_VALUE);
-            btn.setPrefHeight(36);
-            btn.setAlignment(Pos.BASELINE_LEFT);
-            btn.setStyle("-fx-background-color: -color-bg-subtle; -fx-text-fill: -color-fg-default; -fx-background-radius: 6; -fx-font-size: 13px; -fx-cursor: hand; -fx-padding: 0 12 0 12; -fx-effect: none; -fx-background-insets: 0;");
-            btn.setGraphic(content);
+            content.setPrefHeight(36);
+            content.setPadding(new Insets(0, 12, 0, 12));
+            content.setStyle(BG_STYLE);
+            content.setMouseTransparent(true);
 
             if (isProgress) {
                 // 进度模式：纯展示，无交互
-                btn.setMouseTransparent(true);
-                btn.setCursor(Cursor.DEFAULT);
             } else {
-                FxRippleUtil.install(btn);
-                btn.setOnMouseEntered(e -> SvgManager.animateHoverDrawIcon(icon, true, 400));
-                btn.setOnMouseExited(e -> SvgManager.animateHoverDrawIcon(icon, false, 400));
+                addHoverEvent(icon, content);
                 if (item.onAction() != null) {
-                    btn.setOnAction(e -> item.onAction().run());
+                    setOnMouseClicked(e -> item.onAction().run());
                 }
             }
 
-            Pane wrapper = new Pane() {
-                @Override
-                protected void layoutChildren() {
-                    double w = getWidth();
-                    double h = getHeight();
-                    if (w > 0 && h > 0) {
-                        btn.resizeRelocate(0, 0, w, h);
-                    }
-                }
-            };
-            wrapper.getChildren().add(btn);
-            setPadding(new Insets(2, 0, 2, 0));
+            StackPane wrapper = new StackPane(content);
+            wrapper.setPadding(new Insets(2, 0, 2, 0));
+            wrapper.setMouseTransparent(true);
+            setPadding(new Insets(0));
             setGraphic(wrapper);
         }
 
@@ -645,14 +634,16 @@ public class Sidebar extends VBox {
             setOnMouseExited(null);
             setCursor(Cursor.DEFAULT);
 
-            setPadding(new Insets(2, 0, 2, 0));
-            setGraphic(item.wikiUpdater().getContainer());
+            StackPane wrapper = new StackPane(item.wikiUpdater().getContainer());
+            wrapper.setPadding(new Insets(2, 0, 2, 0));
+            wrapper.setMouseTransparent(true);
+            setPadding(new Insets(0));
+            setGraphic(wrapper);
         }
 
         // ── 箭头动画 ─────────────────────────────────────────
 
         private void animateArrow(SVGPath arrow, boolean wasExpanded) {
-            double from = wasExpanded ? 180 : 0;
             double to = wasExpanded ? 0 : 180;
             Timeline tl = new Timeline(
                     new KeyFrame(Duration.millis(200),
