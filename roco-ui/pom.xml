@@ -179,9 +179,9 @@
                             <buildArgs>
                                 <!-- =====调试时需要将这两项注释掉，有些错误不会被记录在日志中====== -->
                                 <!-- 指定链接器子系统为 WINDOWS -->
-<!--                                <buildArg>-H:NativeLinkerOption=/SUBSYSTEM:WINDOWS</buildArg>-->
+                                <buildArg>-H:NativeLinkerOption=/SUBSYSTEM:WINDOWS</buildArg>
                                 <!-- 指定入口点，确保在无控制台模式下正确启动 -->
-<!--                                <buildArg>-H:NativeLinkerOption=/ENTRY:mainCRTStartup</buildArg>-->
+                                <buildArg>-H:NativeLinkerOption=/ENTRY:mainCRTStartup</buildArg>
                                 <!-- ==================================================== -->
                                 <buildArg>-R:MaxHeapSize=512M</buildArg>
                                 <buildArg>-R:MinHeapSize=128M</buildArg>
