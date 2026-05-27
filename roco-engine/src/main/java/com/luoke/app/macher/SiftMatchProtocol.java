@@ -84,20 +84,6 @@ public class SiftMatchProtocol {
     }
 
     /**
-     * 编码地图灰度数据。
-     *
-     * @return [w(4B)][h(4B)][pixelsLen(4B)][gray8]
-     */
-    public static byte[] encodeMapData(byte[] grayPixels, int w, int h) {
-        ByteBuffer buf = ByteBuffer.allocate(12 + grayPixels.length).order(ByteOrder.BIG_ENDIAN);
-        buf.putInt(w);
-        buf.putInt(h);
-        buf.putInt(grayPixels.length);
-        buf.put(grayPixels);
-        return buf.array();
-    }
-
-    /**
      * 编码匹配帧数据（全彩 BGRA）。
      *
      * @return [w(4B)][h(4B)][hintX(8B)][hintY(8B)][pixelsLen(4B)][BGRA32]
@@ -153,13 +139,6 @@ public class SiftMatchProtocol {
     }
 
     // ==================== 值对象 ====================
-
-    /**
-     * 地图灰度数据值对象
-     */
-    @ThreadSafe
-    public record MapImageData(int width, int height, byte[] grayPixels) {
-    }
 
     /**
      * 匹配结果值对象（含耗时统计）

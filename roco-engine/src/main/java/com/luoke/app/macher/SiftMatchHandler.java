@@ -182,11 +182,13 @@ public class SiftMatchHandler {
     private void handleRequestMap(SocketSession session) {
         log.info("收到 REQUEST_MAP，加载地图...");
         try {
-            MapImageData mapData = MapImageLoader.load();
-            byte[] body = encodeMapData(mapData.grayPixels(), mapData.width(), mapData.height());
-            session.send(MSG_MAP_DATA, body);
+            MapImageLoader.ImageInfo info = MapImageLoader.loadImage();
+            int bodyLength = 12 + info.width() * info.height();
+            session.sendStreaming(MSG_MAP_DATA, bodyLength, out -> {
+                MapImageLoader.writeStreaming(info, out);
+            });
             log.info("地图数据已发送: {}x{} ({} 灰度像素)",
-                    mapData.width(), mapData.height(), mapData.grayPixels().length);
+                    info.width(), info.height(), info.width() * info.height());
         } catch (Exception e) {
             log.error("加载地图数据失败", e);
             byte[] errBody = ("Map load error: " + e.getMessage())
@@ -271,13 +273,6 @@ public class SiftMatchHandler {
                                         long timeoutMs) throws InterruptedException {
         SocketSession s = sessionManager.getActiveSession();
         if (s == null || !sessionManager.isReady()) {
-            if (s == null) {
-                log.warn("sendFrameAndWait 跳过: activeSession 为空");
-            } else if (!sessionManager.isReady()) {
-                log.warn("sendFrameAndWait 跳过: activeSession={} init={} ready={} closed={}",
-                        s, sessionManager.isActiveInitialized(),
-                        sessionManager.isActiveReady(), s.isClosed());
-            }
             return MatchResult.FAIL;
         }
 
