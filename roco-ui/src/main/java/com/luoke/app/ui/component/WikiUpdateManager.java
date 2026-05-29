@@ -10,7 +10,7 @@ import com.luoke.app.hook.multicast.HookRegistry;
 import com.luoke.app.map.MapResourceUpdater;
 import com.luoke.app.map.core.DownloadProgressContext;
 import java.io.IOException;
-import com.luoke.app.ui.service.SvgManager;
+import com.luoke.app.ui.service.resource.SvgManager;
 import com.luoke.app.ui.util.DialogUtils;
 import com.luoke.app.ui.util.FxRippleUtil;
 import javafx.application.Platform;
@@ -110,15 +110,22 @@ public class WikiUpdateManager {
     private void startDownloadTask() {
         Thread.ofPlatform().daemon(true).name("wiki-update").start(() -> {
             try {
-                MapResourceUpdater.updateAllResources();
-                Platform.runLater(this::switchToNormalState);
-                HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION,
-                        new StatusEvent("WIKI资源同步完成", NotificationType.SUCCESS));
+                boolean success = MapResourceUpdater.updateAllResources();
+                Platform.runLater(() -> {
+                    switchToNormalState();
+                    if (success) {
+                        HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION,
+                                new StatusEvent("WIKI资源同步完成", NotificationType.SUCCESS));
+                    } else {
+                        HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION,
+                                new StatusEvent("资源同步失败，请检查网络", NotificationType.ERROR));
+                    }
+                });
             } catch (RuntimeException e) {
                 Platform.runLater(() -> {
                     switchToNormalState();
                     HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION,
-                            new StatusEvent("资源同步失败，请检查网络", NotificationType.ERROR));
+                            new StatusEvent("资源同步异常: " + e.getMessage(), NotificationType.ERROR));
                 });
             }
         });

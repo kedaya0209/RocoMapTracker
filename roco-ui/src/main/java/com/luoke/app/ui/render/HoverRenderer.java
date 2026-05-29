@@ -7,7 +7,7 @@ import com.luoke.app.context.CameraContext;
 import com.luoke.app.context.MapContext;
 import com.luoke.app.map.model.Point;
 import com.luoke.app.map.model.ResourcePoint;
-import com.luoke.app.ui.service.IconCache;
+import com.luoke.app.ui.service.resource.IconCache;
 import com.luoke.app.ui.util.CoordinateUtil;
 import javafx.scene.Node;
 import javafx.scene.canvas.Canvas;

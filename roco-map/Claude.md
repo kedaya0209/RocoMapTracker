@@ -2,7 +2,7 @@
 
 地图管理层 – 地图下载/拼接/瓦片、资源点模型、远程 Wiki 数据抓取
 
-AI 协作专用 – 依赖 roco-common + JavaFX，不依赖 roco-engine/roco-macher。
+AI 协作专用 – 依赖 roco-common + JavaFX。
 
 
 ## 模块职责
@@ -31,19 +31,18 @@ MapStitcher           图块拼接为完整地图 PNG
 IconDownloader        并发图标下载（虚拟线程 + 信号量）
 ResourceConfigBuilder 分类+点位 → resource_config.json
 DownloadProgressContext 下载进度 AtomicInteger 跟踪
+JsMapConfigParser     JS 对象正则解析 → MapConfig DTO
+MapFileMover          暂存→最终目录移动 + init 清单
+
+loader 包 – 数据加载 (5 个)：
 LoadInfo              远程配置/点位/分类加载协调
 MapConfigLoader       Jsoup 抓取 mapData script
 MapCategoryLoader     Jsoup 抓取 categoryData pre
 MapPointLoader        Jsoup 抓取 mapPointData pre
 ImageLoader           图标字节缓存 ConcurrentHashMap
-JsMapConfigParser     JS 对象正则解析 → MapConfig DTO
-MapFileMover          暂存→最终目录移动 + init 清单
 
-DTO (6 个)：
-LayerOption, MapCategoryItem, MapConfig, MapLayer, MapPointItem, Point
-
-Entity (2 个)：
-DownloadResult, Tile
+DTO (8 个)：
+DownloadResult, Tile, LayerOption, MapCategoryItem, MapConfig, MapLayer, MapPointItem, LatLng
 
 Model (4 个)：
 Point, ResourceConfig, ResourcePoint, RoutePath
@@ -106,7 +105,7 @@ Point, ResourceConfig, ResourcePoint, RoutePath
 
 模块依赖
 - 依赖 JavaFX（ImageView 类型），但渲染由 roco-ui 负责。
-- 不依赖 roco-engine、roco-macher。
+- 不依赖 roco-engine。
 
 
 ## 与其他模块的交互

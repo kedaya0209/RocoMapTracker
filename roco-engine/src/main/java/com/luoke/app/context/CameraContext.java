@@ -3,10 +3,12 @@ package com.luoke.app.context;
 import net.jcip.annotations.ThreadSafe;
 import com.luoke.app.config.UiConfig;
 import com.luoke.app.config.ViewConfig;
+import com.luoke.app.hook.HookEventType;
+import com.luoke.app.hook.event.FollowModeEvent;
+import com.luoke.app.hook.multicast.HookRegistry;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -19,11 +21,6 @@ public class CameraContext {
      * 跟随模式开关
      */
     private final AtomicBoolean followMode = new AtomicBoolean(ViewConfig.DEFAULT_FOLLOW_MODE);
-
-    /**
-     * 跟随模式变化监听器
-     */
-    private final CopyOnWriteArrayList<Runnable> followModeListeners = new CopyOnWriteArrayList<>();
 
     @Getter
     @Setter
@@ -51,13 +48,6 @@ public class CameraContext {
         return Holder.INSTANCE;
     }
 
-    /**
-     * 注册跟随模式变化回调
-     */
-    public void onFollowModeChange(Runnable listener) {
-        followModeListeners.add(listener);
-    }
-
     public boolean isFollowMode() {
         return followMode.get();
     }
@@ -67,9 +57,8 @@ public class CameraContext {
             if (followMode) {
                 applyFollowViewport();
             }
-            for (Runnable r : followModeListeners) {
-                r.run();
-            }
+            HookRegistry.INSTANCE.publish(HookEventType.FOLLOW_MODE_CHANGED,
+                    new FollowModeEvent(followMode));
         }
     }
 

@@ -1,7 +1,7 @@
 # RocoMapTracker 项目根目录
 
 AI 协作专用 – 全局架构索引与跨模块约束
-项目版本: 1.1.0 | Java 25 + GraalVM Native Image | OpenCV: JavaCPP 4.13.0-1.5.13
+项目版本: 1.1.1 | Java 25 + GraalVM Native Image | C++ OpenCV 4.10.0
 
 
 # Language & Communication Rules (MANDATORY)
@@ -108,8 +108,8 @@ mvn javafx:run -pl roco-ui
 mvn clean package
 
 # C++ 子进程编译 (Visual Studio)
-cd cpp && build_capture.bat   # capture.exe
-cd cpp && build_sift.bat      # sift_match.exe
+cd cpp && build_capture.bat   # RocoMapTracker-capture.exe
+cd cpp && build_sift.bat      # RocoMapTracker-sift_match.exe
 
 # Native Image 构建
 mvn -Pnative clean package -pl roco-ui -am
@@ -125,38 +125,35 @@ mvn -Pnative-pgo clean package -pl roco-ui -am          # PGO 优化
 
 roco-ui (最终应用 JavaFX + Native Image)
 └─ roco-engine (核心引擎: 截图/上下文/Hook/匹配调度)
-├─ roco-macher (SIFT 匹配算法)
-│    ├─ roco-model (模型推理 ONNX/DJL)
-│    │    └─ roco-common (基础工具)
-│    └─ roco-common
 ├─ roco-map (地图管理: 下载/拼接/资源点)
-│    └─ roco-common
+│    └─ roco-common (基础工具)
 └─ roco-common
 
 模块职责表（使用空格分隔，请视为等宽字体）：
 
 模块            职责
 roco-common    配置中心、资源/JSON 工具
-roco-model     ONNX 推理、CNN 箭头检测、OCR
 roco-map       地图下载/拼接、资源点模型
-roco-macher    SIFT 匹配器、小地图检测
 roco-engine    截图采集、上下文、Hook 事件、匹配调度
 roco-ui        JavaFX 界面、渲染引擎、设置面板
 cpp/           C++ WGC 截图 + SIFT 匹配子进程 (Socket)
-c/             JNI 局部引用帧管理 (jniframe.c)
+plugins/       Python pcap 桥接器子进程
 
 
 # 跨语言边界逻辑
 
 
 
-C++ 子进程          Java 侧                                         协议
-capture.exe         CaptureHandler + CaptureProcessManager          Socket, BGRA 帧, ROI 万分数
-sift_match.exe      SiftMatchHandler + SiftProcessManager           请求-响应, 特征匹配
+C++ 子进程                     Java 侧                                         协议
+RocoMapTracker-capture.exe     CaptureHandler + CaptureProcessManager          Socket, BGRA 帧, ROI 万分数
+RocoMapTracker-sift_match.exe  SiftMatchHandler + SiftProcessManager          请求-响应, 特征匹配
 
 - ROI 坐标使用万分数 (0~10000)：自适应分辨率。
+Python 子进程                     Java 侧                                    协议
+RocoMapTracker-pcap.exe          ExternalBridgeHandler + PcapProcessManager   Socket, 游戏事件
+
 - 子进程生命周期：NativeProcess 管理，JobObjectManager 保证父进程退出时子进程销毁。
-- 崩溃自动重连：CaptureService / SiftClientManager 监控。
+- 崩溃自动重连：CaptureService / SiftClientManager / PcapBridgeManager 监控。
 
 
 # 坐标系数学
@@ -186,7 +183,6 @@ Hook 事件单向流：数据层 → UI 层
 
 ## 捕获与匹配
 - CaptureService 黑帧检测阈值：连续 30 帧全黑 → 强停 + 重连。
-- OCR 稳定性判定：2 次连续相同结果才更新计数。
 - 地图匹配连续失败 5 次才标记 Lost。
 
 ## GraalVM Native Image 约束
@@ -194,12 +190,6 @@ Hook 事件单向流：数据层 → UI 层
 - reachability-metadata.json 必须完整声明反射/JNI 访问。
 - System.gc() 在 Serial GC 下有效（同步全量回收）。
 - roco-common 需依赖 graal-sdk (provided)。
-
-## JavaCPP OpenCV 约束 (nopointergc=true)
-- 所有临时 Native 对象在 try (PointerScope scope) 内创建。
-- FlannBasedMatcher 必须在 scope 外创建。
-- 严禁散乱的 .close() 调用，仅在 destroy() 中关闭字段级 Mat。
-- FLANN 强制单树模式：new KDTreeIndexParams(1)。
 
 ## 资源路径系统
 - 内嵌资源通过 classpath 访问，外部资源通过 ResourceUtils.getExternalFile()。
@@ -216,7 +206,6 @@ Hook 事件单向流：数据层 → UI 层
 #ROI 布局 (万分数)
 ROI   用途                坐标 (x,y,w,h)           实际覆盖 (1920×1080)
 0     小地图 (SIFT+箭头)   (8900,700,1000,1800)    右上角 192×194
-1     物品栏 (OCR)         (8750,2870,1100,1700)   右侧中部 211×486
 
 实际像素 = 万分数 × 窗口尺寸 / 10000
 
@@ -226,9 +215,7 @@ ROI   用途                坐标 (x,y,w,h)           实际覆盖 (1920×1080)
 请查看对应子目录下的 CLAUDE.md：
 
 - roco-common/CLAUDE.md
-- roco-model/CLAUDE.md
 - roco-map/CLAUDE.md
-- roco-macher/CLAUDE.md
 - roco-engine/CLAUDE.md
 - roco-ui/CLAUDE.md
 - cpp/CLAUDE.md

@@ -19,5 +19,17 @@ public enum HookEventType {
     /**
      * 状态轮播消息 — 用于 StatusCarousel 底部状态栏展示系统运行状态
      */
-    STATUS_CAROUSEL
+    STATUS_CAROUSEL,
+    /**
+     * 跟随模式切换事件 — CameraContext 跟随状态变更时发布，FloatToolbox 监听以更新按钮颜色
+     */
+    FOLLOW_MODE_CHANGED,
+    /**
+     * 路线列表变更事件 — PathContext 路线增删时发布，RouteManagerStage 监听以刷新列表
+     */
+    ROUTE_LIST_CHANGED,
+    /**
+     * 导航模式切换事件 — Sidebar/SettingDefinitions 切换导航模式时发布，TitleBar 监听以同步按钮图标
+     */
+    NAV_MODE_CHANGED
 }

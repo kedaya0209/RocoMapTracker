@@ -1,6 +1,9 @@
 package com.luoke.app.context;
 
 import net.jcip.annotations.ThreadSafe;
+import com.luoke.app.hook.HookEventType;
+import com.luoke.app.hook.event.RouteListEvent;
+import com.luoke.app.hook.multicast.HookRegistry;
 import com.luoke.app.map.model.RoutePath;
 import lombok.Getter;
 import lombok.Setter;
@@ -9,8 +12,6 @@ import lombok.extern.slf4j.Slf4j;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.function.Consumer;
 
 @ThreadSafe
 @Slf4j
@@ -20,7 +21,6 @@ public class PathContext {
 
     @Getter
     private final ArrayList<RoutePath> savedRoutes = new ArrayList<>();
-    private final CopyOnWriteArrayList<Consumer<List<RoutePath>>> changeListeners = new CopyOnWriteArrayList<>();
 
     @Getter
     @Setter
@@ -43,17 +43,9 @@ public class PathContext {
         return INSTANCE;
     }
 
-    /**
-     * 注册列表变化回调 (用于 UI 层绑定)
-     */
-    public void onChange(Consumer<List<RoutePath>> listener) {
-        changeListeners.add(listener);
-    }
-
     private void notifyChanged() {
-        for (Consumer<List<RoutePath>> r : changeListeners) {
-            r.accept(savedRoutes);
-        }
+        HookRegistry.INSTANCE.publish(HookEventType.ROUTE_LIST_CHANGED,
+                new RouteListEvent(new ArrayList<>(savedRoutes)));
     }
 
     public void startNewRoute() {

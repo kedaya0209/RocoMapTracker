@@ -1,6 +1,6 @@
 package com.luoke.app.capture;
 
-import com.luoke.app.process.JobObjectManager;
+import com.luoke.app.platform.JobObjectManager;
 import com.luoke.app.process.NativeProcess;
 import com.luoke.app.process.NativeProcessFactory;
 import com.luoke.app.socket.SocketServer;
@@ -11,7 +11,6 @@ import net.jcip.annotations.NotThreadSafe;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.util.concurrent.TimeUnit;
 
 /**
  * capture.exe 子进程生命周期管理器 — 单一职责：启动、停止、销毁截图子进程。
@@ -73,15 +72,11 @@ public class CaptureProcessManager {
     }
 
     /**
-     * 优雅停止进程，超时后强制销毁
+     * 停止进程 — JobObject 保证子进程随父进程退出，直接强杀无需等待。
      */
     public void stopProcess() {
         if (process != null && process.isAlive()) {
-            process.destroy();
-            if (!process.waitFor(3, TimeUnit.SECONDS)) {
-                log.warn("capture.exe pid={} 未在 3 秒内停止，强制终止", process.pid());
-                process.destroyForcibly();
-            }
+            process.destroyForcibly();
         }
     }
 

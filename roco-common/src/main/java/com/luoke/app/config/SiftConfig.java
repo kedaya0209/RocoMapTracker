@@ -1,6 +1,7 @@
 package com.luoke.app.config;
 
 import net.jcip.annotations.NotThreadSafe;
+import com.luoke.app.roi.RoiRect;
 import java.util.Properties;
 
 /**
@@ -121,6 +122,11 @@ public final class SiftConfig {
      * SIFT 匹配等待超时（毫秒）
      */
     public static long MATCH_TIMEOUT_MS = 500;
+
+    /** 获取小地图 ROI 万分数坐标 */
+    public static RoiRect roiMapRect() {
+        return new RoiRect(ROI_MAP_X, ROI_MAP_Y, ROI_MAP_W, ROI_MAP_H);
+    }
 
     private SiftConfig() {
         throw new AssertionError("禁止实例化配置类");

@@ -2,9 +2,9 @@ package com.luoke.app.ui.component.setting;
 
 import net.jcip.annotations.NotThreadSafe;
 import atlantafx.base.theme.Styles;
-import com.luoke.app.capture.CaptureService;
-import com.luoke.app.ui.component.VersionMode;
-import com.luoke.app.ui.service.VersionManager;
+import com.luoke.app.capture.FullFrameControl;
+import com.luoke.app.ui.service.VersionMode;
+import com.luoke.app.ui.service.ui.VersionManager;
 import com.luoke.app.ui.util.DialogUtils;
 import com.luoke.app.ui.util.FxRippleUtil;
 import javafx.application.Platform;
@@ -46,7 +46,7 @@ public class SettingsStage extends Stage {
      * CaptureService 引用（用于全帧模式切换），由 ModernCanvasApp 注入
      */
     @Setter
-    private static CaptureService captureService;
+    private static FullFrameControl captureService;
     private final SettingConfigManager configManager = new SettingConfigManager();
     private final StackPane rootStackPane = new StackPane();
     private final StackPane rightPanel;

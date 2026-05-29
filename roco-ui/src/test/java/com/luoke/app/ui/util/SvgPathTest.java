@@ -1,6 +1,6 @@
 package com.luoke.app.ui.util;
 
-import com.luoke.app.ui.service.SvgManager;
+import com.luoke.app.ui.service.resource.SvgManager;
 import javafx.scene.shape.SVGPath;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;

@@ -1,97 +1,74 @@
 # roco-ui
 
-用户界面层，JavaFX 桌面应用 + Native Image 构建配置。是整个项目的入口点和最终交付物。
+用户界面层 — JavaFX 桌面应用 + Native Image 构建配置。是整个项目的入口点和最终交付物。
 
 ## 职责
 
 ### 应用入口
 
-- **Main** — `main()` 入口：初始化 JavaCPP OpenCV → launch JavaFX
-- **ModernCanvasApp** — 主 Application：初始化流程 + UI 构建 + 截图守护
+- **Main** — `main()` 入口：初始化环境 → launch JavaFX
+- **ModernCanvasApp** — 主 Application：初始化流程 + UI 构建 + 截图守护启动
 
-### UI 组件 (ui/component/)
+### UI 组件
 
-- **InteractiveCanvas** — 交互画布：鼠标/键盘事件 + 图标渲染 + hover + 路线编辑
-- **Sidebar** — 侧边栏 (进度条/统计/操作按钮)
-- **FloatToolbox** — 浮动工具箱
-- **TitleBar** — 标题栏 (跟随主题)
-- **NotificationToast** — Toast 通知 (跟随主题)
-- **LoadingOverlay** — 加载遮罩 (跟随主题)
-- **ResourceCounterPanel** — 物资计数面板
-- **RouteManagerStage** — 路线管理器
-- **StatsOverlay** — 统计信息覆盖层
-- **UiAnimator** — UI 动画
+- **InteractiveCanvas** — 交互画布：鼠标/键盘事件编排（委托 PathEditor/HoverManager/ContextMenuManager）
+- **TitleBar** — 标题栏 + 幽灵模式 + 状态轮播
+- **Sidebar/SidebarCell** — 分类侧边栏
+- **FloatToolbox** — 浮动工具栏（跟随/计数开关）
+- **SettingsStage** — IntelliJ 风格设置面板（11 分类）
+- **RouteManagerStage** — 路线管理窗口
+- **NotificationToast** — Toast 通知
+- **ResourceCounterPanel** — 物资采集统计面板
+- **StatsOverlay** — 实时性能覆盖层
+- **LoadingOverlay** — 全屏加载遮罩
 
-### 渲染 (ui/render/)
+### 渲染引擎
 
-- **RenderLoop** — AnimationTimer 渲染循环：快照复用 + 分层绘制
-- **PlayerRenderer** — 玩家图标渲染
-- **PathRenderer** — 路线渲染
+- **MapRenderer** — AnimationTimer 渲染循环：viewportDirty 快照复用 + 分层绘制
+- **PlayerRenderer** — 玩家图标渲染（角度旋转 + 潮汐波纹）
+- **IconLayerManager** — 资源点图标 ImageView 管理 + 灰度切换
+- **RouteRenderer** — Canvas 路线渲染
+- **HoverRenderer** — Canvas hover 高亮
+- **TileManager** — 多分辨率地图瓦片管理
 
-### 工具 (ui/util/)
+### SVG 管理
 
-- **DialogUtils** — 对话框工具 (跟随主题)
-- **WindowManager** — 窗口拖拽/缩放
-- **RestartUtils** — 重启工具
+- **SvgManager** — 门面（委托 SvgAnimator / SvgIconBuilder / SvgPathUtil）
+- **SvgAnimator** — 画线动画
+- **SvgIconBuilder** — 图标构建
 
-### 其他
+### 服务
 
-- **MapRawCache** — mmap 地图缓存 (PNG→.raw→MappedByteBuffer)
-- **UiResponseHook** — 监听 UI 相关 Hook 事件
+- **CaptureServiceManager** — 截图服务看门狗
+- **SiftClientManager** — SIFT 客户端管理
+- **PcapBridgeManager** — pcap 桥接器生命周期管理
+- **InfrastructureManager** — JobObject + SocketServer 管理
+- **ResourceInitService** — 资源初始化验证
+- **IconCache** — 纹理图集缓存
+
+### 窗口管理
+
+- **WindowManager** — 8 方向边缘拖拽缩放
+- **ThemeManager** — 7 种 AtlantaFX 主题切换
 
 ## 依赖
 
-| 依赖                                 | 版本     |
-|------------------------------------|--------|
-| JavaFX Controls/Graphics/Base/FXML | 25     |
-| AtlantaFX Base                     | 2.1.0  |
-| Logback Classic                    | 1.4.11 |
+| 依赖 | 版本 |
+|---|---|
+| JavaFX Controls/Graphics/Base | 25.0.3 |
+| AtlantaFX Base | 2.1.0 |
+| Logback Classic | 1.5.32 |
 
 ## 内部依赖
 
-- `roco-engine` (传递依赖所有核心模块)
-
-## 资源
-
-- `dll/` — 运行时 DLL (awt, jvm, wgc_capture, jniframe 等)
-- `META-INF/native-image/reachability-metadata.json` — GraalVM 反射/JNI 元数据
-- `logback.xml` — 日志配置
+- `roco-engine`（传递依赖所有核心模块）
 
 ## 构建配置
 
-- **maven-assembly-plugin** — 构建 fat jar (jar-with-dependencies)
+- **maven-shade-plugin** — 构建 fat jar
 - **javafx-maven-plugin** — JavaFX 运行/打包
-- **native-maven-plugin** — GraalVM Native Image 编译 (3 个 profile: native / native-instrument / native-pgo)
+- **native-maven-plugin** — GraalVM Native Image 编译（3 个 profile: native / native-instrument / native-pgo）
 
-## GraalVM Native Image 元数据维护规则 (重要)
+## GraalVM Native Image 元数据维护规则
 
-当在 `roco-ui` 或任何其他模块中 **添加新的静态资源**（如 `dll/` 下的新 `.dll`、`icon/` 下的新 `.svg`、配置文件等）或者 **需要反射/JNI 访问的 Java 类**时，**必须同步修改** 以下文件：
-
-- `META-INF/native-image/reachability-metadata.json`
-
-### 何时需要更新
-
-- 新增或删除一个 DLL 文件 → 更新 `"resources"` 或 `"bundles"` 中的路径。
-- 新增一个通过 `MethodHandle`、`反射`（如 `Class.forName`、`method.invoke`）或 `JNI` 访问的类 → 在 `"reflection"` 或 `"jni"` 节中添加对应配置。
-- 新增一个通过 `ServiceLoader` 加载的服务 → 在 `"resources"` 中添加 `META-INF/services/` 条目。
-- 新增一个需要序列化/反序列化的类（Jackson、JSON 等）→ 添加反射配置。
-
-### 配置示例
-
-```json
-{
-  "reflection": [
-    {
-      "name": "com.example.NewClass",
-      "methods": [
-        { "name": "newMethod", "parameterTypes": [] }
-      ]
-    }
-  ],
-  "resources": [
-    {
-      "pattern": "dll/newlib\\.dll$"
-    }
-  ]
-}
-```
+当新增静态资源（DLL、SVG、配置文件等）或需要反射/JNI 访问的 Java 类时，必须同步修改 `META-INF/native-image/reachability-metadata.json`。

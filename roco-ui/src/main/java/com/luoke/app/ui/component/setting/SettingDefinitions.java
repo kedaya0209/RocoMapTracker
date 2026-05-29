@@ -16,11 +16,13 @@ import com.luoke.app.config.NavigConfig;
 import com.luoke.app.config.UpdateConfig;
 import com.luoke.app.config.BuildConfig;
 import com.luoke.app.context.CameraContext;
-import com.luoke.app.ui.component.TitleBar;
-import com.luoke.app.context.CameraContext;
-import com.luoke.app.macher.map.SwitchMapMatcher;
+import com.luoke.app.hook.AppEvents;
+import com.luoke.app.hook.HookEventType;
+import com.luoke.app.hook.event.NavModeEvent;
+import com.luoke.app.hook.multicast.HookRegistry;
+import com.luoke.app.match.map.SwitchMapMatcher;
 import com.luoke.app.ui.component.RouteManagerStage;
-import com.luoke.app.ui.service.ThemeManager;
+import com.luoke.app.ui.service.ui.ThemeManager;
 import com.luoke.app.update.UpdateManager;
 import lombok.extern.slf4j.Slf4j;
 
@@ -42,17 +44,6 @@ public final class SettingDefinitions {
     public static final List<SettingCategory> CATEGORIES = buildCategories();
 
     private SettingDefinitions() {
-    }
-
-    /**
-     * 获取 TitleBar 实例（可能为 null）
-     */
-    private static TitleBar getTitleBar() {
-        try {
-            return TitleBar.getInstance();
-        } catch (Exception e) {
-            return null;
-        }
     }
 
     // ================================================================
@@ -291,8 +282,8 @@ public final class SettingDefinitions {
                                 () -> {
                                     boolean enabled = NavigConfig.NAVIGATION_ENABLED;
                                     CameraContext.getInstance().setNavMode(enabled);
-                                    TitleBar titleBar = getTitleBar();
-                                    if (titleBar != null) titleBar.setNavModeFromExternal(enabled);
+                                    HookRegistry.INSTANCE.publish(HookEventType.NAV_MODE_CHANGED, new NavModeEvent(enabled));
+                                    AppEvents.publish(NavModeEvent.class, new NavModeEvent(enabled));
                                     ConfigPersistence.save();
                                 },
                                 () -> NavigConfig.NAVIGATION_ENABLED,

@@ -1,8 +1,10 @@
 package com.luoke.app.ui.component;
 
+import com.luoke.app.config.PcapConfig;
 import net.jcip.annotations.NotThreadSafe;
 import atlantafx.base.theme.Styles;
-import com.luoke.app.ui.service.VersionManager;
+import com.luoke.app.ui.service.VersionMode;
+import com.luoke.app.ui.service.ui.VersionManager;
 import com.luoke.app.ui.util.DialogUtils;
 import com.luoke.app.ui.util.FxRippleUtil;
 import javafx.application.Platform;
@@ -55,6 +57,8 @@ public class VersionSelectorPanel extends StackPane {
     private final VBox advCard;
     private final Button stdBtn;
     private final Button advBtn;
+    private static final String GITHUB_API = "https://api.github.com/repos/" + PcapConfig.PCAP_REPO + "/releases/latest";
+    private static final String GITHUB_DL_MIRROR = "https://gh-proxy.org/";
 
     public VersionSelectorPanel(StackPane rootStack) {
         this.rootStack = rootStack;
@@ -111,12 +115,6 @@ public class VersionSelectorPanel extends StackPane {
 
     // ── 抓包环境检测与懒下载 ──────────────────────────────────
 
-    private static final String PCAP_EXE_PATH = "/plugins/RocoMapTracker-pcap.exe";
-    private static final String PCAP_REPO = "kedaya0209/RocoMapTracker-pacp";
-    private static final String GITHUB_API = "https://api.github.com/repos/" + PCAP_REPO + "/releases/latest";
-    /** GitHub 下载镜像（国内用户可改为 <a href="https://gh-proxy.org/">...</a>） */
-    private static final String GITHUB_DL_MIRROR = "https://gh-proxy.org/";
-
     /**
      * 检查抓包环境：npcap 驱动 + pcap 组件，缺失则弹窗引导处理。
      */
@@ -126,7 +124,7 @@ public class VersionSelectorPanel extends StackPane {
             return;
         }
         // npcap 已就绪，检查 pcap 组件是否已下载
-        File pcapExe = new File(FilePathUtil.getExternalPath(PCAP_EXE_PATH, true));
+        File pcapExe = new File(FilePathUtil.getExternalPath(PcapConfig.PCAP_EXE, true));
         if (!pcapExe.exists()) {
             showPcapDownloadConfirmDialog();
             return;
@@ -226,7 +224,7 @@ public class VersionSelectorPanel extends StackPane {
         dialogBox.getChildren().addAll(
                 titleLabel("需要安装抓包驱动"),
                 msgLabel("高级版需要 npcap 抓包驱动才能运行。\n请前往 npcap 官网下载安装："),
-                createLink("https://npcap.com/", "https://npcap.com/"),
+                createLink(PcapConfig.NPCAP_LINK, PcapConfig.NPCAP_LINK),
                 okBtn);
 
         StackPane mask = fadeInMask();
@@ -237,7 +235,7 @@ public class VersionSelectorPanel extends StackPane {
     // ── pcap 组件下载确认 ─────────────────────────────────────
 
     private void showPcapDownloadConfirmDialog() {
-        String repoUrl = "https://github.com/" + PCAP_REPO + "/releases/latest";
+        String repoUrl = "https://github.com/" + PcapConfig.PCAP_REPO + "/releases/latest";
 
         HBox btnBox = new HBox(15);
         btnBox.setAlignment(Pos.CENTER);
@@ -312,12 +310,12 @@ public class VersionSelectorPanel extends StackPane {
                 if (zipPath == null) return; // 用户取消
 
                 Platform.runLater(() -> statusLabel.setText("正在解压..."));
-                extractZip(zipPath, PCAP_EXE_PATH);
+                extractZip(zipPath, PcapConfig.PCAP_EXE);
                 Files.deleteIfExists(zipPath);
 
                 Platform.runLater(() -> {
                     rootStack.getChildren().remove(mask);
-                    if (new File(FilePathUtil.getExternalPath(PCAP_EXE_PATH, true)).exists()) {
+                    if (new File(FilePathUtil.getExternalPath(PcapConfig.PCAP_EXE, true)).exists()) {
                         vm.switchTo(VersionMode.ADVANCED);
                         hide();
                     } else {

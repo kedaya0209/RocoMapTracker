@@ -1,6 +1,6 @@
 package com.luoke.app.map.core;
 
-import com.luoke.app.map.LoadInfo;
+import com.luoke.app.map.loader.LoadInfo;
 import com.luoke.app.map.MapResourceUpdater;
 import com.luoke.app.map.dto.MapCategoryItem;
 import com.luoke.app.map.util.MapFileMover;
@@ -46,7 +46,7 @@ public class IconDownloader {
         isStopRequested.set(true);
     }
 
-    public static void downloadIcons() {
+    public static boolean downloadIcons() {
         isStopRequested.set(false); // 每次开始前重置状态
 
         progress.setStatusText("正在解析图标列表...");
@@ -73,6 +73,7 @@ public class IconDownloader {
             }
             CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
         }
+        return true;
     }
 
     private static void downloadIcon(String url, Semaphore semaphore) {

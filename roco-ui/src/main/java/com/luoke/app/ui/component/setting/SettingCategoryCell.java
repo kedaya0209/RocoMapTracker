@@ -1,7 +1,7 @@
 package com.luoke.app.ui.component.setting;
 
 import net.jcip.annotations.NotThreadSafe;
-import com.luoke.app.ui.service.SvgManager;
+import com.luoke.app.ui.service.resource.SvgManager;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;

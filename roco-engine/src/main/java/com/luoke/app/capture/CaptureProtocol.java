@@ -1,5 +1,6 @@
 package com.luoke.app.capture;
 
+import com.luoke.app.capture.frame.ROIData;
 import net.jcip.annotations.ThreadSafe;
 
 import java.nio.ByteBuffer;
@@ -8,7 +9,7 @@ import java.nio.ByteOrder;
 /**
  * capture.exe 协议常量与序列化 — 纯函数工具类。
  *
- * <p>与 {@link com.luoke.app.macher.SiftMatchProtocol} 对称，
+ * <p>与 {@link com.luoke.app.match.SiftMatchProtocol} 对称，
  * 将协议层从 {@link CaptureHandler} 协调器中剥离。
  */
 @ThreadSafe

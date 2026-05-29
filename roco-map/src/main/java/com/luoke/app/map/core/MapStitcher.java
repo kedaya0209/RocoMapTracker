@@ -1,7 +1,7 @@
 package com.luoke.app.map.core;
 
 import com.luoke.app.map.MapResourceUpdater;
-import com.luoke.app.map.entity.Tile;
+import com.luoke.app.map.dto.Tile;
 import com.luoke.app.utils.FilePathUtil;
 import lombok.extern.slf4j.Slf4j;
 import net.jcip.annotations.NotThreadSafe;

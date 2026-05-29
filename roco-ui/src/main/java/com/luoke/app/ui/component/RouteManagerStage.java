@@ -3,8 +3,10 @@ package com.luoke.app.ui.component;
 import net.jcip.annotations.NotThreadSafe;
 import atlantafx.base.theme.Styles;
 import com.luoke.app.context.PathContext;
+import com.luoke.app.hook.AbstractGenericHook;
 import com.luoke.app.hook.HookEventType;
 import com.luoke.app.hook.event.NotificationType;
+import com.luoke.app.hook.event.RouteListEvent;
 import com.luoke.app.hook.event.StatusEvent;
 import com.luoke.app.hook.multicast.HookRegistry;
 import com.luoke.app.map.model.RoutePath;
@@ -28,6 +30,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.io.File;
 import java.util.List;
+import java.util.Set;
 
 /**
  * 路线管理工具窗口 - 单例模式 (双重检查锁实现)
@@ -172,7 +175,17 @@ public class RouteManagerStage extends Stage {
         // --- 路线列表 ---
         PathContext pc = PathContext.getInstance();
         ObservableList<RoutePath> routeItems = FXCollections.observableArrayList(pc.getSavedRoutes());
-        pc.onChange(routes -> Platform.runLater(() -> routeItems.setAll(routes)));
+        HookRegistry.INSTANCE.register(new AbstractGenericHook<RouteListEvent>() {
+            @Override
+            public void onEvent(HookEventType eventType, RouteListEvent data) {
+                Platform.runLater(() -> routeItems.setAll(data.routes()));
+            }
+
+            @Override
+            public Set<HookEventType> supportedEvents() {
+                return Set.of(HookEventType.ROUTE_LIST_CHANGED);
+            }
+        });
         listView.setItems(routeItems);
         listView.setPrefHeight(200);
         VBox.setVgrow(listView, Priority.ALWAYS);

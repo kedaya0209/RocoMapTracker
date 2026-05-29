@@ -82,12 +82,8 @@ public class SocketServer {
         } catch (IOException ignored) {
         }
 
-        if (acceptThread != null) {
-            try {
-                acceptThread.join(2000);
-            } catch (InterruptedException ignored) {
-            }
-        }
+        // accept 线程为 daemon，serverSocket.close() 使 accept() 立即抛出异常退出，无需 join 等待
+        acceptThread = null;
 
         for (SocketSession s : sessions.values()) s.close();
 

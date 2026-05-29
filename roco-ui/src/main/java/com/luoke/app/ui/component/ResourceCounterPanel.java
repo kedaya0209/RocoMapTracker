@@ -24,6 +24,8 @@ import javafx.util.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 @NotThreadSafe
 public class ResourceCounterPanel extends VBox {
@@ -34,6 +36,10 @@ public class ResourceCounterPanel extends VBox {
     private static final int ICON_SIZE = 24;
     private final FlowPane rowsContainer;
     private final Map<String, Image> iconCache = new HashMap<>();
+    /** 最新的待刷新数据（仅保留最新一份） */
+    private final AtomicReference<MaterialCollectionEvent> pendingData = new AtomicReference<>();
+    /** 脏标记：表示有待刷新数据 */
+    private final AtomicBoolean dirty = new AtomicBoolean(false);
 
     private ResourceCounterPanel() {
         super(0);
@@ -70,7 +76,10 @@ public class ResourceCounterPanel extends VBox {
         HookRegistry.INSTANCE.register(new AbstractGenericHook<MaterialCollectionEvent>() {
             @Override
             public void onEvent(HookEventType eventType, MaterialCollectionEvent data) {
-                refreshData(data.summary(), data.backpackTotals());
+                pendingData.set(data);
+                if (dirty.compareAndSet(false, true)) {
+                    Platform.runLater(ResourceCounterPanel.this::flushPending);
+                }
             }
 
             @Override
@@ -78,6 +87,18 @@ public class ResourceCounterPanel extends VBox {
                 return Set.of(HookEventType.MATERIAL_COLLECTION_UPDATED);
             }
         });
+    }
+
+    /**
+     * 批量刷新：取最新数据并重建 UI。
+     * 仅在 FX 线程执行，通过 dirty 标记保证同一帧内多次事件只触发一次刷新。
+     */
+    private void flushPending() {
+        dirty.set(false);
+        MaterialCollectionEvent event = pendingData.getAndSet(null);
+        if (event != null) {
+            refreshData(event.summary(), event.backpackTotals());
+        }
     }
 
     public static ResourceCounterPanel getInstance() {
@@ -92,38 +113,34 @@ public class ResourceCounterPanel extends VBox {
     }
 
     public void refreshData(Map<String, Integer> summary, Map<String, Integer> backpackTotals) {
-        Platform.runLater(() -> {
-            rowsContainer.getChildren().clear();
+        rowsContainer.getChildren().clear();
 
-            if (summary == null || summary.isEmpty()) {
-                toggle(false);
-                return;
-            }
+        if (summary == null || summary.isEmpty()) {
+            toggle(false);
+            return;
+        }
 
-            // TreeMap 按名称字典序排列，面板显示固定顺序
-            summary.forEach((name, total) -> {
-                // 无对应图标的丢弃该项
-                if (!hasIcon(name)) return;
+        summary.forEach((name, total) -> {
+            if (!hasIcon(name)) return;
 
-                HBox row = new HBox(8);
-                row.setAlignment(Pos.CENTER_LEFT);
+            HBox row = new HBox(8);
+            row.setAlignment(Pos.CENTER_LEFT);
 
-                ImageView iconView = new ImageView(loadIcon(name));
-                iconView.setFitWidth(ICON_SIZE);
-                iconView.setFitHeight(ICON_SIZE);
+            ImageView iconView = new ImageView(loadIcon(name));
+            iconView.setFitWidth(ICON_SIZE);
+            iconView.setFitHeight(ICON_SIZE);
 
-                int bpTotal = backpackTotals.getOrDefault(name, 0);
-                Label countLabel = new Label(total + " / " + bpTotal);
-                countLabel.setStyle("-fx-text-fill: -color-accent-emphasis; -fx-font-weight: bold;");
+            int bpTotal = backpackTotals.getOrDefault(name, 0);
+            Label countLabel = new Label(total + " / " + bpTotal);
+            countLabel.setStyle("-fx-text-fill: -color-accent-emphasis; -fx-font-weight: bold;");
 
-                row.getChildren().addAll(iconView, countLabel);
-                rowsContainer.getChildren().add(row);
-            });
-
-            if (!isVisible() || getOpacity() < 1.0) {
-                toggle(true);
-            }
+            row.getChildren().addAll(iconView, countLabel);
+            rowsContainer.getChildren().add(row);
         });
+
+        if (!isVisible() || getOpacity() < 1.0) {
+            toggle(true);
+        }
     }
 
     private Image loadIcon(String name) {
