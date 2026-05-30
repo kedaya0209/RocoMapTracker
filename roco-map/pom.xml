@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>com.luoke</groupId>
+        <groupId>io.github.kedaya0209</groupId>
         <artifactId>roco-map-tracker</artifactId>
         <version>1.1.1</version>
     </parent>
@@ -19,7 +19,7 @@
             <artifactId>jcip-annotations</artifactId>
         </dependency>
         <dependency>
-            <groupId>com.luoke</groupId>
+            <groupId>io.github.kedaya0209</groupId>
             <artifactId>roco-common</artifactId>
         </dependency>
         <dependency>
@@ -64,5 +64,14 @@
                 </includes>
             </resource>
         </resources>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <configuration>
+                    <encoding>UTF-8</encoding>
+                </configuration>
+            </plugin>
+        </plugins>
     </build>
 </project>

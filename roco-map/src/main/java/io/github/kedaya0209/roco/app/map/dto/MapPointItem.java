@@ -1,0 +1,26 @@
+package io.github.kedaya0209.roco.app.map.dto;
+
+import lombok.Data;
+import net.jcip.annotations.NotThreadSafe;
+
+
+@Data
+@NotThreadSafe
+public class MapPointItem {
+
+    private Integer markType;
+
+    private String title;
+
+    private String id;
+
+    private LatLng point;
+
+    private String uid;
+
+    private String layer;
+
+    private Long time;
+
+    private Integer version;
+}

@@ -1,0 +1,188 @@
+# RKPP Update
+
+## Ver2.2 - Notgedrungen
+
+Base Version: Ver1.2 - Zusammenhalt
+Date: 2026-05-24
+
+本文档记录 Ver2.2 的发布前变更。这个版本的目标是把 RKPP 从 2026-04 的 schema fallback 形态推进到 2026-05 新协议可用状态，并用真实进服与完整协议流量验证。
+
+---
+
+## 1. 新版本数据源适配
+
+Ver2.2 以以下来源刷新数据与解码依据：
+
+- RocoMITMServer Ver2.1：`messages.json`、`opcodes.json`、`decoder_overrides.json`、通用 protobuf codec、opcode payload decoder。
+- Roco-Kingdom-World-Data 2026-05-21：`Attr`、`Pet`、`Skill` world-data 导出。
+
+新增 `tools/update_roco_data.py`，用于把上述来源转换为 RKPP 当前数据格式。
+
+本次生成结果：
+
+- `Data/opcode.json`：1626 条 opcode 元信息。
+- `Data/proto_schema.json`：3659 条 message 条目与 1083 条 enum 条目，包含短名 alias。
+- `Data/Attr.csv`：86 条属性映射。
+- `Data/Pet.csv`：1065 条宠物映射。
+- `Data/Skill.csv`：1378 条技能映射。
+
+---
+
+## 2. 接入 RocoMITMServer 解码逻辑
+
+新增：
+
+- `rkpp_codec.py`
+- `rkpp_opcode_payload.py`
+
+这两个模块来自 RocoMITMServer Ver2.1 的解码实现，并已调整为 RKPP 本地导入方式。`rkpp_analysis.py` 现在会优先使用 opcode 元信息中的 `decode_as` / `full_name`，在存在 `payload_hex` 时调用 payload decoder 解析 flattened payload。
+
+典型验证：
+
+- `0x0260` flattened shop payload 可解析出 `shop_data.id = 3014`。
+- `goods_data[0].goods_id = 67016`。
+- `decode_source = flattened:shop_data`。
+
+---
+
+## 3. 0x4013 解密兼容增强
+
+`rkpp_network.py` 新增：
+
+- `FIXED_AES_IV = bytes(range(16))`
+- `decrypt_4013_body_candidates()`
+
+现在同一条 0x4013 会同时尝试：
+
+- `fixed_iv`：新版固定 IV 模式。
+- `embedded_iv`：历史包体内嵌 IV 模式。
+
+`rkpp_analyzer.py` 会对候选解密结果逐个尝试解析，成功后记录 `decrypt_mode`，失败时保留诊断信息。
+
+真实 2026-05-24 实机流量验证中，本场会话使用 `embedded_iv`，新版 `fixed_iv` 路径也有单元测试覆盖。
+
+---
+
+## 4. TGCP internal header 支持
+
+`rkpp_proto.py` 新增 TGCP internal header 解析：
+
+- 识别 `55aa0000` 与 `39630000` 结构。
+- 支持 30 字节内部头。
+- s2c opcode 从 `session_id & 0xFFFF` 推导。
+- c2s opcode 从 `sub_id` 推导。
+- 保留 `payload_hex` 与 `internal_session_id`、`internal_sub_id`、`internal_counter1`、`internal_counter2`。
+
+同时 `strip_tsf4g_padding()` 扩展为兼容随机前缀 `tsf4g` trailer，覆盖 2026-05 新流量尾部格式。
+
+---
+
+## 5. c2s 0x7CA2 请求封装支持
+
+Ver2.2 进一步补齐 2026-05 实机流量中的 c2s alternate request record：
+
+- offset `4:8` 为 opcode。
+- offset `8:10` 为 magic `0x7CA2`。
+- offset `10:14` 为 request sequence。
+- offset `14:` 为 protobuf payload 与 `tsf4g` trailer。
+
+该格式覆盖了旧实测中原本落入 `ok_unparsed` 的 712 条客户端请求包，包括：
+
+- `0x0133` `ZoneSceneMoveReq`
+- `0x01A9` `ZoneSceneSetNpcPosReq`
+- `0x0159` `ZoneSceneSyncPlayerStatusReq`
+- `0x035E` `ZoneSceneSyncStaminaReq`
+- `0x130B` `ZoneBattleCmdPushbackReq`
+- `0x1313` `ZoneBattleRoundFlowFinishReq`
+
+修复后这些包会进入正常 opcode/schema 解码路径，不再作为未解析包保留。
+
+---
+
+## 6. CSV 与诊断字段增强
+
+`decoded_packets.csv` 新增字段：
+
+- `decrypt_mode`
+- `decode_source`
+- `internal_session_id`
+- `internal_sub_id`
+- `internal_counter1`
+- `internal_counter2`
+
+这些字段用于区分不同解密路径、payload 解码来源和 TGCP 内部头信息，便于后续按真实流量继续补齐解析覆盖率。
+
+`ok_unparsed` 现在作为“解密成功但当前未细分的包”处理，不再计入连续错误，也不再输出 warning 刷屏；CSV 中仍保留 `decrypt_status=ok_unparsed` 作为后续覆盖率诊断依据。当前已知的 `0x7CA2` c2s 请求封装已经正式解析，不再落入该状态。
+
+---
+
+## 7. 实机链路验证结果
+
+2026-05-24 完成真实登录与一场包含战斗事件的完整 live capture。
+
+原始 live capture 基于旧 parser 的输出统计：
+
+- `decoded_packets.csv`：2050 行。
+- 成功解析 opcode：1333 行。
+- 战斗相关 opcode：45 行。
+- 0x4013 解析成功：1333 行 `ok embedded_iv`。
+- 残余未细分：712 行 `ok_unparsed embedded_iv`。
+
+补齐 `0x7CA2` c2s 请求封装后，对同一份 pcap 离线重放：
+
+- `decoded_packets.csv`：2051 行。
+- 成功解析 opcode：2046 行。
+- 0x4013 解析成功：2046 行 `ok embedded_iv`。
+- `c2s_alt_7ca2`：712 行。
+- `ok_unparsed`：0 行。
+
+关键战斗 opcode 已覆盖：
+
+- `0x1316` `ZoneBattleEnterNotify`
+- `0x131A` `ZoneBattleRoundStartNotify`
+- `0x1322` `ZoneBattleCmdSyncNotify`
+- `0x1324` `ZoneBattlePerformStartNotify`
+- `0x130C` `ZoneBattleCmdPushbackRsp`
+- `0x13F4` `ZoneBattleInstantPerformNotify`
+- `0x132C` `ZoneBattleFinishNotify`
+
+本场摘要结论：
+
+- 战斗结果：`WIN_DEFEAT`
+- 回合数：5
+- 用时：94 秒
+- 摘要覆盖进入战斗、首发对位、我方阵容、敌方可见、回合开始、技能广播、伤害、能量变化、换人、能量瓶、愿力强化和战斗结束。
+
+---
+
+## 8. 测试与发布检查
+
+新增 `tests/test_new_version_adaptation.py`，覆盖：
+
+- 新 opcode 查找：`0x028D -> ZoneGetHandbookSeasonAwardReq`。
+- 新 world-data 映射：属性、宠物、技能。
+- flattened payload 解码。
+- `fixed_iv` 解密候选与 TGCP internal header 解析。
+- `0x7CA2` c2s alternate request record 解析。
+
+发布前验证：
+
+- `python -m unittest discover -s tests`：18 tests OK。
+- `python -m compileall -q .`：通过。
+
+---
+
+## 9. 已知剩余项
+
+- 当前已知的 `0x7CA2` c2s 请求封装已补齐；如果未来出现新的 `ok_unparsed`，它们会保留在 CSV 诊断中，但不会再作为运行时 warning 刷屏。
+- RocoMITMServer 的 proto/schema 是当前主要数据来源，后续协议更新时应优先重新执行 `tools/update_roco_data.py`，再补必要的语义摘要。
+
+---
+
+## 10. 核心结论
+
+Ver2.2 的重点不是继续扩写单个 opcode 的硬编码字段翻译，而是把 RKPP 的新版协议适配主路升级为：
+
+`RocoMITMServer schema/codec + world-data 映射 + 多候选 0x4013 解密 + TGCP internal header + c2s 0x7CA2 request record + 战斗语义摘要`
+
+这条链路已经通过 2026-05-24 的真实进服与完整战斗验证。
