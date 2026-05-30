@@ -77,7 +77,7 @@ public class InteractiveCanvas extends Canvas {
         setOnMousePressed(this::onMousePressed);
         setOnMouseClicked(this::onMouseClicked);
         setOnMouseDragged(this::onMouseDragged);
-        setOnMouseReleased(_ -> pathEditor.onMouseReleased());
+        setOnMouseReleased(e -> pathEditor.onMouseReleased(e));
         setOnScroll(this::onScroll);
     }
 

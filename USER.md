@@ -4,11 +4,11 @@
 - **当前痛点**：Claude 总是忘记 Native Image 虚拟线程 Bug、忘记检查编码规范
 
 ## 项目上下文
-- **语言**：Java 25 + GraalVM Native Image
+- **语言**：Java 25 + C++ 17 + Python + GraalVM Native Image
 - **构建**：Maven 多模块
-- **关键依赖**：JavaCPP OpenCV 4.13.0、JavaFX、DJL
+- **关键依赖**：JavaFX 25、Jackson、Jsoup、AtlantaFX
+- **视觉处理**：全部在 C++ 子进程中完成（OpenCV SIFT/FLANN/RANSAC + HSV），Java 侧零 OpenCV 依赖
 - **特殊约束**：
-    - 所有临时 Native 对象必须在 try (PointerScope) 内
     - C++ 子进程通过 Socket 通信（万分数坐标）
     - Native Image 下虚拟线程阻塞 I/O 会崩溃（必须用平台线程）
 

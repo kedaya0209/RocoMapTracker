@@ -1,5 +1,6 @@
 package com.luoke.app.process;
 
+import com.luoke.app.platform.JobObjectManager;
 import net.jcip.annotations.NotThreadSafe;
 import lombok.extern.slf4j.Slf4j;
 

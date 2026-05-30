@@ -2,20 +2,12 @@ package com.luoke.app.map;
 
 import com.luoke.app.config.DownloadConfig;
 import com.luoke.app.map.core.IconDownloader;
+import com.luoke.app.map.loader.LoadInfo;
 import net.jcip.annotations.NotThreadSafe;
 import com.luoke.app.map.core.MapDownloader;
 import com.luoke.app.map.core.ResourceConfigBuilder;
 import com.luoke.app.map.util.MapFileMover;
-import com.luoke.app.utils.ResourceUtils;
 import lombok.extern.slf4j.Slf4j;
-
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.FileVisitResult;
-import java.nio.file.FileVisitor;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.attribute.BasicFileAttributes;
 
 /**
  * 地图资源更新触发器
@@ -65,11 +57,6 @@ public final class MapResourceUpdater {
     public static final String METADATA_FILE = "download/maps/metadata_%s.csv";
 
     /**
-     * 失败记录文件路径模板
-     */
-    public static final String FAILED_FILE = "download/maps/failed_%s.csv";
-
-    /**
      * 分块处理大小
      */
     public static int CHUNK_SIZE = DownloadConfig.DOWNLOAD_CHUNK_SIZE;
@@ -111,61 +98,50 @@ public final class MapResourceUpdater {
 
     // ========== 公共API方法 ==========
 
-    public static void updateAllResources() {
-        File downloadDir = ResourceUtils.getExternalFile(DOWNLOAD_DIR);
-        if (downloadDir.exists()) {
-            try {
-                Files.walkFileTree(downloadDir.toPath(), new FileVisitor<Path>() {
-                    @Override
-                    public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
-                        return FileVisitResult.CONTINUE;
-                    }
+    /**
+     * 全量更新：地图瓦片 → 资源点配置 → 图标 → 移动到最终目录。
+     * 每次更新开始前清空分类缓存，确保从远程获取最新数据。
+     *
+     * @return true 全部成功，false 中途失败（地图下载或配置构建出错）
+     */
+    public static boolean updateAllResources() {
+        LoadInfo.invalidateCategoryCache();
 
-                    @Override
-                    public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-                        Files.deleteIfExists(file);
-                        return FileVisitResult.CONTINUE;
-                    }
-
-                    @Override
-                    public FileVisitResult visitFileFailed(Path file, IOException exc) throws IOException {
-                        return FileVisitResult.CONTINUE;
-                    }
-
-                    @Override
-                    public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
-                        Files.deleteIfExists(dir);
-                        return FileVisitResult.CONTINUE;
-                    }
-                });
-            } catch (IOException e) {
-                log.error("删除下载文件夹失败, e:", e);
-            }
-        }
-
-        MapDownloader.updateMap();
-        if (MapDownloader.getIsStopRequested().get()) {
-            return;
-        }
-
-        ResourceConfigBuilder.buildAndSaveConfig();
-
-        IconDownloader.downloadIcons();
-        if (IconDownloader.getIsStopRequested().get()) {
-            return;
-        }
-
-        MapFileMover.moveAllResources();
-    }
-
-    public static void updateMapOnly() {
-        MapDownloader.updateMap();
+        if (!MapDownloader.updateMap()) return false;
         MapFileMover.moveMapsToResource();
-    }
 
-    public static void updateIconsAndConfigOnly() {
-        ResourceConfigBuilder.buildAndSaveConfig();
+        if (!ResourceConfigBuilder.buildAndSaveConfig()) return false;
+
         IconDownloader.downloadIcons();
         MapFileMover.moveAllResources();
+        return true;
+    }
+
+    /**
+     * 仅更新地图瓦片，用于恢复缺失的地图文件。
+     *
+     * @return true 成功，false 失败
+     */
+    public static boolean updateMapOnly() {
+        LoadInfo.invalidateCategoryCache();
+
+        if (!MapDownloader.updateMap()) return false;
+        MapFileMover.moveMapsToResource();
+        return true;
+    }
+
+    /**
+     * 仅更新配置和图标，用于恢复缺失的配置/图标文件。
+     *
+     * @return true 成功，false 失败
+     */
+    public static boolean updateIconsAndConfigOnly() {
+        LoadInfo.invalidateCategoryCache();
+
+        if (!ResourceConfigBuilder.buildAndSaveConfig()) return false;
+
+        IconDownloader.downloadIcons();
+        MapFileMover.moveAllResources();
+        return true;
     }
 }

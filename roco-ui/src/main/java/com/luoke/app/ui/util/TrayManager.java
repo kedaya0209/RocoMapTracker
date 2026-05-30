@@ -2,7 +2,7 @@ package com.luoke.app.ui.util;
 
 import com.luoke.app.config.CaptureConfig;
 import com.luoke.app.config.SiftConfig;
-import com.luoke.app.ui.service.SvgManager;
+import com.luoke.app.ui.service.resource.SvgManager;
 import com.luoke.app.utils.FilePathUtil;
 import com.luoke.app.utils.ResourceUtils;
 import javafx.application.Platform;
@@ -51,168 +51,6 @@ import java.util.concurrent.CompletableFuture;
 @Slf4j
 public class TrayManager {
 
-    // ============================================================
-    // Win32 常量
-    // ============================================================
-
-    private static final long HWND_MESSAGE = -3L;
-
-    private static final int WM_DESTROY = 0x0002;
-    private static final int WM_QUIT = 0x0012;
-    private static final int WM_LBUTTONDBLCLK = 0x0203;
-    private static final int WM_RBUTTONUP = 0x0205;
-
-    private static final int NIM_ADD = 0;
-    private static final int NIM_MODIFY = 1;
-    private static final int NIM_DELETE = 2;
-    private static final int NIM_SETVERSION = 4;
-    private static final int NIF_MESSAGE = 0x0001;
-    private static final int NIF_ICON = 0x0002;
-    private static final int NIF_TIP = 0x0004;
-    private static final int NIF_SHOWTIP = 0x0080;
-    private static final int NOTIFYICON_VERSION_4 = 4;
-
-    // NOTIFYICONDATAW x64 字段偏移
-    private static final long NID_CBSIZE = 0L;
-    private static final long NID_HWND = 8L;
-    private static final long NID_UID = 16L;
-    private static final long NID_UFLAGS = 20L;
-    private static final long NID_UCALLBACKMSG = 24L;
-    private static final long NID_HICON = 32L;
-    private static final long NID_SZTIP = 40L;
-    private static final long NID_UVERSION = 816L;
-    private static final long NID_SIZE = 1024L;
-
-    // ============================================================
-    // FFM 符号绑定（首次使用时惰性初始化）
-    // ============================================================
-
-    private static volatile boolean symbolsLoaded;
-    private static MethodHandle ShellNotifyIconW;
-    private static MethodHandle CreateWindowExW;
-    private static MethodHandle DefWindowProcW;
-    private static MethodHandle RegisterClassExW;
-    private static MethodHandle DestroyWindow;
-    private static MethodHandle GetMessageW;
-    private static MethodHandle TranslateMessage;
-    private static MethodHandle DispatchMessageW;
-    private static MethodHandle PostThreadMessageW;
-    private static MethodHandle GetWindowThreadProcessId;
-    private static MethodHandle GetCursorPos;
-    private static MethodHandle CreateDIBSection;
-    private static MethodHandle CreateIconIndirect;
-    private static MethodHandle DestroyIcon;
-    private static MethodHandle DeleteObject;
-    private static MethodHandle GetDC;
-    private static MethodHandle ReleaseDC;
-    private static MethodHandle CreateBitmap;
-
-    private static void ensureSymbols() {
-        if (symbolsLoaded) return;
-        synchronized (TrayManager.class) {
-            if (symbolsLoaded) return;
-            try {
-                Linker linker = Linker.nativeLinker();
-                SymbolLookup user32 = SymbolLookup.libraryLookup("user32", Arena.global());
-                SymbolLookup shell32 = SymbolLookup.libraryLookup("shell32", Arena.global());
-                SymbolLookup gdi32 = SymbolLookup.libraryLookup("gdi32", Arena.global());
-
-                ShellNotifyIconW = linker.downcallHandle(
-                        shell32.findOrThrow("Shell_NotifyIconW"),
-                        FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.ADDRESS));
-
-                CreateWindowExW = linker.downcallHandle(
-                        user32.findOrThrow("CreateWindowExW"),
-                        FunctionDescriptor.of(ValueLayout.JAVA_LONG,
-                                ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS,
-                                ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT,
-                                ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG,
-                                ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.ADDRESS));
-
-                DefWindowProcW = linker.downcallHandle(
-                        user32.findOrThrow("DefWindowProcW"),
-                        FunctionDescriptor.of(ValueLayout.JAVA_LONG,
-                                ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT,
-                                ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG));
-
-                RegisterClassExW = linker.downcallHandle(
-                        user32.findOrThrow("RegisterClassExW"),
-                        FunctionDescriptor.of(ValueLayout.JAVA_SHORT, ValueLayout.ADDRESS));
-
-                DestroyWindow = linker.downcallHandle(
-                        user32.findOrThrow("DestroyWindow"),
-                        FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG));
-
-                GetMessageW = linker.downcallHandle(
-                        user32.findOrThrow("GetMessageW"),
-                        FunctionDescriptor.of(ValueLayout.JAVA_INT,
-                                ValueLayout.ADDRESS, ValueLayout.JAVA_LONG,
-                                ValueLayout.JAVA_INT, ValueLayout.JAVA_INT));
-
-                TranslateMessage = linker.downcallHandle(
-                        user32.findOrThrow("TranslateMessage"),
-                        FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS));
-
-                DispatchMessageW = linker.downcallHandle(
-                        user32.findOrThrow("DispatchMessageW"),
-                        FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.ADDRESS));
-
-                PostThreadMessageW = linker.downcallHandle(
-                        user32.findOrThrow("PostThreadMessageW"),
-                        FunctionDescriptor.of(ValueLayout.JAVA_INT,
-                                ValueLayout.JAVA_INT, ValueLayout.JAVA_INT,
-                                ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG));
-
-                GetWindowThreadProcessId = linker.downcallHandle(
-                        user32.findOrThrow("GetWindowThreadProcessId"),
-                        FunctionDescriptor.of(ValueLayout.JAVA_INT,
-                                ValueLayout.JAVA_LONG, ValueLayout.ADDRESS));
-
-                GetCursorPos = linker.downcallHandle(
-                        user32.findOrThrow("GetCursorPos"),
-                        FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS));
-
-                CreateDIBSection = linker.downcallHandle(
-                        gdi32.findOrThrow("CreateDIBSection"),
-                        FunctionDescriptor.of(ValueLayout.JAVA_LONG,
-                                ValueLayout.JAVA_LONG, ValueLayout.ADDRESS,
-                                ValueLayout.JAVA_INT, ValueLayout.ADDRESS,
-                                ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT));
-
-                CreateIconIndirect = linker.downcallHandle(
-                        user32.findOrThrow("CreateIconIndirect"),
-                        FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.ADDRESS));
-
-                DestroyIcon = linker.downcallHandle(
-                        user32.findOrThrow("DestroyIcon"),
-                        FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG));
-
-                DeleteObject = linker.downcallHandle(
-                        gdi32.findOrThrow("DeleteObject"),
-                        FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG));
-
-                GetDC = linker.downcallHandle(
-                        user32.findOrThrow("GetDC"),
-                        FunctionDescriptor.of(ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG));
-
-                ReleaseDC = linker.downcallHandle(
-                        user32.findOrThrow("ReleaseDC"),
-                        FunctionDescriptor.of(ValueLayout.JAVA_INT,
-                                ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG));
-
-                CreateBitmap = linker.downcallHandle(
-                        gdi32.findOrThrow("CreateBitmap"),
-                        FunctionDescriptor.of(ValueLayout.JAVA_LONG,
-                                ValueLayout.JAVA_INT, ValueLayout.JAVA_INT,
-                                ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.ADDRESS));
-
-                symbolsLoaded = true;
-                log.info("FFM Win32 符号加载完成");
-            } catch (Throwable e) {
-                log.error("FFM Win32 符号加载失败，系统托盘不可用", e);
-            }
-        }
-    }
 
     // ============================================================
     // 实例字段
@@ -275,8 +113,8 @@ public class TrayManager {
         initialized = true;
         if (!trayAvailable) return;
 
-        ensureSymbols();
-        if (!symbolsLoaded) {
+        Win32TraySymbols.ensureSymbols();
+        if (!Win32TraySymbols.symbolsLoaded) {
             trayAvailable = false;
             return;
         }
@@ -302,8 +140,8 @@ public class TrayManager {
             // 先删除旧图标
             if (currentHIcon != 0) {
                 try {
-                    int _nim = (int) ShellNotifyIconW.invokeExact(NIM_DELETE, nidData);
-                    int _di = (int) DestroyIcon.invokeExact(currentHIcon);
+                    int _nim = (int) Win32TraySymbols.ShellNotifyIconW.invokeExact(Win32TraySymbols.NIM_DELETE, nidData);
+                    int _di = (int) Win32TraySymbols.DestroyIcon.invokeExact(currentHIcon);
                 } catch (Throwable ignored) {
                 }
                 currentHIcon = 0;
@@ -327,40 +165,40 @@ public class TrayManager {
         }
 
         // 构造 NOTIFYICONDATAW
-        nidData = arena.allocate(NID_SIZE);
+        nidData = arena.allocate(Win32TraySymbols.NID_SIZE);
         nidData.fill((byte) 0);
-        nidData.set(ValueLayout.JAVA_INT, NID_CBSIZE, NID_CBSIZE_VAL);
-        nidData.set(ValueLayout.JAVA_LONG, NID_HWND, messageHwnd);
-        nidData.set(ValueLayout.JAVA_INT, NID_UID, 0);
-        nidData.set(ValueLayout.JAVA_INT, NID_UFLAGS, NIF_MESSAGE | NIF_ICON | NIF_TIP | NIF_SHOWTIP);
-        nidData.set(ValueLayout.JAVA_INT, NID_UCALLBACKMSG, callbackMsg);
-        nidData.set(ValueLayout.JAVA_LONG, NID_HICON, currentHIcon);
+        nidData.set(ValueLayout.JAVA_INT, Win32TraySymbols.NID_CBSIZE, Win32TraySymbols.NID_CBSIZE_VAL);
+        nidData.set(ValueLayout.JAVA_LONG, Win32TraySymbols.NID_HWND, messageHwnd);
+        nidData.set(ValueLayout.JAVA_INT, Win32TraySymbols.NID_UID, 0);
+        nidData.set(ValueLayout.JAVA_INT, Win32TraySymbols.NID_UFLAGS, Win32TraySymbols.NIF_MESSAGE | Win32TraySymbols.NIF_ICON | Win32TraySymbols.NIF_TIP | Win32TraySymbols.NIF_SHOWTIP);
+        nidData.set(ValueLayout.JAVA_INT, Win32TraySymbols.NID_UCALLBACKMSG, callbackMsg);
+        nidData.set(ValueLayout.JAVA_LONG, Win32TraySymbols.NID_HICON, currentHIcon);
 
         // 设置标题提示
         String tip = CaptureConfig.APP_MAIN_TITLE;
         byte[] tipBytes = tip.getBytes(StandardCharsets.UTF_16LE);
-        nidData.asSlice(NID_SZTIP, Math.min(tipBytes.length, 256))
+        nidData.asSlice(Win32TraySymbols.NID_SZTIP, Math.min(tipBytes.length, 256))
                 .copyFrom(MemorySegment.ofArray(tipBytes));
 
         // 添加图标
         try {
-            int result = (int) ShellNotifyIconW.invokeExact(NIM_ADD, nidData);
+            int result = (int) Win32TraySymbols.ShellNotifyIconW.invokeExact(Win32TraySymbols.NIM_ADD, nidData);
             if (result == 0) {
-                log.warn("Shell_NotifyIconW(NIM_ADD) 失败");
+                log.warn("Shell_NotifyIconW(Win32TraySymbols.NIM_ADD) 失败");
                 trayAvailable = false;
                 return;
             }
 
-            // 设置 NOTIFYICON_VERSION_4 以获得正确的消息通知
-            MemorySegment verData = arena.allocate(NID_SIZE);
+            // 设置 Win32TraySymbols.NOTIFYICON_VERSION_4 以获得正确的消息通知
+            MemorySegment verData = arena.allocate(Win32TraySymbols.NID_SIZE);
             verData.fill((byte) 0);
-            verData.set(ValueLayout.JAVA_INT, NID_CBSIZE, NID_CBSIZE_VAL);
-            verData.set(ValueLayout.JAVA_LONG, NID_HWND, messageHwnd);
-            verData.set(ValueLayout.JAVA_INT, NID_UID, 0);
-            verData.set(ValueLayout.JAVA_INT, NID_UFLAGS, NIF_MESSAGE);
-            verData.set(ValueLayout.JAVA_INT, NID_UCALLBACKMSG, callbackMsg);
-            verData.set(ValueLayout.JAVA_INT, NID_UVERSION, NOTIFYICON_VERSION_4);
-            int _nsv = (int) ShellNotifyIconW.invokeExact(NIM_SETVERSION, verData);
+            verData.set(ValueLayout.JAVA_INT, Win32TraySymbols.NID_CBSIZE, Win32TraySymbols.NID_CBSIZE_VAL);
+            verData.set(ValueLayout.JAVA_LONG, Win32TraySymbols.NID_HWND, messageHwnd);
+            verData.set(ValueLayout.JAVA_INT, Win32TraySymbols.NID_UID, 0);
+            verData.set(ValueLayout.JAVA_INT, Win32TraySymbols.NID_UFLAGS, Win32TraySymbols.NIF_MESSAGE);
+            verData.set(ValueLayout.JAVA_INT, Win32TraySymbols.NID_UCALLBACKMSG, callbackMsg);
+            verData.set(ValueLayout.JAVA_INT, Win32TraySymbols.NID_UVERSION, Win32TraySymbols.NOTIFYICON_VERSION_4);
+            int _nsv = (int) Win32TraySymbols.ShellNotifyIconW.invokeExact(Win32TraySymbols.NIM_SETVERSION, verData);
         } catch (Throwable e) {
             log.error("创建托盘图标异常", e);
             trayAvailable = false;
@@ -400,7 +238,7 @@ public class TrayManager {
                 .findVirtual(TrayManager.class, "onWndProc",
                         MethodType.methodType(long.class, long.class, int.class, long.class, long.class))
                 .bindTo(this);
-        wndProcStub = linker.upcallStub(
+        wndProcStub = Win32TraySymbols.linker.upcallStub(
                 wndProcHandle,
                 FunctionDescriptor.of(ValueLayout.JAVA_LONG,
                         ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT,
@@ -408,26 +246,26 @@ public class TrayManager {
                 arena);
 
         // 注册窗口类（WNDCLASSEXW）
-        MemorySegment wcex = arena.allocate(WNDCLASSEX_SIZE);
+        MemorySegment wcex = arena.allocate(Win32TraySymbols.WNDCLASSEX_SIZE);
         wcex.fill((byte) 0);
-        wcex.set(ValueLayout.JAVA_INT, 0, WNDCLASSEX_SIZE);    // cbSize
+        wcex.set(ValueLayout.JAVA_INT, 0, Win32TraySymbols.WNDCLASSEX_SIZE);    // cbSize
         wcex.set(ValueLayout.JAVA_LONG, 8, wndProcStub.address()); // lpfnWndProc
         wcex.set(ValueLayout.JAVA_LONG, 64, clsNameMem.address()); // lpszClassName
 
-        short atom = (short) RegisterClassExW.invokeExact(wcex);
+        short atom = (short) Win32TraySymbols.RegisterClassExW.invokeExact(wcex);
         if (atom == 0) {
             windowReady.completeExceptionally(new RuntimeException("RegisterClassExW 失败"));
             return;
         }
 
-        // 创建消息窗口（HWND_MESSAGE = 父窗口为消息-only）
-        messageHwnd = (long) CreateWindowExW.invokeExact(
+        // 创建消息窗口（Win32TraySymbols.HWND_MESSAGE = 父窗口为消息-only）
+        messageHwnd = (long) Win32TraySymbols.CreateWindowExW.invokeExact(
                 0,                            // dwExStyle
                 clsNameMem,                   // lpClassName
                 MemorySegment.NULL,           // lpWindowName
                 0,                            // dwStyle
                 0, 0, 0, 0,                   // x, y, w, h
-                HWND_MESSAGE,                 // hWndParent = HWND_MESSAGE
+                Win32TraySymbols.HWND_MESSAGE,                 // hWndParent = Win32TraySymbols.HWND_MESSAGE
                 0L,                           // hMenu
                 0L,                           // hInstance
                 MemorySegment.NULL);          // lpParam
@@ -443,11 +281,11 @@ public class TrayManager {
         windowReady.complete(null);
 
         // 消息泵循环
-        MemorySegment msg = arena.allocate(MSG_SIZE);
+        MemorySegment msg = arena.allocate(Win32TraySymbols.MSG_SIZE);
         int result;
-        while ((result = (int) GetMessageW.invokeExact(msg, 0L, 0, 0)) > 0) {
-            int _tm = (int) TranslateMessage.invokeExact(msg);
-            long _dm = (long) DispatchMessageW.invokeExact(msg);
+        while ((result = (int) Win32TraySymbols.GetMessageW.invokeExact(msg, 0L, 0, 0)) > 0) {
+            int _tm = (int) Win32TraySymbols.TranslateMessage.invokeExact(msg);
+            long _dm = (long) Win32TraySymbols.DispatchMessageW.invokeExact(msg);
         }
         pumpRunning = false;
     }
@@ -466,11 +304,11 @@ public class TrayManager {
             // 托盘图标通知
             if (msg == callbackMsg) {
                 int notification = (int) lParam;
-                if (notification == WM_RBUTTONUP) {
+                if (notification == Win32TraySymbols.WM_RBUTTONUP) {
                     Platform.runLater(() -> {
                         MemorySegment pt = arena.allocate(8);
                         try {
-                            int _gcp = (int) GetCursorPos.invokeExact(pt);
+                            int _gcp = (int) Win32TraySymbols.GetCursorPos.invokeExact(pt);
                             int x = pt.get(ValueLayout.JAVA_INT, 0);
                             int y = pt.get(ValueLayout.JAVA_INT, 4);
                             showMenu(x, y);
@@ -480,15 +318,15 @@ public class TrayManager {
                     });
                     return 0;
                 }
-                if (notification == WM_LBUTTONDBLCLK) {
+                if (notification == Win32TraySymbols.WM_LBUTTONDBLCLK) {
                     Platform.runLater(this::showWindow);
                     return 0;
                 }
             }
-            if (msg == WM_DESTROY) {
+            if (msg == Win32TraySymbols.WM_DESTROY) {
                 return 0;
             }
-            return (long) DefWindowProcW.invokeExact(hwnd, msg, wParam, lParam);
+            return (long) Win32TraySymbols.DefWindowProcW.invokeExact(hwnd, msg, wParam, lParam);
         } catch (Throwable e) {
             log.error("窗口过程异常", e);
             return 0;
@@ -600,13 +438,13 @@ public class TrayManager {
             bmi.set(ValueLayout.JAVA_SHORT, 14, (short) 32);// biBitCount
 
             // 获取屏幕 DC
-            long hdc = (long) GetDC.invokeExact(0L);
+            long hdc = (long) Win32TraySymbols.GetDC.invokeExact(0L);
 
             // CreateDIBSection
             MemorySegment ppvBits = arena.allocate(ValueLayout.ADDRESS);
-            long hBitmap = (long) CreateDIBSection.invokeExact(
+            long hBitmap = (long) Win32TraySymbols.CreateDIBSection.invokeExact(
                     hdc, bmi, 0, ppvBits, 0L, 0);
-            int _rdc = (int) ReleaseDC.invokeExact(0L, hdc);
+            int _rdc = (int) Win32TraySymbols.ReleaseDC.invokeExact(0L, hdc);
 
             if (hBitmap == 0) {
                 log.warn("CreateDIBSection 失败");
@@ -630,31 +468,31 @@ public class TrayManager {
             long maskStride = ((width + 31L) / 32L) * 4L;
             MemorySegment maskData = arena.allocate(maskStride * height);
             maskData.fill((byte) 0);
-            long hMask = (long) CreateBitmap.invokeExact(
+            long hMask = (long) Win32TraySymbols.CreateBitmap.invokeExact(
                     width, height, 1, 1, maskData);
 
             if (hMask == 0) {
                 log.warn("CreateBitmap(mask) 失败");
-                int _do = (int) DeleteObject.invokeExact(hBitmap);
+                int _do = (int) Win32TraySymbols.DeleteObject.invokeExact(hBitmap);
                 return 0;
             }
 
             // 构造 ICONINFO
-            MemorySegment ii = arena.allocate(ICONINFO_SIZE);
+            MemorySegment ii = arena.allocate(Win32TraySymbols.ICONINFO_SIZE);
             ii.fill((byte) 0);
             ii.set(ValueLayout.JAVA_INT, 0, 1);              // fIcon = TRUE
             // xHotspot/yHotspot 对于图标忽略，保持 0
-            ii.set(ValueLayout.JAVA_LONG, ICONINFO_HBMMASK, hMask);
-            ii.set(ValueLayout.JAVA_LONG, ICONINFO_HBMCOLOR, hBitmap);
+            ii.set(ValueLayout.JAVA_LONG, Win32TraySymbols.ICONINFO_HBMMASK, hMask);
+            ii.set(ValueLayout.JAVA_LONG, Win32TraySymbols.ICONINFO_HBMCOLOR, hBitmap);
 
-            long hIcon = (long) CreateIconIndirect.invokeExact(ii);
+            long hIcon = (long) Win32TraySymbols.CreateIconIndirect.invokeExact(ii);
             if (hIcon == 0) {
                 log.warn("CreateIconIndirect 失败");
             }
 
             // 清理临时 GDI 对象
-            int _dm = (int) DeleteObject.invokeExact(hMask);
-            int _db = (int) DeleteObject.invokeExact(hBitmap);
+            int _dm = (int) Win32TraySymbols.DeleteObject.invokeExact(hMask);
+            int _db = (int) Win32TraySymbols.DeleteObject.invokeExact(hBitmap);
 
             return hIcon;
         } catch (Throwable e) {
@@ -688,7 +526,7 @@ public class TrayManager {
         // 1. 删除托盘图标
         if (nidData != null && messageHwnd != 0) {
             try {
-                int _nim = (int) ShellNotifyIconW.invokeExact(NIM_DELETE, nidData);
+                int _nim = (int) Win32TraySymbols.ShellNotifyIconW.invokeExact(Win32TraySymbols.NIM_DELETE, nidData);
             } catch (Throwable ignored) {
             }
         }
@@ -696,18 +534,17 @@ public class TrayManager {
         // 2. 销毁 HICON
         if (currentHIcon != 0) {
             try {
-                int _di = (int) DestroyIcon.invokeExact(currentHIcon);
+                int _di = (int) Win32TraySymbols.DestroyIcon.invokeExact(currentHIcon);
             } catch (Throwable ignored) {
             }
             currentHIcon = 0;
         }
 
-        // 3. 停止消息泵
+        // 3. 停止消息泵（线程为 daemon，JVM 退出时自动终止，无需 join 等待）
         pumpRunning = false;
         if (pumpThread != null && pumpThread.isAlive()) {
             try {
-                int _ptm = (int) PostThreadMessageW.invokeExact((int) pumpThreadId, WM_QUIT, 0L, 0L);
-                pumpThread.join(1000);
+                int _ptm = (int) Win32TraySymbols.PostThreadMessageW.invokeExact((int) pumpThreadId, Win32TraySymbols.WM_QUIT, 0L, 0L);
             } catch (Throwable ignored) {
             }
             pumpThread = null;
@@ -716,7 +553,7 @@ public class TrayManager {
         // 4. 销毁窗口
         if (messageHwnd != 0) {
             try {
-                int _dw = (int) DestroyWindow.invokeExact(messageHwnd);
+                int _dw = (int) Win32TraySymbols.DestroyWindow.invokeExact(messageHwnd);
             } catch (Throwable ignored) {
             }
             messageHwnd = 0;
@@ -831,28 +668,4 @@ public class TrayManager {
         return label;
     }
 
-    // ============================================================
-    // FFM 静态字段（无法放入静态初始化块）
-    // ============================================================
-
-    private static final Linker linker = Linker.nativeLinker();
-
-    // NOTIFYICONDATAW x64 cbSize 值（含 Vista+ hBalloonIcon 字段）
-    private static final int NID_CBSIZE_VAL = 976;
-
-    // ICONINFO x64 字段偏移
-    // typedef struct { BOOL fIcon; DWORD xHotspot; DWORD yHotspot; HBITMAP hbmMask; HBITMAP hbmColor; } ICONINFO;
-    // x64: fIcon(4)+xHotspot(4)+yHotspot(4)+pad(4)+hbmMask(8)+hbmColor(8) = 32
-    private static final int ICONINFO_SIZE = 32;
-    private static final long ICONINFO_HBMMASK = 16L;   // offset of hbmMask
-    private static final long ICONINFO_HBMCOLOR = 24L;  // offset of hbmColor
-
-    // WNDCLASSEXW x64 大小
-    // cbSize(4)+style(4)+lpfnWndProc(8)+cbClsExtra(4)+cbWndExtra(4)+pad(4)
-    // +hInstance(8)+hIcon(8)+hCursor(8)+hbrBackground(8)+lpszMenuName(8)+lpszClassName(8)+hIconSm(8) = 80
-    private static final int WNDCLASSEX_SIZE = 80;
-
-    // MSG x64 大小
-    // hwnd(8)+message(4)+pad(4)+wParam(8)+lParam(8)+time(4)+pt(8) = 44 → 按 8 字节对齐 = 48
-    private static final int MSG_SIZE = 48;
 }

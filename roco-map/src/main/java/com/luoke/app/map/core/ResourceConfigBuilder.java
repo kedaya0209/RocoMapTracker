@@ -1,7 +1,7 @@
 package com.luoke.app.map.core;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.luoke.app.map.LoadInfo;
+import com.luoke.app.map.loader.LoadInfo;
 import com.luoke.app.map.MapResourceUpdater;
 import com.luoke.app.map.dto.MapCategoryItem;
 import com.luoke.app.map.dto.MapPointItem;
@@ -27,7 +27,7 @@ import java.util.Map;
 public class ResourceConfigBuilder {
     private static final ObjectMapper om = JsonUtils.getMapper();
 
-    public static void buildAndSaveConfig() {
+    public static boolean buildAndSaveConfig() {
         try {
             List<MapCategoryItem> categories = LoadInfo.parseCategoryData();
             List<MapPointItem> points = LoadInfo.parsePointJson();
@@ -54,9 +54,11 @@ public class ResourceConfigBuilder {
             om.writerWithDefaultPrettyPrinter().writeValue(out, list);
 
             log.info("✅ 配置生成完成：{} 条", list.size());
+            return true;
 
         } catch (IOException e) {
             log.error("❌ 生成配置失败", e);
+            return false;
         }
     }
 

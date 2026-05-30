@@ -10,7 +10,7 @@ import com.luoke.app.hook.IHook;
 import com.luoke.app.hook.multicast.HookRegistry;
 import com.luoke.app.map.model.ResourcePoint;
 import com.luoke.app.ui.component.StatsOverlay;
-import com.luoke.app.ui.service.TileManager;
+import com.luoke.app.ui.service.resource.TileManager;
 import javafx.animation.KeyFrame;
 import javafx.application.Platform;
 import javafx.animation.Timeline;

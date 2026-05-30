@@ -24,7 +24,7 @@ import javafx.scene.shape.SVGPath;
 import javafx.scene.text.TextAlignment;
 import javafx.util.Duration;
 
-import com.luoke.app.ui.service.SvgManager;
+import com.luoke.app.ui.service.resource.SvgManager;
 
 @ThreadSafe
 public class DialogUtils {

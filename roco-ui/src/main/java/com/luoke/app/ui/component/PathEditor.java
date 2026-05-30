@@ -1,5 +1,6 @@
 package com.luoke.app.ui.component;
 
+import javafx.scene.input.MouseEvent;
 import net.jcip.annotations.NotThreadSafe;
 import com.luoke.app.config.ViewConfig;
 import com.luoke.app.context.MapContext;
@@ -110,7 +111,7 @@ public class PathEditor {
     /**
      * 鼠标释放：结束节点拖拽
      */
-    public void onMouseReleased() {
+    public void onMouseReleased(MouseEvent event) {
         draggedNodeIndex = -1;
     }
 

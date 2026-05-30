@@ -14,7 +14,7 @@ public class MapPointItem {
 
     private String id;
 
-    private Point point;
+    private LatLng point;
 
     private String uid;
 

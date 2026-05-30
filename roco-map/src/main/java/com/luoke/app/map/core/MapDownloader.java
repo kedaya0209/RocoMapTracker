@@ -1,12 +1,11 @@
 package com.luoke.app.map.core;
 
 import com.luoke.app.config.DownloadConfig;
-import com.luoke.app.map.LoadInfo;
+import com.luoke.app.map.loader.LoadInfo;
 import com.luoke.app.map.MapResourceUpdater;
 import net.jcip.annotations.NotThreadSafe;
-import com.luoke.app.map.entity.DownloadResult;
-import com.luoke.app.map.entity.Tile;
-import com.luoke.app.map.util.MapFileMover;
+import com.luoke.app.map.dto.DownloadResult;
+import com.luoke.app.map.dto.Tile;
 import com.luoke.app.utils.FilePathUtil;
 import com.luoke.app.utils.PngUtil;
 import lombok.Getter;
@@ -46,17 +45,18 @@ public class MapDownloader {
     private static int tileW = -1;
     private static int tileH = -1;
 
-    public static void updateMap() {
+    public static boolean updateMap() {
         try {
             log.info("开始地图资源更新流程...");
             downloadAllMaps();
             if (isStopRequested.get()) {
-                return;
+                return false;
             }
-            MapFileMover.moveMapsToResource();
             log.info("✅ 所有任务已圆满完成！");
+            return true;
         } catch (RuntimeException e) {
             log.error("❌ 更新地图流程发生崩溃", e);
+            return false;
         }
     }
 

@@ -3,8 +3,13 @@ package com.luoke.app.ui.component;
 import net.jcip.annotations.NotThreadSafe;
 import com.luoke.app.config.ViewConfig;
 import com.luoke.app.context.CameraContext;
-import com.luoke.app.ui.service.SvgManager;
-import com.luoke.app.ui.service.VersionManager;
+import com.luoke.app.hook.AbstractGenericHook;
+import com.luoke.app.hook.HookEventType;
+import com.luoke.app.hook.event.FollowModeEvent;
+import com.luoke.app.hook.multicast.HookRegistry;
+import com.luoke.app.ui.service.VersionMode;
+import com.luoke.app.ui.service.resource.SvgManager;
+import com.luoke.app.ui.service.ui.VersionManager;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -17,6 +22,8 @@ import javafx.scene.paint.Color;
 import javafx.scene.shape.SVGPath;
 import javafx.scene.transform.Scale;
 import javafx.util.Duration;
+
+import java.util.Set;
 
 @NotThreadSafe
 public class FloatToolbox extends VBox {
@@ -86,8 +93,17 @@ public class FloatToolbox extends VBox {
 
         CameraContext cameraCtx = CameraContext.getInstance();
         btn.setOnMouseClicked(_ -> cameraCtx.setFollowMode(!cameraCtx.isFollowMode()));
-        cameraCtx.onFollowModeChange(() ->
-                Platform.runLater(() -> icon.setFill(cameraCtx.isFollowMode() ? Color.web(unifiedBlueColor) : Color.WHITE)));
+        HookRegistry.INSTANCE.register(new AbstractGenericHook<FollowModeEvent>() {
+            @Override
+            public void onEvent(HookEventType eventType, FollowModeEvent data) {
+                Platform.runLater(() -> icon.setFill(data.followMode() ? Color.web(unifiedBlueColor) : Color.WHITE));
+            }
+
+            @Override
+            public Set<HookEventType> supportedEvents() {
+                return Set.of(HookEventType.FOLLOW_MODE_CHANGED);
+            }
+        });
 
         return btn;
     }
@@ -116,7 +132,17 @@ public class FloatToolbox extends VBox {
         if (isFollowLogic) {
             CameraContext cameraCtx = CameraContext.getInstance();
             btn.setOnMouseClicked(_ -> cameraCtx.setFollowMode(!cameraCtx.isFollowMode()));
-            cameraCtx.onFollowModeChange(() -> Platform.runLater(() -> icon.setFill(cameraCtx.isFollowMode() ? Color.web(unifiedBlueColor) : Color.WHITE)));
+            HookRegistry.INSTANCE.register(new AbstractGenericHook<FollowModeEvent>() {
+                @Override
+                public void onEvent(HookEventType eventType, FollowModeEvent data) {
+                    Platform.runLater(() -> icon.setFill(data.followMode() ? Color.web(unifiedBlueColor) : Color.WHITE));
+                }
+
+                @Override
+                public Set<HookEventType> supportedEvents() {
+                    return Set.of(HookEventType.FOLLOW_MODE_CHANGED);
+                }
+            });
         } else if (panel != null) {
             // 切换面板显示的逻辑
             btn.setOnMouseClicked(_ -> {

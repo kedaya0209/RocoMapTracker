@@ -1,6 +1,10 @@
 package com.luoke.app.capture;
 
+import com.luoke.app.capture.frame.CaptureFrameBuffer;
+import com.luoke.app.capture.frame.ROIData;
+import com.luoke.app.capture.pipeline.RoiProcessor;
 import com.luoke.app.config.CaptureConfig;
+import com.luoke.app.platform.WindowFinder;
 import com.luoke.app.config.PathConfig;
 import com.luoke.app.hook.HookEventType;
 import com.luoke.app.hook.event.CaptureStateEvent;
@@ -27,7 +31,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 @NotThreadSafe
 @Data
 @Slf4j
-public class CaptureService {
+public class CaptureService implements FullFrameControl {
     private final String windowTitle;
     private final AtomicInteger continuousBlackFrames = new AtomicInteger(0);
     //退避策略 减少连续重启频率

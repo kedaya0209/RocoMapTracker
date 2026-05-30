@@ -21,7 +21,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * 本组件不叠加冗余的速率限制。</p>
  *
  * <p>所有子进程 Handler（{@link com.luoke.app.capture.CaptureHandler}、
- * {@link com.luoke.app.macher.SiftMatchHandler}）共用此组件。</p>
+ * {@link com.luoke.app.match.SiftMatchHandler}）共用此组件。</p>
  */
 @ThreadSafe
 @Slf4j

@@ -2,8 +2,7 @@ package com.luoke.app.pcap;
 
 import net.jcip.annotations.NotThreadSafe;
 import com.luoke.app.config.PcapConfig;
-import com.luoke.app.config.SocketConfig;
-import com.luoke.app.process.JobObjectManager;
+import com.luoke.app.platform.JobObjectManager;
 import com.luoke.app.process.NativeProcess;
 import com.luoke.app.process.NativeProcessFactory;
 import com.luoke.app.utils.FilePathUtil;
@@ -19,7 +18,7 @@ import java.util.concurrent.TimeUnit;
 /**
  * Pcap 子进程生命周期管理器 — 管理 pcap.exe 的启动、重启、销毁。
  * <p>
- * 与 {@link com.luoke.app.macher.SiftProcessManager} 模式对称，但更精简（无热切换需求）。
+ * 与 {@link com.luoke.app.match.SiftProcessManager} 模式对称，但更精简（无热切换需求）。
  */
 @NotThreadSafe
 @Slf4j
@@ -94,16 +93,11 @@ public class PcapProcessManager {
     }
 
     /**
-     * 停止 pcap.exe
+     * 停止 pcap.exe — JobObject 保证子进程随父进程退出，直接强杀无需等待。
      */
     public void stop() {
         if (activeProcess != null && activeProcess.isAlive()) {
-            activeProcess.destroy();
-            if (!activeProcess.waitFor(SocketConfig.SIFT_PROCESS_STOP_TIMEOUT, TimeUnit.SECONDS)) {
-                log.warn("pcap.exe pid={} 未在 {}s 内停止，强制终止",
-                        activeProcess.pid(), SocketConfig.SIFT_PROCESS_STOP_TIMEOUT);
-                activeProcess.destroyForcibly();
-            }
+            activeProcess.destroyForcibly();
         }
         activeProcess = null;
         restartCount = 0;

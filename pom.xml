@@ -11,10 +11,8 @@
 
     <modules>
         <module>roco-common</module>
-        <module>roco-model</module>
         <module>roco-map</module>
         <module>roco-engine</module>
-        <module>roco-macher</module>
         <module>roco-ui</module>
     </modules>
 
@@ -34,9 +32,6 @@
         <graalvm.version>25.0.3</graalvm.version>
         <djl.version>0.36.0</djl.version>
         <atlantafx.version>2.1.0</atlantafx.version>
-        <javacv.version>4.13.0-1.5.13</javacv.version>
-        <openblas.version>0.3.31-1.5.13</openblas.version>
-        <javacpp.version>1.5.13</javacpp.version>
         <app.version>${project.version}</app.version>
     </properties>
 
@@ -74,35 +69,6 @@
                 <artifactId>lombok</artifactId>
                 <version>${lombok.version}</version>
                 <scope>provided</scope>
-            </dependency>
-
-            <!-- JavaCPP/OpenCV — 仅 roco-macher 测试模块使用 -->
-            <dependency>
-                <groupId>org.bytedeco</groupId>
-                <artifactId>javacpp</artifactId>
-                <version>${javacpp.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.bytedeco</groupId>
-                <artifactId>opencv</artifactId>
-                <version>${javacv.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.bytedeco</groupId>
-                <artifactId>opencv</artifactId>
-                <version>${javacv.version}</version>
-                <classifier>windows-x86_64</classifier>
-            </dependency>
-            <dependency>
-                <groupId>org.bytedeco</groupId>
-                <artifactId>openblas</artifactId>
-                <version>${openblas.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.bytedeco</groupId>
-                <artifactId>openblas</artifactId>
-                <version>${openblas.version}</version>
-                <classifier>windows-x86_64</classifier>
             </dependency>
 
             <!-- JavaFX / DJL -->
@@ -172,17 +138,7 @@
             </dependency>
             <dependency>
                 <groupId>com.luoke</groupId>
-                <artifactId>roco-model</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.luoke</groupId>
                 <artifactId>roco-map</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.luoke</groupId>
-                <artifactId>roco-macher</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

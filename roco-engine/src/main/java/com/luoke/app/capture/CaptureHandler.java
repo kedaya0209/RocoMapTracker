@@ -1,5 +1,10 @@
 package com.luoke.app.capture;
 
+import com.luoke.app.capture.frame.CaptureFrameBuffer;
+import com.luoke.app.capture.frame.FrameDeserializer;
+import com.luoke.app.capture.frame.ROIData;
+import com.luoke.app.capture.pipeline.RoiProcessor;
+import com.luoke.app.capture.pipeline.ThroughputStats;
 import com.luoke.app.process.NativeProcessFactory;
 import com.luoke.app.process.ProcessRestartHelper;
 import com.luoke.app.config.SocketConfig;

@@ -8,7 +8,7 @@ AI 协作专用 – 本模块不依赖任何内部模块，无 JavaFX，无模�
 ## 模块职责
 
 
-- 配置中心：14 个 Config 类，管理应用所有可配置参数。
+- 配置中心：15 个 Config 类，管理应用所有可配置参数。
 - 配置持久化：Properties 文件读写，支持 UTF-8 BOM。
 - 资源管理：ResourceUtils 实现外部文件优先 → classpath 回退。
 - 文件路径解析：FilePathUtil 提供应用根目录定位和文件路径拼接。
@@ -20,23 +20,25 @@ AI 协作专用 – 本模块不依赖任何内部模块，无 JavaFX，无模�
 - 资源套件切换：ResourceConfigContext 支持 INTERNAL / EXTERNAL 资源模式。
 
 
-## 类清单 (21 个)
+## 类清单 (25 个)
 
 
-### 配置类 (14 个)：
+### 配置类 (15 个)：
 CaptureConfig         截图配置：窗口名、FPS、黑帧检测阈值
 ConfigHelper          Properties 类型安全读取工具（含默认值）
 ConfigPersistence     配置持久化：UTF-8 BOM 的 app_config.properties
 DownloadConfig        下载设置：URL、超时、重试、并发数
 MiniMapConfig         小地图检测参数：resize、HoughCircles
-OcrConfig             OCR 管线设置：并发、扫描间隔、ROI 坐标
+NavigConfig           导航模式配置：角度、旋转
 PathConfig            不可变路径常量：exe、地图、模型等
+PcapConfig            pcap 桥接器配置：端口、重启策略
 PlayerConfig          玩家追踪：EMA 平滑、瞬移检测、Lost 容差
 RenderConfig          渲染/动画：图标尺寸、缩放、玩家标记、Toast
 SiftConfig            SIFT 匹配参数：特征检测、FLANN、RANSAC
 SocketConfig          Socket/子进程：超时、重启间隔
 StatsConfig           统计覆盖层：FPS、耗时显示开关
 UiConfig              UI/交互：主题、字体、缩放、hover 半径
+UpdateConfig          自动更新配置：检查间隔、下载源
 ViewConfig            地图视图：缩放、跟随模式、置灰距离
 
 ### 工具类 (7 个)：
@@ -47,6 +49,9 @@ EnvironmentUtil       GraalVM Native Image 环境检测
 JsonUtils             Jackson ObjectMapper 单例
 ResourceUtils         资源加载：外部文件优先 → classpath 回退
 ResourceConfigContext 资源套件枚举：INTERNAL / EXTERNAL 切换
+
+### 值对象 (1 个)：
+RoiRect              不可变 ROI 万分数坐标 (x, y, w, h)，@ThreadSafe
 
 注意：旧 FileUtil 已拆分为 FilePathUtil + HashUtil + ResourceExtractor + EnvironmentUtil 四个专用工具类。
 FileUtil 保留为 @Deprecated(forRemoval=true) 委托层，新代码禁止使用。
@@ -86,9 +91,7 @@ Native Image 兼容
 
 ## 与其他模块的交互
 
-- roco-model：通过 ConfigHelper 读取模型相关配置，通过 ResourceUtils 加载 ONNX 模型。
 - roco-map：通过 ResourceUtils 访问地图瓦片和图标资源，通过 PathConfig 获取存储路径。
-- roco-macher：通过 SiftConfig 获取匹配参数，通过 FilePathUtil 处理缓存文件路径。
 - roco-engine：通过各 Config 类获取运行时参数，通过 ResourceConfigContext 切换资源模式，
   通过 FilePathUtil 定位子进程 exe 路径。
 - roco-ui：通过 UiConfig、RenderConfig 等控制 UI 行为，通过 PathConfig 定位子进程 exe，
@@ -123,8 +126,8 @@ ResourceExtractor.extractAll();
 // 环境检测
 boolean isNative = EnvironmentUtil.isNative();
 
-// 获取临时目录中的 native 库
-String dllPath = FilePathUtil.getExternalFile("/dll/opencv_java490.dll").getAbsolutePath();
+// 获取子进程 exe 路径
+String exePath = FilePathUtil.getExternalPath(PcapConfig.PCAP_EXE, true);
 
 ## 本模块工具类清单（优先使用）
 

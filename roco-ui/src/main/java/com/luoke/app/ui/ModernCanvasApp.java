@@ -17,9 +17,9 @@ import com.luoke.app.hook.HookEventType;
 import com.luoke.app.hook.event.NotificationType;
 import com.luoke.app.hook.event.ProgressEvent;
 import com.luoke.app.hook.event.StatusEvent;
-import com.luoke.app.hook.impl.UiResponseHook;
+import com.luoke.app.ui.hook.UiResponseHook;
 import com.luoke.app.hook.multicast.HookRegistry;
-import com.luoke.app.macher.map.SwitchMapMatcher;
+import com.luoke.app.match.map.SwitchMapMatcher;
 import com.luoke.app.socket.SocketServer;
 import com.luoke.app.ui.component.FloatToolbox;
 import com.luoke.app.ui.component.LoadingOverlay;
@@ -27,8 +27,17 @@ import com.luoke.app.ui.component.ResourceCounterPanel;
 import com.luoke.app.ui.component.Sidebar;
 import com.luoke.app.ui.component.TitleBar;
 import com.luoke.app.ui.component.UiAnimator;
-import com.luoke.app.ui.component.VersionMode;
-import com.luoke.app.ui.service.*;
+import com.luoke.app.ui.service.VersionMode;
+import com.luoke.app.ui.service.lifecycle.CaptureServiceManager;
+import com.luoke.app.ui.service.lifecycle.InfrastructureManager;
+import com.luoke.app.ui.service.lifecycle.PcapBridgeManager;
+import com.luoke.app.ui.service.lifecycle.SiftClientManager;
+import com.luoke.app.ui.service.resource.ResourceInitService;
+import com.luoke.app.ui.service.resource.ResourceInitUiDelegate;
+import com.luoke.app.ui.service.ui.MainUiComposer;
+import com.luoke.app.ui.service.ui.ThemeManager;
+import com.luoke.app.ui.service.ui.VersionManager;
+import com.luoke.app.ui.service.ui.WindowManager;
 import com.luoke.app.ui.util.DialogUtils;
 import com.luoke.app.ui.util.DialogUtils.ProgressControl;
 import com.luoke.app.ui.util.TrayManager;
@@ -216,20 +225,6 @@ public class ModernCanvasApp extends Application {
         }
         primaryStage.initStyle(StageStyle.TRANSPARENT);
         primaryStage.setScene(scene);
-    }
-
-    /**
-     * 加载程序图标（JavaFX 窗口装饰图标）。
-     */
-    private void loadStageIcons() {
-        try {
-            Image icon = new Image(ResourceUtils.getResourceStream(PathConfig.ICON_PNG));
-            if (!icon.isError()) {
-                primaryStage.getIcons().add(icon);
-            }
-        } catch (Exception e) {
-            log.warn("程序图标加载失败", e);
-        }
     }
 
     /**

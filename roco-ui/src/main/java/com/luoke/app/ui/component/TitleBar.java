@@ -13,9 +13,10 @@ import com.luoke.app.context.CameraContext;
 import com.luoke.app.context.MapContext;
 import com.luoke.app.hook.HookEventType;
 import com.luoke.app.hook.IHook;
+import com.luoke.app.hook.event.NavModeEvent;
 import com.luoke.app.hook.event.StatusCarouselEvent;
 import com.luoke.app.hook.multicast.HookRegistry;
-import com.luoke.app.ui.service.SvgManager;
+import com.luoke.app.ui.service.resource.SvgManager;
 import com.luoke.app.ui.util.DialogUtils;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -250,6 +251,9 @@ public class TitleBar extends HBox implements IHook<Object> {
 
         // 注册状态轮播事件
         HookRegistry.INSTANCE.register(this);
+        // 双写：新 EventBus（迁移完成后移除上方 HookRegistry）
+        com.luoke.app.hook.AppEvents.subscribe(NavModeEvent.class,
+                evt -> Platform.runLater(() -> setNavModeFromExternal(evt.enabled())));
     }
 
     public static TitleBar getInstance(Stage stage, Button menuBtn, Node... overlayNodes) {
@@ -363,16 +367,17 @@ public class TitleBar extends HBox implements IHook<Object> {
     }
 
     /**
-     * 外部调用 — 当 Sidebar/Setting 切换导航模式时同步 UI
+     * 当外部切换导航模式时同步 UI（通过 Hook 事件触发）
      */
-    public void setNavModeFromExternal(boolean enabled) {
+    private void setNavModeFromExternal(boolean enabled) {
         if (enabled == navMode) return;
         navBtn.fire();
     }
 
     /**
-     * 外部调用 — Sidebar 切换匹配开关时同步标题栏图标与轮播事件
+     * 同步匹配开关图标与轮播事件
      */
+    @Deprecated
     public void publishMatchToggleEvent() {
         boolean on = SiftConfig.SIFT_MATCHING_ENABLED;
         Node icon = matchToggleBtn.getGraphic();
@@ -546,13 +551,15 @@ public class TitleBar extends HBox implements IHook<Object> {
 
     @Override
     public Set<HookEventType> supportedEvents() {
-        return Set.of(HookEventType.STATUS_CAROUSEL);
+        return Set.of(HookEventType.STATUS_CAROUSEL, HookEventType.NAV_MODE_CHANGED);
     }
 
     @Override
     public void onEvent(HookEventType type, Object data) {
         if (data instanceof StatusCarouselEvent event) {
             Platform.runLater(() -> updateStatus(event));
+        } else if (data instanceof NavModeEvent navEvent) {
+            Platform.runLater(() -> setNavModeFromExternal(navEvent.enabled()));
         }
     }
 

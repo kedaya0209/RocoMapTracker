@@ -11,7 +11,7 @@ AI 协作专用 – 依赖 roco-engine（以及传递依赖），是最终应用
 - 应用入口：Main 初始化 OpenCV → 启动 JavaFX。
 - 主界面：ModernCanvasApp 管理场景、启动截图守护、发布初始化进度。
 - 渲染引擎：MapRenderer 驱动渲染循环，IconLayerManager 管理资源点图标，PlayerRenderer 渲染玩家，RouteRenderer 绘制路线。
-- SVG 管理：SvgManager 加载/缓存 SVG，支持画线动画（XML DOM 解析）。
+- SVG 管理：SvgManager 门面，委托 SvgAnimator / SvgIconBuilder / SvgPathUtil 分别负责动画、构建、路径。
 - 图标图集：IconCache 管理彩色+灰度纹理图集，GPU 槽位访问。
 - 瓦片管理：TileManager 管理多分辨率地图瓦片 ImageView 生命周期。
 - 设置面板：SettingsStage IntelliJ 风格设置窗口，支持 11 分类配置。
@@ -20,19 +20,20 @@ AI 协作专用 – 依赖 roco-engine（以及传递依赖），是最终应用
 - 窗口管理：WindowManager 支持 8 方向边缘拖拽缩放。
 
 
-## 类清单 (49 个)
+## 类清单 (54 个)
 
 
 入口 (2 个)：
 Main                   入口点：初始化 OpenCV → launch JavaFX
 ModernCanvasApp        主 Application：初始化 + UI 构建 + 截图守护
 
-hook 实现 (1 个)：
+ui.hook – Hook 实现 (1 个)：
 UiResponseHook         监听 UI_NOTIFICATION / INIT_PROGRESS / CAPTURE_STATE
 
-component – UI 组件 (15 个)：
+component – UI 组件 (16 个)：
 InteractiveCanvas      交互画布：鼠标/键盘事件 → 委托 PathEditor/HoverManager
 Sidebar                左侧分类侧边栏：算法/资源/主题/路线/WIKI 更新
+SidebarCell            侧边栏分类单元格（从 Sidebar 内联类提取）
 TitleBar               标题栏 + 状态轮播 + 幽灵模式（透明度+置顶）
 RouteManagerStage      路线管理窗口：保存/编辑/导入/导出
 FloatToolbox           浮动工具栏：自动跟随/物资计数开关
@@ -47,12 +48,13 @@ UiAnimator             侧边栏滑入/滑出动画
 WikiUpdateManager      WIKI 资源更新：下载按钮 + 进度条
 AddPointDialog         添加地图标记对话框 + 自动补全
 
-component/setting – 设置面板 (10 个)：
+component/setting – 设置面板 (11 个)：
 SettingsStage          单例 IntelliJ 风格设置窗口：分类列表 + 右侧配置面板
 SettingDefinitions     11 分类全部可配置项定义注册中心
 SettingConfigManager   设置数据层：控件注册/配置读写/变更追踪/快照管理
 SettingFieldBuilder    配置控件工厂：CheckBox/Spinner/ComboBox 等
 RoiPreview             ROI 截帧预览 + 全帧模式 + 弹出调整窗口
+RoiZoomPopup           ROI 截帧弹出放大预览（从 RoiPreview 提取）
 PlayerPreview          玩家实时动画预览：图标 + 拾取光晕 + 波纹
 SettingCategory        record(name, icon, fields)
 SettingCategoryCell    分类列表单元格：hover 高亮 + SVG 图标动画
@@ -67,24 +69,37 @@ RouteRenderer          Canvas 路线渲染：脏检测 + 平移补偿
 HoverRenderer          Canvas hover 高亮：辉光 + 资源图标
 RenderLayer            渲染层接口：getNode() / onFrame()
 
-service – 服务 (12 个)：
-SvgManager             SVG 加载/缓存/构建/画线动画（XML DOM 解析）
+service.lifecycle – 进程/服务生命周期 (4 个)：
+CaptureServiceManager  CaptureService 生命周期 + 看门狗重连
+SiftClientManager      SIFT 客户端生命周期：启动/重启/停止
+InfrastructureManager  JobObject + SocketServer 生命周期
+PcapBridgeManager      pcap 桥接器生命周期
+
+service.resource – 资源/缓存管理 (9 个)：
+SvgManager             SVG 门面：加载/缓存/构建/画线动画（委托给子类）
+SvgAnimator            SVG 画线动画实现（SvgManager 子类）
+SvgIconBuilder         SVG 图标构建实现（SvgManager 子类）
+SvgPathUtil            SVG 路径工具方法（SvgManager 子类）
 ResourceInitService    资源初始化验证 + 首运行对话框 + 地图元数据加载
+ResourceInitUiDelegate 资源初始化 UI 回调接口
 TileManager            瓦片 ImageView 生命周期：级别选择/视口约束/回收
 IconCache              图标纹理图集：彩色+灰度双图集，GPU 槽位访问
 TileGeneratorService   多分辨率瓦片金字塔生成（5 级）
-MainUiComposer         静态 UI 组装器：场景图构建
-CaptureServiceManager  CaptureService 生命周期 + 看门狗重连
-WindowManager          窗口拖拽/缩放：8 方向边缘矩形
-SiftClientManager      SIFT 客户端生命周期：启动/重启/停止
-InfrastructureManager  JobObject + SocketServer 生命周期
-ThemeManager           7 种 AtlanFX 主题切换
-ResourceInitUiDelegate 资源初始化 UI 回调接口
 
-util (3 个)：
+service.ui – UI 级服务 (4 个)：
+MainUiComposer         静态 UI 组装器：场景图构建
+ThemeManager           7 种 AtlanFX 主题切换
+WindowManager          窗口拖拽/缩放：8 方向边缘矩形
+VersionManager         版本切换管理
+
+service – 服务 (1 个)：
+VersionMode            版本模式枚举
+
+util (4 个)：
 DialogUtils            模态覆盖对话框工具
 FxRippleUtil           Material Design 涟漪效果
 RestartUtils           Native Image 兼容的重启工具
+Win32TraySymbols       Win32 托盘图标和常量（TrayManager 静态符号）
 
 
 ## 单例模式
@@ -113,7 +128,7 @@ RestartUtils           Native Image 兼容的重启工具
 
 | 类名                     | 用途                                       |
 |-------------------------|-------------------------------------------|
-| SvgManager              | SVG 加载、缓存、画线动画                    |
+| SvgManager              | SVG 门面：加载/缓存/构建/画线动画（委托子类）|
 | IconCache               | 图标纹理图集（彩色+灰度）                   |
 | TileManager             | 地图瓦片管理（多分辨率）                    |
 | MapRenderer             | 渲染循环协调（强制刷新 viewport）           |

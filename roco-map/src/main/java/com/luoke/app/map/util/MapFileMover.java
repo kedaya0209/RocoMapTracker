@@ -87,6 +87,9 @@ public class MapFileMover {
 
         // 执行文件移动
         move(src, dst);
+
+        // 移动后同步更新 init 清单，确保地图文件被记录
+        writeInitManifest();
     }
 
     /**
