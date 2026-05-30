@@ -12,7 +12,7 @@ import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * pcap 桥接器生命周期管理 — 协调 rmt_bridge.py 子进程与外部事件注册。
+ * pcap 桥接器生命周期管理 — 协调 pcap.exe 子进程与外部事件注册。
  * <p>
  * 职责：
  * <ul>
@@ -30,6 +30,8 @@ public class PcapBridgeManager {
     @Getter
     private final PcapProcessManager processManager;
     private ExternalBridgeHandler bridgeHandler;
+
+    @Getter
     private boolean initialized = false;
 
     public PcapBridgeManager() {
@@ -63,13 +65,6 @@ public class PcapBridgeManager {
         } else {
             log.error("PcapBridgeManager 初始化失败 — pcap.exe 未启动");
         }
-    }
-
-    /**
-     * @return 是否已初始化
-     */
-    public boolean isInitialized() {
-        return initialized;
     }
 
     /**

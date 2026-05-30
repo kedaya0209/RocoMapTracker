@@ -1,15 +1,17 @@
 package io.github.kedaya0209.roco.app.pcap;
 
 import net.jcip.annotations.NotThreadSafe;
-import io.github.kedaya0209.roco.app.config.PcapConfig;
+import io.github.kedaya0209.roco.app.config.SnifferConfig;
 import io.github.kedaya0209.roco.app.platform.JobObjectManager;
 import io.github.kedaya0209.roco.app.process.NativeProcess;
 import io.github.kedaya0209.roco.app.process.NativeProcessFactory;
+import io.github.kedaya0209.roco.app.update.plugin.PluginUpdateManager;
 import io.github.kedaya0209.roco.app.utils.FilePathUtil;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
@@ -47,13 +49,15 @@ public class PcapProcessManager {
             return false;
         }
 
-        String exePath = FilePathUtil.getExternalPath(PcapConfig.PCAP_EXE, true);
-        StringBuilder cmd = new StringBuilder("\"").append(exePath).append("\" --rmt-port ").append(serverPort);
-        if (iface != null && !iface.isBlank()) {
-            cmd.append(" --iface ").append(iface);
-        }
+        String exePath = PluginUpdateManager.getInstance()
+                .getPluginEntryPath("sniffer")
+                .orElseGet(() -> FilePathUtil.getExternalPath(SnifferConfig.SNIFFER_EXE, true));
+        StringBuilder cmd = new StringBuilder("\"").append(exePath).append("\" ").append(serverPort);
 
-        NativeProcess proc = processFactory.create(cmd.toString(), JobObjectManager.getJobHandle(), true);
+        // 以插件目录为工作目录（sniffer 在同一目录下查找 rmt.db）
+        String workDir = new File(exePath).getParentFile().getAbsolutePath();
+
+        NativeProcess proc = processFactory.create(cmd.toString(), JobObjectManager.getJobHandle(), true, workDir);
         if (proc == null) {
             log.error("启动 pcap.exe 失败");
             return false;
@@ -61,6 +65,7 @@ public class PcapProcessManager {
 
         this.activeProcess = proc;
         this.restartCount = 0;
+        PluginUpdateManager.getInstance().setPluginRunning("sniffer", true);
         startReaderThread(proc);
         log.info("pcap.exe 已启动 (pid={}), 端口={}", proc.pid(), serverPort);
         return true;
@@ -75,11 +80,11 @@ public class PcapProcessManager {
      */
     public boolean restartAfterCrash(int serverPort, String iface) {
         long now = System.currentTimeMillis();
-        if (now - lastRestartTime < TimeUnit.SECONDS.toMillis(PcapConfig.RESTART_DELAY_SEC)) {
+        if (now - lastRestartTime < TimeUnit.SECONDS.toMillis(SnifferConfig.RESTART_DELAY_SEC)) {
             log.warn("跳过 pcap.exe 重启，冷却中");
             return false;
         }
-        if (restartCount >= PcapConfig.MAX_RESTART_ATTEMPTS) {
+        if (restartCount >= SnifferConfig.MAX_RESTART_ATTEMPTS) {
             log.error("pcap.exe 连续崩溃 {} 次，停止重启", restartCount);
             return false;
         }
@@ -101,6 +106,7 @@ public class PcapProcessManager {
         }
         activeProcess = null;
         restartCount = 0;
+        PluginUpdateManager.getInstance().setPluginRunning("sniffer", false);
     }
 
     /**
@@ -124,6 +130,7 @@ public class PcapProcessManager {
                     } catch (IOException e) {
                         log.warn("[pcap] stdout reader 异常: {}", e.getMessage());
                     }
+                    PluginUpdateManager.getInstance().setPluginRunning("sniffer", false);
                     int code = proc.exitCode();
                     if (code == 0) {
                         log.info("[pcap] 正常退出 (code=0)");

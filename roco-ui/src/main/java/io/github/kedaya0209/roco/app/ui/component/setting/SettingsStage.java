@@ -485,6 +485,12 @@ public class SettingsStage extends Stage {
             container.getChildren().addAll(topRow, scroll);
             VBox.setVgrow(scroll, Priority.ALWAYS);
             rightPanel.getChildren().setAll(container);
+        } else if ("插件管理".equals(category.name())) {
+            PluginManagementView pmv = new PluginManagementView();
+            pmv.setDialogRoot(rootStackPane);
+            pmv.refresh();
+            scroll.setContent(pmv.getNode());
+            rightPanel.getChildren().setAll(scroll);
         } else {
             rightPanel.getChildren().setAll(scroll);
         }

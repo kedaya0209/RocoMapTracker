@@ -130,6 +130,9 @@ public class Sidebar extends VBox {
             UpdateManager.getInstance().manualCheck(null);
         }));
 
+        // 插件管理
+        items.add(new SidebarItem(SidebarItem.Type.ACTION, "插件管理", null, null, null, false, "/icon/plugins.svg", () -> openSettingsCategory("插件管理")));
+
         // 关于
         items.add(new SidebarItem(SidebarItem.Type.ACTION, "关于", null, null, null, false, "/icon/about.svg", this::openAboutDialog));
 

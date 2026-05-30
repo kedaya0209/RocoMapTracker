@@ -1,8 +1,14 @@
 package io.github.kedaya0209.roco.app.ui.service.resource;
 
 import net.jcip.annotations.ThreadSafe;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+
 import javafx.scene.Node;
 import javafx.scene.image.Image;
+import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.SVGPath;
 
@@ -20,6 +26,32 @@ public class SvgManager {
     /** 创建固定尺寸的 SVG 图标节点 */
     public static Node createIcon(String resourcePath, double size) {
         return SvgIconBuilder.createIcon(resourcePath, size);
+    }
+
+    /** 从外部 SVG 文件创建图标节点 */
+    public static Node createIconFromFile(File svgFile, double size) {
+        try (FileInputStream fis = new FileInputStream(svgFile)) {
+            byte[] raw = fis.readAllBytes();
+            StackPane box = new StackPane();
+            box.setPrefSize(size, size);
+            box.setMinSize(size, size);
+            box.setMaxSize(size, size);
+            box.getChildren().add(SvgIconBuilder.buildBaseGroup(raw, size));
+            return box;
+        } catch (Exception e) {
+            return createLetterPlaceholder(size);
+        }
+    }
+
+    private static Node createLetterPlaceholder(double size) {
+        SVGPath sp = new SVGPath();
+        sp.setContent("M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z");
+        sp.setStyle("-fx-fill: -color-accent-fg;");
+        StackPane box = new StackPane(sp);
+        box.setPrefSize(size, size);
+        box.setMinSize(size, size);
+        box.setMaxSize(size, size);
+        return box;
     }
 
     /** 创建固定尺寸的 SVG 图标节点，允许指定样式 */

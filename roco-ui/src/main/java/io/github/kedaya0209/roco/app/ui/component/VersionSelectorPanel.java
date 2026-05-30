@@ -1,6 +1,6 @@
 package io.github.kedaya0209.roco.app.ui.component;
 
-import io.github.kedaya0209.roco.app.config.PcapConfig;
+import io.github.kedaya0209.roco.app.config.SnifferConfig;
 import net.jcip.annotations.NotThreadSafe;
 import atlantafx.base.theme.Styles;
 import io.github.kedaya0209.roco.app.ui.service.VersionMode;
@@ -57,7 +57,7 @@ public class VersionSelectorPanel extends StackPane {
     private final VBox advCard;
     private final Button stdBtn;
     private final Button advBtn;
-    private static final String GITHUB_API = "https://api.github.com/repos/" + PcapConfig.PCAP_REPO + "/releases/latest";
+    private static final String GITHUB_API = "https://api.github.com/repos/" + SnifferConfig.SNIFFER_REPO + "/releases/latest";
     private static final String GITHUB_DL_MIRROR = "https://gh-proxy.org/";
 
     public VersionSelectorPanel(StackPane rootStack) {
@@ -116,17 +116,17 @@ public class VersionSelectorPanel extends StackPane {
     // ── 抓包环境检测与懒下载 ──────────────────────────────────
 
     /**
-     * 检查抓包环境：npcap 驱动 + pcap 组件，缺失则弹窗引导处理。
+     * 检查抓包环境：npcap 驱动 + sniffer 组件，缺失则弹窗引导处理。
      */
     private void checkResourcesReady() {
         if (!isNpcapInstalled()) {
             showNpcapDialog();
             return;
         }
-        // npcap 已就绪，检查 pcap 组件是否已下载
-        File pcapExe = new File(FilePathUtil.getExternalPath(PcapConfig.PCAP_EXE, true));
-        if (!pcapExe.exists()) {
-            showPcapDownloadConfirmDialog();
+        // npcap 已就绪，检查 sniffer 组件是否已下载
+        File snifferExe = new File(FilePathUtil.getExternalPath(SnifferConfig.SNIFFER_EXE, true));
+        if (!snifferExe.exists()) {
+            showSnifferDownloadConfirmDialog();
             return;
         }
         vm.switchTo(VersionMode.ADVANCED);
@@ -224,7 +224,7 @@ public class VersionSelectorPanel extends StackPane {
         dialogBox.getChildren().addAll(
                 titleLabel("需要安装抓包驱动"),
                 msgLabel("高级版需要 npcap 抓包驱动才能运行。\n请前往 npcap 官网下载安装："),
-                createLink(PcapConfig.NPCAP_LINK, PcapConfig.NPCAP_LINK),
+                createLink(SnifferConfig.NPCAP_LINK, SnifferConfig.NPCAP_LINK),
                 okBtn);
 
         StackPane mask = fadeInMask();
@@ -232,10 +232,10 @@ public class VersionSelectorPanel extends StackPane {
         okBtn.setOnAction(_ -> rootStack.getChildren().remove(mask));
     }
 
-    // ── pcap 组件下载确认 ─────────────────────────────────────
+    // ── sniffer 组件下载确认 ──────────────────────────────────
 
-    private void showPcapDownloadConfirmDialog() {
-        String repoUrl = "https://github.com/" + PcapConfig.PCAP_REPO + "/releases/latest";
+    private void showSnifferDownloadConfirmDialog() {
+        String repoUrl = "https://github.com/" + SnifferConfig.SNIFFER_REPO + "/releases/latest";
 
         HBox btnBox = new HBox(15);
         btnBox.setAlignment(Pos.CENTER);
@@ -254,8 +254,8 @@ public class VersionSelectorPanel extends StackPane {
 
         VBox dialogBox = dialogBox(300);
         dialogBox.getChildren().addAll(
-                titleLabel("下载 pcap 组件"),
-                msgLabel("需要下载 pcap 抓包组件，是否继续？"),
+                titleLabel("下载 sniffer 组件"),
+                msgLabel("需要下载 sniffer 抓包组件，是否继续？"),
                 createLink(repoUrl, repoUrl),
                 btnBox);
 
@@ -285,7 +285,7 @@ public class VersionSelectorPanel extends StackPane {
 
         VBox dialogBox = dialogBox(280);
         dialogBox.getChildren().addAll(
-                titleLabel("正在下载 pcap 组件..."),
+                titleLabel("正在下载 sniffer 组件..."),
                 progressBar, statusLabel, cancelBtn);
 
         StackPane mask = fadeInMask();
@@ -296,7 +296,7 @@ public class VersionSelectorPanel extends StackPane {
         });
 
         // 异步下载流程：解析 URL → 下载（有进度）→ 解压 → 校验
-        Thread.ofPlatform().daemon(true).name("pcap-download").start(() -> {
+        Thread.ofPlatform().daemon(true).name("sniffer-download").start(() -> {
             try {
                 String downloadUrl = resolveDownloadUrl();
                 Platform.runLater(() -> statusLabel.setText("正在下载..."));
@@ -310,12 +310,12 @@ public class VersionSelectorPanel extends StackPane {
                 if (zipPath == null) return; // 用户取消
 
                 Platform.runLater(() -> statusLabel.setText("正在解压..."));
-                extractZip(zipPath, PcapConfig.PCAP_EXE);
+                extractZip(zipPath, SnifferConfig.SNIFFER_EXE);
                 Files.deleteIfExists(zipPath);
 
                 Platform.runLater(() -> {
                     rootStack.getChildren().remove(mask);
-                    if (new File(FilePathUtil.getExternalPath(PcapConfig.PCAP_EXE, true)).exists()) {
+                    if (new File(FilePathUtil.getExternalPath(SnifferConfig.SNIFFER_EXE, true)).exists()) {
                         vm.switchTo(VersionMode.ADVANCED);
                         hide();
                     } else {
@@ -323,7 +323,7 @@ public class VersionSelectorPanel extends StackPane {
                     }
                 });
             } catch (Exception e) {
-                log.error("下载 pcap 组件失败", e);
+                log.error("下载 sniffer 组件失败", e);
                 Platform.runLater(() -> {
                     rootStack.getChildren().remove(mask);
                     if (!cancelFlag.get()) {
@@ -355,7 +355,7 @@ public class VersionSelectorPanel extends StackPane {
                 String name = asset.get("name").asText();
                 if (name.endsWith(".zip")) {
                     String url = asset.get("browser_download_url").asText();
-                    log.info("pcap 下载 URL: {}", url);
+                    log.info("sniffer 下载 URL: {}", url);
                     return GITHUB_DL_MIRROR + url;
                 }
             }
@@ -395,7 +395,7 @@ public class VersionSelectorPanel extends StackPane {
 
             Path downloadDir = Path.of("download");
             Files.createDirectories(downloadDir);
-            Path tempFile = downloadDir.resolve("pcap.zip");
+            Path tempFile = downloadDir.resolve("sniffer.zip");
             try (InputStream in = response.body();
                  FileOutputStream fos = new FileOutputStream(tempFile.toFile())) {
                 byte[] buf = new byte[8192];
@@ -418,7 +418,7 @@ public class VersionSelectorPanel extends StackPane {
         }
     }
 
-    /** 解压 zip 到外部 pcap 目录 */
+    /** 解压 zip 到外部 sniffer 目录 */
     private void extractZip(Path zipPath, String exeClasspath) throws IOException {
         File targetDir = new File(FilePathUtil.getExternalPath(exeClasspath, true)).getParentFile();
         if (!targetDir.exists()) targetDir.mkdirs();
@@ -441,7 +441,7 @@ public class VersionSelectorPanel extends StackPane {
                 zis.closeEntry();
             }
         }
-        log.info("pcap 组件已解压到 {}", targetDir);
+        log.info("sniffer 组件已解压到 {}", targetDir);
     }
 
     // ── 标准版卡片 ──────────────────────────────────────────

@@ -21,4 +21,18 @@ public interface NativeProcessFactory {
      * @return NativeProcess 实例，失败返回 null
      */
     NativeProcess create(String commandLine, long hJob, boolean redirectStdout);
+
+    /**
+     * 创建子进程（带工作目录）。
+     *
+     * @param commandLine      完整命令行
+     * @param hJob             JobObject 句柄
+     * @param redirectStdout   是否重定向 stdout
+     * @param workingDirectory 工作目录，null 使用默认
+     * @return NativeProcess 实例，失败返回 null
+     */
+    default NativeProcess create(String commandLine, long hJob, boolean redirectStdout,
+                                  String workingDirectory) {
+        return create(commandLine, hJob, redirectStdout);
+    }
 }

@@ -173,6 +173,20 @@ public class NativeProcess {
      * @return NativeProcess, 失败返回 null
      */
     public static NativeProcess create(String commandLine, long hJob, boolean redirectStdout) {
+        return create(commandLine, hJob, redirectStdout, null);
+    }
+
+    /**
+     * 使用 FFM CreateProcessW 创建子进程，带工作目录。
+     *
+     * @param commandLine      完整命令行
+     * @param hJob             JobObject 句柄 (0 = 不加入 Job)
+     * @param redirectStdout   是否重定向 stdout
+     * @param workingDirectory 工作目录（null = 继承父进程）
+     * @return NativeProcess, 失败返回 null
+     */
+    public static NativeProcess create(String commandLine, long hJob, boolean redirectStdout,
+                                       String workingDirectory) {
         try (Arena arena = Arena.ofConfined()) {
             // 1. 创建 stdout pipe (同时重定向 stderr 到同一 pipe)
             long hRead = 0, hWrite = 0;
@@ -257,6 +271,14 @@ public class NativeProcess {
             MemorySegment cmdSeg = arena.allocate(cmdBytes.length + 2);
             MemorySegment.copy(MemorySegment.ofArray(cmdBytes), 0, cmdSeg, 0, cmdBytes.length);
 
+            // 5.5 编码工作目录 (UTF-16LE, null-terminated), null 表示继承父进程
+            MemorySegment workingDirSeg = MemorySegment.NULL;
+            if (workingDirectory != null && !workingDirectory.isBlank()) {
+                byte[] wdBytes = workingDirectory.getBytes(StandardCharsets.UTF_16LE);
+                workingDirSeg = arena.allocate(wdBytes.length + 2);
+                MemorySegment.copy(MemorySegment.ofArray(wdBytes), 0, workingDirSeg, 0, wdBytes.length);
+            }
+
             // 6. 调用 CreateProcessW
             int createFlags = CREATE_NO_WINDOW;
             if (attrList != null) {
@@ -275,7 +297,7 @@ public class NativeProcess {
                     redirectStdout ? 1 : 0, // bInheritHandles
                     createFlags,            // dwCreationFlags
                     MemorySegment.NULL,     // lpEnvironment
-                    MemorySegment.NULL,     // lpCurrentDirectory
+                    workingDirSeg,           // lpCurrentDirectory
                     suiEx,                  // lpStartupInfo
                     procInfo                // lpProcessInformation
             );

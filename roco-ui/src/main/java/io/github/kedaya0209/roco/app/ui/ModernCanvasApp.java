@@ -8,6 +8,7 @@ import net.jcip.annotations.NotThreadSafe;
 import io.github.kedaya0209.roco.app.config.BuildConfig;
 import io.github.kedaya0209.roco.app.config.CaptureConfig;
 import io.github.kedaya0209.roco.app.config.ConfigPersistence;
+import io.github.kedaya0209.roco.app.config.SnifferConfig;
 import io.github.kedaya0209.roco.app.config.PathConfig;
 import io.github.kedaya0209.roco.app.config.SiftConfig;
 import io.github.kedaya0209.roco.app.config.UiConfig;
@@ -44,10 +45,19 @@ import io.github.kedaya0209.roco.app.ui.util.TrayManager;
 import io.github.kedaya0209.roco.app.update.UpdateManager;
 import io.github.kedaya0209.roco.app.update.UpdateUiDelegate;
 import io.github.kedaya0209.roco.app.update.VersionInfo;
+import io.github.kedaya0209.roco.app.update.plugin.PluginInfo;
+import io.github.kedaya0209.roco.app.update.plugin.PluginSource;
+import io.github.kedaya0209.roco.app.update.plugin.PluginStatus;
+import io.github.kedaya0209.roco.app.update.plugin.PluginUpdateInfo;
+import io.github.kedaya0209.roco.app.update.plugin.PluginUpdateManager;
+import io.github.kedaya0209.roco.app.update.plugin.PluginUpdateUiDelegate;
 
 import java.io.File;
 import java.io.InputStream;
 import java.nio.file.Files;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Consumer;
 import java.nio.file.StandardCopyOption;
 import io.github.kedaya0209.roco.app.utils.ResourceExtractor;
 
@@ -129,6 +139,9 @@ public class ModernCanvasApp extends Application {
      */
     private void startBackgroundInit() {
         Thread.ofPlatform().daemon(true).name("resource-extractor").start(() -> {
+            // 预加载插件管理器，WatchService + 后台扫描提前就绪
+            PluginUpdateManager.getInstance();
+
             ResourceExtractor.extractAll((total, done) -> {
                 double progress = 0.15 * done / total;
                 String text = String.format("正在校验&释放内嵌资源 (%d/%d)...", done, total);
@@ -272,13 +285,60 @@ public class ModernCanvasApp extends Application {
         VersionManager.getInstance().setOnSwitch(mode -> {
             if (mode == VersionMode.ADVANCED) {
                 int port = SocketServer.instance().getPort();
-                pcapBridgeManager.init(port, null);
+                PluginUpdateManager pm = PluginUpdateManager.getInstance();
+
+                // 确保 sniffer 插件已安装
+                pm.scanPlugins();
+                boolean snifferReady = pm.getPlugin("sniffer")
+                        .filter(p -> p.status() != PluginStatus.DAMAGED
+                                && p.status() != PluginStatus.DISABLED)
+                        .isPresent();
+
+                if (snifferReady) {
+                    pcapBridgeManager.init(port, null);
+                } else {
+                    // 后台自动下载安装
+                    var pc = DialogUtils.showDownloadProgressDialog(
+                            rootStack, "需要下载高级版组件 (sniffer)...", null);
+                    Thread.ofPlatform().daemon(true).name("sniffer-install").start(() -> {
+                        pm.checkRemotePlugin("sniffer",
+                                new PluginSource("github-release", SnifferConfig.SNIFFER_REPO))
+                            .ifPresentOrElse(update ->
+                                    pm.downloadPlugin(update,
+                                        prog -> pc.updateProgress(prog, "下载中..."),
+                                        () -> {
+                                            pc.close();
+                                            pm.scanPlugins();
+                                            pcapBridgeManager.init(port, null);
+                                        },
+                                        err -> {
+                                            pc.close();
+                                            Platform.runLater(() ->
+                                                    DialogUtils.showSimpleDialog(rootStack,
+                                                            "安装失败",
+                                                            "sniffer 插件安装失败: " + err,
+                                                            "确定", true, () -> {}));
+                                        }),
+                                    () -> {
+                                        pc.close();
+                                        Platform.runLater(() ->
+                                                DialogUtils.showSimpleDialog(rootStack,
+                                                        "安装失败",
+                                                        "无法获取 sniffer 插件信息，请检查网络连接",
+                                                        "确定", true, () -> {}));
+                                    });
+                    });
+                }
+
                 ResourceCounterPanel.getInstance().toggle(false);
                 floatToolbox.setCollectButtonVisible(true);
                 SiftConfig.SIFT_MATCHING_ENABLED = true;
                 Platform.runLater(() ->
                         DialogUtils.showSimpleDialog(rootStack, "提示",
-                                "请手动断开游戏网络连接后重连，以便抓包组件捕获通信密钥。", "确定", true, () -> {}));
+                                "高级版组件 (sniffer) 已就绪，请手动断开游戏网络连接后重连，以便抓包组件捕获通信密钥。", "确定", true, () -> {}));
+
+                // 切换到高级模式时检查插件更新
+                pm.checkAllPlugins(true);
             } else {
                 pcapBridgeManager.stop();
                 ResourceCounterPanel.getInstance().toggle(false);
@@ -298,6 +358,23 @@ public class ModernCanvasApp extends Application {
             UpdateManager.getInstance().startPeriodicCheck(UpdateConfig.CHECK_INTERVAL_HOURS);
         }
 
+        // 插件更新管理器
+        PluginUpdateManager pm = PluginUpdateManager.getInstance();
+        pm.setUiDelegate(createPluginUpdateUiDelegate());
+        pm.checkAllPlugins(true);
+
+        // 插件启用/禁用与 NativeProcess 联动
+        pm.setOnPluginDisabled(id -> {
+            if ("sniffer".equals(id)) {
+                pcapBridgeManager.stop();
+            }
+        });
+        pm.setOnPluginEnabled(id -> {
+            if ("sniffer".equals(id) && VersionManager.getInstance().getCurrentMode() == VersionMode.ADVANCED) {
+                pcapBridgeManager.init(SocketServer.instance().getPort(), null);
+            }
+        });
+
         // UI 完全就绪后补设任务栏图标（start() 阶段 HWND 可能未就绪）
         initTaskbarIcon();
 
@@ -310,7 +387,7 @@ public class ModernCanvasApp extends Application {
 
     private UpdateUiDelegate createUpdateUiDelegate() {
         return new UpdateUiDelegate() {
-            private volatile ProgressControl downloadProgress;
+            private volatile DialogUtils.ProgressControl downloadProgress;
             private volatile boolean backgroundMode;
 
             @Override
@@ -377,6 +454,38 @@ public class ModernCanvasApp extends Application {
                     Platform.exit();
                     System.exit(0);
                 });
+            }
+        };
+    }
+
+    private PluginUpdateUiDelegate createPluginUpdateUiDelegate() {
+        return new PluginUpdateUiDelegate() {
+            @Override
+            public void showPluginUpdatesAvailable(Map<PluginInfo, PluginUpdateInfo> updates,
+                                                    Consumer<List<String>> onDownloadSelected) {
+                Platform.runLater(() ->
+                        DialogUtils.showPluginUpdatesDialog(rootStack, updates, onDownloadSelected));
+            }
+
+            @Override
+            public void showDownloadProgress(String pluginId, String version, double progress) {
+                Platform.runLater(() -> {
+                    sidebar.setDownloadProgress(progress);
+                });
+            }
+
+            @Override
+            public void hideDownloadProgress(String pluginId) {
+                Platform.runLater(() -> {
+                    sidebar.setDownloadProgress(-1);
+                });
+            }
+
+            @Override
+            public void showUpdateReady(String pluginId, String message, Runnable onOk) {
+                Platform.runLater(() ->
+                        DialogUtils.showSimpleDialog(rootStack, "插件更新", message,
+                                "确定", false, onOk));
             }
         };
     }

@@ -46,6 +46,11 @@ public final class PathConfig {
     public static final String INTERNAL_RESOURCE_POINT_CONFIG_PATH = "/source/point/internal_resource_point.json";
 
     // ============================================================
+    // 插件数据
+    // ============================================================
+    public static final String RMT_DB = "/plugins/sniffer/rmt.db";
+
+    // ============================================================
     // 模型文件
     // ============================================================
     public static final String MODEL_DIR = "/model/";

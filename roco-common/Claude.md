@@ -31,7 +31,7 @@ DownloadConfig        下载设置：URL、超时、重试、并发数
 MiniMapConfig         小地图检测参数：resize、HoughCircles
 NavigConfig           导航模式配置：角度、旋转
 PathConfig            不可变路径常量：exe、地图、模型等
-PcapConfig            pcap 桥接器配置：端口、重启策略
+SnifferConfig          sniffer 插件配置：仓库、重启策略
 PlayerConfig          玩家追踪：EMA 平滑、瞬移检测、Lost 容差
 RenderConfig          渲染/动画：图标尺寸、缩放、玩家标记、Toast
 SiftConfig            SIFT 匹配参数：特征检测、FLANN、RANSAC
@@ -127,7 +127,7 @@ ResourceExtractor.extractAll();
 boolean isNative = EnvironmentUtil.isNative();
 
 // 获取子进程 exe 路径
-String exePath = FilePathUtil.getExternalPath(PcapConfig.PCAP_EXE, true);
+String exePath = FilePathUtil.getExternalPath(SnifferConfig.SNIFFER_EXE, true);
 
 ## 本模块工具类清单（优先使用）
 
