@@ -168,9 +168,12 @@ public class SiftMatchHandler {
         log.info("收到 REQUEST_CONFIG，发送参数...");
         try {
             SiftVariant variant = launchParams.get() != null ? launchParams.get() : SiftVariant.PCA_ULTRA;
-            byte[] body = encodeConfig(variant.variantOrdinal(), variant.cacheSuffix());
+            // 选择缓存后缀
+            String cacheSuffix = variant.cacheSuffix();
+            byte[] body = encodeConfig(variant.variantOrdinal(), cacheSuffix, 0);
             session.send(MSG_CONFIG_DATA, body);
-            log.info("CONFIG_DATA 已发送 ({} 字节)", body.length);
+            log.info("CONFIG_DATA 已发送 ({} 字节, algoKind={}, cache={})",
+                    body.length, SiftConfig.ALGO_KIND, cacheSuffix);
         } catch (RuntimeException e) {
             log.error("序列化 CONFIG_DATA 失败", e);
             byte[] errBody = ("Config error: " + e.getMessage())
@@ -323,6 +326,30 @@ public class SiftMatchHandler {
         }
 
         launchParams.set(newVariant);
+        sessionManager.enterSwitching();
+
+        if (processManager.launchPendingProcess(server) == null) {
+            log.error("启动待命进程失败，保留当前活跃会话");
+            sessionManager.resetSwitching();
+            if (stateCallback != null) {
+                stateCallback.onStateChange(false, "Failed to launch new process");
+            }
+        }
+    }
+
+    /**
+     * 强制重启子进程（算法类型切换时使用，跳过变体未变更检查）。
+     */
+    public void restartForce() {
+        // 取消正在进行的切换
+        if (sessionManager.isSwitching()) {
+            SocketSession oldPending = sessionManager.cancelPendingCleanup();
+            if (oldPending != null && !oldPending.isClosed()) {
+                oldPending.send(MSG_SHUTDOWN, null);
+            }
+            processManager.clearPending();
+        }
+
         sessionManager.enterSwitching();
 
         if (processManager.launchPendingProcess(server) == null) {

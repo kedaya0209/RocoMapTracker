@@ -54,8 +54,7 @@ public class PlayerStateTracker {
             smoothedY = alpha * y + (1 - alpha) * smoothedY;
         }
 
-        // 反方向修正：速度方向与箭头朝向明显相反（>120°）时翻转 180°
-        // 偶发误判场景：箭头凸包最小内角顶点选到了尾部而非尖端
+        // 反方向修正（后备）：速度方向与箭头朝向明显相反（>120°）时翻转 180°
         if (angle != null && hasPreviousMatch) {
             double speedSq = velocityX * velocityX + velocityY * velocityY;
             if (speedSq > SPEED_THRESHOLD_SQ) {
@@ -77,7 +76,15 @@ public class PlayerStateTracker {
                 hasSmoothedAngle = true;
             } else {
                 double aDiff = normalizeAngleDiff(angle - smoothedAngle);
-                smoothedAngle = (smoothedAngle + PlayerConfig.PLAYER_EMA_ALPHA * aDiff + 360) % 360;
+                if (Math.abs(aDiff) > 90.0) {
+                    // 大角度跳变（含 C++ 方向修正）：直接快照，消除平滑延迟
+                    smoothedAngle = angle;
+                } else {
+                    double angleAlpha = Math.abs(aDiff) > PlayerConfig.PLAYER_ANGLE_OUTLIER_THRESHOLD
+                        ? PlayerConfig.PLAYER_ANGLE_EMA_ALPHA * 0.5
+                        : PlayerConfig.PLAYER_ANGLE_EMA_ALPHA;
+                    smoothedAngle = (smoothedAngle + angleAlpha * aDiff + 360) % 360;
+                }
             }
             angle = smoothedAngle;
         }

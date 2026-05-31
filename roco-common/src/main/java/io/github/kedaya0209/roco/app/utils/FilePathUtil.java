@@ -93,7 +93,7 @@ public final class FilePathUtil {
 
     /**
      * 将 classpath 资源路径映射为外部物理文件（相对于 app root）。
-     * <br>例: {@code getExternalFile("/dll/sift/sift_match.exe") → &lt;appRoot&gt;/dll/sift/sift_match.exe}
+     * <br>例: {@code getExternalFile("/match/match.exe") → &lt;appRoot&gt;/match/match.exe}
      */
     public static File getExternalFile(String internalPath) {
         String safePath = internalPath.replaceFirst("^[/\\\\]+", "");

@@ -38,7 +38,7 @@ public class SiftMatchProtocol {
     /**
      * 序列化 CONFIG_DATA 二进制格式 (Big-Endian):
      * <pre>
-     *   [4B]siftVariant [4B]nfeatures [4B]nOctaveLayers
+     *   [4B]kind(AlgoKind) [4B]siftVariant [4B]nfeatures [4B]nOctaveLayers
      *   [8B]contrastThreshold [8B]edgeThreshold [8B]sigma
      *   [8B]matchRatioThreshold [4B]matchMinCount [4B]searchRadius
      *   [4B]flannKDTreeCount [4B]flannSearchChecks
@@ -46,12 +46,12 @@ public class SiftMatchProtocol {
      *   [4B]cacheFilePathLen [NB]cacheFilePath(UTF-8)
      * </pre>
      */
-    public static byte[] encodeConfig(int variant, String cacheSuffix) {
+    public static byte[] encodeConfig(int variant, String cacheSuffix, int algoKind) {
         String siftMapPath = ResourceConfigContext.getSiftMap();
         String cacheFilePath = FilePathUtil.getExternalFile(CACHE_PREFIX + siftMapPath + cacheSuffix).getAbsolutePath();
         byte[] cachePathBytes = cacheFilePath.getBytes(StandardCharsets.UTF_8);
 
-        int bodyLen = 4 + 4 + 4 + 8 + 8 + 8       // variant + SIFT
+        int bodyLen = 4 + 4 + 4 + 4 + 8 + 8 + 8    // kind + variant + SIFT
                 + 8 + 4 + 4                          // MATCH
                 + 4 + 4                              // FLANN
                 + 8 + 4 + 8                          // RANSAC
@@ -59,6 +59,7 @@ public class SiftMatchProtocol {
 
         ByteBuffer buf = ByteBuffer.allocate(bodyLen).order(ByteOrder.BIG_ENDIAN);
 
+        buf.putInt(algoKind);
         buf.putInt(variant);
         buf.putInt(SiftConfig.SIFT_N_FEATURES);
         buf.putInt(SiftConfig.SIFT_N_OCTAVE_LAYERS);

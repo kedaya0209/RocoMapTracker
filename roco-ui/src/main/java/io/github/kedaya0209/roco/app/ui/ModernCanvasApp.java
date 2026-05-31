@@ -162,6 +162,9 @@ public class ModernCanvasApp extends Application {
             log.info("算法变体切换: {}", newVariant);
             siftClientManager.restartClient(newVariant);
         });
+        SwitchMapMatcher.getInstance().setAlgoKindCallback(newAlgoKind -> {
+            log.info("算法类型固定为 SIFT");
+        });
 
         ResourceInitService initService = getResourceInitService();
         initService.start(this::buildMainUi);

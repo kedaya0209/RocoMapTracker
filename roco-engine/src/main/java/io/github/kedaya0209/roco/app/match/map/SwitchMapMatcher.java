@@ -33,6 +33,9 @@ public class SwitchMapMatcher {
      */
     private volatile SwitchCallback switchCallback;
 
+    private volatile AlgoKindSwitchCallback algoKindCallback;
+    private volatile int lastAlgoKind = SiftConfig.ALGO_KIND;
+
     private SwitchMapMatcher() {
     }
 
@@ -69,6 +72,40 @@ public class SwitchMapMatcher {
         if (cb != null) {
             cb.onSwitch(type);
         }
+    }
+
+    public void setAlgoKindCallback(AlgoKindSwitchCallback cb) {
+        this.algoKindCallback = cb;
+        this.lastAlgoKind = SiftConfig.ALGO_KIND;
+    }
+
+    /**
+     * 运行时切换算法类型（由侧边栏调用）。
+     */
+    public void switchAlgoKind(String name) {
+        log.info("算法类型固定为 SIFT");
+    }
+
+    /**
+     * 触发算法类型重启（由设置面板 onApply 调用）。
+     * 自动跳过未变更的情况，防止每次应用设置时重复重启。
+     */
+    public void triggerAlgoKindRestart() {
+        int currentAlgoKind = SiftConfig.ALGO_KIND;
+        if (currentAlgoKind == lastAlgoKind) return;
+        lastAlgoKind = currentAlgoKind;
+        AlgoKindSwitchCallback cb = algoKindCallback;
+        if (cb != null) {
+            cb.onAlgoKindSwitch(currentAlgoKind);
+        }
+    }
+
+    /**
+     * 上层注入的回调: 算法类型变更后触发，由 ModernCanvasApp 重启 C++ 进程
+     */
+    @FunctionalInterface
+    public interface AlgoKindSwitchCallback {
+        void onAlgoKindSwitch(int newAlgoKind);
     }
 
     /**

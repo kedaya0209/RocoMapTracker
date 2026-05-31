@@ -74,12 +74,12 @@ jobs:
           cl /std:c++17 /O2 /EHsc /arch:AVX2 /Fe:capture.exe capture_main.cpp resource.res d3d11.lib dxgi.lib windowsapp.lib runtimeobject.lib user32.lib ws2_32.lib winmm.lib
         working-directory: cpp
 
-      - name: Build sift_match.exe (with source-built OpenCV)
+      - name: Build match.exe (with source-built OpenCV)
         run: |
           set "INCLUDE=D:\a\opencv-install\include;D:\a\zlib\include;%INCLUDE%"
           set "LIB=D:\a\opencv-install\x64\vc17\lib;D:\a\zlib\lib;%LIB%"
           rc /nologo /fo resource.res resource.rc
-          cl /std:c++17 /O2 /EHsc /arch:AVX2 /I"D:\a\opencv-install\include" /I"D:\a\zlib\include" /Fe:sift_match.exe sift_match_main.cpp resource.res /link /OPT:REF /LIBPATH:"D:\a\opencv-install\x64\vc17\lib" /LIBPATH:"D:\a\zlib\lib" ws2_32.lib opencv_core4100.lib opencv_imgproc4100.lib opencv_features2d4100.lib opencv_flann4100.lib opencv_calib3d4100.lib zlib.lib
+          cl /std:c++17 /O2 /EHsc /arch:AVX2 /I"D:\a\opencv-install\include" /I"D:\a\zlib\include" /Fe:RocoMapTracker-match.exe match_main.cpp sift_matcher.cpp match_common.cpp resource.res /link /OPT:REF /LIBPATH:"D:\a\opencv-install\x64\vc17\lib" /LIBPATH:"D:\a\zlib\lib" ws2_32.lib opencv_core4100.lib opencv_imgproc4100.lib opencv_features2d4100.lib opencv_flann4100.lib opencv_calib3d4100.lib zlib.lib
           for %%D in (core imgproc features2d flann calib3d) do copy /Y "D:\a\opencv-install\x64\vc17\bin\opencv_%%D4100.dll" .
         working-directory: cpp
         shell: cmd
@@ -90,7 +90,7 @@ jobs:
           name: cpp-binaries
           path: |
             cpp/capture.exe
-            cpp/sift_match.exe
+            cpp/RocoMapTracker-match.exe
             cpp/opencv_core4100.dll
             cpp/opencv_imgproc4100.dll
             cpp/opencv_features2d4100.dll
@@ -137,8 +137,8 @@ jobs:
         shell: cmd
         run: |
           copy /Y cpp\capture.exe roco-ui\src\main\resources\capture\RocoMapTracker-capture.exe
-          copy /Y cpp\sift_match.exe roco-ui\src\main\resources\sift\RocoMapTracker-sift_match.exe
-          for %%D in (core imgproc features2d flann calib3d) do copy /Y cpp\opencv_%%D4100.dll roco-ui\src\main\resources\sift\opencv_%%D4100.dll
+          copy /Y cpp\RocoMapTracker-match.exe roco-ui\src\main\resources\match\RocoMapTracker-match.exe
+          for %%D in (core imgproc features2d flann calib3d) do copy /Y cpp\opencv_%%D4100.dll roco-ui\src\main\resources\match\opencv_%%D4100.dll
 
       - name: Download private assets
         env:

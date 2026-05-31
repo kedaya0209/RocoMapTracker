@@ -240,6 +240,11 @@ public class Sidebar extends VBox {
         });
     }
 
+    private void switchAlgoKind(String name, SidebarItem header) {
+        log.info("算法类型固定为 SIFT");
+        collapseCurrent();
+    }
+
     private void switchResource(String resource, SidebarItem header) {
         boolean isInternal = resource.equals("内置资源");
         if (isInternal == DownloadConfig.INTERNAL_RESOURCE) return;

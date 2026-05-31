@@ -17,7 +17,8 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 
 /**
- * SIFT 子进程生命周期管理器 — 单一职责：管理 sift_match.exe 的启动、重启、销毁。
+ * 匹配子进程生命周期管理器 — 管理 match.exe 的启动、重启、销毁。
+ * 实际算法由 CONFIG_DATA 中的 kind 字段指定。
  *
  * <p>不持有任何 SocketSession 引用，与会话管理完全解耦。
  * 所有方法均为同步操作，异步编排由 {@link SiftMatchHandler} 协调器负责。</p>
@@ -40,7 +41,7 @@ public class SiftProcessManager {
     // ==================== 进程启动 ====================
 
     /**
-     * 创建新的 sift_match.exe 进程并连接到指定 SocketServer
+     * 创建新的 match.exe 进程并连接到指定 SocketServer
      *
      * @param server    Socket 服务端
      * @param threadName stdout 读取线程名
@@ -53,16 +54,16 @@ public class SiftProcessManager {
             return null;
         }
 
-        String exePath = FilePathUtil.getExternalPath(PathConfig.SIFT_MATCH_EXE, true);
+        String exePath = FilePathUtil.getExternalPath(PathConfig.MATCH_EXE, true);
         String cmdLine = "\"" + exePath + "\" " + port;
         NativeProcess proc = processFactory.create(cmdLine, JobObjectManager.getJobHandle(), true);
         if (proc == null) {
-            log.error("通过 NativeProcess 启动 sift_match.exe 失败");
+            log.error("通过 NativeProcess 启动 match.exe 失败");
             return null;
         }
 
         startReaderThread(proc, threadName);
-        log.info("sift_match.exe 已启动 (pid={}), 端口={}", proc.pid(), port);
+        log.info("match.exe 已启动 (pid={}), 端口={}", proc.pid(), port);
         return proc;
     }
 
@@ -85,7 +86,7 @@ public class SiftProcessManager {
     public boolean restartAfterCrash(SocketServer server) {
         long now = System.currentTimeMillis();
         if (now - lastRestartTime < SocketConfig.SIFT_RESTART_MIN_INTERVAL) {
-            log.warn("跳过 sift_match.exe 重启，触发速率限制 ({}ms < {}ms)",
+            log.warn("跳过 match.exe 重启，触发速率限制 ({}ms < {}ms)",
                     now - lastRestartTime, SocketConfig.SIFT_RESTART_MIN_INTERVAL);
             return false;
         }

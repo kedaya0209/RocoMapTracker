@@ -16,7 +16,7 @@ public final class PathConfig {
     // 可执行文件
     // ============================================================
     public static final String CAPTURE_EXE = "/capture/RocoMapTracker-capture.exe";
-    public static final String SIFT_MATCH_EXE = "/sift/RocoMapTracker-sift_match.exe";
+    public static final String MATCH_EXE = "/match/RocoMapTracker-match.exe";
 
     // ============================================================
     // 资源初始化

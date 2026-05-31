@@ -137,7 +137,7 @@ public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
                 stats.recordMatch(elapsed);
                 // 记录 C++ 端分段耗时（小地图检测/特征提取/FLANN匹配/箭头方向）
                 stats.recordSiftTimings(result.tMinimapMs(), result.tExtractMs(), result.tFlannMs());
-                stats.recordDirection((long) result.tArrowMs());
+                stats.recordDirection(Math.round(result.tArrowMs()));
 
                 if (result.success()) {
                     double angle = AngleConverter.toJavaFX(result.angle());

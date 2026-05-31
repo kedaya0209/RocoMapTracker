@@ -52,6 +52,15 @@ public class SiftClientManager {
     }
 
     /**
+     * 强制重启客户端（算法类型切换时调用）
+     */
+    public void restartByAlgoKind(int algoKind) {
+        if (client != null) {
+            client.restartForce();
+        }
+    }
+
+    /**
      * 停止客户端
      */
     public void stop() {

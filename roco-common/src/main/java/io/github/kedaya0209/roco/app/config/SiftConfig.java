@@ -11,12 +11,17 @@ import java.util.Properties;
 public final class SiftConfig {
 
     // ============================================================
-    // SIFT 与匹配参数
+    // 匹配器类型
     // ============================================================
     /**
      * 匹配器类型（SIFT / SIFT-PCA / SIFT-ULTRA / SIFT-PCA-ULTRA）
      */
     public static String MAP_MATCHAER = "SIFT-ULTRA";
+
+    // --- 算法选择 ---
+    /** 算法类型: 0=SIFT */
+    public static int ALGO_KIND = 0;
+    public static final int ALGO_SIFT = 0;
     // --- SIFT 检测器 ---
     /**
      * SIFT 最大特征点数（0=无限制）
@@ -134,6 +139,7 @@ public final class SiftConfig {
 
     public static void load(Properties prop) {
         MAP_MATCHAER = ConfigHelper.getStr(prop, "map.matcher", MAP_MATCHAER);
+        ALGO_KIND = 0; // 固定 SIFT，AKAZE 已移除
         SIFT_N_FEATURES = ConfigHelper.getInt(prop, "sift.n.features", SIFT_N_FEATURES);
         FLANN_KD_TREES = ConfigHelper.getInt(prop, "flann.kd.trees", FLANN_KD_TREES);
         FLANN_SEARCH_CHECKS = ConfigHelper.getInt(prop, "flann.search.checks", FLANN_SEARCH_CHECKS);
@@ -148,6 +154,8 @@ public final class SiftConfig {
     public static void save(StringBuilder sb) {
         sb.append("# 匹配器类型（SIFT / SIFT-PCA / SIFT-ULTRA / SIFT-PCA-ULTRA）\n");
         sb.append("map.matcher=").append(MAP_MATCHAER).append("\n");
+        sb.append("# 算法类型: 0=SIFT\n");
+        sb.append("algo.kind=").append(ALGO_KIND).append("\n");
         sb.append("# SIFT 最大特征点数（0=无限制）\n");
         sb.append("sift.n.features=").append(SIFT_N_FEATURES).append("\n");
         sb.append("# FLANN KD 树数量\n");
