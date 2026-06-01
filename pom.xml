@@ -4,9 +4,9 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>com.luoke</groupId>
+    <groupId>io.github.kedaya0209</groupId>
     <artifactId>roco-map-tracker</artifactId>
-    <version>1.1.1</version>
+    <version>1.2.0</version>
     <packaging>pom</packaging>
 
     <modules>
@@ -132,22 +132,30 @@
 
             <!-- Internal modules -->
             <dependency>
-                <groupId>com.luoke</groupId>
+                <groupId>io.github.kedaya0209</groupId>
                 <artifactId>roco-common</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
-                <groupId>com.luoke</groupId>
+                <groupId>io.github.kedaya0209</groupId>
                 <artifactId>roco-map</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
-                <groupId>com.luoke</groupId>
+                <groupId>io.github.kedaya0209</groupId>
                 <artifactId>roco-engine</artifactId>
                 <version>${project.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
+
+    <distributionManagement>
+        <repository>
+            <id>github</id>
+            <name>GitHub Packages</name>
+            <url>https://maven.pkg.github.com/kedaya0209/RocoMapTracker</url>
+        </repository>
+    </distributionManagement>
 
     <build>
         <pluginManagement>
@@ -168,6 +176,13 @@
                                 <version>${lombok.version}</version>
                             </path>
                         </annotationProcessorPaths>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-jar-plugin</artifactId>
+                    <configuration>
+                        <encoding>UTF-8</encoding>
                     </configuration>
                 </plugin>
             </plugins>

@@ -188,7 +188,7 @@
       ]
     },
     {
-      "type": "com.luoke.app.Main",
+      "type": "io.github.kedaya0209.roco.app.Main",
       "jniAccessible": true,
       "methods": [
         {
@@ -200,7 +200,7 @@
       ]
     },
     {
-      "type": "com.luoke.app.platform.WindowFinder",
+      "type": "io.github.kedaya0209.roco.app.platform.WindowFinder",
       "methods": [
         {
           "name": "enumProcImpl",
@@ -212,7 +212,7 @@
       ]
     },
     {
-      "type": "com.luoke.app.map.dto.MapCategoryItem",
+      "type": "io.github.kedaya0209.roco.app.map.dto.MapCategoryItem",
       "methods": [
         {
           "name": "<init>",
@@ -275,7 +275,7 @@
       ]
     },
     {
-      "type": "com.luoke.app.map.dto.MapPointItem",
+      "type": "io.github.kedaya0209.roco.app.map.dto.MapPointItem",
       "methods": [
         {
           "name": "<init>",
@@ -302,7 +302,7 @@
         {
           "name": "setPoint",
           "parameterTypes": [
-            "com.luoke.app.map.dto.LatLng"
+            "io.github.kedaya0209.roco.app.map.dto.LatLng"
           ]
         },
         {
@@ -332,7 +332,7 @@
       ]
     },
     {
-      "type": "com.luoke.app.map.dto.LatLng",
+      "type": "io.github.kedaya0209.roco.app.map.dto.LatLng",
       "methods": [
         {
           "name": "<init>",
@@ -353,7 +353,7 @@
       ]
     },
     {
-      "type": "com.luoke.app.map.model.Point",
+      "type": "io.github.kedaya0209.roco.app.map.model.Point",
       "methods": [
         {
           "name": "<init>",
@@ -382,7 +382,7 @@
       ]
     },
     {
-      "type": "com.luoke.app.map.model.ResourceConfig",
+      "type": "io.github.kedaya0209.roco.app.map.model.ResourceConfig",
       "methods": [
         {
           "name": "<init>",
@@ -461,7 +461,7 @@
       ]
     },
     {
-      "type": "com.luoke.app.map.model.RoutePath",
+      "type": "io.github.kedaya0209.roco.app.map.model.RoutePath",
       "methods": [
         {
           "name": "<init>",
@@ -510,7 +510,7 @@
       ]
     },
     {
-      "type": "com.luoke.app.ui.ModernCanvasApp",
+      "type": "io.github.kedaya0209.roco.app.ui.ModernCanvasApp",
       "methods": [
         {
           "name": "<init>",
@@ -4521,48 +4521,6 @@
       "glob": "icon/**"
     },
     {
-      "glob": "icon/about.svg"
-    },
-    {
-      "glob": "icon/change.svg"
-    },
-    {
-      "glob": "icon/download.svg"
-    },
-    {
-      "glob": "icon/follow.svg"
-    },
-    {
-      "glob": "icon/ghost.svg"
-    },
-    {
-      "glob": "icon/match.svg"
-    },
-    {
-      "glob": "icon/match_toggle.svg"
-    },
-    {
-      "glob": "icon/navigation.svg"
-    },
-    {
-      "glob": "icon/resources.svg"
-    },
-    {
-      "glob": "icon/rmt.svg"
-    },
-    {
-      "glob": "icon/route.svg"
-    },
-    {
-      "glob": "icon/settings.svg"
-    },
-    {
-      "glob": "icon/theme.svg"
-    },
-    {
-      "glob": "icon/update.svg"
-    },
-    {
       "glob": "javafx_font.dll"
     },
     {
@@ -4584,223 +4542,10 @@
       "glob": "prism_d3d.dll"
     },
     {
-      "glob": "sift/**"
-    },
-    {
-      "glob": "sift/RocoMapTracker-sift_match.exe"
-    },
-    {
-      "glob": "sift/concrt140.dll"
-    },
-    {
-      "glob": "sift/msvcp140.dll"
-    },
-    {
-      "glob": "sift/msvcp140_1.dll"
-    },
-    {
-      "glob": "sift/msvcp140_2.dll"
-    },
-    {
-      "glob": "sift/msvcp140_atomic_wait.dll"
-    },
-    {
-      "glob": "sift/opencv_calib3d4100.dll"
-    },
-    {
-      "glob": "sift/opencv_core4100.dll"
-    },
-    {
-      "glob": "sift/opencv_features2d4100.dll"
-    },
-    {
-      "glob": "sift/opencv_flann4100.dll"
-    },
-    {
-      "glob": "sift/opencv_imgproc4100.dll"
-    },
-    {
-      "glob": "sift/vcruntime140.dll"
-    },
-    {
-      "glob": "sift/vcruntime140_1.dll"
-    },
-    {
-      "glob": "sift/vcruntime140_threads.dll"
+      "glob": "match/**"
     },
     {
       "glob": "source/**"
-    },
-    {
-      "glob": "source/icon/player.png"
-    },
-    {
-      "glob": "source/icon/伞伞菌.png"
-    },
-    {
-      "glob": "source/icon/凤眼莲.png"
-    },
-    {
-      "glob": "source/icon/向阳花.png"
-    },
-    {
-      "glob": "source/icon/喵喵草.png"
-    },
-    {
-      "glob": "source/icon/喷气菇.png"
-    },
-    {
-      "glob": "source/icon/大嘴花.png"
-    },
-    {
-      "glob": "source/icon/天使草.png"
-    },
-    {
-      "glob": "source/icon/幽幽草.png"
-    },
-    {
-      "glob": "source/icon/幽幽鬼火.png"
-    },
-    {
-      "glob": "source/icon/彩玉花.png"
-    },
-    {
-      "glob": "source/icon/恶魔雪茄.png"
-    },
-    {
-      "glob": "source/icon/星霜花.png"
-    },
-    {
-      "glob": "source/icon/杏黄贝.png"
-    },
-    {
-      "glob": "source/icon/洋红珊瑚.png"
-    },
-    {
-      "glob": "source/icon/流星兰.png"
-    },
-    {
-      "glob": "source/icon/海桑花.png"
-    },
-    {
-      "glob": "source/icon/海珊瑚.png"
-    },
-    {
-      "glob": "source/icon/海神花.png"
-    },
-    {
-      "glob": "source/icon/火焰花.png"
-    },
-    {
-      "glob": "source/icon/睡铃.png"
-    },
-    {
-      "glob": "source/icon/短木莲.png"
-    },
-    {
-      "glob": "source/icon/石耳.png"
-    },
-    {
-      "glob": "source/icon/紫晶菇.png"
-    },
-    {
-      "glob": "source/icon/紫莲刚玉.png"
-    },
-    {
-      "glob": "source/icon/紫雀花.png"
-    },
-    {
-      "glob": "source/icon/花星角.png"
-    },
-    {
-      "glob": "source/icon/荧光兰.png"
-    },
-    {
-      "glob": "source/icon/蓝掌.png"
-    },
-    {
-      "glob": "source/icon/蓝晶碧玺.png"
-    },
-    {
-      "glob": "source/icon/藻羽花.png"
-    },
-    {
-      "glob": "source/icon/蜜黄菌.png"
-    },
-    {
-      "glob": "source/icon/象牙花.png"
-    },
-    {
-      "glob": "source/icon/雪菇.png"
-    },
-    {
-      "glob": "source/icon/风卷草.png"
-    },
-    {
-      "glob": "source/icon/骨片.png"
-    },
-    {
-      "glob": "source/icon/黄石榴石.png"
-    },
-    {
-      "glob": "source/icon/黑晶琉璃.png"
-    },
-    {
-      "glob": "source/map/WorldMap_SIFT.png"
-    },
-    {
-      "glob": "source/map/WorldMap_Show_tiles/3/0_0.png"
-    },
-    {
-      "glob": "source/map/WorldMap_Show_tiles/3/0_1.png"
-    },
-    {
-      "glob": "source/map/WorldMap_Show_tiles/3/0_2.png"
-    },
-    {
-      "glob": "source/map/WorldMap_Show_tiles/3/0_3.png"
-    },
-    {
-      "glob": "source/map/WorldMap_Show_tiles/3/1_0.png"
-    },
-    {
-      "glob": "source/map/WorldMap_Show_tiles/3/1_1.png"
-    },
-    {
-      "glob": "source/map/WorldMap_Show_tiles/3/1_2.png"
-    },
-    {
-      "glob": "source/map/WorldMap_Show_tiles/3/1_3.png"
-    },
-    {
-      "glob": "source/map/WorldMap_Show_tiles/3/2_0.png"
-    },
-    {
-      "glob": "source/map/WorldMap_Show_tiles/3/2_1.png"
-    },
-    {
-      "glob": "source/map/WorldMap_Show_tiles/3/2_2.png"
-    },
-    {
-      "glob": "source/map/WorldMap_Show_tiles/3/2_3.png"
-    },
-    {
-      "glob": "source/map/WorldMap_Show_tiles/3/3_0.png"
-    },
-    {
-      "glob": "source/map/WorldMap_Show_tiles/3/3_1.png"
-    },
-    {
-      "glob": "source/map/WorldMap_Show_tiles/3/3_2.png"
-    },
-    {
-      "glob": "source/map/WorldMap_Show_tiles/3/3_3.png"
-    },
-    {
-      "glob": "source/point/collect_set.txt"
-    },
-    {
-      "glob": "source/point/internal_resource_point.json"
     },
     {
       "glob": "ucrtbase.dll"
@@ -5158,7 +4903,7 @@
     ],
     "directUpcalls": [
       {
-        "class": "com.luoke.app.platform.WindowFinder",
+        "class": "io.github.kedaya0209.roco.app.platform.WindowFinder",
         "method": "enumProcImpl",
         "returnType": "jint",
         "parameterTypes": [

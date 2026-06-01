@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
-    <!-- 控制台输出 + 强制 UTF-8 -->
+    <!-- 鎺у埗鍙拌緭鍑?+ 寮哄埗 UTF-8 -->
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
             <charset>UTF-8</charset>
@@ -8,7 +8,7 @@
         </encoder>
     </appender>
 
-    <!-- 文件输出 + 强制 UTF-8 -->
+    <!-- 鏂囦欢杈撳嚭 + 寮哄埗 UTF-8 -->
     <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <file>logs/RocoMapTracker.log</file>
         <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
@@ -24,11 +24,11 @@
         </encoder>
     </appender>
 
-    <!-- 日志级别配置 -->
-    <logger name="com.luoke" level="INFO"/>
+    <!-- 鏃ュ織绾у埆閰嶇疆 -->
+    <logger name="io.github.kedaya0209" level="INFO"/>
     <logger name="org.bytedeco" level="INFO"/>
 
-    <!-- 根日志配置 -->
+    <!-- 鏍规棩蹇楅厤缃?-->
     <root level="INFO">
         <appender-ref ref="CONSOLE"/>
         <appender-ref ref="FILE"/>
