@@ -1,14 +1,7 @@
 package io.github.kedaya0209.roco.app.ui.component;
 
-import net.jcip.annotations.NotThreadSafe;
-import net.jcip.annotations.ThreadSafe;
 import atlantafx.base.theme.Styles;
-import io.github.kedaya0209.roco.app.config.ConfigPersistence;
-import io.github.kedaya0209.roco.app.config.DownloadConfig;
-import io.github.kedaya0209.roco.app.config.NavigConfig;
-import io.github.kedaya0209.roco.app.config.UiConfig;
-import io.github.kedaya0209.roco.app.config.SiftConfig;
-import io.github.kedaya0209.roco.app.config.BuildConfig;
+import io.github.kedaya0209.roco.app.config.*;
 import io.github.kedaya0209.roco.app.context.CameraContext;
 import io.github.kedaya0209.roco.app.context.ResourceConfigContext;
 import io.github.kedaya0209.roco.app.hook.AppEvents;
@@ -20,20 +13,27 @@ import io.github.kedaya0209.roco.app.hook.multicast.HookRegistry;
 import io.github.kedaya0209.roco.app.match.map.SwitchMapMatcher;
 import io.github.kedaya0209.roco.app.ui.component.setting.SettingsStage;
 import io.github.kedaya0209.roco.app.ui.service.ui.ThemeManager;
-import io.github.kedaya0209.roco.app.update.UpdateManager;
 import io.github.kedaya0209.roco.app.ui.util.DialogUtils;
 import io.github.kedaya0209.roco.app.ui.util.RestartUtils;
-import java.io.IOException;
+import io.github.kedaya0209.roco.app.update.UpdateManager;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
-import javafx.scene.control.*;
-import javafx.scene.layout.*;
+import javafx.scene.control.Hyperlink;
+import javafx.scene.control.Label;
+import javafx.scene.control.ListView;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.StackPane;
+import javafx.scene.layout.VBox;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import net.jcip.annotations.NotThreadSafe;
+import net.jcip.annotations.ThreadSafe;
+
+import java.io.IOException;
 
 @NotThreadSafe
 @Slf4j
@@ -43,7 +43,6 @@ public class Sidebar extends VBox {
     private final ListView<SidebarItem> listView;
     private final ObservableList<SidebarItem> items = FXCollections.observableArrayList();
     private RouteManagerStage routeManagerStage;
-    // 当前展开状态
     private SidebarItem.Category expandedCategory = null;
     private volatile boolean isAlgorithmLoading = false;
     @Setter
@@ -53,18 +52,21 @@ public class Sidebar extends VBox {
 
     public Sidebar() {
         super(0);
-        setPadding(new Insets(15, 15, 15, 15));
+        setPadding(new Insets(0, 0, 0, 0));
         setStyle("-fx-background-color: -color-bg-default; -fx-border-color: -color-border-muted; -fx-border-width: 0 1 0 0;");
 
         // 标题
         Label title = new Label("系统设置");
         title.getStyleClass().addAll(Styles.TEXT_BOLD, Styles.TEXT_CAPTION);
         title.setStyle("-fx-text-fill: -color-fg-muted;");
-        title.setPadding(new Insets(0, 0, 10, 5));
+        title.setPadding(new Insets(15, 15, 10, 15));
 
         // ListView
         listView = new ListView<>();
-        listView.setStyle("-fx-background-color: transparent; -fx-border-color: transparent; -fx-selection-bar: transparent; -fx-selection-bar-non-focused: transparent; -fx-padding: 0;");
+        listView.setStyle(
+                "-fx-background-color: transparent; -fx-border-color: transparent;"
+                        + "-fx-selection-bar: transparent; -fx-selection-bar-non-focused: transparent;"
+                        + "-fx-padding: 0;");
         listView.setFocusTraversable(false);
         wikiUpdater = new WikiUpdateManager();
         wikiUpdater.checkAndShowProgress();
@@ -73,7 +75,6 @@ public class Sidebar extends VBox {
         listView.setItems(items);
         listView.setCellFactory(_ -> new SidebarCell(
                 () -> expandedCategory, this::onHeaderClick, this::onOptionClick));
-        // 让 ListView 自动填满可用高度
         VBox.setVgrow(listView, Priority.ALWAYS);
         hideHScrollBar(listView);
         listView.skinProperty().addListener((_, _, sk) -> {
@@ -81,6 +82,13 @@ public class Sidebar extends VBox {
         });
 
         getChildren().addAll(title, listView);
+
+        // 绑定场景后预初始化 RouteManagerStage
+        sceneProperty().addListener((_, _, scene) -> {
+            if (scene != null) {
+                Platform.runLater(this::initRouteManager);
+            }
+        });
 
         if (!DownloadConfig.INTERNAL_RESOURCE) {
             initWikiFooter();
@@ -90,83 +98,79 @@ public class Sidebar extends VBox {
     private void buildItems() {
         items.clear();
 
-        // 设置按钮
-        items.add(new SidebarItem(SidebarItem.Type.ACTION, "设置", null, null, null, false, "/icon/settings.svg", this::openSettings));
+        items.add(new SidebarItem(SidebarItem.Type.ACTION, "设置",
+                null, null, null, false, "/icon/settings.svg", this::openSettings));
+        items.add(new SidebarItem(SidebarItem.Type.ACTION, "版本切换",
+                null, null, null, false, "/icon/change.svg", this::onVersionSwitchClick));
 
-        // 版本切换
-        items.add(new SidebarItem(SidebarItem.Type.ACTION, "版本切换", null, null, null, false, "/icon/change.svg", this::onVersionSwitchClick));
-
-        // 匹配算法选择
+        // 分类菜单
         items.add(new SidebarItem(SidebarItem.Type.HEADER, "匹配算法选择",
-                SidebarItem.Category.ALGORITHM, SiftConfig.MAP_MATCHAER, null, false, "/icon/match.svg", null));
-
-        // 资源模式切换
+                SidebarItem.Category.ALGORITHM, SiftConfig.MAP_MATCHAER,
+                null, false, "/icon/match.svg", null));
         items.add(new SidebarItem(SidebarItem.Type.HEADER, "资源模式切换",
                 SidebarItem.Category.RESOURCE,
-                DownloadConfig.INTERNAL_RESOURCE ? "内置资源" : "WIKI资源", null, false, "/icon/resources.svg", null));
-
-        // 主题切换
+                DownloadConfig.INTERNAL_RESOURCE ? "内置资源" : "WIKI资源",
+                null, false, "/icon/resources.svg", null));
         items.add(new SidebarItem(SidebarItem.Type.HEADER, "主题切换",
-                SidebarItem.Category.THEME, UiConfig.THEME, null, false, "/icon/theme.svg", null));
-
-        // 视角跟随模式
+                SidebarItem.Category.THEME, UiConfig.THEME,
+                null, false, "/icon/theme.svg", null));
         items.add(new SidebarItem(SidebarItem.Type.HEADER, "视角跟随",
-                SidebarItem.Category.NAVIGATION, NavigConfig.NAVIGATION_ENABLED ? "已开启" : "已关闭", null, false, "/icon/navigation.svg", null));
+                SidebarItem.Category.NAVIGATION,
+                NavigConfig.NAVIGATION_ENABLED ? "已开启" : "已关闭",
+                null, false, "/icon/navigation.svg", null));
 
         // 匹配开关
         items.add(new SidebarItem(SidebarItem.Type.HEADER, "匹配开关",
-                SidebarItem.Category.MATCH, SiftConfig.SIFT_MATCHING_ENABLED ? "已开启" : "已关闭", null, false, "/icon/match_toggle.svg", null));
+                SidebarItem.Category.MATCH,
+                SiftConfig.SIFT_MATCHING_ENABLED ? "已开启" : "已关闭",
+                null, false, "/icon/match_toggle.svg", null));
 
-        // 路线管理
-        items.add(new SidebarItem(SidebarItem.Type.ACTION, "路线管理", null, null, null, false, "/icon/route.svg", this::openRouteManager));
-
-        // WIKI 更新（特殊容器）
+        // 操作项
+        items.add(new SidebarItem(SidebarItem.Type.ACTION, "路线管理",
+                null, null, null, false, "/icon/route.svg", this::openRouteManager));
         items.add(new SidebarItem(SidebarItem.Type.WIKI, null, null, null, wikiUpdater));
-
-        // 检查更新
-        items.add(new SidebarItem(SidebarItem.Type.ACTION, "检查更新", null, null, null, false, "/icon/update.svg", () -> {
+        items.add(new SidebarItem(SidebarItem.Type.ACTION, "检查更新",
+                null, null, null, false, "/icon/update.svg", () -> {
             HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION,
                     new StatusEvent("正在检查更新，请稍候...", NotificationType.INFO));
             UpdateManager.getInstance().manualCheck(null);
         }));
-
-        // 插件管理
-        items.add(new SidebarItem(SidebarItem.Type.ACTION, "插件管理", null, null, null, false, "/icon/plugins.svg", () -> openSettingsCategory("插件管理")));
-
-        // 关于
-        items.add(new SidebarItem(SidebarItem.Type.ACTION, "关于", null, null, null, false, "/icon/about.svg", this::openAboutDialog));
-
+        items.add(new SidebarItem(SidebarItem.Type.ACTION, "插件管理",
+                null, null, null, false, "/icon/plugins.svg",
+                () -> openSettingsCategory("插件管理")));
+        items.add(new SidebarItem(SidebarItem.Type.ACTION, "关于",
+                null, null, null, false, "/icon/about.svg", this::openAboutDialog));
     }
 
+    // ══════════ Header / Option 处理 ══════════
+
     private void onVersionSwitchClick() {
-        if (onShowVersionSelector != null) {
-            onShowVersionSelector.run();
-        }
+        if (onShowVersionSelector != null) onShowVersionSelector.run();
     }
 
     private void onHeaderClick(SidebarItem item) {
-        if (item.category() == SidebarItem.Category.MATCH) return; // Switch 控件直接控制，不展开
+        if (item.category() == SidebarItem.Category.MATCH) return;
         if (expandedCategory == item.category()) {
             collapseCurrent();
             return;
         }
         collapseCurrent();
         expandedCategory = item.category();
+
         String[] options = switch (item.category()) {
             case ALGORITHM -> SwitchMapMatcher.getInstance().getMatchers().toArray(new String[0]);
             case RESOURCE -> ResourceConfigContext.getTags().toArray(new String[0]);
             case THEME -> ThemeManager.getAvailableThemes();
-            case NAVIGATION -> new String[]{
-                "启用视角跟随",
-                "打开导航设置"
-            };
-            case MATCH -> new String[]{}; // 不会被执行（早期 return 保护）
+            case NAVIGATION -> new String[]{"启用视角跟随", "打开导航设置"};
+            case MATCH -> new String[]{};
         };
 
         String currentValue = item.currentValue();
         int insertIndex = items.indexOf(item) + 1;
         for (int i = 0; i < options.length; i++) {
-            boolean selected = options[i].equalsIgnoreCase(currentValue);
+            boolean selected = options[i].equalsIgnoreCase(currentValue)
+                    || (item.category() == SidebarItem.Category.NAVIGATION
+                    && options[i].startsWith(currentValue != null && currentValue.contains("开启") ? "关闭" : "启用"));
             items.add(insertIndex + i,
                     new SidebarItem(SidebarItem.Type.OPTION, options[i],
                             item.category(), null, null, selected));
@@ -186,7 +190,8 @@ public class Sidebar extends VBox {
             case RESOURCE -> switchResource(value, header);
             case THEME -> switchTheme(value, header);
             case NAVIGATION -> handleNavOption(value, header);
-            case MATCH -> {} // Switch 控件直接控制
+            case MATCH -> {
+            }
         }
         collapseCurrent();
     }
@@ -208,9 +213,7 @@ public class Sidebar extends VBox {
 
     private void closeSidebarAfterDelay() {
         Platform.runLater(() -> {
-            if (animator != null) {
-                animator.closeSidebar();
-            }
+            if (animator != null) animator.closeSidebar();
         });
     }
 
@@ -220,9 +223,10 @@ public class Sidebar extends VBox {
         expandedCategory = null;
     }
 
+    // ══════════ 算法/资源/主题 切换 ══════════
+
     private void switchAlgorithm(String algo, SidebarItem header) {
         if (isAlgorithmLoading) return;
-
         isAlgorithmLoading = true;
         updateHeaderValue(header, algo);
 
@@ -231,18 +235,13 @@ public class Sidebar extends VBox {
                 SwitchMapMatcher.getInstance().switchMapMatcher(algo);
                 HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION,
                         new StatusEvent("正在重启匹配引擎: " + algo + " ...", NotificationType.INFO));
-            } catch (Exception e) { // SwitchMapMatcher 涉及原生库调用，可能抛出多种异常
+            } catch (Exception e) {
                 HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION,
                         new StatusEvent("切换算法失败", NotificationType.ERROR));
             } finally {
                 Platform.runLater(() -> isAlgorithmLoading = false);
             }
         });
-    }
-
-    private void switchAlgoKind(String name, SidebarItem header) {
-        log.info("算法类型固定为 SIFT");
-        collapseCurrent();
     }
 
     private void switchResource(String resource, SidebarItem header) {
@@ -271,6 +270,8 @@ public class Sidebar extends VBox {
                 new StatusEvent("主题已切换: " + name, NotificationType.SUCCESS));
     }
 
+    // ══════════ 工具方法 ══════════
+
     private void updateHeaderValue(SidebarItem header, String newValue) {
         int idx = items.indexOf(header);
         if (idx >= 0) {
@@ -278,6 +279,23 @@ public class Sidebar extends VBox {
                     header.category(), newValue, null, false, header.iconSvg(), null));
         }
     }
+
+    public void setDownloadProgress(double progress) {
+        Platform.runLater(() -> {
+            for (int i = 0; i < items.size(); i++) {
+                SidebarItem item = items.get(i);
+                if (!"检查更新".equals(item.title())) continue;
+                String title = progress < 0 ? "检查更新"
+                        : String.format("检查更新 (%.0f%%)", progress * 100);
+                items.set(i, new SidebarItem(SidebarItem.Type.ACTION, title,
+                        null, null, null, false, "/icon/update.svg",
+                        item.onAction(), progress));
+                return;
+            }
+        });
+    }
+
+    // ══════════ Dialogs / Windows ══════════
 
     private void openSettings() {
         openSettingsCategory(null);
@@ -293,25 +311,6 @@ public class Sidebar extends VBox {
             settingsStage.initOwner(rootPane.getScene().getWindow());
         }
         settingsStage.showDialog(rootPane, categoryName);
-    }
-
-    /**
-     * 更新"检查更新"项显示下载进度（后台下载模式）
-     * @param progress -1 表示隐藏进度，0~1 表示下载百分比
-     */
-    public void setDownloadProgress(double progress) {
-        Platform.runLater(() -> {
-            for (int i = 0; i < items.size(); i++) {
-                SidebarItem item = items.get(i);
-                if (!"检查更新".equals(item.title())) continue;
-                String title = progress < 0 ? "检查更新"
-                        : String.format("检查更新 (%.0f%%)", progress * 100);
-                items.set(i, new SidebarItem(SidebarItem.Type.ACTION, title,
-                        null, null, null, false, "/icon/update.svg",
-                        item.onAction(), progress));
-                return;
-            }
-        });
     }
 
     private void openRouteManager() {
@@ -346,15 +345,20 @@ public class Sidebar extends VBox {
                 "https://github.com/kedaya0209/RocoMapTracker");
     }
 
+    // ══════════ 页脚 ══════════
+
     private void initWikiFooter() {
         VBox footer = new VBox(2);
         footer.setAlignment(Pos.CENTER);
         footer.setPadding(new Insets(8, 0, 0, 0));
 
         Hyperlink wikiLink = new Hyperlink("数据来源：洛克王国WIKI");
-        String linkStyle = "-fx-text-fill: -color-fg-subtle; -fx-font-size: 10px; -fx-underline: true; -fx-border-color: transparent; -fx-padding: 0;";
+        String linkStyle = "-fx-text-fill: -color-fg-subtle; -fx-font-size: 10px;"
+                + "-fx-underline: true; -fx-border-color: transparent; -fx-padding: 0;";
         wikiLink.setStyle(linkStyle);
-        wikiLink.setOnMouseEntered(e -> wikiLink.setStyle("-fx-text-fill: -color-fg-muted; -fx-font-size: 10px; -fx-underline: true; -fx-border-color: transparent; -fx-padding: 0;"));
+        wikiLink.setOnMouseEntered(e -> wikiLink.setStyle(
+                "-fx-text-fill: -color-fg-muted; -fx-font-size: 10px;"
+                        + "-fx-underline: true; -fx-border-color: transparent; -fx-padding: 0;"));
         wikiLink.setOnMouseExited(e -> wikiLink.setStyle(linkStyle));
         wikiLink.setOnAction(e -> {
             openWebpage("https://wiki.biligame.com/rocom/");
@@ -376,9 +380,6 @@ public class Sidebar extends VBox {
         }
     }
 
-    /**
-     * 隐藏 ListView 的横向滚动条。通过 Platform.runLater 确保 skin 的子节点已就绪。
-     */
     private static void hideHScrollBar(ListView<?> lv) {
         Platform.runLater(() -> {
             for (Node hbar : lv.lookupAll(".scroll-bar:horizontal")) {
@@ -387,7 +388,7 @@ public class Sidebar extends VBox {
         });
     }
 
-    // ========== Item Model ==========
+    // ══════════ Item Model ══════════
 
     private StackPane findRootPane() {
         Node node = this;
@@ -397,12 +398,10 @@ public class Sidebar extends VBox {
         return null;
     }
 
-    // ========== Item Model ==========
-
     @ThreadSafe
     public record SidebarItem(Type type, String title, Category category, String currentValue,
-                              WikiUpdateManager wikiUpdater, boolean selected, String iconSvg, Runnable onAction,
-                              double progress) {
+                              WikiUpdateManager wikiUpdater, boolean selected, String iconSvg,
+                              Runnable onAction, double progress) {
 
         public SidebarItem(Type type, String title, Category category, String currentValue,
                            WikiUpdateManager wikiUpdater, boolean selected, String iconSvg,
@@ -410,11 +409,13 @@ public class Sidebar extends VBox {
             this(type, title, category, currentValue, wikiUpdater, selected, iconSvg, onAction, -1);
         }
 
-        public SidebarItem(Type type, String title, Category category, String currentValue, WikiUpdateManager wikiUpdater) {
+        public SidebarItem(Type type, String title, Category category, String currentValue,
+                           WikiUpdateManager wikiUpdater) {
             this(type, title, category, currentValue, wikiUpdater, false, null, null, -1);
         }
 
-        public SidebarItem(Type type, String title, Category category, String currentValue, WikiUpdateManager wikiUpdater, boolean selected) {
+        public SidebarItem(Type type, String title, Category category, String currentValue,
+                           WikiUpdateManager wikiUpdater, boolean selected) {
             this(type, title, category, currentValue, wikiUpdater, selected, null, null, -1);
         }
 

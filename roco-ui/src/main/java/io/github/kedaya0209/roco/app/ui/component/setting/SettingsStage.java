@@ -1,6 +1,5 @@
 package io.github.kedaya0209.roco.app.ui.component.setting;
 
-import net.jcip.annotations.NotThreadSafe;
 import atlantafx.base.theme.Styles;
 import io.github.kedaya0209.roco.app.capture.FullFrameControl;
 import io.github.kedaya0209.roco.app.ui.service.VersionMode;
@@ -22,11 +21,13 @@ import javafx.scene.shape.Rectangle;
 import javafx.scene.shape.SVGPath;
 import javafx.stage.Screen;
 import javafx.stage.Stage;
-import javafx.stage.Window;
 import javafx.stage.StageStyle;
+import javafx.stage.Window;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import net.jcip.annotations.NotThreadSafe;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -51,6 +52,8 @@ public class SettingsStage extends Stage {
     private final StackPane rootStackPane = new StackPane();
     private final StackPane rightPanel;
     private final ListView<SettingCategory> categoryList;
+    private final List<SettingCategory> categoryItems = new ArrayList<>();
+    private SettingCategory selectedCategory;
     private StackPane ownerRoot;
     private Button applyBtn;
     private Label titleLabel;
@@ -163,10 +166,6 @@ public class SettingsStage extends Stage {
         clip.setArcHeight(24);
         rootStackPane.setClip(clip);
 
-        // 分类切换监听（初始分类在 showDialog 中延迟刷新，避免首次打开卡顿）
-        categoryList.getSelectionModel().selectedItemProperty().addListener((_, _, cat) -> {
-            if (cat != null) refreshCategory(cat);
-        });
     }
 
     // ================================================================
@@ -219,30 +218,22 @@ public class SettingsStage extends Stage {
 
         if (needsInitialRefresh) {
             needsInitialRefresh = false;
-            Platform.runLater(() -> {
-                int idx = findCategoryIndex(selectCategoryName);
-                categoryList.getSelectionModel().select(idx);
-            });
+            Platform.runLater(() -> selectIndex(findCategoryIndex(selectCategoryName)));
         } else if (selectCategoryName != null) {
             int idx = findCategoryIndex(selectCategoryName);
-            if (idx >= 0) {
-                categoryList.getSelectionModel().select(idx);
-            }
+            if (idx >= 0) selectIndex(idx);
         } else {
             // 重新打开面板时强制刷新当前分类，重建 RoiPreview 等动态组件
-            SettingCategory current = categoryList.getSelectionModel().getSelectedItem();
-            if (current != null) {
-                categoryList.getSelectionModel().clearSelection();
-                Platform.runLater(() -> categoryList.getSelectionModel().select(current));
+            if (selectedCategory != null) {
+                refreshCategory(selectedCategory);
             }
         }
     }
 
     private int findCategoryIndex(String name) {
         if (name == null) return 0;
-        ObservableList<SettingCategory> items = categoryList.getItems();
-        for (int i = 0; i < items.size(); i++) {
-            if (items.get(i).name().equals(name)) return i;
+        for (int i = 0; i < categoryItems.size(); i++) {
+            if (categoryItems.get(i).name().equals(name)) return i;
         }
         return 0;
     }
@@ -277,24 +268,43 @@ public class SettingsStage extends Stage {
     }
 
     // ================================================================
-    // 分类列表
+    // 分类列表（ListView + AtlanFX 主题）
     // ================================================================
 
     private ListView<SettingCategory> buildCategoryList() {
-        ListView<SettingCategory> lv = new ListView<>();
+        List<SettingCategory> items = SettingDefinitions.CATEGORIES.stream()
+                .filter(c -> VersionManager.getInstance().getCurrentMode() == VersionMode.ADVANCED
+                        || !"物资面板".equals(c.name()))
+                .toList();
+        categoryItems.clear();
+        categoryItems.addAll(items);
+        ObservableList<SettingCategory> observableItems = FXCollections.observableArrayList(items);
+
+        ListView<SettingCategory> lv = new ListView<>(observableItems);
+        lv.setFocusTraversable(false);
         lv.setPrefWidth(180);
         lv.setMaxWidth(180);
         lv.setMinWidth(140);
-        lv.setStyle("-fx-background-color: transparent; -fx-border-color: transparent; " +
-                "-fx-selection-bar: transparent; -fx-selection-bar-non-focused: transparent; -fx-hbar-policy: never;");
-        lv.setFocusTraversable(false);
-        lv.setItems(FXCollections.observableArrayList(
-                SettingDefinitions.CATEGORIES.stream()
-                        .filter(c -> VersionManager.getInstance().getCurrentMode() == VersionMode.ADVANCED
-                                || !"物资面板".equals(c.name()))
-                        .toList()));
         lv.setCellFactory(_ -> new SettingCategoryCell());
+
+        lv.getSelectionModel().selectedItemProperty().addListener((_, _, selected) -> {
+            if (selected != null) {
+                selectedCategory = selected;
+                refreshCategory(selected);
+            }
+        });
+
+        // 用透明背景，让 root 圆角 clip 生效
+        lv.setStyle("-fx-background-color: transparent; -fx-border-color: transparent;");
         return lv;
+    }
+
+    private void selectCategory(SettingCategory cat) {
+        categoryList.getSelectionModel().select(cat);
+    }
+
+    private void selectIndex(int index) {
+        categoryList.getSelectionModel().select(index);
     }
 
     // ================================================================

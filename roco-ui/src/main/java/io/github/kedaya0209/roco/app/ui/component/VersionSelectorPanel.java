@@ -1,29 +1,28 @@
 package io.github.kedaya0209.roco.app.ui.component;
 
-import io.github.kedaya0209.roco.app.config.SnifferConfig;
-import net.jcip.annotations.NotThreadSafe;
 import atlantafx.base.theme.Styles;
+import com.fasterxml.jackson.databind.JsonNode;
+import io.github.kedaya0209.roco.app.config.SnifferConfig;
 import io.github.kedaya0209.roco.app.ui.service.VersionMode;
 import io.github.kedaya0209.roco.app.ui.service.ui.VersionManager;
 import io.github.kedaya0209.roco.app.ui.util.DialogUtils;
 import io.github.kedaya0209.roco.app.ui.util.FxRippleUtil;
-import javafx.application.Platform;
 import io.github.kedaya0209.roco.app.utils.FilePathUtil;
 import io.github.kedaya0209.roco.app.utils.JsonUtils;
-import com.fasterxml.jackson.databind.JsonNode;
 import javafx.animation.FadeTransition;
+import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
-import javafx.scene.control.*;
-import javafx.scene.layout.HBox;
-import javafx.scene.layout.Priority;
-import javafx.scene.layout.Region;
-import javafx.scene.layout.StackPane;
-import javafx.scene.layout.VBox;
+import javafx.scene.control.Button;
+import javafx.scene.control.Hyperlink;
+import javafx.scene.control.Label;
+import javafx.scene.control.ProgressBar;
+import javafx.scene.layout.*;
 import javafx.scene.text.TextAlignment;
 import javafx.util.Duration;
 import lombok.extern.slf4j.Slf4j;
+import net.jcip.annotations.NotThreadSafe;
 
 import java.io.*;
 import java.net.URI;
@@ -63,6 +62,7 @@ public class VersionSelectorPanel extends StackPane {
     public VersionSelectorPanel(StackPane rootStack) {
         this.rootStack = rootStack;
         setPickOnBounds(false);
+        setViewOrder(-20);
         setStyle("-fx-background-color: rgba(0,0,0,0.55);");
 
         Label title = new Label("选择版本模式");

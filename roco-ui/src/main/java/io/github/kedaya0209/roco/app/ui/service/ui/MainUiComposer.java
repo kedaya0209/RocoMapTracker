@@ -1,15 +1,17 @@
 package io.github.kedaya0209.roco.app.ui.service.ui;
 
-import net.jcip.annotations.NotThreadSafe;
-import net.jcip.annotations.ThreadSafe;
+import atlantafx.base.controls.ModalPane;
 import io.github.kedaya0209.roco.app.config.RenderConfig;
 import io.github.kedaya0209.roco.app.context.MapContext;
 import io.github.kedaya0209.roco.app.context.ResourceConfigContext;
 import io.github.kedaya0209.roco.app.ui.component.*;
-import io.github.kedaya0209.roco.app.ui.service.resource.SvgManager;
 import io.github.kedaya0209.roco.app.ui.render.MapRenderer;
+import io.github.kedaya0209.roco.app.ui.service.resource.SvgManager;
 import io.github.kedaya0209.roco.app.ui.util.FxRippleUtil;
 import io.github.kedaya0209.roco.app.utils.ResourceUtils;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.geometry.Side;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.effect.DropShadow;
@@ -22,6 +24,8 @@ import javafx.scene.paint.Color;
 import javafx.scene.shape.SVGPath;
 import javafx.stage.Stage;
 import lombok.extern.slf4j.Slf4j;
+import net.jcip.annotations.NotThreadSafe;
+import net.jcip.annotations.ThreadSafe;
 
 /**
  * 主界面 UI 组装器。
@@ -82,13 +86,15 @@ public final class MainUiComposer {
         StatsOverlay statsOverlay = StatsOverlay.getInstance();
         ResourceCounterPanel resourcePanel = ResourceCounterPanel.getInstance();
 
-        // 侧边栏（初始偏移量足够大，确保 Platform.runLater 修正前不会露出来）
+        // 侧边栏（ModalPane 抽屉式遮罩层，在标题栏下方展开）
         Sidebar sidebar = new Sidebar();
-        sidebar.setTranslateX(-1000);
-        AnchorPane sidebarContainer = new AnchorPane(sidebar);
-        sidebarContainer.setPickOnBounds(false);
-        AnchorPane.setTopAnchor(sidebar, 45.0);
-        AnchorPane.setBottomAnchor(sidebar, 0.0);
+        sidebar.setPrefWidth(284);
+        sidebar.setMaxWidth(284);
+        sidebar.setPadding(new Insets(45, 12, 0, 12));
+        ModalPane sidebarModal = new ModalPane(-10);
+        sidebarModal.setAlignment(Pos.CENTER_LEFT);
+        sidebarModal.setPadding(new Insets(0, 0, 0, 0));
+        sidebarModal.usePredefinedTransitionFactories(Side.LEFT);
 
         // 右侧面板
         AnchorPane panelAnchor = new AnchorPane(statsOverlay, resourcePanel);
@@ -108,27 +114,28 @@ public final class MainUiComposer {
         // 菜单按钮
         Button menuBtn = createMenuButton();
         TitleBar titleBar = TitleBar.getInstance(primaryStage, menuBtn,
-                canvasContainer, sidebarContainer, panelAnchor, floatContainer);
+                canvasContainer, panelAnchor, floatContainer, sidebarModal);
+
+        // 侧边栏切换
+        uiAnimator.setupSidebarToggle(menuBtn, sidebarModal, sidebar);
+        sidebar.setAnimator(uiAnimator);
 
         VBox uiOverlay = new VBox(titleBar);
         uiOverlay.setPickOnBounds(false);
+        uiOverlay.setViewOrder(-15); // 永远在侧边栏 ModalPane 之上
 
         AnchorPane resizeLayer = new AnchorPane();
         resizeLayer.setPickOnBounds(false);
         windowManager.setMaxSize(primaryStage.getWidth(), primaryStage.getHeight());
         windowManager.install(primaryStage, resizeLayer);
 
-        // 层级
-        rootStack.getChildren().addAll(canvasContainer, sidebarContainer,
-                panelAnchor, floatContainer, uiOverlay, resizeLayer);
+        // 层级：画布 → 右侧面板 → 浮动工具栏 → 缩放 → 侧边栏遮罩 → 标题栏（最上层）
+        rootStack.getChildren().addAll(canvasContainer,
+                panelAnchor, floatContainer, resizeLayer, sidebarModal, uiOverlay);
 
         // 版本选择覆盖层
         VersionSelectorPanel versionPanel = new VersionSelectorPanel(rootStack);
         sidebar.setOnShowVersionSelector(versionPanel::show);
-
-        // 侧边栏切换
-        uiAnimator.setupSidebarToggle(menuBtn, sidebar, floatContainer);
-        sidebar.setAnimator(uiAnimator);
 
         return new UiBuildResult(renderer, canvasContainer, sidebar, floatToolbox);
     }
@@ -152,7 +159,7 @@ public final class MainUiComposer {
                 + "-fx-cursor: hand;";
         btn.setStyle(baseStyle);
         btn.setOnMouseEntered(e -> btn.setStyle(
-                baseStyle + "-fx-background-color: -color-bg-subtle;" + "-fx-background-radius: 6px;"));
+                baseStyle + "-fx-background-color: -color-bg-subtle;-fx-background-radius: 6px;"));
         btn.setOnMouseExited(e -> btn.setStyle(baseStyle));
         FxRippleUtil.install(btn);
         return btn;

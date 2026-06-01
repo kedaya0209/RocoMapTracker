@@ -1,37 +1,29 @@
 package io.github.kedaya0209.roco.app.ui.component.setting;
 
 import atlantafx.base.theme.Styles;
-import io.github.kedaya0209.roco.app.update.plugin.PluginInfo;
-import io.github.kedaya0209.roco.app.update.plugin.PluginStatus;
-import io.github.kedaya0209.roco.app.update.plugin.PluginUpdateManager;
 import io.github.kedaya0209.roco.app.ui.service.resource.SvgManager;
 import io.github.kedaya0209.roco.app.ui.util.DialogUtils;
 import io.github.kedaya0209.roco.app.ui.util.FxRippleUtil;
+import io.github.kedaya0209.roco.app.update.plugin.PluginInfo;
+import io.github.kedaya0209.roco.app.update.plugin.PluginStatus;
+import io.github.kedaya0209.roco.app.update.plugin.PluginUpdateManager;
 import javafx.animation.Animation;
 import javafx.animation.KeyFrame;
-import javafx.animation.RotateTransition;
 import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
-import javafx.scene.control.Button;
-import javafx.scene.control.CheckBox;
-import javafx.scene.control.Label;
-import javafx.scene.control.ScrollPane;
+import javafx.scene.control.*;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.*;
-import javafx.scene.paint.Color;
 import javafx.util.Duration;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.File;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /**
  * 插件管理页面 — 显示已安装插件列表、状态、启用/禁用、更新操作。
@@ -57,13 +49,10 @@ public class PluginManagementView {
     private int lastCacheVersion = -1;
 
     /** 弹窗根容器（设置面板的 rootStackPane），用于显示确认弹窗 */
+    @Setter
     private StackPane dialogRoot;
 
     private final Timeline progressPoller;
-
-    public void setDialogRoot(StackPane dialogRoot) {
-        this.dialogRoot = dialogRoot;
-    }
 
     public PluginManagementView() {
         this.root = new VBox(10);
@@ -157,9 +146,13 @@ public class PluginManagementView {
         statusLabel.setText(String.format("共 %d 个插件 | %d 正常 | %d 可更新 | %d 异常",
                 plugins.size(), normalCount, updateCount, damagedCount));
 
+        Accordion accordion = new Accordion();
+        accordion.setStyle("-fx-background-color: transparent; -fx-border-color: transparent; -fx-padding: 0; " +
+                "-fx-background-insets: 0; -fx-border-width: 0;");
         for (PluginInfo plugin : plugins) {
-            pluginList.getChildren().add(createPluginCard(plugin));
+            accordion.getPanes().add(createPluginCard(plugin));
         }
+        pluginList.getChildren().add(accordion);
     }
 
     /** 轮询插件下载进度 + 运行状态，更新卡片 */
@@ -214,21 +207,20 @@ public class PluginManagementView {
         }
     }
 
-    private VBox createPluginCard(PluginInfo plugin) {
-        // 可展开标志
-        boolean[] expanded = {false};
+    private TitledPane createPluginCard(PluginInfo plugin) {
+        // 自定义箭头（替代 TitledPane 默认箭头，放在 card 内部）
         Label arrowLabel = new Label("▶");
         arrowLabel.setStyle("-fx-text-fill: -color-fg-muted; -fx-font-size: 11px; -fx-cursor: hand;");
-        // StackPane 包装后旋转整体，▶ 绕中心旋转而不是绕着尖端
         StackPane arrowWrapper = new StackPane(arrowLabel);
         arrowWrapper.setPrefWidth(16);
         arrowWrapper.setPrefHeight(16);
         arrowWrapper.setRotate(0);
 
-        // 主行
+        // 主行 — 作为 TitledPane 的 graphic
         HBox card = new HBox(12);
         card.setPadding(new Insets(12, 14, 12, 14));
         card.setAlignment(Pos.CENTER_LEFT);
+        card.setMaxWidth(Double.MAX_VALUE);
         card.setStyle("-fx-background-color: -color-bg-inset; -fx-background-radius: 8; " +
                 "-fx-border-color: -color-border-muted; -fx-border-radius: 8; -fx-border-width: 0.5;");
 
@@ -355,11 +347,9 @@ public class PluginManagementView {
         card.getChildren().addAll(arrowWrapper, enableCb, iconNode, info, actions);
         cardMap.put(plugin.id(), card);
 
-        // 详情面板（折叠状态）
+        // 详情面板（由 TitledPane 管理展开/折叠）
         VBox detailPanel = new VBox(4);
-        detailPanel.setPadding(new Insets(0, 14, 12, 62)); // 缩进与图标对齐
-        detailPanel.setVisible(false);
-        detailPanel.setManaged(false);
+        detailPanel.setPadding(new Insets(10, 14, 14, 14)); // 缩进与图标对齐
 
         if (!plugin.description().isEmpty()) {
             detailPanel.getChildren().add(createDetailRow("描述", plugin.description()));
@@ -379,21 +369,58 @@ public class PluginManagementView {
             detailPanel.getChildren().add(createDetailRow("文件", sb.toString()));
         }
 
-        // 点击箭头切换详情
-        Runnable toggleDetail = () -> {
-            expanded[0] = !expanded[0];
-            RotateTransition rt = new RotateTransition(Duration.millis(200), arrowWrapper);
-            rt.setToAngle(expanded[0] ? 90 : 0);
-            rt.play();
-            detailPanel.setVisible(expanded[0]);
-            detailPanel.setManaged(expanded[0]);
-        };
-        arrowWrapper.setOnMouseClicked(e -> toggleDetail.run());
+        TitledPane pane = new TitledPane();
+        pane.setText(null);
+        pane.setGraphic(card);
+        pane.setContent(detailPanel);
+        pane.setExpanded(false);
+        pane.setStyle("-fx-background-color: transparent; -fx-border-color: transparent; -fx-padding: 0 0 8 0;");
 
-        // 整个卡片容器
-        VBox container = new VBox(0);
-        container.getChildren().addAll(card, detailPanel);
-        return container;
+        // 隐藏 TitledPane 默认箭头 + 覆盖 title/content 默认样式
+        pane.skinProperty().addListener((_, _, sk) -> {
+            if (sk != null) {
+                Region arrowBtn = (Region) pane.lookup(".arrow-button");
+                if (arrowBtn != null) {
+                    arrowBtn.setVisible(false);
+                    arrowBtn.setManaged(false);
+                    arrowBtn.setPrefWidth(0);
+                    arrowBtn.setPrefHeight(0);
+                    arrowBtn.setMinWidth(0);
+                    arrowBtn.setMinHeight(0);
+                }
+                Region titleRegion = (Region) pane.lookup(".title");
+                if (titleRegion != null) {
+                    titleRegion.setStyle(
+                            "-fx-background-color: -color-bg-inset; " +
+                                    "-fx-background-insets: 0; " +
+                                    "-fx-background-radius: 8; " +
+                                    "-fx-border-color: -color-border-muted; " +
+                                    "-fx-border-radius: 8; " +
+                                    "-fx-border-width: 0.5; " +
+                                    "-fx-padding: 0; " +
+                                    "-fx-alignment: center-left;"
+                    );
+                }
+                Region contentRegion = (Region) pane.lookup(".content");
+                if (contentRegion != null) {
+                    contentRegion.setStyle(
+                            "-fx-background-color: transparent; " +
+                                    "-fx-background-insets: 0; " +
+                                    "-fx-background-radius: 0; " +
+                                    "-fx-border-color: transparent; " +
+                                    "-fx-border-width: 0; " +
+                                    "-fx-padding: 0;"
+                    );
+                }
+            }
+        });
+
+        // 自定义箭头跟随展开/折叠旋转
+        pane.expandedProperty().addListener((_, _, expanded) -> {
+            arrowWrapper.setRotate(expanded ? 90 : 0);
+        });
+
+        return pane;
     }
 
     /** 创建首字母占位图标 */

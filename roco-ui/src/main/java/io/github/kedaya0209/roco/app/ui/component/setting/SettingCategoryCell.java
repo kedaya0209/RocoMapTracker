@@ -1,6 +1,5 @@
 package io.github.kedaya0209.roco.app.ui.component.setting;
 
-import net.jcip.annotations.NotThreadSafe;
 import io.github.kedaya0209.roco.app.ui.service.resource.SvgManager;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -9,6 +8,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
+import net.jcip.annotations.NotThreadSafe;
 
 /**
  * 设置分类列表项渲染器 — 带图标和悬停高亮效果。
@@ -54,7 +54,7 @@ public class SettingCategoryCell extends ListCell<SettingCategory> {
         selectedProperty().addListener((_, _, now) -> updateRowStyle(row, now));
 
         StackPane wrapper = new StackPane(row);
-        wrapper.setPadding(new Insets(1, 0, 1, 0));
+        wrapper.setPadding(new Insets(1, 14, 1, 0));
         wrapper.setMouseTransparent(true);
         setPadding(new Insets(0));
         setGraphic(wrapper);
