@@ -46,6 +46,8 @@ public class Sidebar extends VBox {
     private SidebarItem.Category expandedCategory = null;
     private volatile boolean isAlgorithmLoading = false;
     @Setter
+    private StackPane rootStack;
+    @Setter
     private UiAnimator animator;
     @Setter
     private Runnable onShowVersionSelector;
@@ -284,7 +286,7 @@ public class Sidebar extends VBox {
         Platform.runLater(() -> {
             for (int i = 0; i < items.size(); i++) {
                 SidebarItem item = items.get(i);
-                if (!"检查更新".equals(item.title())) continue;
+                if (item.title() == null || !item.title().startsWith("检查更新")) continue;
                 String title = progress < 0 ? "检查更新"
                         : String.format("检查更新 (%.0f%%)", progress * 100);
                 items.set(i, new SidebarItem(SidebarItem.Type.ACTION, title,
@@ -391,6 +393,7 @@ public class Sidebar extends VBox {
     // ══════════ Item Model ══════════
 
     private StackPane findRootPane() {
+        if (rootStack != null) return rootStack;
         Node node = this;
         while ((node = node.getParent()) != null) {
             if (node instanceof StackPane sp) return sp;

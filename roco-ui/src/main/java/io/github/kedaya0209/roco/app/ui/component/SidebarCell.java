@@ -225,7 +225,17 @@ class SidebarCell extends ListCell<Sidebar.SidebarItem> {
             }
         }
 
-        StackPane wrapper = new StackPane(content);
+        StackPane wrapper = new StackPane();
+        if (isProgress) {
+            ProgressBar progressBar = new ProgressBar(item.progress());
+            progressBar.setPrefWidth(Double.MAX_VALUE);
+            progressBar.setMaxHeight(3);
+            progressBar.setStyle("-fx-accent: #2a7de1; -fx-background-radius: 1.5;");
+            VBox vbox = new VBox(2, content, progressBar);
+            wrapper.getChildren().add(vbox);
+        } else {
+            wrapper.getChildren().add(content);
+        }
         wrapper.setPadding(new Insets(2, 0, 2, 0));
         wrapper.setMouseTransparent(true);
         setPadding(new Insets(0));

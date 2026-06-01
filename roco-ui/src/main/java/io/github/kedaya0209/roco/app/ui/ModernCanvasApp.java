@@ -40,7 +40,6 @@ import io.github.kedaya0209.roco.app.ui.service.ui.ThemeManager;
 import io.github.kedaya0209.roco.app.ui.service.ui.VersionManager;
 import io.github.kedaya0209.roco.app.ui.service.ui.WindowManager;
 import io.github.kedaya0209.roco.app.ui.util.DialogUtils;
-import io.github.kedaya0209.roco.app.ui.util.DialogUtils.ProgressControl;
 import io.github.kedaya0209.roco.app.ui.util.TrayManager;
 import io.github.kedaya0209.roco.app.update.UpdateManager;
 import io.github.kedaya0209.roco.app.update.UpdateUiDelegate;
@@ -65,7 +64,6 @@ import javafx.application.Application;
 import javafx.application.HostServices;
 import javafx.application.Platform;
 import javafx.scene.Scene;
-import javafx.scene.image.Image;
 import javafx.scene.layout.Background;
 import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
@@ -472,16 +470,11 @@ public class ModernCanvasApp extends Application {
 
             @Override
             public void showDownloadProgress(String pluginId, String version, double progress) {
-                Platform.runLater(() -> {
-                    sidebar.setDownloadProgress(progress);
-                });
+                // 插件进度由 PluginManagementView 自己的轮询处理，不需要更新 sidebar
             }
 
             @Override
             public void hideDownloadProgress(String pluginId) {
-                Platform.runLater(() -> {
-                    sidebar.setDownloadProgress(-1);
-                });
             }
 
             @Override

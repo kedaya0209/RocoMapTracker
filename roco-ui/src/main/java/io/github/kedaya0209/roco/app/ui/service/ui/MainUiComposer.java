@@ -88,6 +88,7 @@ public final class MainUiComposer {
 
         // 侧边栏（ModalPane 抽屉式遮罩层，在标题栏下方展开）
         Sidebar sidebar = new Sidebar();
+        sidebar.setRootStack(rootStack);
         sidebar.setPrefWidth(284);
         sidebar.setMaxWidth(284);
         sidebar.setPadding(new Insets(45, 12, 0, 12));

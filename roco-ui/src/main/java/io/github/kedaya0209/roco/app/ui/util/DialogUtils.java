@@ -14,6 +14,7 @@ import javafx.animation.Animation;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.application.Platform;
+import javafx.event.Event;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
@@ -183,6 +184,7 @@ public class DialogUtils {
 
         dialogBox.getChildren().addAll(icon, titleLabel, contentContainer, btnBox);
         mask.getChildren().add(dialogBox);
+        mask.setViewOrder(-20);
         rootStack.getChildren().add(mask);
 
         mask.setOpacity(0);
@@ -328,6 +330,9 @@ public class DialogUtils {
 
         dialogBox.getChildren().addAll(contentContainer, btnBox);
         mask.getChildren().add(dialogBox);
+        mask.setViewOrder(-20);
+        mask.setOnMouseClicked(e -> fadeOutAndRemove(rootStack, mask, null));
+        dialogBox.setOnMouseClicked(Event::consume);
         rootStack.getChildren().add(mask);
 
         mask.setOpacity(0);
@@ -434,6 +439,7 @@ public class DialogUtils {
         }
 
         mask.getChildren().add(dialogBox);
+        mask.setViewOrder(-20);
         rootStack.getChildren().add(mask);
 
         mask.setOpacity(0);
@@ -494,6 +500,7 @@ public class DialogUtils {
         btnBox.getChildren().addAll(laterBtn, installBtn);
         dialogBox.getChildren().addAll(icon, titleLabel, msgLabel, btnBox);
         mask.getChildren().add(dialogBox);
+        mask.setViewOrder(-20);
         rootStack.getChildren().add(mask);
 
         // 按钮事件（使用 fadeOutAndRemove 统一关闭弹窗）
@@ -630,6 +637,7 @@ public class DialogUtils {
         btnBox.getChildren().addAll(cancelBtn, updateBtn);
         dialogBox.getChildren().addAll(icon, titleLabel, scrollWrapper, btnBox);
         mask.getChildren().add(dialogBox);
+        mask.setViewOrder(-20);
         rootStack.getChildren().add(mask);
 
         cancelBtn.setOnAction(e -> fadeOutAndRemove(rootStack, mask, null));
@@ -729,6 +737,7 @@ public class DialogUtils {
 
         dialogBox.getChildren().addAll(icon, titleLabel, msgLabel, btnBox);
         mask.getChildren().add(dialogBox);
+        mask.setViewOrder(-20);
         rootStack.getChildren().add(mask);
 
         mask.setOpacity(0);
