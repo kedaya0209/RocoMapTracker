@@ -97,6 +97,29 @@ public final class MainUiComposer {
         sidebarModal.setPadding(new Insets(0, 0, 0, 0));
         sidebarModal.usePredefinedTransitionFactories(Side.LEFT);
 
+        // 侧边栏打开时地图毛玻璃效果
+        // AtomicBoolean 确保首次 showing=true 之后才执行效果，防止初始化阶段误触发
+        var blurReady = new java.util.concurrent.atomic.AtomicBoolean(false);
+        sidebarModal.displayProperty().addListener((_, _, showing) -> {
+            if (!blurReady.get()) {
+                if (showing) {
+                    blurReady.set(true);
+                } else {
+                    return; // 初始化阶段 showing=false → 跳过
+                }
+                // 首次 showing=true → 初始化标记 + 继续执行设置 blur
+            }
+            if (showing) {
+                canvasContainer.setEffect(new javafx.scene.effect.GaussianBlur(6));
+            } else {
+                javafx.animation.FadeTransition ft = new javafx.animation.FadeTransition(
+                        javafx.util.Duration.millis(200), canvasContainer);
+                ft.setToValue(1.0);
+                ft.setOnFinished(_ -> canvasContainer.setEffect(null));
+                ft.play();
+            }
+        });
+
         // 右侧面板
         AnchorPane panelAnchor = new AnchorPane(statsOverlay, resourcePanel);
         panelAnchor.setPickOnBounds(false);

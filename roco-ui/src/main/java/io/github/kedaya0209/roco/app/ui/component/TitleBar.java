@@ -118,27 +118,11 @@ public class TitleBar extends HBox implements IHook<Object> {
 
         // --- 2. 幽灵模式锚点图标 ---
         ghostBtn = new Button();
-        ghostBtn.setStyle(
-                "-fx-background-color: transparent;" +
-                        "-fx-border-color: transparent;" +
-                        "-fx-padding: 6px;" +
-                        "-fx-cursor: hand;"
-        );
+        ghostBtn.getStyleClass().add("title-bar-btn");
 
         ghostIcon = createGhostIcon();
         setSvgFill(ghostIcon, "-color-fg-muted");
         ghostBtn.setGraphic(ghostIcon);
-        ghostBtn.setPrefSize(32, 32);
-        ghostBtn.setMinSize(32, 32);
-        ghostBtn.setMaxSize(32, 32);
-
-        // Hover 背景高亮（baseStyle 重建避免累积）
-        String ghostBaseStyle = ghostBtn.getStyle();
-        ghostBtn.setOnMouseEntered(_ -> ghostBtn.setStyle(
-                ghostBaseStyle + "-fx-background-color: -color-bg-subtle;" +
-                        "-fx-background-radius: 6px;"
-        ));
-        ghostBtn.setOnMouseExited(_ -> ghostBtn.setStyle(ghostBaseStyle));
 
         ghostBtn.setOnAction(_ -> {
             ghostMode = !ghostMode;
@@ -172,52 +156,22 @@ public class TitleBar extends HBox implements IHook<Object> {
 
         // --- 3. 导航模式按钮 ---
         navBtn = new Button();
-        navBtn.setStyle(
-                "-fx-background-color: transparent;" +
-                        "-fx-border-color: transparent;" +
-                        "-fx-padding: 6px;" +
-                        "-fx-cursor: hand;"
-        );
+        navBtn.getStyleClass().add("title-bar-btn");
 
         Node navIcon = createNavIcon();
         setSvgFill(navIcon, "-color-fg-muted");
         navBtn.setGraphic(navIcon);
-        navBtn.setPrefSize(32, 32);
-        navBtn.setMinSize(32, 32);
-        navBtn.setMaxSize(32, 32);
-
-        String navBaseStyle = navBtn.getStyle();
-        navBtn.setOnMouseEntered(_ -> navBtn.setStyle(
-                navBaseStyle + "-fx-background-color: -color-bg-subtle;" +
-                        "-fx-background-radius: 6px;"
-        ));
-        navBtn.setOnMouseExited(_ -> navBtn.setStyle(navBaseStyle));
 
         navBtn.setOnAction(_ -> toggleNavMode(stage, menuBtn, overlayNodes));
 
         // --- 3.5 匹配开关按钮 ---
         matchToggleBtn = new Button();
-        matchToggleBtn.setStyle(
-                "-fx-background-color: transparent;" +
-                        "-fx-border-color: transparent;" +
-                        "-fx-padding: 6px;" +
-                        "-fx-cursor: hand;"
-        );
+        matchToggleBtn.getStyleClass().add("title-bar-btn");
 
         Node matchIcon = createMatchToggleIcon();
         boolean matchOn = SiftConfig.SIFT_MATCHING_ENABLED;
         setSvgFill(matchIcon, matchOn ? "-color-accent-emphasis" : "-color-fg-muted");
         matchToggleBtn.setGraphic(matchIcon);
-        matchToggleBtn.setPrefSize(32, 32);
-        matchToggleBtn.setMinSize(32, 32);
-        matchToggleBtn.setMaxSize(32, 32);
-
-        String matchBaseStyle = matchToggleBtn.getStyle();
-        matchToggleBtn.setOnMouseEntered(_ -> matchToggleBtn.setStyle(
-                matchBaseStyle + "-fx-background-color: -color-bg-subtle;" +
-                        "-fx-background-radius: 6px;"
-        ));
-        matchToggleBtn.setOnMouseExited(_ -> matchToggleBtn.setStyle(matchBaseStyle));
 
         matchToggleBtn.setOnAction(_ -> {
             SiftConfig.SIFT_MATCHING_ENABLED = !SiftConfig.SIFT_MATCHING_ENABLED;
@@ -464,25 +418,13 @@ public class TitleBar extends HBox implements IHook<Object> {
 
         Button btn = new Button();
         btn.setGraphic(minimizeGraphic);
-        btn.setStyle(
-                "-fx-background-color: transparent;" +
-                        "-fx-border-color: transparent;" +
-                        "-fx-padding: 6px;" +
-                        "-fx-cursor: hand;"
-        );
-        btn.setPrefSize(32, 32);
-        btn.setMinSize(32, 32);
-        btn.setMaxSize(32, 32);
+        btn.getStyleClass().add("title-bar-btn");
 
-        String baseStyle = btn.getStyle();
         btn.setOnMouseEntered(_ -> {
             minimizeIcon.setStyle("-fx-stroke: -color-accent-emphasis; -fx-stroke-width: 2; -fx-stroke-line-cap: round;");
-            btn.setStyle(baseStyle + "-fx-background-color: -color-bg-subtle;" +
-                    "-fx-background-radius: 6px;");
         });
         btn.setOnMouseExited(_ -> {
             minimizeIcon.setStyle("-fx-stroke: -color-fg-muted; -fx-stroke-width: 2; -fx-stroke-line-cap: round;");
-            btn.setStyle(baseStyle);
         });
         btn.setOnAction(_ -> {
             if (minimizeHandler != null) {
@@ -504,26 +446,14 @@ public class TitleBar extends HBox implements IHook<Object> {
 
         Button closeBtn = new Button();
         closeBtn.setGraphic(closeGraphic);
+        closeBtn.getStyleClass().add("title-bar-btn");
 
-        // 初始样式：无边框，透明背景
-        closeBtn.setStyle(
-                "-fx-background-color: transparent;" +
-                        "-fx-border-color: transparent;" +
-                        "-fx-padding: 6px;" +
-                        "-fx-cursor: hand;"
-        );
-
-        // Hover 逻辑（baseStyle 重建避免累积）
-        String closeBaseStyle = closeBtn.getStyle();
         closeBtn.setOnMouseEntered(_ -> {
             closeIcon.setStyle("-fx-stroke: -color-danger-emphasis; -fx-stroke-width: 2; -fx-stroke-line-cap: round;");
-            closeBtn.setStyle(closeBaseStyle + "-fx-background-color: -color-bg-subtle;" +
-                    "-fx-background-radius: 6px;");
         });
 
         closeBtn.setOnMouseExited(_ -> {
             closeIcon.setStyle("-fx-stroke: -color-fg-muted; -fx-stroke-width: 2; -fx-stroke-line-cap: round;");
-            closeBtn.setStyle(closeBaseStyle);
         });
 
         // ===================== 【核心：添加关闭确认弹窗】 =====================

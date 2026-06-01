@@ -157,6 +157,7 @@ public class VersionSelectorPanel extends StackPane {
     /** 创建统一样式的遮罩并淡入 */
     private StackPane fadeInMask() {
         StackPane mask = new StackPane();
+        mask.setViewOrder(-50);
         mask.setStyle("-fx-background-color: rgba(0, 0, 0, 0.8);");
         rootStack.getChildren().add(mask);
         mask.setOpacity(0);

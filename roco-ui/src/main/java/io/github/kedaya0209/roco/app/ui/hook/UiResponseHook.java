@@ -8,8 +8,8 @@ import io.github.kedaya0209.roco.app.hook.event.NotificationType;
 import io.github.kedaya0209.roco.app.hook.event.ProgressEvent;
 import io.github.kedaya0209.roco.app.hook.event.StatusEvent;
 import io.github.kedaya0209.roco.app.ui.component.LoadingOverlay;
-import io.github.kedaya0209.roco.app.ui.component.NotificationToast;
 import io.github.kedaya0209.roco.app.ui.component.StatsOverlay;
+import io.github.kedaya0209.roco.app.ui.component.ToastManager;
 import javafx.application.Platform;
 import javafx.scene.layout.StackPane;
 
@@ -41,7 +41,7 @@ public class UiResponseHook extends AbstractGenericHook<Object> {
             switch (type) {
                 case UI_NOTIFICATION -> {
                     if (data instanceof StatusEvent(String message, NotificationType type1)) {
-                        NotificationToast.show(rootStack, message, type1);
+                        ToastManager.show(rootStack, message, type1);
                     }
                 }
                 case INIT_PROGRESS -> {
@@ -52,9 +52,9 @@ public class UiResponseHook extends AbstractGenericHook<Object> {
                 case CAPTURE_STATE -> {
                     if (data instanceof CaptureStateEvent state) {
                         if (state.connected()) {
-                            NotificationToast.show(rootStack, "窗口连接成功 ID: " + state.id(), NotificationType.SUCCESS);
+                            ToastManager.show(rootStack, "窗口连接成功 ID: " + state.id(), NotificationType.SUCCESS);
                         } else {
-                            NotificationToast.show(rootStack, "游戏连接断开，等待重连", NotificationType.ERROR);
+                            ToastManager.show(rootStack, "游戏连接断开，等待重连", NotificationType.ERROR);
                         }
                         // 这里调用你实际拥有的 update 方法来刷新显示逻辑
                         StatsOverlay.getInstance().update();

@@ -4344,6 +4344,9 @@
       "glob": "com/sun/**/*.css"
     },
     {
+      "glob": "styles/**/*.css"
+    },
+    {
       "glob": "icon/**/*.ico"
     },
     {

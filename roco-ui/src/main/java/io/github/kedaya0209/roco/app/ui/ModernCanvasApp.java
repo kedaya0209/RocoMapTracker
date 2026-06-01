@@ -237,6 +237,8 @@ public class ModernCanvasApp extends Application {
         if (css != null) {
             scene.getStylesheets().add(css);
         }
+        // 加载全局 UI 增强样式表
+        scene.getStylesheets().add(getClass().getResource("/styles/ui.css").toExternalForm());
         primaryStage.initStyle(StageStyle.TRANSPARENT);
         primaryStage.setScene(scene);
     }
