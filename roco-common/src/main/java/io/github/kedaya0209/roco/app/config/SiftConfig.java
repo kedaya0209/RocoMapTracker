@@ -149,6 +149,9 @@ public final class SiftConfig {
         RANSAC_MAX_ITERS = ConfigHelper.getInt(prop, "ransac.max.iters", RANSAC_MAX_ITERS);
         MATCH_TIMEOUT_MS = ConfigHelper.getLong(prop, "match.timeout.ms", MATCH_TIMEOUT_MS);
         SIFT_MATCHING_ENABLED = ConfigHelper.getBool(prop, "sift.matching.enabled", true);
+        SIFT_TILE_SIZE = ConfigHelper.getInt(prop, "sift.tile.size", SIFT_TILE_SIZE);
+        SIFT_TILE_OVERLAP = ConfigHelper.getInt(prop, "sift.tile.overlap", SIFT_TILE_OVERLAP);
+        SIFT_DEDUP_DISTANCE = (float) ConfigHelper.getDouble(prop, "sift.dedup.distance", SIFT_DEDUP_DISTANCE);
     }
 
     public static void save(StringBuilder sb) {
@@ -173,6 +176,12 @@ public final class SiftConfig {
         sb.append("# SIFT 匹配等待超时（毫秒）\n");
         sb.append("match.timeout.ms=").append(MATCH_TIMEOUT_MS).append("\n");
         sb.append("# SIFT 匹配总开关\n");
-        sb.append("sift.matching.enabled=").append(SIFT_MATCHING_ENABLED).append("\n\n");
+        sb.append("sift.matching.enabled=").append(SIFT_MATCHING_ENABLED).append("\n");
+        sb.append("# 训练瓦片基础尺寸（像素）\n");
+        sb.append("sift.tile.size=").append(SIFT_TILE_SIZE).append("\n");
+        sb.append("# 训练瓦片重叠宽度（像素）\n");
+        sb.append("sift.tile.overlap=").append(SIFT_TILE_OVERLAP).append("\n");
+        sb.append("# 重叠区域特征去重距离（像素）\n");
+        sb.append("sift.dedup.distance=").append(SIFT_DEDUP_DISTANCE).append("\n\n");
     }
 }

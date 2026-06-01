@@ -46,14 +46,6 @@ private:
 };
 
 // ============================================================================
-// 重叠分块训练常量
-// ============================================================================
-static constexpr int TILE_SIZE_SIFT = 2000;
-static constexpr int TILE_OVERLAP_SIFT = 200;
-static constexpr int64_t LARGE_MAP_THRESHOLD_PX = 9000000;
-static constexpr float DEDUP_DISTANCE = 4.0f;
-
-// ============================================================================
 // Cache file magic (SIFT-specific)
 // ============================================================================
 static constexpr uint32_t SIFT_CACHE_MAGIC = 0x53494654; // "SIFT"

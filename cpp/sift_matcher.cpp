@@ -134,7 +134,7 @@ bool SiftMatcher::train(const uint8_t* gray_pixels, int w, int h) {
     }
 
     int64_t total_pixels = (int64_t)w * h;
-    if (total_pixels >= LARGE_MAP_THRESHOLD_PX) {
+    if (total_pixels >= params.largeMapThreshold) {
         LOG("Map is large (%dx%d=%lldpx), using overlapping tiling",
             w, h, (long long)total_pixels);
         return train_tiled(map_gray, w, h);
@@ -346,9 +346,12 @@ bool SiftMatcher::train_direct(cv::Mat& map_gray) {
 }
 
 bool SiftMatcher::train_tiled(cv::Mat& map_gray, int map_w, int map_h) {
-    int stride = TILE_SIZE_SIFT - TILE_OVERLAP_SIFT;
-    int cols = (int)std::ceil((double)(map_w - TILE_OVERLAP_SIFT) / stride);
-    int rows = (int)std::ceil((double)(map_h - TILE_OVERLAP_SIFT) / stride);
+    int tileSize = params.tileSize > 0 ? params.tileSize : 2000;
+    int tileOverlap = params.tileOverlap;
+    float dedupDist = params.dedupDistance > 0 ? params.dedupDistance : 4.0f;
+    int stride = tileSize - tileOverlap;
+    int cols = (int)std::ceil((double)(map_w - tileOverlap) / stride);
+    int rows = (int)std::ceil((double)(map_h - tileOverlap) / stride);
     LOG("Tile layout: %dx%d (%d tiles)", cols, rows, cols * rows);
 
     struct KpEntry { float x, y; std::vector<float> desc; };
@@ -358,8 +361,8 @@ bool SiftMatcher::train_tiled(cv::Mat& map_gray, int map_w, int map_h) {
     for (int r = 0; r < rows; r++) {
         for (int c = 0; c < cols; c++) {
             int tile_x = c * stride, tile_y = r * stride;
-            int tile_w = std::min(TILE_SIZE_SIFT, map_w - tile_x);
-            int tile_h = std::min(TILE_SIZE_SIFT, map_h - tile_y);
+            int tile_w = std::min(tileSize, map_w - tile_x);
+            int tile_h = std::min(tileSize, map_h - tile_y);
             cv::Rect roi(tile_x, tile_y, tile_w, tile_h);
             cv::Mat tile_gray = map_gray(roi);
 
@@ -389,7 +392,7 @@ bool SiftMatcher::train_tiled(cv::Mat& map_gray, int map_w, int map_h) {
     if (all_kps.empty()) { LOGERR("No keypoints detected in any tile"); return false; }
 
     int total_count = (int)all_kps.size();
-    int cell_size = (int)std::ceil(DEDUP_DISTANCE);
+    int cell_size = (int)std::ceil(dedupDist);
     int grid_cols = map_w / cell_size + 1, grid_rows = map_h / cell_size + 1;
     std::vector<int> grid(grid_cols * grid_rows, -1);
     std::vector<bool> keep(total_count, false);
@@ -404,7 +407,7 @@ bool SiftMatcher::train_tiled(cv::Mat& map_gray, int map_w, int map_h) {
                 int nx = cx + dx, ny = cy + dy;
                 if (nx >= 0 && nx < grid_cols && ny >= 0 && ny < grid_rows) {
                     int existing = grid[ny * grid_cols + nx];
-                    if (existing >= 0 && std::hypot(kp.x - all_kps[existing].x, kp.y - all_kps[existing].y) < DEDUP_DISTANCE)
+                    if (existing >= 0 && std::hypot(kp.x - all_kps[existing].x, kp.y - all_kps[existing].y) < dedupDist)
                         duplicate = true;
                 }
             }
