@@ -134,6 +134,11 @@ bool SiftMatcher::train(const uint8_t* gray_pixels, int w, int h) {
         return false;
     }
 
+    int64_t total_pixels = (int64_t)w * (int64_t)h;
+    if (total_pixels >= params.largeMapThreshold) {
+        LOG("Large map %dx%d (%lld pixels), using tiled training", w, h, (long long)total_pixels);
+        return train_tiled(map_gray, w, h);
+    }
     return train_direct(map_gray);
 }
 
