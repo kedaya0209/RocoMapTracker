@@ -62,9 +62,6 @@ public class MapRenderer implements IHook<Object> {
     private double lastOy = Double.NaN;
     private boolean firstFrame = true;
 
-    // 上次活跃子图偏移，用于检测切换
-    private double lastSubOffsetY = 0;
-
     public MapRenderer(Pane parent) {
         this.parent = parent;
 
@@ -154,20 +151,8 @@ public class MapRenderer implements IHook<Object> {
         double oy = mm.getOffsetY();
         double scale = mm.getScale();
 
-        double subOffsetY = mm.getActiveSubImageOffsetY();
-
-        // 子图切换 → 通知 TileManager
-        if (Math.abs(subOffsetY - lastSubOffsetY) > 1e-9) {
-            lastSubOffsetY = subOffsetY;
-            if (mm.getMultiMapMetadata() != null
-                    && mm.getActiveSubImageIndex() < mm.getMultiMapMetadata().subImages().size()) {
-                var sub = mm.getMultiMapMetadata().subImages().get(mm.getActiveSubImageIndex());
-                tileManager.setActiveSubImage(sub.index(), sub.tileDir());
-            }
-        }
-
-        // 转换为子图局部坐标
-        double localOy = oy + subOffsetY * scale;
+        // 转换为子图局部坐标（始终在大陆空间，offsetY=0）
+        double localOy = oy;
         double localPlayerY = mm.getRenderPlayerY();
 
         // 首帧适配
@@ -178,10 +163,10 @@ public class MapRenderer implements IHook<Object> {
                 ox = mm.getOffsetX();
                 oy = mm.getOffsetY();
                 scale = mm.getScale();
-                localOy = oy + subOffsetY * scale;
-                log.info("首帧 view={}x{} scale={} localOy={} subOffsetY={}",
+                localOy = oy;
+                log.info("首帧 view={}x{} scale={}",
                         (int) parent.getWidth(), (int) parent.getHeight(),
-                        String.format("%.4f", scale), (int) localOy, (int) subOffsetY);
+                        String.format("%.4f", scale));
             }
         }
 
@@ -190,14 +175,14 @@ public class MapRenderer implements IHook<Object> {
                 || Math.abs(ox - lastOx) > 1e-9
                 || Math.abs(localOy - lastOy) > 1e-9;
 
-        // ====== 洞穴模式同步 ======
+        // ====== 洞穴叠加同步 ======
         if (mm.getMultiMapMetadata() != null && mm.isCaveMode()) {
             int idx = mm.getCaveIndex();
             var subs = mm.getMultiMapMetadata().subImages();
             String caveDir = (idx >= 0 && idx < subs.size()) ? subs.get(idx).tileDir() : "";
-            tileManager.setCaveMode(true, idx, caveDir);
+            tileManager.setCaveOverlay(idx, caveDir);
         } else {
-            tileManager.setCaveMode(false, -1, null);
+            tileManager.setCaveOverlay(-1, null);
         }
 
         // ====== GPU 变换（局部坐标系） ======
@@ -279,8 +264,8 @@ public class MapRenderer implements IHook<Object> {
     }
 
     /**
-     * 将视口约束到活跃子图的局部边界内（8192×8192）。
-     * 避免 CameraContext 使用拼接坐标计算视口时滑出子图区域。
+     * 将视口约束到大陆局部边界内（8192×8192）。
+     * 大陆始终是底图坐标空间，offsetY=0。
      */
     private void clampToLocalBounds(MapContext mm) {
         if (mm.getMultiMapMetadata() == null) return;
@@ -291,16 +276,14 @@ public class MapRenderer implements IHook<Object> {
         double subH = tileManager.getMapHeight() * scale;
 
         double oy = mm.getOffsetY();
-        double subOy = mm.getActiveSubImageOffsetY();
-        double localOy = oy + subOy * scale;
 
         if (subH >= vh) {
-            localOy = Math.clamp(localOy, vh - subH, 0);
+            oy = Math.clamp(oy, vh - subH, 0);
         } else {
-            localOy = (vh - subH) / 2;
+            oy = (vh - subH) / 2;
         }
 
-        mm.setOffsetY(localOy - subOy * scale);
+        mm.setOffsetY(oy);
     }
 
     // ==================== IHook ====================

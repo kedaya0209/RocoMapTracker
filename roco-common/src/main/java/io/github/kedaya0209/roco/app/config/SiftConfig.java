@@ -34,7 +34,7 @@ public final class SiftConfig {
     /**
      * SIFT 对比度阈值
      */
-    public static double SIFT_CONTRAST_THRESHOLD = 0.001;
+    public static double SIFT_CONTRAST_THRESHOLD = 0.0005;
     /**
      * SIFT 边缘阈值
      */
@@ -80,17 +80,17 @@ public final class SiftConfig {
     /**
      * 匹配点最小数量
      */
-    public static int MATCH_MIN_COUNT = 10;
+    public static int MATCH_MIN_COUNT = 30;
     /**
      * 空间过滤搜索半径（像素）
      */
-    public static int SEARCH_RADIUS = 500;
+    public static int SEARCH_RADIUS = 300;
 
     // --- RANSAC ---
     /**
      * RANSAC 重投影误差阈值
      */
-    public static double RANSAC_REPROJ_THRESHOLD = 10.0;
+    public static double RANSAC_REPROJ_THRESHOLD = 5.0;
     /**
      * RANSAC 最大迭代次数
      */

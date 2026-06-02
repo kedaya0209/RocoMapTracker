@@ -8,43 +8,49 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
  * 洞穴图融合工具 — 将洞穴透明图边缘外的透明区域填充暗化的大陆图特征，
  * 使 SIFT 在洞穴边缘附近有可匹配特征。
  *
- * <p>思路：把洞穴区域膨胀 extendPx 像素得到遮罩 → 从大陆图裁出该区域并暗化 →
- * 原洞穴图盖在上面。三步完成，不需要距离变换。
+ * <p>思路：二值化洞穴遮罩 → BFS 连通域发现 & 过滤（去孤立小点）→
+ * BFS 波面膨胀（extendPx 层）→ 从大陆图抠出膨胀区域并暗化 → 洞穴内容叠加。
  *
  * <p>使用方式：
  * <pre>
  *     mvn compile exec:java -pl roco-map \
  *         -Dexec.mainClass="io.github.kedaya0209.roco.app.map.CaveImageFuser" \
- *         -Dexec.args="200 0.7"
+ *         -Dexec.args="30 0.3"
  * </pre>
- * 参数：extendPx（延伸像素数）=200, darkFactor（暗化系数）=0.7
+ * 注意：8192x8192 需要约 1GB 堆内存，建议加 MAVEN_OPTS：
+ * <pre>
+ *     MAVEN_OPTS=-Xmx1g mvn compile exec:java -pl roco-map \
+ *         -Dexec.mainClass="io.github.kedaya0209.roco.app.map.CaveImageFuser" \
+ *         -Dexec.args="30 0.3"
+ * </pre>
+ * 参数：extendPx（膨胀像素数）=30, darkFactor（暗化系数）=0.3
  */
 public class CaveImageFuser {
 
     private static final String MAIN_MAP = "卡洛西亚大陆.png";
-    private static final int[][] DIRS = {{-1,0}, {1,0}, {0,-1}, {0,1}};
-    private static final int BRIGHTNESS_THRESHOLD = 20; // 无 alpha 透明时用亮度检测
+    private static final int BRIGHTNESS_THRESHOLD = 20;
+    private static final int ALPHA_THRESHOLD = 50;
+    private static final int MIN_COMPONENT_SIZE = 200;
 
     public static void main(String[] args) throws Exception {
-        int extendPx = args.length > 0 ? Integer.parseInt(args[0]) : 200;
-        double darkFactor = args.length > 1 ? Double.parseDouble(args[1]) : 0.7;
+        int extendPx = args.length > 0 ? Integer.parseInt(args[0]) : 30;
+        double darkFactor = args.length > 1 ? Double.parseDouble(args[1]) : 0.3;
 
-        // 定位 resources 目录
         String baseDir = System.getProperty("cave-fuser.resources",
-                "roco-map/src/main/resources");
+                "RocoMapTracker/roco-map/src/main/resources");
         Path mapsDir = Paths.get(baseDir, "source", "maps");
         if (!Files.isDirectory(mapsDir)) {
             System.err.println("目录不存在: " + mapsDir.toAbsolutePath());
             System.exit(1);
         }
 
-        // 收集洞穴 PNG（排除主地图）
         List<Path> cavePngs = new ArrayList<>();
         try (var stream = Files.list(mapsDir)) {
             stream.filter(p -> p.toString().endsWith(".png")
@@ -58,7 +64,6 @@ public class CaveImageFuser {
             return;
         }
 
-        // 加载大陆图
         Path mainPath = mapsDir.resolve(MAIN_MAP);
         System.out.println("加载大陆图: " + MAIN_MAP + " (" + (mainPath.toFile().length() / 1024 / 1024) + " MB)");
         BufferedImage mainMap = ImageIO.read(mainPath.toFile());
@@ -96,19 +101,20 @@ public class CaveImageFuser {
 
         System.out.println("  尺寸: " + w + "x" + h);
 
+        int n = w * h;
+
         // 读取全图 ARGB
-        int[] caveARGB = new int[w * h];
+        int[] caveARGB = new int[n];
         caveImg.getRGB(0, 0, w, h, caveARGB, 0, w);
 
-        // 检查是否有 alpha 透明像素
         boolean hasAlphaGap = false;
-        for (int i = 0; i < Math.min(caveARGB.length, 100000); i++) {
+        for (int i = 0; i < Math.min(n, 100000); i++) {
             if (((caveARGB[i] >> 24) & 0xFF) == 0) { hasAlphaGap = true; break; }
         }
         System.out.println("  使用 " + (hasAlphaGap ? "alpha 透明检测" : "亮度检测 (黑底)"));
 
-        // 1. 洞穴遮罩：alpha>0 或 亮度>阈值（无透明时）
-        boolean[] caveMask = new boolean[w * h];
+        // ============ 1. 二值化遮罩 ============
+        boolean[] caveMask = new boolean[n];
         int cavePixels = 0;
         for (int y = 0; y < h; y++) {
             for (int x = 0; x < w; x++) {
@@ -116,109 +122,146 @@ public class CaveImageFuser {
                 int argb = caveARGB[idx];
                 boolean isCave;
                 if (hasAlphaGap) {
-                    isCave = ((argb >> 24) & 0xFF) > 0;
+                    isCave = ((argb >> 24) & 0xFF) >= ALPHA_THRESHOLD;
                 } else {
-                    int r = (argb >> 16) & 0xFF;
-                    int g = (argb >> 8) & 0xFF;
-                    int b = argb & 0xFF;
-                    int lum = (r * 299 + g * 587 + b * 114) / 1000;
-                    isCave = lum > BRIGHTNESS_THRESHOLD;
+                    isCave = ((argb >> 16) & 0xFF) * 299 + ((argb >> 8) & 0xFF) * 587 + (argb & 0xFF) * 114 > BRIGHTNESS_THRESHOLD * 1000;
                 }
                 caveMask[idx] = isCave;
                 if (isCave) cavePixels++;
             }
         }
-        System.out.println("  洞穴像素: " + cavePixels + " / " + (w * h));
+        System.out.println("  洞穴像素: " + cavePixels + " / " + n);
 
-        int wm1 = w - 1, hm1 = h - 1;
+        // ============ 2. BFS 连通域发现 + 波面膨胀 ============
+        // dilated[] 输出：true = 在膨胀区内（含洞穴本身）
+        boolean[] dilated = new boolean[n];
+        // BFS 队列：最大洞穴像素数，只需 tiny 分配
+        int[] bfsQueue = new int[Math.max(cavePixels, 1)];
+        // 当前层波面
+        ArrayList<Integer> wavefront = new ArrayList<>();
 
-        // 2. 膨胀遮罩 — BFS 从洞穴边界向外延伸 extendPx 层
-        boolean[] dilateMask = caveMask.clone();
-        int[] qx = new int[w * h];
-        int[] qy = new int[w * h];
-        int head = 0, tail = 0;
+        int[] dirs4 = {-1, 1, -w, w}; // 左、右、上、下
 
-        // 种子：洞穴边界像素（邻接透明区域的洞穴像素）
-        for (int y = 0; y < h; y++) {
-            for (int x = 0; x < w; x++) {
-                if (!caveMask[y * w + x]) continue;
-                for (int[] d : DIRS) {
-                    int nx = x + d[0], ny = y + d[1];
-                    if (nx < 0 || nx > wm1 || ny < 0 || ny > hm1) continue;
-                    if (!caveMask[ny * w + nx]) {
-                        qx[tail] = x; qy[tail] = y; tail++;
-                        break;
+        for (int start = 0; start < n; start++) {
+            if (!caveMask[start] || dilated[start]) continue;
+
+            // BFS 发现连通分量
+            int qHead = 0, qTail = 0;
+            bfsQueue[qTail++] = start;
+            dilated[start] = true;
+
+            while (qHead < qTail) {
+                int idx = bfsQueue[qHead++];
+                int x = idx % w;
+                for (int d : dirs4) {
+                    int ni = idx + d;
+                    // 边界检查
+                    if (d == -1 && x == 0) continue;
+                    if (d == 1 && x == w - 1) continue;
+                    if (ni < 0 || ni >= n) continue;
+                    if (caveMask[ni] && !dilated[ni]) {
+                        dilated[ni] = true;
+                        bfsQueue[qTail++] = ni;
+                    }
+                }
+            }
+
+            int compSize = qTail;
+            if (compSize < MIN_COMPONENT_SIZE) {
+                // 小连通域：回滚 dilated，丢弃
+                for (int j = 0; j < compSize; j++) {
+                    dilated[bfsQueue[j]] = false;
+                }
+                continue;
+            }
+
+            // 大连通域：从所有边界像素开始波面，计入第 1 层
+            for (int j = 0; j < compSize; j++) {
+                int idx = bfsQueue[j];
+                int x = idx % w;
+                for (int d : dirs4) {
+                    int ni = idx + d;
+                    if (d == -1 && x == 0) continue;
+                    if (d == 1 && x == w - 1) continue;
+                    if (ni < 0 || ni >= n) continue;
+                    if (!caveMask[ni] && !dilated[ni]) {
+                        dilated[ni] = true;
+                        wavefront.add(ni);
                     }
                 }
             }
         }
-        System.out.println("  边界种子: " + tail);
 
-        // 逐层膨胀
-        int expanded = 0;
-        for (int layer = 0; layer < extendPx && head < tail; layer++) {
-            int layerEnd = tail;
-            int layerAdded = 0;
-            while (head < layerEnd) {
-                int x = qx[head], y = qy[head]; head++;
-                for (int[] dir : DIRS) {
-                    int nx = x + dir[0], ny = y + dir[1];
-                    if (nx < 0 || nx > wm1 || ny < 0 || ny > hm1) continue;
-                    int nIdx = ny * w + nx;
-                    if (!dilateMask[nIdx]) {
-                        dilateMask[nIdx] = true;
-                        qx[tail] = nx; qy[tail] = ny; tail++;
-                        layerAdded++;
+        int afterFilter = 0;
+        for (int i = 0; i < n; i++) {
+            if (dilated[i] && !caveMask[i]) afterFilter++; // 非洞穴的膨胀像素
+        }
+        int keptCavePixels = 0;
+        for (int i = 0; i < n; i++) {
+            if (dilated[i] && caveMask[i]) keptCavePixels++;
+        }
+        System.out.println("  过滤后洞穴像素: " + keptCavePixels + ", 初始波面: " + wavefront.size());
+
+        // 继续膨胀 extendPx-1 层
+        int totalDilated = keptCavePixels + wavefront.size();
+        ArrayList<Integer> nextWave = new ArrayList<>();
+        for (int layer = 1; layer < extendPx && !wavefront.isEmpty(); layer++) {
+            for (int q : wavefront) {
+                int x = q % w;
+                for (int d : dirs4) {
+                    int ni = q + d;
+                    if (d == -1 && x == 0) continue;
+                    if (d == 1 && x == w - 1) continue;
+                    if (ni < 0 || ni >= n) continue;
+                    if (!dilated[ni]) {
+                        dilated[ni] = true;
+                        nextWave.add(ni);
                     }
                 }
             }
-            expanded += layerAdded;
+            totalDilated += nextWave.size();
+            // swap
+            ArrayList<Integer> tmp = wavefront;
+            wavefront = nextWave;
+            nextWave = tmp;
+            nextWave.clear();
         }
-        System.out.println("  延伸像素: " + expanded + " (延伸 " + extendPx + "px)");
+        System.out.println("  膨胀后总像素 (extendPx=" + extendPx + "): " + totalDilated + " / " + n);
 
-        // 3. 合成：新建输出图，膨胀区域铺暗化大陆图底，再盖原洞穴图
+        // 释放 caveMask 内存，为 outImg 腾空间
+        caveMask = null;
+
+        // ============ 3. 填充 + 叠加（单遍） ============
         BufferedImage outImg = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
-
-        int basePixels = 0;
+        int basePixels = 0, overlaid = 0;
         for (int y = 0; y < h; y++) {
             for (int x = 0; x < w; x++) {
                 int idx = y * w + x;
-                if (dilateMask[idx]) {
-                    int mainRGB = mainMap.getRGB(x, y);
-                    double darkMul = 1.0 - darkFactor; // 0.5→50%亮度, 0.7→30%亮度
-                    int r = (int) (((mainRGB >> 16) & 0xFF) * darkMul);
-                    int g = (int) (((mainRGB >> 8) & 0xFF) * darkMul);
-                    int b = (int) ((mainRGB & 0xFF) * darkMul);
-                    outImg.setRGB(x, y, (255 << 24) | (r << 16) | (g << 8) | b);
-                    basePixels++;
-                }
-            }
-        }
+                if (!dilated[idx]) continue;
 
-        int overlaid = 0;
-        for (int y = 0; y < h; y++) {
-            for (int x = 0; x < w; x++) {
-                int idx = y * w + x;
-                if (caveMask[idx]) {
-                    int alpha = (caveARGB[idx] >> 24) & 0xFF;
-                    int caveR = (caveARGB[idx] >> 16) & 0xFF;
-                    int caveG = (caveARGB[idx] >> 8) & 0xFF;
-                    int caveB = caveARGB[idx] & 0xFF;
-                    int mainARGB = outImg.getRGB(x, y);
-                    int mainR = (mainARGB >> 16) & 0xFF;
-                    int mainG = (mainARGB >> 8) & 0xFF;
-                    int mainB = mainARGB & 0xFF;
-                    int outR = (caveR * alpha + mainR * (255 - alpha)) / 255;
-                    int outG = (caveG * alpha + mainG * (255 - alpha)) / 255;
-                    int outB = (caveB * alpha + mainB * (255 - alpha)) / 255;
-                    outImg.setRGB(x, y, (255 << 24) | (outR << 16) | (outG << 8) | outB);
+                int mainRGB = mainMap.getRGB(x, y);
+                int mr = (int) (((mainRGB >> 16) & 0xFF) * darkFactor);
+                int mg = (int) (((mainRGB >> 8) & 0xFF) * darkFactor);
+                int mb = (int) ((mainRGB & 0xFF) * darkFactor);
+
+                int alpha = (caveARGB[idx] >> 24) & 0xFF;
+                if (alpha >= ALPHA_THRESHOLD) {
+                    int cr = (caveARGB[idx] >> 16) & 0xFF;
+                    int cg = (caveARGB[idx] >> 8) & 0xFF;
+                    int cb = caveARGB[idx] & 0xFF;
+                    int or = (cr * alpha + mr * (255 - alpha)) / 255;
+                    int og = (cg * alpha + mg * (255 - alpha)) / 255;
+                    int ob = (cb * alpha + mb * (255 - alpha)) / 255;
+                    outImg.setRGB(x, y, (255 << 24) | (or << 16) | (og << 8) | ob);
                     overlaid++;
+                } else {
+                    outImg.setRGB(x, y, (255 << 24) | (mr << 16) | (mg << 8) | mb);
                 }
+                basePixels++;
             }
         }
-        System.out.println("  底部像素: " + basePixels + ", 洞穴叠加: " + overlaid);
+        System.out.println("  填充像素: " + basePixels + ", 洞穴叠加: " + overlaid + " (暗化系数 " + darkFactor + ")");
 
-        // 4. 写回
         ImageIO.write(outImg, "png", caveFile);
         System.out.println("  已写回: " + caveFile.getName());
     }

@@ -148,40 +148,47 @@ public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
                 if (result.success()) {
                     log.info("resultL{}", result);
 
-                    // 子图切换时重置 EMA，避免坐标跨子图平滑过渡（引起视口滑动感）
+                    // Plan B: 用 C++ 返回的 map_id 确定子图
                     CompositeMapMetadata meta = MapContext.getInstance().getMultiMapMetadata();
-                    if (meta != null) {
-                        var newSub = meta.findByY(result.y());
-                        if (newSub != null && newSub.index() != MapContext.getInstance().getActiveSubImageIndex()) {
-                            log.info("子图切换 {}→{}, 重置位置平滑",
-                                MapContext.getInstance().getActiveSubImageIndex(), newSub.index());
-                            stateTracker.reset();
-                        }
+                    int mapId = result.mapId();
+                    CompositeMapMetadata.SubImageInfo sub = null;
+                    if (meta != null && mapId >= 0 && mapId < meta.subImages().size()) {
+                        sub = meta.subImages().get(mapId);
+                    }
+
+                    // Plan B: C++ 返回子图局部坐标，所有子图 offsetY=0，full == local
+                    double fullX = result.x();
+                    double fullY = result.y() + ((sub != null) ? sub.offsetY() : 0);
+
+                    // 安全检测：map_id 失效时坐标可能在完整图空间（>8192），记警告
+                    if (mapId < 0 && (result.y() > 8192 || result.x() > 8192)) {
+                        log.warn("map_id={} 且坐标异常 ({}), 可能投票未生效，结果不可靠",
+                                mapId, String.format("%.1f,%.1f", result.x(), result.y()));
+                    }
+
+                    // 大陆/洞穴切换时重置 EMA（渲染始终在大陆空间）
+                    boolean newCave = sub != null && sub.isCave();
+                    if (newCave != wasCaveMode) {
+                        log.info("洞穴切换: caveMode={} (map_id={}), 重置位置平滑", newCave, mapId);
+                        stateTracker.reset();
                     }
 
                     double angle = AngleConverter.toJavaFX(result.angle());
-                    stateTracker.onMatchSuccess(result.x(), result.y(),
+                    stateTracker.onMatchSuccess(fullX, fullY,
                         Double.isNaN(angle) ? null : angle);
 
-                    // 统一在 MapMatcherProcessor 中用坐标+元数据判断大陆/洞穴
+                    // 用 map_id + 元数据判断大陆/洞穴，更新洞穴状态
+                    // 渲染始终使用大陆坐标空间（offsetY=0），不切换活跃子图
                     boolean inCave = false;
                     String caveName = null;
                     int caveIdx = -1;
-                    int activeIndex = 0;
-                    double activeOffsetY = 0;
 
-                    if (meta != null) {
-                        var sub = meta.findByY(result.y());
-                        if (sub != null && sub.isCave()) {
-                            inCave = true;
-                            caveIdx = sub.index();
-                            caveName = sub.name();
-                            activeIndex = sub.index();
-                            activeOffsetY = sub.offsetY();
-                        }
+                    if (sub != null && sub.isCave()) {
+                        inCave = true;
+                        caveIdx = sub.index();
+                        caveName = sub.name();
                     }
                     MapContext.getInstance().updateCaveMode(inCave, caveIdx, caveName);
-                    MapContext.getInstance().setActiveSubImage(activeIndex, activeOffsetY);
 
                     // 洞穴模式变化时发布轮播事件
                     if (inCave != wasCaveMode) {

@@ -2,7 +2,6 @@ package io.github.kedaya0209.roco.app.ui.service.resource;
 
 import net.jcip.annotations.NotThreadSafe;
 import io.github.kedaya0209.roco.app.config.RenderConfig;
-import io.github.kedaya0209.roco.app.context.ResourceConfigContext;
 import io.github.kedaya0209.roco.app.map.model.CompositeMapMetadata;
 import io.github.kedaya0209.roco.app.utils.ResourceUtils;
 import javafx.scene.Group;
@@ -25,12 +24,8 @@ import java.util.concurrent.Future;
 /**
  * 瓦片管理器 — 多分辨率金字塔瓦片的加载、缓存与视图管理。
  * <p>
- * 始终以单子图尺寸（8192x8192）渲染：
- * <ul>
- *   <li>普通模式：显示当前活跃子图的瓦片</li>
- *   <li>洞穴模式：大陆瓦片作为半透明底图 + 当前洞穴瓦片叠加在上层</li>
- * </ul>
- * 瓦片从子图专属目录以局部行列号加载，不感知拼接坐标。
+ * 大陆图始终作为底图渲染。匹配到洞穴时，洞穴瓦片叠加在大陆之上。
+ * 所有子图共享同一坐标空间（8192x8192，offsetY=0）。
  */
 @Slf4j
 @NotThreadSafe
@@ -41,10 +36,10 @@ public class TileManager {
 
     private final Group worldGroup;
     private final int mapW, mapH;
-    // 主瓦片集（当前活跃子图）
-    private final Map<String, ImageView> activeTiles = new HashMap<>();
-    // 洞穴模式底图瓦片集（大陆 = 子图 0）
-    private final Map<String, ImageView> bgTiles = new HashMap<>();
+    // 大陆瓦片集（始终存在）
+    private final Map<String, ImageView> mainlandTiles = new HashMap<>();
+    // 洞穴叠加瓦片集（进入洞穴模式时叠加）
+    private final Map<String, ImageView> caveOverlayTiles = new HashMap<>();
     private final Set<String> needed = new HashSet<>();
     private final List<String> missingKeys = new ArrayList<>();
     private final Map<String, byte[]> loadedBytes = new ConcurrentHashMap<>();
@@ -57,9 +52,6 @@ public class TileManager {
     // 缩放稳定延迟
     private int scaleStableFrames = 0;
 
-    // 当前活跃子图
-    private int activeSubIndex = 0;
-    private String activeTileDir;
     private String mainlandTileDir;
     private boolean hasMultiMap = false;
 
@@ -75,25 +67,41 @@ public class TileManager {
     }
 
     /**
-     * 使用默认子图（大陆, 索引 0）的瓦片目录初始化。
+     * 使用元数据初始化：寻找大陆子图（isCave=false）作为底图。
      */
     public void initFromMetadata(CompositeMapMetadata metadata) {
         if (metadata == null || metadata.subImages().isEmpty()) return;
         this.hasMultiMap = true;
-        // 大陆 = 子图 0
-        var mainland = metadata.subImages().get(0);
+        // 寻找大陆子图（第一个非洞穴子图），否则用子图0
+        var mainland = metadata.subImages().stream()
+                .filter(s -> !s.isCave())
+                .findFirst()
+                .orElse(metadata.subImages().get(0));
         this.mainlandTileDir = normalizeDir(mainland.tileDir());
-        this.activeTileDir = this.mainlandTileDir;
-        this.activeSubIndex = 0;
     }
 
-    /** 切换活跃子图（改变瓦片加载源） */
-    public void setActiveSubImage(int index, String tileDir) {
-        if (index == this.activeSubIndex && Objects.equals(tileDir, this.activeTileDir)) return;
-        this.activeSubIndex = index;
-        this.activeTileDir = normalizeDir(tileDir);
-        // 清空当前瓦片，下次帧循环重新加载
-        clearTiles(activeTiles);
+    /**
+     * 根据洞穴索引从元数据获取瓦片目录。
+     */
+    public void setCaveOverlay(int caveIdx, String caveDir) {
+        if (caveIdx < 0 || caveDir == null || caveDir.isEmpty()) {
+            // 退出洞穴叠加
+            if (this.caveMode) {
+                this.caveMode = false;
+                this.activeCaveIndex = -1;
+                this.caveTileDir = null;
+                clearTiles(caveOverlayTiles);
+            }
+            return;
+        }
+        String dir = normalizeDir(caveDir);
+        if (this.caveMode && this.activeCaveIndex == caveIdx && Objects.equals(this.caveTileDir, dir)) {
+            return; // 无变化
+        }
+        this.caveMode = true;
+        this.activeCaveIndex = caveIdx;
+        this.caveTileDir = dir;
+        clearTiles(caveOverlayTiles);
     }
 
     private static String normalizeDir(String dir) {
@@ -132,8 +140,8 @@ public class TileManager {
     // ==================== 层级选择 ====================
 
     public void reset() {
-        clearTiles(activeTiles);
-        clearTiles(bgTiles);
+        clearTiles(mainlandTiles);
+        clearTiles(caveOverlayTiles);
         lastLevel = -1;
         scaleStableFrames = 0;
     }
@@ -144,29 +152,6 @@ public class TileManager {
             worldGroup.getChildren().remove(iv);
         }
         tileMap.clear();
-    }
-
-    // ==================== 洞穴叠加 ====================
-
-    public void setCaveMode(boolean enabled, int caveIdx, String caveDir) {
-        if (this.caveMode == enabled && this.activeCaveIndex == caveIdx) return;
-        this.caveMode = enabled;
-        this.activeCaveIndex = enabled ? caveIdx : -1;
-        this.caveTileDir = enabled ? normalizeDir(caveDir) : null;
-
-        if (!enabled) {
-            // 退出洞穴模式：清空底图，恢复为主瓦片集
-            clearTiles(bgTiles);
-            activeTileDir = mainlandTileDir;
-            activeSubIndex = 0;
-        } else {
-            // 进入洞穴模式：主瓦片集切到洞穴，底图用大陆
-            activeTileDir = this.caveTileDir;
-            activeSubIndex = caveIdx;
-        }
-        // 标记需要重新加载
-        clearTiles(activeTiles);
-        clearTiles(bgTiles);
     }
 
     // ==================== 瓦片加载与回收 ====================
@@ -193,6 +178,8 @@ public class TileManager {
 
     /**
      * 更新瓦片视图。所有坐标均为子图局部坐标（0..8192）。
+     * <p>
+     * 始终渲染大陆瓦片作为底图。洞穴模式下额外叠加洞穴瓦片。
      */
     public void updateTiles(double ox, double oy, double scale, int level, double vw, double vh) {
         if (vw <= 0 || vh <= 0) return;
@@ -220,16 +207,15 @@ public class TileManager {
             }
         }
 
-        if (caveMode && hasMultiMap) {
-            // 洞穴模式：两趟加载 — 大陆底图（后层）+ 洞穴前景（前层）
-            updateTileLayer(needed, bgTiles, mainlandTileDir, level,
-                    RenderConfig.CAVE_MAINLAND_OPACITY, false);
-            updateTileLayer(needed, activeTiles, caveTileDir, level,
-                    1.0, true);
-        } else {
-            // 普通模式：单趟加载
-            updateTileLayer(needed, activeTiles, activeTileDir, level,
-                    1.0, true);
+        // 第一趟：大陆底图（始终加载）
+        updateTileLayer(needed, mainlandTiles, mainlandTileDir, level, 1.0, false);
+
+        // 第二趟：洞穴叠加（仅在洞穴模式下）
+        if (caveMode && caveTileDir != null) {
+            updateTileLayer(needed, caveOverlayTiles, caveTileDir, level, 1.0, true);
+        } else if (!caveOverlayTiles.isEmpty()) {
+            // 已退出洞穴模式，清理残留叠加瓦片
+            clearTiles(caveOverlayTiles);
         }
     }
 

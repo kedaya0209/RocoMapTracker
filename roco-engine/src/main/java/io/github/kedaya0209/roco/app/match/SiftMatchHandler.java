@@ -6,6 +6,7 @@ import io.github.kedaya0209.roco.app.config.SocketConfig;
 import io.github.kedaya0209.roco.app.context.ResourceConfigContext;
 import io.github.kedaya0209.roco.app.hook.HookEventType;
 import io.github.kedaya0209.roco.app.map.model.CompositeMapMetadata;
+import io.github.kedaya0209.roco.app.map.model.CompositeMapMetadata.SubImageInfo;
 import io.github.kedaya0209.roco.app.utils.ResourceUtils;
 import io.github.kedaya0209.roco.app.hook.event.StatusCarouselEvent;
 import io.github.kedaya0209.roco.app.process.NativeProcess;
@@ -173,12 +174,57 @@ public class SiftMatchHandler {
         try {
             SiftVariant variant = launchParams.get() != null ? launchParams.get() : SiftVariant.PCA_ULTRA;
             String cacheSuffix = variant.cacheSuffix();
-            // Dual cache: cave suffix = cache suffix + "_cave"
-            String caveCacheSuffix = cacheSuffix + "_cave";
-            byte[] body = encodeConfig(variant.variantOrdinal(), cacheSuffix, caveCacheSuffix, 0);
+
+            // Plan B unified index: load sub-image heights + per-sub-image SIFT params from metadata
+            int[] subImageHeights = null;
+            SubImageSiftOverride[] subImageOverrides = null;
+            SubImageSiftOverride matchingSift = null;
+            if (ResourceConfigContext.isMultiMapActive()) {
+                try (InputStream is = ResourceUtils.getResourceStream(
+                        ResourceConfigContext.getMultiMapMetadata())) {
+                    CompositeMapMetadata metadata = CompositeMapMetadata.load(is);
+                    var subs = metadata.subImages();
+                    subImageHeights = subs.stream()
+                            .mapToInt(SubImageInfo::height)
+                            .toArray();
+
+                    // 收集有 SIFT 参数覆盖的子图
+                    subImageOverrides = subs.stream()
+                            .filter(sub -> sub.siftOverride() != null && sub.siftOverride().hasAny())
+                            .map(sub -> {
+                                var o = sub.siftOverride();
+                                return new SubImageSiftOverride(
+                                        sub.index(), o.contrastThreshold(),
+                                        o.edgeThreshold(), o.nfeatures(),
+                                        o.nOctaveLayers(), o.sigma());
+                            })
+                            .toArray(SubImageSiftOverride[]::new);
+
+                    // 匹配侧 SIFT 参数（元数据覆盖）
+                    CompositeMapMetadata.SiftParams ms = metadata.matchingSift();
+                    if (ms != null && ms.hasAny()) {
+                        matchingSift = new SubImageSiftOverride(
+                                -1, ms.contrastThreshold(), ms.edgeThreshold(),
+                                ms.nfeatures(), ms.nOctaveLayers(), ms.sigma());
+                    }
+
+                    cacheSuffix = cacheSuffix + ".multi2";
+                    log.info("MultiMap 模式: {} 子图, {} 个参数覆盖, 匹配参数={}, 缓存后缀={}",
+                            subImageHeights.length, subImageOverrides.length,
+                            matchingSift != null ? "自定义" : "SiftConfig默认",
+                            cacheSuffix);
+                } catch (Exception e) {
+                    log.warn("加载 MultiMap 元数据失败，回退到普通模式", e);
+                }
+            }
+
+            // Plan B: 不再使用独立的 cave 缓存路径（统一索引只有一个缓存文件）
+            String caveCacheSuffix = ""; // 0 length = no cave cache
+            byte[] body = encodeConfig(variant.variantOrdinal(), cacheSuffix, caveCacheSuffix, 0,
+                    subImageHeights, subImageOverrides, matchingSift);
             session.send(MSG_CONFIG_DATA, body);
-            log.info("CONFIG_DATA 已发送 ({} 字节, algoKind={}, cache={}, cave={})",
-                    body.length, SiftConfig.ALGO_KIND, cacheSuffix, caveCacheSuffix);
+            log.info("CONFIG_DATA 已发送 ({} 字节, algoKind={}, cache={})",
+                    body.length, SiftConfig.ALGO_KIND, cacheSuffix);
         } catch (RuntimeException e) {
             log.error("序列化 CONFIG_DATA 失败", e);
             byte[] errBody = ("Config error: " + e.getMessage())

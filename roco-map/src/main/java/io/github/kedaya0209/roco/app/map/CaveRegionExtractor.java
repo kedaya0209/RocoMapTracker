@@ -26,7 +26,7 @@ public class CaveRegionExtractor {
         int extendPx = args.length > 0 ? Integer.parseInt(args[0]) : 200;
 
         String baseDir = System.getProperty("cave-fuser.resources",
-                "roco-map/src/main/resources");
+                "RocoMapTracker/roco-map/src/main/resources");
         Path mapsDir = Paths.get(baseDir, "source", "maps");
         if (!Files.isDirectory(mapsDir)) {
             System.err.println("目录不存在: " + mapsDir.toAbsolutePath());

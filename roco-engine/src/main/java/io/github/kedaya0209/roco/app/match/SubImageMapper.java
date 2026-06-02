@@ -42,7 +42,7 @@ public class SubImageMapper {
             subs.add(new SubImageInfo(name, mapWidth, h, offset));
         }
 
-        this.metadata = new CompositeMapMetadata(subs);
+        this.metadata = new CompositeMapMetadata(subs, null);
     }
 
     public SubImageMapper(CompositeMapMetadata metadata) {

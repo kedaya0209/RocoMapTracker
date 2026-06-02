@@ -74,10 +74,23 @@ enum class AlgoKind : int32_t {
     SIFT  = 0,
 };
 
+/**
+ * Per-sub-image SIFT parameter overrides (for training).
+ * 0.0 for double fields or -1 for int32_t fields means "use the AlgoParams default".
+ */
+struct SubImageSiftParams {
+    int32_t subImageIndex = -1;
+    double contrastThreshold = 0.0;   // 0.0 = 不覆盖
+    double edgeThreshold = 0.0;       // 0.0 = 不覆盖
+    int32_t nfeatures = -1;           // -1 = 不覆盖
+    int32_t nOctaveLayers = -1;       // -1 = 不覆盖
+    double sigma = 0.0;               // 0.0 = 不覆盖
+};
+
 struct AlgoParams {
     AlgoKind kind = AlgoKind::SIFT;
 
-    // SIFT
+    // SIFT (用于匹配侧，训练侧可由 per-sub-image overrides 覆盖)
     int32_t siftVariant = 3;      // PCA_ULTRA
     int32_t nfeatures = 0;
     int32_t nOctaveLayers = 3;
@@ -107,10 +120,16 @@ struct AlgoParams {
 
     // Paths
     std::string cacheFilePath;
-    std::string caveCacheFilePath;  // second cache path for cave-only mode
 
-    // Multi-subimage: sub-image boundary heights (for determining which sub-image a match falls in)
+    // Multi-subimage: sub-image boundary heights, in pixels, top-to-bottom order.
+    // Used for Plan B unified index — each sub-image gets its own map_id during training,
+    // and match() votes on which sub-image the query belongs to.
     std::vector<int> subImageHeights;
+
+    // Per-sub-image SIFT parameter overrides for training.
+    // If empty, all sub-images use the defaults above.
+    std::vector<SubImageSiftParams> subImageSiftParams;
+
 };
 
 // ============================================================================
@@ -183,7 +202,7 @@ struct MatchResult {
     float t_minimap_ms = 0;
     float t_extract_ms = 0;
     float t_matching_ms = 0;
-    int cache_type = -1;  // -1=none, 0=full, 1=cave — C++侧内部使用的缓存类型
+    int map_id = -1;  // -1=unknown, 0+=sub-image index for multimap
 };
 
 // ============================================================================
@@ -193,7 +212,7 @@ struct MatchResult {
 std::vector<uint8_t> serialize_result(bool success, double x, double y, double angle,
                                       float t_minimap_ms = 0, float t_extract_ms = 0,
                                       float t_matching_ms = 0, float t_arrow_ms = 0,
-                                      int cache_type = -1);
+                                      int map_id = -1);
 
 // ============================================================================
 // Abstract matcher interface

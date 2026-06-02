@@ -19,9 +19,11 @@ import java.util.List;
 public final class CompositeMapMetadata {
 
     private final List<SubImageInfo> subImages;
+    private final SiftParams matchingSift;
 
-    public CompositeMapMetadata(List<SubImageInfo> subImages) {
+    public CompositeMapMetadata(List<SubImageInfo> subImages, SiftParams matchingSift) {
         this.subImages = List.copyOf(subImages);
+        this.matchingSift = matchingSift;
     }
 
     /**
@@ -31,8 +33,19 @@ public final class CompositeMapMetadata {
         JsonNode root = JsonUtils.getMapper().readTree(jsonStream);
         int cw = root.get("compositeWidth").asInt();
         int ch = root.get("compositeHeight").asInt();
+
+        // 全局匹配参数（可空）
+        SiftParams matchingSift = null;
+        if (root.has("matchingSift")) {
+            matchingSift = parseSiftParams(root.get("matchingSift"));
+        }
+
         List<SubImageInfo> subs = new ArrayList<>();
         for (JsonNode node : root.get("subImages")) {
+            SiftParams siftOverride = null;
+            if (node.has("sift")) {
+                siftOverride = parseSiftParams(node.get("sift"));
+            }
             subs.add(new SubImageInfo(
                     node.get("index").asInt(),
                     node.get("name").asText(),
@@ -41,14 +54,28 @@ public final class CompositeMapMetadata {
                     node.get("width").asInt(),
                     node.get("height").asInt(),
                     node.get("sourcePath").asText(),
-                    node.get("tileDir").asText()
+                    node.get("tileDir").asText(),
+                    siftOverride
             ));
         }
-        return new CompositeMapMetadata(subs);
+        return new CompositeMapMetadata(subs, matchingSift);
+    }
+
+    private static SiftParams parseSiftParams(JsonNode n) {
+        Double ct = n.has("contrastThreshold") ? n.get("contrastThreshold").asDouble() : null;
+        Double et = n.has("edgeThreshold") ? n.get("edgeThreshold").asDouble() : null;
+        Integer nf = n.has("nfeatures") ? n.get("nfeatures").asInt() : null;
+        Integer nol = n.has("nOctaveLayers") ? n.get("nOctaveLayers").asInt() : null;
+        Double sg = n.has("sigma") ? n.get("sigma").asDouble() : null;
+        return new SiftParams(ct, et, nf, nol, sg);
     }
 
     public List<SubImageInfo> subImages() {
         return subImages;
+    }
+
+    public SiftParams matchingSift() {
+        return matchingSift;
     }
 
     public int totalHeight() {
@@ -83,6 +110,23 @@ public final class CompositeMapMetadata {
     }
 
     /**
+     * SIFT 参数覆盖（所有字段可空，null = 使用默认值）。
+     */
+    @Immutable
+    public record SiftParams(
+            Double contrastThreshold,
+            Double edgeThreshold,
+            Integer nfeatures,
+            Integer nOctaveLayers,
+            Double sigma
+    ) {
+        public boolean hasAny() {
+            return contrastThreshold != null || edgeThreshold != null
+                    || nfeatures != null || nOctaveLayers != null || sigma != null;
+        }
+    }
+
+    /**
      * 单个子图信息。
      */
     @Immutable
@@ -94,12 +138,13 @@ public final class CompositeMapMetadata {
             int width,
             int height,
             String sourcePath,
-            String tileDir
+            String tileDir,
+            SiftParams siftOverride
     ) {
         /** @deprecated 兼容旧代码，使用 index/name/isCave/sourcePath/tileDir 代替 */
         @Deprecated
         public SubImageInfo(String name, int width, int height, int offsetY) {
-            this(0, name, false, offsetY, width, height, null, null);
+            this(0, name, false, offsetY, width, height, null, null, null);
         }
     }
 }

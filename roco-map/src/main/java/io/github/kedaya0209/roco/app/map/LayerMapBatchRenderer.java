@@ -18,14 +18,15 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * 批量渲染 5 组 LayerMap：每组生成 8192×8192 透明图 + 遮罩图。
+ * 批量渲染 6 组 LayerMap：每组生成 8192×8192 透明图 + 遮罩图。
  * <pre>
  * 分组：
- *   信仰者村落  — id=4,5
- *   拾荒者港口  — id=7,8
- *   月兔暗港    — id=12,16
- *   二叠山丘一层 — id=10
- *   下水管道口  — id=2
+ *   信仰者村落一层 — id=4
+ *   信仰者村落二层 — id=5
+ *   拾荒者港口    — id=7,8
+ *   月兔暗港      — id=12,16
+ *   二叠山丘一层  — id=10
+ *   下水管道口    — id=2
  * </pre>
  */
 @Slf4j
@@ -57,7 +58,7 @@ public class LayerMapBatchRenderer {
         String base = mapDir.endsWith("\\") || mapDir.endsWith("/") ? mapDir : mapDir + File.separator;
         this.configPath = base + "layermap_config.json";
         this.layermapDir = base + "layermap" + File.separator;
-        this.siftPath = base + "WorldMap_SIFT.png";
+        this.siftPath = base + "卡洛西亚大陆.png";
         this.outputDir = outputDir.endsWith("\\") || outputDir.endsWith("/") ? outputDir : outputDir + File.separator;
     }
 
@@ -67,9 +68,10 @@ public class LayerMapBatchRenderer {
         // 1. 加载所有图层
         List<LayerMapLayer> allLayers = loadAllLayers();
 
-        // 2. 构建 5 个分组
+        // 2. 构建 6 个分组（信仰者村落拆为一层/二层）
         List<LayerGroup> groups = Arrays.asList(
-                group("信仰者村落", allLayers, 4, 5),
+                group("信仰者村落一层", allLayers, 4),
+                group("信仰者村落二层", allLayers, 5),
                 group("拾荒者港口", allLayers, 7, 8),
                 group("月兔暗港", allLayers, 12, 16),
                 group("二叠山丘一层", allLayers, 10),
@@ -95,6 +97,22 @@ public class LayerMapBatchRenderer {
             drawLayers(masked, g.layers);
             ImageIO.write(masked, "PNG", new File(outputDir + g.name + "_遮罩.png"));
             log.info("  遮罩图已保存");
+        }
+
+        // 5. 额外生成合并的 信仰者村落（层4+5），仅用于瓦片生成
+        //    单独的一层/二层图保留作为 SIFT 训练源图
+        LayerGroup merged = group("信仰者村落", allLayers, 4, 5);
+        if (!merged.layers.isEmpty()) {
+            log.info("渲染合并: 信仰者村落 (用于瓦片生成)");
+
+            BufferedImage transparent = new BufferedImage(MAP_SIZE, MAP_SIZE, BufferedImage.TYPE_INT_ARGB);
+            drawLayers(transparent, merged.layers);
+            ImageIO.write(transparent, "PNG", new File(outputDir + merged.name + "_透明.png"));
+
+            BufferedImage masked = copyImage(maskOverlay);
+            drawLayers(masked, merged.layers);
+            ImageIO.write(masked, "PNG", new File(outputDir + merged.name + "_遮罩.png"));
+            log.info("  合并图已保存");
         }
 
         log.info("全部完成！输出目录: {}", outputDir);
