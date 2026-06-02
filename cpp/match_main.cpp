@@ -21,6 +21,18 @@ std::unique_ptr<MatcherBase> create_matcher(const AlgoParams& params) {
 }
 
 // ============================================================================
+// Helper: send INIT_FAILED message
+// ============================================================================
+static bool send_init_failed(SOCKET sock, const char* msg) {
+    uint32_t msg_len = (uint32_t)strlen(msg);
+    std::vector<uint8_t> body(8 + msg_len);
+    write_be32(body.data(), 1);                    // error code
+    write_be32(body.data() + 4, msg_len);
+    memcpy(body.data() + 8, msg, msg_len);
+    return send_message(sock, INIT_FAILED, body.data(), (uint32_t)body.size());
+}
+
+// ============================================================================
 // MAIN
 // ============================================================================
 int main(int argc, char* argv[]) {
@@ -110,11 +122,33 @@ int main(int argc, char* argv[]) {
         closesocket(sock); WSACleanup(); return 1;
     }
 
+    // ============================================================================
+    // Load caches (dual or single)
+    // ============================================================================
     bool init_ok = false;
+    bool needs_retrain = false;  // dual-cache mode: cave cache missing, need full re-train
     if (!params.cacheFilePath.empty()) {
-        init_ok = matcher->load_cache(params.cacheFilePath);
+        if (!params.caveCacheFilePath.empty()) {
+            auto* sift = dynamic_cast<SiftMatcher*>(matcher.get());
+            if (sift) {
+                init_ok = sift->load_two_caches(params.cacheFilePath, params.caveCacheFilePath);
+                // Dual cache mode: full cache 加载成功但 cave 缓存不存在时，
+                // 标记需要重新训练，跳过单缓存回退
+                if (init_ok && !sift->cache_cave_.valid) {
+                    LOG("Dual cache mode: cave cache missing, triggering re-train");
+                    needs_retrain = true;
+                    init_ok = false;
+                }
+            }
+        }
+        if (!init_ok && !needs_retrain) {
+            init_ok = matcher->load_cache(params.cacheFilePath);
+        }
     }
 
+    // ============================================================================
+    // Cache miss → request map data and train
+    // ============================================================================
     if (!init_ok) {
         LOG("Cache miss, requesting map data...");
         if (!send_message(sock, REQUEST_MAP, nullptr, 0)) {
@@ -123,34 +157,68 @@ int main(int argc, char* argv[]) {
         }
 
         type = recv_message(sock, recv_body);
-        if (type != MAP_DATA || recv_body.size() < 12) {
-            LOGERR("Expected MAP_DATA, got type=%d size=%zu", type, recv_body.size());
+        if (type != MAP_DATA) {
+            LOGERR("Expected MAP_DATA, got type=%d", type);
             closesocket(sock); WSACleanup(); return 1;
         }
 
-        int map_w = (int)read_be32(recv_body.data());
-        int map_h = (int)read_be32(recv_body.data() + 4);
-        uint32_t pixels_len = read_be32(recv_body.data() + 8);
+        // --- Parse MAP_DATA header (supports multi-subimage format) ---
+        int sub_count = 1;    // default: single sub-image
+        int map_w, map_h;
+        uint32_t pixels_len;
+        uint8_t* map_pixels;
+        std::vector<int> sub_heights;
+
+        int first_val = (int)read_be32(recv_body.data());
+        if (first_val > 0 && first_val <= 20) {
+            // New multi-subimage format: [subImageCount][w][totalH][subH_0..subH_{N-1}][pixelsLen]
+            if (recv_body.size() < (size_t)(16 + first_val * 4)) {
+                LOGERR("MAP_DATA too short for multi-subimage header");
+                closesocket(sock); WSACleanup(); return 1;
+            }
+            sub_count = first_val;
+            map_w   = (int)read_be32(recv_body.data() + 4);
+            map_h   = (int)read_be32(recv_body.data() + 8);
+            int pixels_off = 12 + sub_count * 4;
+            pixels_len = read_be32(recv_body.data() + pixels_off);
+            map_pixels = recv_body.data() + pixels_off + 4;
+
+            sub_heights.resize(sub_count);
+            for (int i = 0; i < sub_count; i++) {
+                sub_heights[i] = (int)read_be32(recv_body.data() + 12 + i * 4);
+            }
+        } else {
+            // Old format: [w][h][pixelsLen][pixels]
+            if (recv_body.size() < 12) {
+                LOGERR("MAP_DATA too short: %zu bytes", recv_body.size());
+                closesocket(sock); WSACleanup(); return 1;
+            }
+            map_w = first_val;
+            map_h = (int)read_be32(recv_body.data() + 4);
+            pixels_len = read_be32(recv_body.data() + 8);
+            map_pixels = recv_body.data() + 12;
+        }
+
         if (pixels_len != (uint32_t)(map_w * map_h)) {
-            LOGERR("Map pixel size mismatch");
+            LOGERR("Map pixel size mismatch: %u vs %dx%d=%d",
+                    pixels_len, map_w, map_h, map_w * map_h);
             closesocket(sock); WSACleanup(); return 1;
         }
-        LOG("Received map data: %dx%d (%u gray pixels)", map_w, map_h, pixels_len);
+        LOG("Received map data: %dx%d (%u gray pixels, subImageCount=%d)",
+            map_w, map_h, pixels_len, sub_count);
 
-        uint8_t* map_pixels = recv_body.data() + 12;
+        // Copy sub-image heights for runtime sub-image detection logging
+        params.subImageHeights = sub_heights;
+
+        // --- Train full map (uses tiling for large maps) ---
         if (!matcher->train(map_pixels, map_w, map_h)) {
-            LOGERR("Training failed");
-            const char* err_msg = "Training failed";
-            uint8_t err_buf[8];
-            write_be32(err_buf, 1);
-            write_be32(err_buf + 4, (uint32_t)strlen(err_msg));
-            std::vector<uint8_t> body;
-            body.insert(body.end(), err_buf, err_buf + 8);
-            body.insert(body.end(), err_msg, err_msg + strlen(err_msg));
-            send_message(sock, INIT_FAILED, body.data(), (uint32_t)body.size());
+            LOGERR("Full map training failed");
+            send_init_failed(sock, "Full map training failed");
             closesocket(sock); WSACleanup(); return 1;
         }
+        LOG("Full map trained");
 
+        // --- Save full cache immediately (before cave training changes transform state) ---
         if (!params.cacheFilePath.empty()) {
             size_t lastSep = params.cacheFilePath.find_last_of("\\/");
             if (lastSep != std::string::npos) {
@@ -158,6 +226,35 @@ int main(int argc, char* argv[]) {
                 CreateDirectoryA(dir.c_str(), nullptr);
             }
             matcher->save_cache(params.cacheFilePath);
+        }
+
+        // --- Train cave-only cache if dual-cache mode ---
+        bool cave_trained = false;
+        if (sub_count > 1 && !params.caveCacheFilePath.empty()) {
+            auto* sift = dynamic_cast<SiftMatcher*>(matcher.get());
+            if (sift) {
+                int cave_offset = sub_heights[0] * map_w;
+                int cave_height = map_h - sub_heights[0];
+                if (cave_height > 0 && cave_offset < (int)pixels_len) {
+                    if (!sift->train_cave(map_pixels + cave_offset, map_w, cave_height)) {
+                        LOGERR("Cave-only training failed, continuing with single cache");
+                    } else {
+                        LOG("Cave-only trained: %zu features", sift->cache_cave_.keypoints.size());
+                        // Save cave cache (temporarily swap persistent_mat to cave descriptors)
+                        cv::Mat saved = sift->transform->persistent_mat;
+                        sift->transform->persistent_mat = sift->cache_cave_.descriptors;
+                        sift->save_cave_cache(params.caveCacheFilePath);
+                        sift->transform->persistent_mat = saved;  // restore full descriptors
+                        cave_trained = true;
+                    }
+                }
+            }
+        }
+
+        // --- If only single cache mode, save was done above ---
+        if (cave_trained) {
+            LOG("Dual cache saved: full=%s cave=%s",
+                params.cacheFilePath.c_str(), params.caveCacheFilePath.c_str());
         }
     }
 

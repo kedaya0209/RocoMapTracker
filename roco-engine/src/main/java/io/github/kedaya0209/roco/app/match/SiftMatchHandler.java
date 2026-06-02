@@ -3,7 +3,10 @@ package io.github.kedaya0209.roco.app.match;
 import net.jcip.annotations.NotThreadSafe;
 import io.github.kedaya0209.roco.app.config.SiftConfig;
 import io.github.kedaya0209.roco.app.config.SocketConfig;
+import io.github.kedaya0209.roco.app.context.ResourceConfigContext;
 import io.github.kedaya0209.roco.app.hook.HookEventType;
+import io.github.kedaya0209.roco.app.map.model.CompositeMapMetadata;
+import io.github.kedaya0209.roco.app.utils.ResourceUtils;
 import io.github.kedaya0209.roco.app.hook.event.StatusCarouselEvent;
 import io.github.kedaya0209.roco.app.process.NativeProcess;
 import io.github.kedaya0209.roco.app.process.NativeProcessFactory;
@@ -13,6 +16,7 @@ import io.github.kedaya0209.roco.app.socket.SocketServer;
 import io.github.kedaya0209.roco.app.socket.SocketSession;
 import lombok.extern.slf4j.Slf4j;
 
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Set;
@@ -168,12 +172,13 @@ public class SiftMatchHandler {
         log.info("收到 REQUEST_CONFIG，发送参数...");
         try {
             SiftVariant variant = launchParams.get() != null ? launchParams.get() : SiftVariant.PCA_ULTRA;
-            // 选择缓存后缀
             String cacheSuffix = variant.cacheSuffix();
-            byte[] body = encodeConfig(variant.variantOrdinal(), cacheSuffix, 0);
+            // Dual cache: cave suffix = cache suffix + "_cave"
+            String caveCacheSuffix = cacheSuffix + "_cave";
+            byte[] body = encodeConfig(variant.variantOrdinal(), cacheSuffix, caveCacheSuffix, 0);
             session.send(MSG_CONFIG_DATA, body);
-            log.info("CONFIG_DATA 已发送 ({} 字节, algoKind={}, cache={})",
-                    body.length, SiftConfig.ALGO_KIND, cacheSuffix);
+            log.info("CONFIG_DATA 已发送 ({} 字节, algoKind={}, cache={}, cave={})",
+                    body.length, SiftConfig.ALGO_KIND, cacheSuffix, caveCacheSuffix);
         } catch (RuntimeException e) {
             log.error("序列化 CONFIG_DATA 失败", e);
             byte[] errBody = ("Config error: " + e.getMessage())
@@ -183,18 +188,49 @@ public class SiftMatchHandler {
     }
 
     private void handleRequestMap(SocketSession session) {
+        if (ResourceConfigContext.isMultiMapActive()) {
+            handleRequestMultiMap(session);
+            return;
+        }
         log.info("收到 REQUEST_MAP，加载地图...");
         try {
             MapImageLoader.ImageInfo info = MapImageLoader.loadImage();
-            int bodyLength = 12 + info.width() * info.height();
+            int subImageCount = MapImageLoader.getSubImageCount(info.height());
+            int bodyLength = 16 + subImageCount * 4 + info.width() * info.height();
             session.sendStreaming(MSG_MAP_DATA, bodyLength, out -> {
-                MapImageLoader.writeStreaming(info, out);
+                MapImageLoader.writeStreamingMulti(info, subImageCount, out);
             });
-            log.info("地图数据已发送: {}x{} ({} 灰度像素)",
-                    info.width(), info.height(), info.width() * info.height());
+            log.info("地图数据已发送: {}x{} ({} 子图, {} 灰度像素)",
+                    info.width(), info.height(), subImageCount, info.width() * info.height());
         } catch (Exception e) {
             log.error("加载地图数据失败", e);
             byte[] errBody = ("Map load error: " + e.getMessage())
+                    .getBytes(StandardCharsets.UTF_8);
+            session.send(MSG_INIT_FAILED, errBody);
+        }
+    }
+
+    private void handleRequestMultiMap(SocketSession session) {
+        log.info("收到 REQUEST_MAP (MultiMap)，加载子图...");
+        try {
+            CompositeMapMetadata metadata;
+            try (InputStream is = ResourceUtils.getResourceStream(
+                    ResourceConfigContext.getMultiMapMetadata())) {
+                metadata = CompositeMapMetadata.load(is);
+            }
+            int w = metadata.width();
+            int totalH = metadata.totalHeight();
+            var subs = metadata.subImages();
+            int subCount = subs.size();
+            int bodyLength = 16 + subCount * 4 + w * totalH;
+
+            session.sendStreaming(MSG_MAP_DATA, bodyLength, out -> {
+                MapImageLoader.writeStreamingMultiFromMetadata(metadata, out);
+            });
+            log.info("MultiMap 数据已发送: {}x{} ({} 子图)", w, totalH, subCount);
+        } catch (Exception e) {
+            log.error("加载 MultiMap 地图数据失败", e);
+            byte[] errBody = ("MultiMap map load error: " + e.getMessage())
                     .getBytes(StandardCharsets.UTF_8);
             session.send(MSG_INIT_FAILED, errBody);
         }

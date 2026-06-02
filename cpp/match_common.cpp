@@ -431,8 +431,9 @@ double detect_arrow_angle_hsv(const uint8_t* bgra_data, int w, int h,
 // ============================================================================
 std::vector<uint8_t> serialize_result(bool success, double x, double y, double angle,
                                       float t_minimap_ms, float t_extract_ms,
-                                      float t_matching_ms, float t_arrow_ms) {
-    std::vector<uint8_t> buf(41);
+                                      float t_matching_ms, float t_arrow_ms,
+                                      int cache_type) {
+    std::vector<uint8_t> buf(42);
     buf[0] = success ? 1 : 0;
     write_double(buf.data() + 1, x);
     write_double(buf.data() + 9, y);
@@ -441,6 +442,7 @@ std::vector<uint8_t> serialize_result(bool success, double x, double y, double a
     write_float_be(buf.data() + 29, t_extract_ms);
     write_float_be(buf.data() + 33, t_matching_ms);
     write_float_be(buf.data() + 37, t_arrow_ms);
+    buf[41] = (uint8_t)(cache_type & 0xFF);
     return buf;
 }
 
@@ -482,15 +484,25 @@ bool parse_config_data(const std::vector<uint8_t>& body, AlgoParams& p) {
     int32_t cachePathLen = (int32_t)read_be32(body.data() + off); off += 4;
     if (cachePathLen < 0 || off + cachePathLen > body.size()) return false;
     p.cacheFilePath = std::string((const char*)body.data() + off, cachePathLen);
+    off += cachePathLen;
 
-    LOG("CONFIG: kind=%d SIFT(%d,%d,%d,%.4f,%.1f,%.1f) MATCH(%.2f,%d,%d) FLANN(%d,%d) RANSAC(%.1f,%d,%.2f) TILE(%d,%d,%lld,%.1f) cache=%s",
+    // Second cache path (cave-only for dual-cache SIFT)
+    if (off + 4 <= body.size()) {
+        int32_t cavePathLen = (int32_t)read_be32(body.data() + off); off += 4;
+        if (cavePathLen > 0 && off + cavePathLen <= body.size()) {
+            p.caveCacheFilePath = std::string((const char*)body.data() + off, cavePathLen);
+            off += cavePathLen;
+        }
+    }
+
+    LOG("CONFIG: kind=%d SIFT(%d,%d,%d,%.4f,%.1f,%.1f) MATCH(%.2f,%d,%d) FLANN(%d,%d) RANSAC(%.1f,%d,%.2f) TILE(%d,%d,%lld,%.1f) cache=%s cave=%s",
         (int)p.kind,
         (int)p.siftVariant, (int)p.nfeatures, (int)p.nOctaveLayers, p.contrastThreshold, p.edgeThreshold, p.sigma,
         p.matchRatioThreshold, (int)p.matchMinCount, (int)p.searchRadius,
         (int)p.flannKDTreeCount, (int)p.flannSearchChecks,
         p.ransacReprojThreshold, (int)p.ransacMaxIters, p.ransacConfidence,
         (int)p.tileSize, (int)p.tileOverlap, (long long)p.largeMapThreshold, p.dedupDistance,
-        p.cacheFilePath.c_str());
+        p.cacheFilePath.c_str(), p.caveCacheFilePath.c_str());
 
     return true;
 }
@@ -603,7 +615,27 @@ int run_match_loop(SOCKET sock, AlgoParams& params, MatcherBase& matcher,
             match_res = matcher.match(sift_data, sift_w, sift_h, hint_x, hint_y);
             match_res.t_minimap_ms = t_minimap;
 
-            if (match_res.success) success_count++;
+            if (match_res.success) {
+                success_count++;
+
+                // 判断匹配结果属于哪个子图（大陆还是洞穴）
+                if (!params.subImageHeights.empty()) {
+                    int accumY = 0;
+                    int subIdx = 0;
+                    for (size_t i = 0; i < params.subImageHeights.size(); i++) {
+                        if (match_res.y >= accumY && match_res.y < accumY + params.subImageHeights[i]) {
+                            subIdx = (int)i;
+                            break;
+                        }
+                        accumY += params.subImageHeights[i];
+                    }
+                    if (subIdx == 0) {
+                        LOG("当前位置: 大陆 (y=%.1f, subImage=%d)", match_res.y, subIdx);
+                    } else {
+                        LOG("当前位置: 洞穴%d (y=%.1f, subImage=%d)", subIdx, match_res.y, subIdx);
+                    }
+                }
+            }
 
             // 4. Arrow direction detection
             auto t_arrow_start = std::chrono::steady_clock::now();
@@ -615,7 +647,8 @@ int run_match_loop(SOCKET sock, AlgoParams& params, MatcherBase& matcher,
             // 5. Send result
             auto result_buf = serialize_result(match_res.success, match_res.x, match_res.y,
                 arrow_angle,
-                match_res.t_minimap_ms, match_res.t_extract_ms, match_res.t_matching_ms, t_arrow_ms);
+                match_res.t_minimap_ms, match_res.t_extract_ms, match_res.t_matching_ms, t_arrow_ms,
+                match_res.cache_type);
             if (!send_message(sock, MATCH_RESULT, result_buf.data(), (uint32_t)result_buf.size())) {
                 LOG("Socket send failed (RESULT)");
                 break;

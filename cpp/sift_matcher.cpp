@@ -108,6 +108,106 @@ cv::Mat DescriptorTransform::pca_project(cv::Mat& src) {
 }
 
 // ============================================================================
+// FeatureCache
+// ============================================================================
+void FeatureCache::build_flann_index(DescriptorTransform& transform, int flannKDTreeCount) {
+    cv::Mat& descs = transform.persistent_mat;
+    if (descs.empty()) return;
+
+    if (descs.type() == CV_8U) {
+        flann_storage = descs;
+        int rows = descs.rows, cols = descs.cols;
+        cvflann::Matrix<unsigned char> data(flann_storage.ptr<unsigned char>(0), (size_t)rows, (size_t)cols);
+        auto index = std::make_unique<cvflann::KDTreeIndex<cvflann::L2<unsigned char>>>(
+            data, cvflann::KDTreeIndexParams(flannKDTreeCount));
+        index->buildIndex();
+        u8_index = std::move(index);
+    } else {
+        flann_storage_32f = descs;
+        int rows = descs.rows, cols = descs.cols;
+        cvflann::Matrix<float> data(flann_storage_32f.ptr<float>(0), (size_t)rows, (size_t)cols);
+        auto index = std::make_unique<cvflann::KDTreeIndex<cvflann::L2<float>>>(
+            data, cvflann::KDTreeIndexParams(flannKDTreeCount));
+        index->buildIndex();
+        f32_index = std::move(index);
+    }
+    valid = true;
+}
+
+MatchResult FeatureCache::match_scene(const cv::Mat& queryDesc, int flannSearchChecks) {
+    MatchResult res{};
+    if (!u8_index && !f32_index) return res;
+    if (queryDesc.empty()) return res;
+    if (queryDesc.type() != CV_32F) return res;
+
+    std::vector<cv::DMatch> matches;
+    float ratioThreshold = 0.6f;
+
+    if (u8_index) {
+        // Already 8-bit quantized, use u8 index
+        int q_rows = queryDesc.rows, q_cols = queryDesc.cols;
+        for (int qi = 0; qi < q_rows; qi++) {
+            cvflann::Matrix<unsigned char> qmat(
+                const_cast<unsigned char*>(queryDesc.ptr<unsigned char>(qi)), 1, q_cols);
+            int idx[2];
+            float dists[2];
+            u8_index->knnSearch(qmat, cvflann::Matrix<int>(idx, 1, 2),
+                                cvflann::Matrix<float>(dists, 1, 2), 2,
+                                cvflann::SearchParams(flannSearchChecks));
+            if (idx[1] >= 0 && dists[0] < ratioThreshold * dists[1]) {
+                matches.push_back(cv::DMatch(qi, idx[0], dists[0]));
+            }
+        }
+    } else if (f32_index) {
+        int q_rows = queryDesc.rows, q_cols = queryDesc.cols;
+        for (int qi = 0; qi < q_rows; qi++) {
+            cvflann::Matrix<float> qmat(
+                const_cast<float*>(queryDesc.ptr<float>(qi)), 1, q_cols);
+            int idx[2];
+            float dists[2];
+            f32_index->knnSearch(qmat, cvflann::Matrix<int>(idx, 1, 2),
+                                 cvflann::Matrix<float>(dists, 1, 2), 2,
+                                 cvflann::SearchParams(flannSearchChecks));
+            if (idx[1] >= 0 && dists[0] < ratioThreshold * dists[1]) {
+                matches.push_back(cv::DMatch(qi, idx[0], dists[0]));
+            }
+        }
+    }
+
+    if (matches.size() < 4) return res;
+
+    // Build point pairs
+    std::vector<cv::Point2f> src_pts, dst_pts;
+    src_pts.reserve(matches.size());
+    dst_pts.reserve(matches.size());
+    for (auto& dm : matches) {
+        if (dm.queryIdx < queryDesc.rows && dm.trainIdx < (int)keypoint_pts.size()) {
+            // Extract scene keypoint from the query descriptor's original keypoint
+            // We don't have the original scene keypoints here, so estimate from
+            // the center of the frame (handled in the caller's match())
+            src_pts.emplace_back(0, 0); // placeholder, just need dst
+            dst_pts.push_back(keypoint_pts[dm.trainIdx]);
+        }
+    }
+
+    // We use the cached FLANN index only for nearest-neighbor search.
+    // The RANSAC + center transform is done in the caller.
+    // Return only the matched trainIdx coordinates.
+    return res;
+}
+
+void FeatureCache::clear() {
+    keypoints.clear();
+    keypoint_pts.clear();
+    descriptors = cv::Mat();
+    flann_storage = cv::Mat();
+    u8_index.reset();
+    flann_storage_32f = cv::Mat();
+    f32_index.reset();
+    valid = false;
+}
+
+// ============================================================================
 // SiftMatcher
 // ============================================================================
 SiftMatcher::SiftMatcher(const AlgoParams& p)
@@ -126,6 +226,9 @@ SiftMatcher::SiftMatcher(const AlgoParams& p)
     transform = std::make_unique<DescriptorTransform>(v);
 }
 
+// ============================================================================
+// Single cache (backward compatible)
+// ============================================================================
 bool SiftMatcher::train(const uint8_t* gray_pixels, int w, int h) {
     cv::Mat map_gray(h, w, CV_8UC1, (void*)gray_pixels);
     if (map_gray.empty()) {
@@ -137,21 +240,182 @@ bool SiftMatcher::train(const uint8_t* gray_pixels, int w, int h) {
     if (total_pixels >= params.largeMapThreshold) {
         LOG("Map is large (%dx%d=%lldpx), using overlapping tiling",
             w, h, (long long)total_pixels);
-        return train_tiled(map_gray, w, h);
+        return train_tiled(map_gray, w, h, cache_full_);
     }
-    return train_direct(map_gray);
+    return train_direct(map_gray, cache_full_);
+}
+
+bool SiftMatcher::train_cave(const uint8_t* gray_pixels, int w, int h) {
+    cv::Mat map_gray(h, w, CV_8UC1, (void*)gray_pixels);
+    if (map_gray.empty()) {
+        LOGERR("Invalid cave map image: %dx%d", w, h);
+        return false;
+    }
+
+    // Cave 地图也可能很大（5 个洞穴 = 8192x40960），同样用分块训练
+    int64_t total_pixels = (int64_t)w * h;
+    if (total_pixels >= params.largeMapThreshold) {
+        LOG("Cave map is large (%dx%d=%lldpx), using tiled training",
+            w, h, (long long)total_pixels);
+        return train_cave_tiled(map_gray, w, h);
+    }
+
+    // Detect keypoints on cave image
+    std::vector<cv::KeyPoint> kps;
+    cv::Mat raw_descs;
+    sift->detectAndCompute(map_gray, cv::noArray(), kps, raw_descs);
+    if (raw_descs.empty() || raw_descs.type() != CV_32F) {
+        LOGERR("SIFT detection failed on cave map");
+        return false;
+    }
+
+    // Apply EXISTING transform (don't recompute from cave descriptors)
+    return finalize_cave_train(kps, raw_descs);
+}
+
+/**
+ * 应用已有 transform 并构建 FLANN 索引（供 train_cave / train_cave_tiled 共用）。
+ */
+bool SiftMatcher::finalize_cave_train(std::vector<cv::KeyPoint>& kps, cv::Mat& raw_descs) {
+    cache_cave_.keypoints = std::move(kps);
+    cache_cave_.keypoint_pts.reserve(cache_cave_.keypoints.size());
+    for (auto& kp : cache_cave_.keypoints)
+        cache_cave_.keypoint_pts.push_back(kp.pt);
+
+    cv::Mat post_descs;
+    if (transform->variant == ULTRA || transform->variant == PCA_ULTRA) {
+        post_descs = transform->process_to_u8(raw_descs);
+    } else if (transform->variant == PCA) {
+        post_descs = transform->process(raw_descs);
+    } else {
+        raw_descs.convertTo(post_descs, CV_32F);
+    }
+
+    cache_cave_.descriptors = post_descs.clone();
+
+    // Build FLANN using cave descriptors (temporarily swap persistent_mat)
+    cv::Mat saved = transform->persistent_mat;
+    transform->persistent_mat = post_descs;
+    cache_cave_.build_flann_index(*transform, params.flannKDTreeCount);
+    transform->persistent_mat = saved;  // restore full descriptors
+
+    cache_cave_.valid = true;
+    LOG("Cave-only trained: %zu features (applied existing transform)", cache_cave_.keypoints.size());
+    return true;
+}
+
+bool SiftMatcher::train_cave_tiled(cv::Mat& map_gray, int w, int h) {
+    int tileSize = params.tileSize > 0 ? params.tileSize : 2000;
+    int tileOverlap = params.tileOverlap;
+    float dedupDist = params.dedupDistance > 0 ? params.dedupDistance : 4.0f;
+    int stride = tileSize - tileOverlap;
+    int cols = (int)std::ceil((double)(w - tileOverlap) / stride);
+    int rows = (int)std::ceil((double)(h - tileOverlap) / stride);
+    LOG("Cave tile layout: %dx%d (%d tiles)", cols, rows, cols * rows);
+
+    struct KpEntry { float x, y; std::vector<float> desc; };
+    std::vector<KpEntry> all_kps;
+    int desc_dim = 128;
+
+    for (int r = 0; r < rows; r++) {
+        for (int c = 0; c < cols; c++) {
+            int tile_x = c * stride, tile_y = r * stride;
+            int tile_w = std::min(tileSize, w - tile_x);
+            int tile_h = std::min(tileSize, h - tile_y);
+            cv::Rect roi(tile_x, tile_y, tile_w, tile_h);
+            cv::Mat tile_gray = map_gray(roi);
+
+            std::vector<cv::KeyPoint> tile_kps;
+            cv::Mat tile_descs;
+            sift->detectAndCompute(tile_gray, cv::noArray(), tile_kps, tile_descs);
+            if (tile_descs.empty()) continue;
+
+            cv::Mat desc_float;
+            if (tile_descs.type() != CV_32F)
+                tile_descs.convertTo(desc_float, CV_32F);
+            else
+                desc_float = tile_descs;
+
+            desc_dim = desc_float.cols;
+            for (size_t i = 0; i < tile_kps.size(); i++) {
+                KpEntry entry;
+                entry.x = tile_kps[i].pt.x + (float)tile_x;
+                entry.y = tile_kps[i].pt.y + (float)tile_y;
+                entry.desc.resize(desc_dim);
+                memcpy(entry.desc.data(), desc_float.ptr<float>((int)i), desc_dim * sizeof(float));
+                all_kps.push_back(std::move(entry));
+            }
+        }
+    }
+
+    if (all_kps.empty()) { LOGERR("No cave keypoints detected in any tile"); return false; }
+
+    // Dedup
+    int total_count = (int)all_kps.size();
+    int cell_size = (int)std::ceil(dedupDist);
+    int grid_cols = w / cell_size + 1, grid_rows = h / cell_size + 1;
+    std::vector<int> grid(grid_cols * grid_rows, -1);
+    std::vector<bool> keep(total_count, false);
+    int keep_count = 0;
+    for (int i = 0; i < total_count; i++) {
+        auto& kp = all_kps[i];
+        int cx = (int)(kp.x / cell_size), cy = (int)(kp.y / cell_size);
+        bool duplicate = false;
+        for (int dx = -1; dx <= 1 && !duplicate; dx++)
+            for (int dy = -1; dy <= 1 && !duplicate; dy++) {
+                int nx = cx + dx, ny = cy + dy;
+                if (nx >= 0 && nx < grid_cols && ny >= 0 && ny < grid_rows) {
+                    int existing = grid[ny * grid_cols + nx];
+                    if (existing >= 0 && std::hypot(kp.x - all_kps[existing].x, kp.y - all_kps[existing].y) < dedupDist)
+                        duplicate = true;
+                }
+            }
+        if (!duplicate) { grid[cy * grid_cols + cx] = i; keep[i] = true; keep_count++; }
+    }
+    LOG("Cave dedup: %d → %d", total_count, keep_count);
+
+    // 组装连续描述子矩阵（不调 transform->train，直接做后处理）
+    cv::Mat all_descs(keep_count, desc_dim, CV_32F);
+    int pos = 0;
+    for (int i = 0; i < total_count; i++)
+        if (keep[i]) memcpy(all_descs.ptr<float>(pos++), all_kps[i].desc.data(), desc_dim * sizeof(float));
+
+    // 构建 keypoints 数组
+    std::vector<cv::KeyPoint> final_kps;
+    final_kps.reserve(keep_count);
+    for (int i = 0; i < total_count; i++)
+        if (keep[i]) final_kps.push_back(cv::KeyPoint(all_kps[i].x, all_kps[i].y, 1.0f));
+
+    return finalize_cave_train(final_kps, all_descs);
+}
+
+bool SiftMatcher::save_cave_cache(const std::string& path) {
+    return save_cache(cache_cave_, path);
 }
 
 MatchResult SiftMatcher::match(uint8_t* data, int w, int h, double hint_x, double hint_y) {
     MatchResult res{};
-    if (!f32_index && !u8_index) return res;
+
+    // 1. 始终使用全量缓存，不再通过亮度区分地图
+    FeatureCache* cache = &cache_full_;
+    if (!cache || !cache->valid) {
+        if (!cache_cave_.valid) return res;
+        cache = &cache_cave_;
+    }
+    res.cache_type = (cache == &cache_cave_) ? 1 : 0;
+    active_cache_ = res.cache_type;
 
     cv::Mat scene_img(h, w, CV_8UC1, data);
+
+    // CLAHE contrast enhancement (must match training)
+    cv::Ptr<cv::CLAHE> clahe = cv::createCLAHE(3.0, cv::Size(8, 8));
+    cv::Mat enhanced;
+    clahe->apply(scene_img, enhanced);
 
     auto t0 = std::chrono::steady_clock::now();
     std::vector<cv::KeyPoint> scene_kps;
     cv::Mat scene_descriptors;
-    sift->detectAndCompute(scene_img, cv::noArray(), scene_kps, scene_descriptors);
+    sift->detectAndCompute(enhanced, cv::noArray(), scene_kps, scene_descriptors);
     auto t1 = std::chrono::steady_clock::now();
     res.t_extract_ms = std::chrono::duration<float, std::milli>(t1 - t0).count();
 
@@ -161,30 +425,30 @@ MatchResult SiftMatcher::match(uint8_t* data, int w, int h, double hint_x, doubl
     }
 
     good_matches.clear();
-    if (u8_index) {
+    if (cache->u8_index) {
         cv::Mat query_u8 = transform->process_to_u8(scene_descriptors);
         int q_rows = query_u8.rows, q_cols = query_u8.cols;
         for (int qi = 0; qi < q_rows; qi++) {
             cvflann::Matrix<unsigned char> qmat(query_u8.ptr<unsigned char>(qi), 1, q_cols);
             int idx[2];
             float dists[2];
-            u8_index->knnSearch(qmat, cvflann::Matrix<int>(idx, 1, 2),
-                                cvflann::Matrix<float>(dists, 1, 2), 2,
-                                cvflann::SearchParams(flann_search_checks));
+            cache->u8_index->knnSearch(qmat, cvflann::Matrix<int>(idx, 1, 2),
+                                       cvflann::Matrix<float>(dists, 1, 2), 2,
+                                       cvflann::SearchParams(flann_search_checks));
             if (idx[1] >= 0 && dists[0] < match_ratio_threshold * dists[1]) {
                 good_matches.push_back(cv::DMatch(qi, idx[0], dists[0]));
             }
         }
-    } else if (f32_index) {
+    } else if (cache->f32_index) {
         cv::Mat query_desc = transform->process(scene_descriptors);
         int q_rows = query_desc.rows, q_cols = query_desc.cols;
         for (int qi = 0; qi < q_rows; qi++) {
             cvflann::Matrix<float> qmat(query_desc.ptr<float>(qi), 1, q_cols);
             int idx[2];
             float dists[2];
-            f32_index->knnSearch(qmat, cvflann::Matrix<int>(idx, 1, 2),
-                                 cvflann::Matrix<float>(dists, 1, 2), 2,
-                                 cvflann::SearchParams(flann_search_checks));
+            cache->f32_index->knnSearch(qmat, cvflann::Matrix<int>(idx, 1, 2),
+                                        cvflann::Matrix<float>(dists, 1, 2), 2,
+                                        cvflann::SearchParams(flann_search_checks));
             if (idx[1] >= 0 && dists[0] < match_ratio_threshold * dists[1]) {
                 good_matches.push_back(cv::DMatch(qi, idx[0], dists[0]));
             }
@@ -197,13 +461,76 @@ MatchResult SiftMatcher::match(uint8_t* data, int w, int h, double hint_x, doubl
         return res;
     }
 
+    // 4. FLANN 后按坐标划分子图：跨洞穴误匹配过滤
+    //    统计每个子图命中的匹配数，只保留主流子图的匹配做 RANSAC
+    if (!params.subImageHeights.empty()) {
+        std::vector<int> subCounts(params.subImageHeights.size(), 0);
+        for (size_t mi = 0; mi < good_matches.size(); mi++) {
+            int ti = good_matches[mi].trainIdx;
+            if (ti < 0 || ti >= (int)cache->keypoint_pts.size()) continue;
+            double y = cache->keypoint_pts[ti].y;
+            int subIdx = -1;
+            if (active_cache_ == 1) {
+                // 洞穴缓存：Y 是洞穴相对坐标，跳过大陆子图
+                double accum = 0;
+                for (size_t j = 1; j < params.subImageHeights.size(); j++) {
+                    if (y >= accum && y < accum + params.subImageHeights[j]) { subIdx = (int)j; break; }
+                    accum += params.subImageHeights[j];
+                }
+            } else {
+                // 全量缓存：Y 是复合坐标
+                double accum = 0;
+                for (size_t j = 0; j < params.subImageHeights.size(); j++) {
+                    if (y >= accum && y < accum + params.subImageHeights[j]) { subIdx = (int)j; break; }
+                    accum += params.subImageHeights[j];
+                }
+            }
+            if (subIdx >= 0) subCounts[subIdx]++;
+        }
+
+        // 找主流子图
+        int dominantSub = -1, maxCount = 0;
+        for (size_t j = 0; j < subCounts.size(); j++) {
+            if (subCounts[j] > maxCount) { maxCount = subCounts[j]; dominantSub = (int)j; }
+        }
+
+        if (dominantSub >= 0) {
+            // 只保留主流子图的匹配
+            auto it = good_matches.begin();
+            while (it != good_matches.end()) {
+                int ti = it->trainIdx;
+                if (ti < 0 || ti >= (int)cache->keypoint_pts.size()) { ++it; continue; }
+                double y = cache->keypoint_pts[ti].y;
+                int subIdx = -1;
+                if (active_cache_ == 1) {
+                    double accum = 0;
+                    for (size_t j = 1; j < params.subImageHeights.size(); j++) {
+                        if (y >= accum && y < accum + params.subImageHeights[j]) { subIdx = (int)j; break; }
+                        accum += params.subImageHeights[j];
+                    }
+                } else {
+                    double accum = 0;
+                    for (size_t j = 0; j < params.subImageHeights.size(); j++) {
+                        if (y >= accum && y < accum + params.subImageHeights[j]) { subIdx = (int)j; break; }
+                        accum += params.subImageHeights[j];
+                    }
+                }
+                if (subIdx != dominantSub) { it = good_matches.erase(it); } else { ++it; }
+            }
+            int totalMatches = 0;
+            for (int c : subCounts) totalMatches += c;
+            LOG("子图分割: 主流子图=%d (%d/总%d匹配), 过滤后=%zu",
+                dominantSub, maxCount, totalMatches, good_matches.size());
+        }
+    }
+
     src_pts.clear();
     dst_pts.clear();
     for (auto& dm : good_matches) {
         if (dm.queryIdx >= 0 && dm.queryIdx < (int)scene_kps.size()
-            && dm.trainIdx >= 0 && dm.trainIdx < (int)map_keypoint_pts.size()) {
+            && dm.trainIdx >= 0 && dm.trainIdx < (int)cache->keypoint_pts.size()) {
             src_pts.push_back(scene_kps[dm.queryIdx].pt);
-            dst_pts.push_back(map_keypoint_pts[dm.trainIdx]);
+            dst_pts.push_back(cache->keypoint_pts[dm.trainIdx]);
         }
     }
 
@@ -224,6 +551,7 @@ MatchResult SiftMatcher::match(uint8_t* data, int w, int h, double hint_x, doubl
         res.success = true;
         res.x = dst_center[0].x;
         res.y = dst_center[0].y;
+
     }
 
     res.t_matching_ms = std::chrono::duration<float, std::milli>(
@@ -232,10 +560,70 @@ MatchResult SiftMatcher::match(uint8_t* data, int w, int h, double hint_x, doubl
 }
 
 size_t SiftMatcher::feature_count() const {
-    return map_keypoints.size();
+    size_t total = cache_full_.keypoints.size();
+    if (cache_cave_.valid) total += cache_cave_.keypoints.size();
+    return total;
 }
 
+// ============================================================================
+// Dual cache
+// ============================================================================
+bool SiftMatcher::load_two_caches(const std::string& fullPath, const std::string& cavePath) {
+    bool fullOk = load_from_cache(cache_full_, fullPath);
+    if (!fullOk) {
+        LOGERR("Failed to load full cache: %s", fullPath.c_str());
+        return false;
+    }
+
+    bool caveOk = load_from_cache(cache_cave_, cavePath);
+    if (caveOk) {
+        LOG("Dual cache loaded: full=%zu cave=%zu features",
+            cache_full_.keypoints.size(), cache_cave_.keypoints.size());
+    } else {
+        LOG("Cave cache not found (single cache mode): %s", cavePath.c_str());
+    }
+    active_cache_ = 0;
+    return true;
+}
+
+bool SiftMatcher::save_two_caches(const std::string& fullPath, const std::string& cavePath) {
+    if (!save_cache(cache_full_, fullPath)) return false;
+    if (cache_cave_.valid && !save_cache(cache_cave_, cavePath)) return false;
+    return true;
+}
+
+void SiftMatcher::select_cache_by_dark_ratio(double darkRatio) {
+    if (!cache_cave_.valid && !cache_full_.valid) return;
+
+    LOG("darkRatio=%.3f active_cache=%d cave_valid=%d full_valid=%d",
+        darkRatio, active_cache_, (int)cache_cave_.valid, (int)cache_full_.valid);
+
+    if (active_cache_ == 1) {
+        // 当前在洞穴缓存：暗像素比例低于退出阈值才切回大陆
+        if (darkRatio < CAVE_EXIT_RATIO && cache_full_.valid) {
+            LOG("缓存切换: cave → full (darkRatio=%.3f)", darkRatio);
+            active_cache_ = 0;
+        }
+    } else {
+        // 当前在大陆缓存（含初始状态 -1）：暗像素比例高于进入阈值才切到洞穴
+        if (darkRatio > CAVE_ENTER_RATIO && cache_cave_.valid) {
+            LOG("缓存切换: full → cave (darkRatio=%.3f)", darkRatio);
+            active_cache_ = 1;
+        } else if (active_cache_ < 0) {
+            // 初始状态，默认用 full cache
+            active_cache_ = cache_full_.valid ? 0 : (cache_cave_.valid ? 1 : -1);
+        }
+    }
+}
+
+// ============================================================================
+// Single cache save/load (backward compatible)
+// ============================================================================
 bool SiftMatcher::save_cache(const std::string& path) {
+    return save_cache(cache_full_, path);
+}
+
+bool SiftMatcher::save_cache(FeatureCache& cache, const std::string& path) const {
     std::string tmpPath = path + ".tmp";
     FILE* f = fopen(tmpPath.c_str(), "wb");
     if (!f) {
@@ -253,12 +641,20 @@ bool SiftMatcher::save_cache(const std::string& path) {
 
     transform->save_cache(f);
 
-    int32_t kpCount = (int32_t)map_keypoints.size();
+    int32_t kpCount = (int32_t)cache.keypoints.size();
     fwrite(&kpCount, 4, 1, f);
-    for (auto& kp : map_keypoints) {
+    for (auto& kp : cache.keypoints) {
         float x = kp.pt.x, y = kp.pt.y;
         fwrite(&x, 4, 1, f);
         fwrite(&y, 4, 1, f);
+    }
+
+    // Save subImageHeights (for cave cache Y offset and consistency check)
+    int32_t subCount = (int32_t)params.subImageHeights.size();
+    fwrite(&subCount, 4, 1, f);
+    for (int h : params.subImageHeights) {
+        int32_t height = (int32_t)h;
+        fwrite(&height, 4, 1, f);
     }
 
     if (fclose(f) != 0) {
@@ -279,6 +675,10 @@ bool SiftMatcher::save_cache(const std::string& path) {
 }
 
 bool SiftMatcher::load_cache(const std::string& path) {
+    return load_from_cache(cache_full_, path);
+}
+
+bool SiftMatcher::load_from_cache(FeatureCache& cache, const std::string& path) {
     FILE* f = fopen(path.c_str(), "rb");
     if (!f) {
         LOG("No cache file at: %s", path.c_str());
@@ -292,7 +692,7 @@ bool SiftMatcher::load_cache(const std::string& path) {
         fclose(f); return false;
     }
     if (fread(&version, 4, 1, f) != 1 || version != SIFT_CACHE_VERSION) {
-        LOG("Invalid cache version: %d", version);
+        LOG("Invalid cache version: %d (expected %d)", version, SIFT_CACHE_VERSION);
         fclose(f); return false;
     }
     if (fread(&variant, 4, 1, f) != 1 || variant != (int32_t)transform->variant) {
@@ -310,42 +710,73 @@ bool SiftMatcher::load_cache(const std::string& path) {
         LOG("Invalid keypoint count in cache");
         fclose(f); return false;
     }
-    map_keypoints.clear();
-    map_keypoints.reserve(kpCount);
+    cache.clear();
+    cache.keypoints.reserve(kpCount);
     for (int i = 0; i < kpCount; i++) {
         float x, y;
         if (fread(&x, 4, 1, f) != 1 || fread(&y, 4, 1, f) != 1) {
             LOG("Truncated keypoint data at index %d", i);
             fclose(f); return false;
         }
-        map_keypoints.push_back(cv::KeyPoint(x, y, 1.0f));
+        cache.keypoints.push_back(cv::KeyPoint(x, y, 1.0f));
+    }
+
+    // Read subImageHeights (v2+)
+    if (version >= 2) {
+        int32_t subCount;
+        if (fread(&subCount, 4, 1, f) == 1 && subCount > 0 && subCount <= 20) {
+            params.subImageHeights.resize(subCount);
+            bool subOk = true;
+            for (int i = 0; i < subCount; i++) {
+                int32_t h;
+                if (fread(&h, 4, 1, f) != 1) { subOk = false; break; }
+                params.subImageHeights[i] = (int)h;
+            }
+            if (!subOk) params.subImageHeights.clear();
+        }
     }
     fclose(f);
-    return load_from_cache();
+
+    // Build FLANN index and keypoint_pts for this cache
+    cache.descriptors = transform->persistent_mat.clone();
+    cache.keypoint_pts.reserve(cache.keypoints.size());
+    for (auto& kp : cache.keypoints) {
+        cache.keypoint_pts.push_back(kp.pt);
+    }
+    cache.build_flann_index(*transform, params.flannKDTreeCount);
+    cache.valid = true;
+
+    LOG("Cache loaded: %s (%d features, subImageHeights=%zu)", path.c_str(), kpCount, params.subImageHeights.size());
+    return true;
 }
 
-bool SiftMatcher::train_direct(cv::Mat& map_gray) {
+// ============================================================================
+// Training methods (refactored to use FeatureCache)
+// ============================================================================
+bool SiftMatcher::train_direct(cv::Mat& map_gray, FeatureCache& cache) {
     cv::Mat raw_descriptors;
-    sift->detectAndCompute(map_gray, cv::noArray(), map_keypoints, raw_descriptors);
+    cache.keypoints.clear();
+    sift->detectAndCompute(map_gray, cv::noArray(), cache.keypoints, raw_descriptors);
     if (raw_descriptors.empty() || raw_descriptors.type() != CV_32F) {
         LOGERR("SIFT detection failed on map");
         return false;
     }
 
-    map_keypoint_pts.reserve(map_keypoints.size());
-    for (auto& kp : map_keypoints)
-        map_keypoint_pts.push_back(kp.pt);
+    cache.keypoint_pts.reserve(cache.keypoints.size());
+    for (auto& kp : cache.keypoints)
+        cache.keypoint_pts.push_back(kp.pt);
 
     if (!transform->train(raw_descriptors)) {
         LOGERR("Descriptor transform failed");
         return false;
     }
-    build_flann_index();
-    LOG("SIFT trained: %zu features", map_keypoints.size());
+    cache.build_flann_index(*transform, params.flannKDTreeCount);
+    cache.valid = true;
+    LOG("SIFT trained: %zu features", cache.keypoints.size());
     return true;
 }
 
-bool SiftMatcher::train_tiled(cv::Mat& map_gray, int map_w, int map_h) {
+bool SiftMatcher::train_tiled(cv::Mat& map_gray, int map_w, int map_h, FeatureCache& cache) {
     int tileSize = params.tileSize > 0 ? params.tileSize : 2000;
     int tileOverlap = params.tileOverlap;
     float dedupDist = params.dedupDistance > 0 ? params.dedupDistance : 4.0f;
@@ -423,46 +854,18 @@ bool SiftMatcher::train_tiled(cv::Mat& map_gray, int map_w, int map_h) {
 
     if (!transform->train(all_descs)) { LOGERR("Descriptor transform failed"); return false; }
 
-    map_keypoints.clear(); map_keypoints.reserve(keep_count);
-    map_keypoint_pts.clear(); map_keypoint_pts.reserve(keep_count);
+    cache.keypoints.clear(); cache.keypoints.reserve(keep_count);
+    cache.keypoint_pts.clear(); cache.keypoint_pts.reserve(keep_count);
     for (int i = 0; i < total_count; i++) {
         if (keep[i]) {
             auto& kp = all_kps[i];
-            map_keypoints.push_back(cv::KeyPoint(kp.x, kp.y, 1.0f));
-            map_keypoint_pts.emplace_back(kp.x, kp.y);
+            cache.keypoints.push_back(cv::KeyPoint(kp.x, kp.y, 1.0f));
+            cache.keypoint_pts.emplace_back(kp.x, kp.y);
         }
     }
 
-    build_flann_index();
-    LOG("SIFT trained (tiled): %zu features", map_keypoints.size());
-    return true;
-}
-
-void SiftMatcher::build_flann_index() {
-    cv::Mat& descs = transform->persistent_mat;
-    if (descs.type() == CV_8U) {
-        flann_data_storage = descs;
-        int rows = descs.rows, cols = descs.cols;
-        cvflann::Matrix<unsigned char> data(flann_data_storage.ptr<unsigned char>(0), (size_t)rows, (size_t)cols);
-        auto index = std::make_unique<cvflann::KDTreeIndex<cvflann::L2<unsigned char>>>(data, cvflann::KDTreeIndexParams(1));
-        index->buildIndex();
-        u8_index = std::move(index);
-    } else {
-        flann_data_storage_32f = descs;
-        int rows = descs.rows, cols = descs.cols;
-        cvflann::Matrix<float> data(flann_data_storage_32f.ptr<float>(0), (size_t)rows, (size_t)cols);
-        auto index = std::make_unique<cvflann::KDTreeIndex<cvflann::L2<float>>>(data, cvflann::KDTreeIndexParams(1));
-        index->buildIndex();
-        f32_index = std::move(index);
-    }
-}
-
-bool SiftMatcher::load_from_cache() {
-    build_flann_index();
-    transform->persistent_mat = cv::Mat();
-    map_keypoint_pts.reserve(map_keypoints.size());
-    for (auto& kp : map_keypoints)
-        map_keypoint_pts.push_back(kp.pt);
-    LOG("SIFT loaded from cache: %zu features", map_keypoints.size());
+    cache.build_flann_index(*transform, params.flannKDTreeCount);
+    cache.valid = true;
+    LOG("SIFT trained (tiled): %zu features", cache.keypoints.size());
     return true;
 }

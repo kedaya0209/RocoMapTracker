@@ -9,6 +9,7 @@ import io.github.kedaya0209.roco.app.config.DownloadConfig;
 import io.github.kedaya0209.roco.app.context.MapContext;
 import io.github.kedaya0209.roco.app.context.ResourceConfigContext;
 import io.github.kedaya0209.roco.app.context.ResourcePointContext;
+import io.github.kedaya0209.roco.app.map.model.CompositeMapMetadata;
 import io.github.kedaya0209.roco.app.hook.HookEventType;
 import io.github.kedaya0209.roco.app.hook.event.NotificationType;
 import io.github.kedaya0209.roco.app.hook.event.ProgressEvent;
@@ -278,9 +279,24 @@ public class ResourceInitService {
 
     /**
      * 内置资源元数据加载（无需校验，资源打包在 JAR 中）。
-     * 直接从 WorldMap_SIFT.png 头部 IHDR chunk 读取地图尺寸。
+     * 优先使用 MultiMap 元数据，回退到从 WorldMap_SIFT.png 头部 IHDR chunk 读取地图尺寸。
      */
     private void initInternalMapMetadata() throws Exception {
+        // MultiMap 检测：优先使用复合地图元数据
+        if (ResourceConfigContext.isMultiMapActive()) {
+            try (InputStream is = ResourceUtils.getResourceStream(
+                    ResourceConfigContext.getMultiMapMetadata())) {
+                CompositeMapMetadata metadata = CompositeMapMetadata.load(is);
+                int imgW = metadata.width();
+                int imgH = metadata.totalHeight();
+                log.info("内置地图元数据从 MultiMap_metadata.json 读取: {}x{} ({} 子图)",
+                        imgW, imgH, metadata.subImages().size());
+                MapContext.getInstance().init("G", imgW, imgH);
+                MapContext.getInstance().setMultiMapMetadata(metadata);
+            }
+            return;
+        }
+
         String mapPath = ResourceConfigContext.getSiftMap();
         int imgW, imgH;
 
@@ -308,6 +324,21 @@ public class ResourceInitService {
     }
 
     private void initMapMetadata() throws Exception {
+        // MultiMap 检测：优先使用复合地图元数据
+        if (ResourceConfigContext.isMultiMapActive()) {
+            try (InputStream is = ResourceUtils.getResourceStream(
+                    ResourceConfigContext.getMultiMapMetadata())) {
+                CompositeMapMetadata metadata = CompositeMapMetadata.load(is);
+                int imgW = metadata.width();
+                int imgH = metadata.totalHeight();
+                log.info("地图元数据从 MultiMap_metadata.json 读取: {}x{} ({} 子图)",
+                        imgW, imgH, metadata.subImages().size());
+                MapContext.getInstance().init("G", imgW, imgH);
+                MapContext.getInstance().setMultiMapMetadata(metadata);
+            }
+            return;
+        }
+
         String mapPath = ResourceConfigContext.getShowMap();
         int imgW, imgH;
 

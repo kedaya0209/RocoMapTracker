@@ -107,6 +107,10 @@ struct AlgoParams {
 
     // Paths
     std::string cacheFilePath;
+    std::string caveCacheFilePath;  // second cache path for cave-only mode
+
+    // Multi-subimage: sub-image boundary heights (for determining which sub-image a match falls in)
+    std::vector<int> subImageHeights;
 };
 
 // ============================================================================
@@ -179,6 +183,7 @@ struct MatchResult {
     float t_minimap_ms = 0;
     float t_extract_ms = 0;
     float t_matching_ms = 0;
+    int cache_type = -1;  // -1=none, 0=full, 1=cave — C++侧内部使用的缓存类型
 };
 
 // ============================================================================
@@ -187,7 +192,8 @@ struct MatchResult {
 // ============================================================================
 std::vector<uint8_t> serialize_result(bool success, double x, double y, double angle,
                                       float t_minimap_ms = 0, float t_extract_ms = 0,
-                                      float t_matching_ms = 0, float t_arrow_ms = 0);
+                                      float t_matching_ms = 0, float t_arrow_ms = 0,
+                                      int cache_type = -1);
 
 // ============================================================================
 // Abstract matcher interface

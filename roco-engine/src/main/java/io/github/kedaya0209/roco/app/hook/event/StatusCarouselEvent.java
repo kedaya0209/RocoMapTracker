@@ -28,6 +28,7 @@ public record StatusCarouselEvent(String key, String text, Type type) {
     public static final String KEY_SIFT = "sift";
     public static final String KEY_MINIMAP = "minimap";
     public static final String KEY_MATCH = "match";
+    public static final String KEY_CAVE = "cave";
 
     // ======================== Capture 状态 ========================
 
@@ -126,6 +127,16 @@ public record StatusCarouselEvent(String key, String text, Type type) {
             return null;
         }
         return new StatusCarouselEvent(KEY_MATCH, "匹配已开启", Type.SUCCESS);
+    }
+
+    // ======================== 洞穴状态 ========================
+
+    public static StatusCarouselEvent caveEntered(String caveName) {
+        return new StatusCarouselEvent(KEY_CAVE, "洞穴: " + (caveName != null ? caveName : "?"), Type.INFO);
+    }
+
+    public static StatusCarouselEvent caveExited() {
+        return new StatusCarouselEvent(KEY_CAVE, "大陆", Type.SUCCESS);
     }
 
     // ======================== 类型枚举 ========================

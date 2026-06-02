@@ -21,18 +21,19 @@ import java.util.List;
  * <pre>
  *     mvn compile exec:java -pl roco-map \
  *         -Dexec.mainClass="io.github.kedaya0209.roco.app.map.CaveImageFuser" \
- *         -Dexec.args="200 0.5"
+ *         -Dexec.args="200 0.7"
  * </pre>
- * 参数：extendPx（延伸像素数）=200, darkFactor（暗化系数）=0.5
+ * 参数：extendPx（延伸像素数）=200, darkFactor（暗化系数）=0.7
  */
 public class CaveImageFuser {
 
     private static final String MAIN_MAP = "卡洛西亚大陆.png";
     private static final int[][] DIRS = {{-1,0}, {1,0}, {0,-1}, {0,1}};
+    private static final int BRIGHTNESS_THRESHOLD = 20; // 无 alpha 透明时用亮度检测
 
     public static void main(String[] args) throws Exception {
         int extendPx = args.length > 0 ? Integer.parseInt(args[0]) : 200;
-        double darkFactor = args.length > 1 ? Double.parseDouble(args[1]) : 0.5;
+        double darkFactor = args.length > 1 ? Double.parseDouble(args[1]) : 0.7;
 
         // 定位 resources 目录
         String baseDir = System.getProperty("cave-fuser.resources",
@@ -95,15 +96,36 @@ public class CaveImageFuser {
 
         System.out.println("  尺寸: " + w + "x" + h);
 
-        // 1. 洞穴遮罩 (alpha > 0)
+        // 读取全图 ARGB
+        int[] caveARGB = new int[w * h];
+        caveImg.getRGB(0, 0, w, h, caveARGB, 0, w);
+
+        // 检查是否有 alpha 透明像素
+        boolean hasAlphaGap = false;
+        for (int i = 0; i < Math.min(caveARGB.length, 100000); i++) {
+            if (((caveARGB[i] >> 24) & 0xFF) == 0) { hasAlphaGap = true; break; }
+        }
+        System.out.println("  使用 " + (hasAlphaGap ? "alpha 透明检测" : "亮度检测 (黑底)"));
+
+        // 1. 洞穴遮罩：alpha>0 或 亮度>阈值（无透明时）
         boolean[] caveMask = new boolean[w * h];
         int cavePixels = 0;
         for (int y = 0; y < h; y++) {
             for (int x = 0; x < w; x++) {
-                if (((caveImg.getRGB(x, y) >> 24) & 0xFF) > 0) {
-                    caveMask[y * w + x] = true;
-                    cavePixels++;
+                int idx = y * w + x;
+                int argb = caveARGB[idx];
+                boolean isCave;
+                if (hasAlphaGap) {
+                    isCave = ((argb >> 24) & 0xFF) > 0;
+                } else {
+                    int r = (argb >> 16) & 0xFF;
+                    int g = (argb >> 8) & 0xFF;
+                    int b = argb & 0xFF;
+                    int lum = (r * 299 + g * 587 + b * 114) / 1000;
+                    isCave = lum > BRIGHTNESS_THRESHOLD;
                 }
+                caveMask[idx] = isCave;
+                if (isCave) cavePixels++;
             }
         }
         System.out.println("  洞穴像素: " + cavePixels + " / " + (w * h));
@@ -155,7 +177,6 @@ public class CaveImageFuser {
         System.out.println("  延伸像素: " + expanded + " (延伸 " + extendPx + "px)");
 
         // 3. 合成：新建输出图，膨胀区域铺暗化大陆图底，再盖原洞穴图
-        int darkDiv = Math.max(1, (int) Math.round(1.0 / darkFactor));
         BufferedImage outImg = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
 
         int basePixels = 0;
@@ -164,9 +185,10 @@ public class CaveImageFuser {
                 int idx = y * w + x;
                 if (dilateMask[idx]) {
                     int mainRGB = mainMap.getRGB(x, y);
-                    int r = ((mainRGB >> 16) & 0xFF) / darkDiv;
-                    int g = ((mainRGB >> 8) & 0xFF) / darkDiv;
-                    int b = (mainRGB & 0xFF) / darkDiv;
+                    double darkMul = 1.0 - darkFactor; // 0.5→50%亮度, 0.7→30%亮度
+                    int r = (int) (((mainRGB >> 16) & 0xFF) * darkMul);
+                    int g = (int) (((mainRGB >> 8) & 0xFF) * darkMul);
+                    int b = (int) ((mainRGB & 0xFF) * darkMul);
                     outImg.setRGB(x, y, (255 << 24) | (r << 16) | (g << 8) | b);
                     basePixels++;
                 }
@@ -178,11 +200,10 @@ public class CaveImageFuser {
             for (int x = 0; x < w; x++) {
                 int idx = y * w + x;
                 if (caveMask[idx]) {
-                    int caveARGB = caveImg.getRGB(x, y);
-                    int alpha = (caveARGB >> 24) & 0xFF;
-                    int caveR = (caveARGB >> 16) & 0xFF;
-                    int caveG = (caveARGB >> 8) & 0xFF;
-                    int caveB = caveARGB & 0xFF;
+                    int alpha = (caveARGB[idx] >> 24) & 0xFF;
+                    int caveR = (caveARGB[idx] >> 16) & 0xFF;
+                    int caveG = (caveARGB[idx] >> 8) & 0xFF;
+                    int caveB = caveARGB[idx] & 0xFF;
                     int mainARGB = outImg.getRGB(x, y);
                     int mainR = (mainARGB >> 16) & 0xFF;
                     int mainG = (mainARGB >> 8) & 0xFF;

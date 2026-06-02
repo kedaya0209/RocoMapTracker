@@ -45,19 +45,27 @@ public class SiftMatchProtocol {
      *   [8B]ransacReprojThreshold [4B]ransacMaxIters [8B]ransacConfidence
      *   [4B]tileSize [4B]tileOverlap [8B]largeMapThreshold [4B]dedupDistance
      *   [4B]cacheFilePathLen [NB]cacheFilePath(UTF-8)
+     *   [4B]caveCachePathLen [NB]caveCachePath(UTF-8)  // 0 length = no cave cache
      * </pre>
      */
-    public static byte[] encodeConfig(int variant, String cacheSuffix, int algoKind) {
+    public static byte[] encodeConfig(int variant, String cacheSuffix, String caveCacheSuffix, int algoKind) {
         String siftMapPath = ResourceConfigContext.getSiftMap();
         String cacheFilePath = FilePathUtil.getExternalFile(CACHE_PREFIX + siftMapPath + cacheSuffix).getAbsolutePath();
         byte[] cachePathBytes = cacheFilePath.getBytes(StandardCharsets.UTF_8);
+
+        byte[] cavePathBytes = null;
+        if (caveCacheSuffix != null && !caveCacheSuffix.isEmpty()) {
+            String caveFilePath = FilePathUtil.getExternalFile(CACHE_PREFIX + siftMapPath + caveCacheSuffix).getAbsolutePath();
+            cavePathBytes = caveFilePath.getBytes(StandardCharsets.UTF_8);
+        }
 
         int bodyLen = 4 + 4 + 4 + 4 + 8 + 8 + 8    // kind + variant + SIFT
                 + 8 + 4 + 4                          // MATCH
                 + 4 + 4                              // FLANN
                 + 8 + 4 + 8                          // RANSAC
                 + 4 + 4 + 8 + 4                      // TILE
-                + 4 + cachePathBytes.length;         // cache path
+                + 4 + cachePathBytes.length          // cache path
+                + 4 + (cavePathBytes != null ? cavePathBytes.length : 0); // cave cache path
 
         ByteBuffer buf = ByteBuffer.allocate(bodyLen).order(ByteOrder.BIG_ENDIAN);
 
@@ -88,6 +96,13 @@ public class SiftMatchProtocol {
 
         buf.putInt(cachePathBytes.length);
         buf.put(cachePathBytes);
+
+        // Second cache path (cave-only, 0 length = no cave cache)
+        int caveLen = cavePathBytes != null ? cavePathBytes.length : 0;
+        buf.putInt(caveLen);
+        if (cavePathBytes != null) {
+            buf.put(cavePathBytes);
+        }
 
         return buf.array();
     }
@@ -128,9 +143,9 @@ public class SiftMatchProtocol {
     }
 
     /**
-     * 解析 MATCH_RESULT 体，返回 MatchResult（含耗时统计）
+     * 解析 MATCH_RESULT 体，返回 MatchResult（含耗时统计 + 缓存类型）
      * <pre>
-     *   [1]success [8]x [8]y [8]angle [4]tMinimapMs [4]tExtractMs [4]tFlannMs
+     *   [1]success [8]x [8]y [8]angle [4]tMinimapMs [4]tExtractMs [4]tFlannMs [4]tArrowMs [1]cacheType
      * </pre>
      */
     public static MatchResult decodeMatchResult(byte[] body) {
@@ -144,7 +159,8 @@ public class SiftMatchProtocol {
         float tExtract = buf.getFloat();
         float tFlann = buf.getFloat();
         float tArrow = body.length >= 41 ? buf.getFloat() : 0;
-        return new MatchResult(success, x, y, angle, tMinimap, tExtract, tFlann, tArrow);
+        int cacheType = body.length >= 42 ? Byte.toUnsignedInt(buf.get()) : -1;
+        return new MatchResult(success, x, y, angle, tMinimap, tExtract, tFlann, tArrow, cacheType);
     }
 
     // ==================== 值对象 ====================
@@ -154,7 +170,8 @@ public class SiftMatchProtocol {
      */
     @ThreadSafe
     public record MatchResult(boolean success, double x, double y, double angle,
-                               float tMinimapMs, float tExtractMs, float tFlannMs, float tArrowMs) {
-        public static final MatchResult FAIL = new MatchResult(false, 0, 0, 0, 0, 0, 0, 0);
+                               float tMinimapMs, float tExtractMs, float tFlannMs, float tArrowMs,
+                               int cacheType) {
+        public static final MatchResult FAIL = new MatchResult(false, 0, 0, 0, 0, 0, 0, 0, -1);
     }
 }

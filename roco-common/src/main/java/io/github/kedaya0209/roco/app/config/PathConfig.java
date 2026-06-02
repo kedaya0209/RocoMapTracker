@@ -30,6 +30,8 @@ public final class PathConfig {
     public static final String MAP_RESOURCE_DIR = "/source/map/";
     public static final String SHOW_MAP = "/source/map/WorldMap_Show.png";
     public static final String SIFT_MAP = "/source/map/WorldMap_SIFT.png";
+    public static final String MULTI_MAP_METADATA = "/source/maps/MultiMap_metadata.json";
+    public static final String MAPS_DIR = "/source/maps/";
 
     // ============================================================
     // 图标
@@ -44,16 +46,6 @@ public final class PathConfig {
     public static final String RESOURCE_COLLECT_SET = "/source/point/collect_set.txt";
     public static final String RESOURCE_POINT_CONFIG_PATH = "/source/point/resource_config.json";
     public static final String INTERNAL_RESOURCE_POINT_CONFIG_PATH = "/source/point/internal_resource_point.json";
-
-    // ============================================================
-    // 插件数据
-    // ============================================================
-    public static final String RMT_DB = "/plugins/sniffer/rmt.db";
-
-    // ============================================================
-    // 模型文件
-    // ============================================================
-    public static final String MODEL_DIR = "/model/";
     // ============================================================
     // 配置文件
     // ============================================================

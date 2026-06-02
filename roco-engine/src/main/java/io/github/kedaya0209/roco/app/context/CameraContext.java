@@ -64,6 +64,7 @@ public class CameraContext {
 
     /**
      * 启用跟随模式时，立即缩放至 followScale 并居中玩家。
+     * offsetY 以拼接坐标存储，MapRenderer 中转换为子图局部坐标。
      */
     private void applyFollowViewport() {
         MapContext mm = MapContext.getInstance();
@@ -82,9 +83,8 @@ public class CameraContext {
     }
 
     /**
-     * 更新摄像机视口
-     * 启用跟随模式时，自动计算视口偏移量使玩家位于中心。
-     * 不覆盖 scale，缩放由 {@link MapContext#zoom} 统一管理。
+     * 更新摄像机视口。offsetY 以拼接坐标存储，
+     * MapRenderer 中会转换为子图局部坐标。
      */
     public void updateViewport() {
         MapContext mm = MapContext.getInstance();

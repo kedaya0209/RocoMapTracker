@@ -4,7 +4,8 @@ import net.jcip.annotations.NotThreadSafe;
 import java.util.Properties;
 
 /**
- * 玩家状态追踪配置持久化 
+ * 玩家状态追踪配置持久化
+ * 部分参数为热重载，需修改
  */
 @NotThreadSafe
 public final class PlayerConfig {

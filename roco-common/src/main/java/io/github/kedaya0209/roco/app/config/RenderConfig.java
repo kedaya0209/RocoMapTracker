@@ -68,6 +68,8 @@ public final class RenderConfig {
     public static int TOAST_DISPLAY_SEC = 3;
     /** 侧边栏滑入/滑出动画时长（毫秒） */
     public static int SIDEBAR_ANIM_MS = 250;
+    /** 洞穴模式下大陆瓦片背景透明度 */
+    public static double CAVE_MAINLAND_OPACITY = 0.3;
 
     public static void load(Properties prop) {
         ICON_SIZE = ConfigHelper.getDouble(prop, "icon.size", ICON_SIZE);
@@ -89,6 +91,7 @@ public final class RenderConfig {
         TOAST_FADE_IN_MS = ConfigHelper.getInt(prop, "toast.fade.in.ms", TOAST_FADE_IN_MS);
         TOAST_FADE_OUT_MS = ConfigHelper.getInt(prop, "toast.fade.out.ms", TOAST_FADE_OUT_MS);
         SIDEBAR_ANIM_MS = ConfigHelper.getInt(prop, "sidebar.anim.ms", SIDEBAR_ANIM_MS);
+        CAVE_MAINLAND_OPACITY = ConfigHelper.getDouble(prop, "cave.mainland.opacity", CAVE_MAINLAND_OPACITY);
     }
 
     public static void save(StringBuilder sb) {
@@ -125,6 +128,8 @@ public final class RenderConfig {
         sb.append("# Toast 显示停顿时长（秒）\n");
         sb.append("toast.display.sec=").append(TOAST_DISPLAY_SEC).append("\n");
         sb.append("# 侧边栏滑入/滑出动画时长（毫秒）\n");
-        sb.append("sidebar.anim.ms=").append(SIDEBAR_ANIM_MS).append("\n\n");
+        sb.append("sidebar.anim.ms=").append(SIDEBAR_ANIM_MS).append("\n");
+        sb.append("# 洞穴模式下大陆瓦片背景透明度\n");
+        sb.append("cave.mainland.opacity=").append(CAVE_MAINLAND_OPACITY).append("\n\n");
     }
 }

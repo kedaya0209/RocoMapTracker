@@ -2,6 +2,7 @@ package io.github.kedaya0209.roco.app.context;
 
 import io.github.kedaya0209.roco.app.config.PathConfig;
 import io.github.kedaya0209.roco.app.config.DownloadConfig;
+import io.github.kedaya0209.roco.app.utils.ResourceUtils;
 import lombok.Getter;
 import net.jcip.annotations.ThreadSafe;
 
@@ -27,6 +28,22 @@ public class ResourceConfigContext {
 
     public static String getSiftMap() {
         return getCurrentProfile().siftMap;
+    }
+
+    public static String getMultiMapMetadata() {
+        return PathConfig.MULTI_MAP_METADATA;
+    }
+
+    /**
+     * 检查 MultiMap 资源是否可用。
+     */
+    public static boolean isMultiMapActive() {
+        try {
+            ResourceUtils.getResourceStream(PathConfig.MULTI_MAP_METADATA).close();
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     public static String getShowMap() {
