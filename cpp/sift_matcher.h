@@ -49,7 +49,7 @@ private:
 // Cache file magic (SIFT-specific)
 // ============================================================================
 static constexpr uint32_t SIFT_CACHE_MAGIC = 0x53494654; // "SIFT"
-static constexpr int32_t SIFT_CACHE_VERSION = 1;
+static constexpr int32_t SIFT_CACHE_VERSION = 2;
 
 // ============================================================================
 // SiftMatcher
@@ -61,12 +61,11 @@ public:
     std::vector<cv::KeyPoint> map_keypoints;
     std::vector<cv::Point2f> map_keypoint_pts;
 
-    cv::Mat flann_data_storage;
-    std::unique_ptr<cvflann::KDTreeIndex<cvflann::L2<unsigned char>>> u8_index;
-    cv::Mat flann_data_storage_32f;
-    std::unique_ptr<cvflann::KDTreeIndex<cvflann::L2<float>>> f32_index;
+    // FLANN 索引（直接 cv::flann::Index，避免 FlannBasedMatcher 的 3 份内部拷贝）
+    std::unique_ptr<cv::flann::Index> flann_index;
 
     std::vector<cv::DMatch> good_matches;
+    std::vector<cv::DMatch> filtered_matches;
     std::vector<cv::Point2f> src_pts;
     std::vector<cv::Point2f> dst_pts;
 
@@ -75,6 +74,7 @@ public:
     double ransac_reproj_threshold = 10.0;
     int ransac_max_iters = 200;
     double ransac_confidence = 0.95;
+    int search_radius = 500;
     int flann_search_checks = 24;
 
     AlgoParams params;

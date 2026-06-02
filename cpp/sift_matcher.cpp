@@ -113,6 +113,7 @@ cv::Mat DescriptorTransform::pca_project(cv::Mat& src) {
 SiftMatcher::SiftMatcher(const AlgoParams& p)
     : match_ratio_threshold((float)p.matchRatioThreshold)
     , match_min_count(p.matchMinCount)
+    , search_radius(p.searchRadius)
     , ransac_reproj_threshold(p.ransacReprojThreshold)
     , ransac_max_iters(p.ransacMaxIters)
     , ransac_confidence(p.ransacConfidence)
@@ -133,18 +134,12 @@ bool SiftMatcher::train(const uint8_t* gray_pixels, int w, int h) {
         return false;
     }
 
-    int64_t total_pixels = (int64_t)w * h;
-    if (total_pixels >= params.largeMapThreshold) {
-        LOG("Map is large (%dx%d=%lldpx), using overlapping tiling",
-            w, h, (long long)total_pixels);
-        return train_tiled(map_gray, w, h);
-    }
     return train_direct(map_gray);
 }
 
 MatchResult SiftMatcher::match(uint8_t* data, int w, int h, double hint_x, double hint_y) {
     MatchResult res{};
-    if (!f32_index && !u8_index) return res;
+    if (!flann_index) return res;
 
     cv::Mat scene_img(h, w, CV_8UC1, data);
 
@@ -156,37 +151,32 @@ MatchResult SiftMatcher::match(uint8_t* data, int w, int h, double hint_x, doubl
     res.t_extract_ms = std::chrono::duration<float, std::milli>(t1 - t0).count();
 
     if (scene_descriptors.empty()) return res;
-    if (scene_descriptors.type() != CV_32F) {
-        scene_descriptors.convertTo(scene_descriptors, CV_32F);
+
+    // PCA 投影 + 量化（必须与训练时的变换一致）
+    cv::Mat query_desc;
+    if (transform->variant == ULTRA || transform->variant == PCA_ULTRA) {
+        cv::Mat q_u8 = transform->process_to_u8(scene_descriptors);
+        q_u8.convertTo(query_desc, CV_32F);
+    } else {
+        query_desc = transform->process(scene_descriptors);
     }
 
+    // knnSearch(2) + 手动 Lowe 比率测试
+    cv::Mat indices(query_desc.rows, 2, CV_32SC1);
+    cv::Mat dists(query_desc.rows, 2, CV_32FC1);
+    flann_index->knnSearch(query_desc, indices, dists, 2,
+        cv::flann::SearchParams(flann_search_checks, 0.0f, true));
+
     good_matches.clear();
-    if (u8_index) {
-        cv::Mat query_u8 = transform->process_to_u8(scene_descriptors);
-        int q_rows = query_u8.rows, q_cols = query_u8.cols;
-        for (int qi = 0; qi < q_rows; qi++) {
-            cvflann::Matrix<unsigned char> qmat(query_u8.ptr<unsigned char>(qi), 1, q_cols);
-            int idx[2];
-            float dists[2];
-            u8_index->knnSearch(qmat, cvflann::Matrix<int>(idx, 1, 2),
-                                cvflann::Matrix<float>(dists, 1, 2), 2,
-                                cvflann::SearchParams(flann_search_checks));
-            if (idx[1] >= 0 && dists[0] < match_ratio_threshold * dists[1]) {
-                good_matches.push_back(cv::DMatch(qi, idx[0], dists[0]));
-            }
-        }
-    } else if (f32_index) {
-        cv::Mat query_desc = transform->process(scene_descriptors);
-        int q_rows = query_desc.rows, q_cols = query_desc.cols;
-        for (int qi = 0; qi < q_rows; qi++) {
-            cvflann::Matrix<float> qmat(query_desc.ptr<float>(qi), 1, q_cols);
-            int idx[2];
-            float dists[2];
-            f32_index->knnSearch(qmat, cvflann::Matrix<int>(idx, 1, 2),
-                                 cvflann::Matrix<float>(dists, 1, 2), 2,
-                                 cvflann::SearchParams(flann_search_checks));
-            if (idx[1] >= 0 && dists[0] < match_ratio_threshold * dists[1]) {
-                good_matches.push_back(cv::DMatch(qi, idx[0], dists[0]));
+    for (int qi = 0; qi < query_desc.rows; qi++) {
+        int* idx = indices.ptr<int>(qi);
+        float* d = dists.ptr<float>(qi);
+        if (idx[1] >= 0) {
+            // FLANN 返回平方 L2 距离，需要开根号（与 FlannBasedMatcher::knnMatchImpl 一致）
+            float d0 = std::sqrt(d[0]);
+            float d1 = std::sqrt(d[1]);
+            if (d0 < match_ratio_threshold * d1) {
+                good_matches.push_back(cv::DMatch(qi, idx[0], d0));
             }
         }
     }
@@ -197,9 +187,36 @@ MatchResult SiftMatcher::match(uint8_t* data, int w, int h, double hint_x, doubl
         return res;
     }
 
+    // Spatial filter: 利用 hint 位置过滤远处误匹配
+    bool has_hint = !std::isnan(hint_x) && !std::isnan(hint_y)
+                 && hint_x >= -1e9 && hint_y >= -1e9;
+    filtered_matches.clear();
+    if (has_hint) {
+        for (auto& dm : good_matches) {
+            if (dm.trainIdx >= 0 && dm.trainIdx < (int)map_keypoint_pts.size()) {
+                auto& pt = map_keypoint_pts[dm.trainIdx];
+                double dist = std::hypot(pt.x - hint_x, pt.y - hint_y);
+                if (dist <= search_radius) {
+                    filtered_matches.push_back(dm);
+                }
+            }
+        }
+        if (filtered_matches.size() < 4) {
+            filtered_matches = good_matches; // fallback
+        }
+    } else {
+        filtered_matches = good_matches;
+    }
+
+    if (filtered_matches.size() < (size_t)match_min_count) {
+        res.t_matching_ms = std::chrono::duration<float, std::milli>(
+            std::chrono::steady_clock::now() - t1).count();
+        return res;
+    }
+
     src_pts.clear();
     dst_pts.clear();
-    for (auto& dm : good_matches) {
+    for (auto& dm : filtered_matches) {
         if (dm.queryIdx >= 0 && dm.queryIdx < (int)scene_kps.size()
             && dm.trainIdx >= 0 && dm.trainIdx < (int)map_keypoint_pts.size()) {
             src_pts.push_back(scene_kps[dm.queryIdx].pt);
@@ -392,29 +409,36 @@ bool SiftMatcher::train_tiled(cv::Mat& map_gray, int map_w, int map_h) {
     if (all_kps.empty()) { LOGERR("No keypoints detected in any tile"); return false; }
 
     int total_count = (int)all_kps.size();
-    int cell_size = (int)std::ceil(dedupDist);
-    int grid_cols = map_w / cell_size + 1, grid_rows = map_h / cell_size + 1;
-    std::vector<int> grid(grid_cols * grid_rows, -1);
     std::vector<bool> keep(total_count, false);
     int keep_count = 0;
 
-    for (int i = 0; i < total_count; i++) {
-        auto& kp = all_kps[i];
-        int cx = (int)(kp.x / cell_size), cy = (int)(kp.y / cell_size);
-        bool duplicate = false;
-        for (int dx = -1; dx <= 1 && !duplicate; dx++)
-            for (int dy = -1; dy <= 1 && !duplicate; dy++) {
-                int nx = cx + dx, ny = cy + dy;
-                if (nx >= 0 && nx < grid_cols && ny >= 0 && ny < grid_rows) {
-                    int existing = grid[ny * grid_cols + nx];
-                    if (existing >= 0 && std::hypot(kp.x - all_kps[existing].x, kp.y - all_kps[existing].y) < dedupDist)
-                        duplicate = true;
-                }
-            }
-        if (!duplicate) { grid[cy * grid_cols + cx] = i; keep[i] = true; keep_count++; }
-    }
+    if (cols * rows <= 1) {
+        // 单瓦片无需去重
+        for (int i = 0; i < total_count; i++) { keep[i] = true; }
+        keep_count = total_count;
+        LOG("Dedup: %d → %d (single tile, skipped)", total_count, keep_count);
+    } else {
+        int cell_size = (int)std::ceil(dedupDist);
+        int grid_cols = map_w / cell_size + 1, grid_rows = map_h / cell_size + 1;
+        std::vector<int> grid(grid_cols * grid_rows, -1);
 
-    LOG("Dedup: %d → %d", total_count, keep_count);
+        for (int i = 0; i < total_count; i++) {
+            auto& kp = all_kps[i];
+            int cx = (int)(kp.x / cell_size), cy = (int)(kp.y / cell_size);
+            bool duplicate = false;
+            for (int dx = -1; dx <= 1 && !duplicate; dx++)
+                for (int dy = -1; dy <= 1 && !duplicate; dy++) {
+                    int nx = cx + dx, ny = cy + dy;
+                    if (nx >= 0 && nx < grid_cols && ny >= 0 && ny < grid_rows) {
+                        int existing = grid[ny * grid_cols + nx];
+                        if (existing >= 0 && std::hypot(kp.x - all_kps[existing].x, kp.y - all_kps[existing].y) < dedupDist)
+                            duplicate = true;
+                    }
+                }
+            if (!duplicate) { grid[cy * grid_cols + cx] = i; keep[i] = true; keep_count++; }
+        }
+        LOG("Dedup: %d → %d", total_count, keep_count);
+    }
 
     cv::Mat all_descs(keep_count, desc_dim, CV_32F);
     int pos = 0;
@@ -440,21 +464,23 @@ bool SiftMatcher::train_tiled(cv::Mat& map_gray, int map_w, int map_h) {
 
 void SiftMatcher::build_flann_index() {
     cv::Mat& descs = transform->persistent_mat;
+    cv::Mat train_data;
     if (descs.type() == CV_8U) {
-        flann_data_storage = descs;
-        int rows = descs.rows, cols = descs.cols;
-        cvflann::Matrix<unsigned char> data(flann_data_storage.ptr<unsigned char>(0), (size_t)rows, (size_t)cols);
-        auto index = std::make_unique<cvflann::KDTreeIndex<cvflann::L2<unsigned char>>>(data, cvflann::KDTreeIndexParams(1));
-        index->buildIndex();
-        u8_index = std::move(index);
+        // ULTRA 变体：CV_8U → CV_32F（flann::Index 需要）
+        descs.convertTo(train_data, CV_32F);
     } else {
-        flann_data_storage_32f = descs;
-        int rows = descs.rows, cols = descs.cols;
-        cvflann::Matrix<float> data(flann_data_storage_32f.ptr<float>(0), (size_t)rows, (size_t)cols);
-        auto index = std::make_unique<cvflann::KDTreeIndex<cvflann::L2<float>>>(data, cvflann::KDTreeIndexParams(1));
-        index->buildIndex();
-        f32_index = std::move(index);
+        train_data = descs;
     }
+
+    // 直接创建 flann::Index — 仅 1 份 features_clone 拷贝（vs FlannBasedMatcher 的 3 份）
+    flann_index = std::make_unique<cv::flann::Index>(
+        train_data,
+        cv::flann::KDTreeIndexParams(1),
+        cvflann::FLANN_DIST_L2
+    );
+
+    // 不释放 persistent_mat — save_cache() 需要它写出缓存文件
+    // train_data 出作用域自动释放
 }
 
 bool SiftMatcher::load_from_cache() {
