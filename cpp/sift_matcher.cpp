@@ -271,6 +271,10 @@ bool SiftMatcher::save_cache(const std::string& path) {
 
     fwrite(&magic, 4, 1, f);
     fwrite(&version, 4, 1, f);
+
+    uint32_t config_hash = compute_config_hash();
+    fwrite(&config_hash, 4, 1, f);
+
     fwrite(&variant, 4, 1, f);
 
     transform->save_cache(f);
@@ -317,6 +321,17 @@ bool SiftMatcher::load_cache(const std::string& path) {
         LOG("Invalid cache version: %d", version);
         fclose(f); return false;
     }
+    // v7: config hash validation
+    uint32_t cached_hash = 0;
+    if (fread(&cached_hash, 4, 1, f) != 1) {
+        LOG("Truncated cache: missing config hash");
+        fclose(f); return false;
+    }
+    uint32_t current_hash = compute_config_hash();
+    if (cached_hash != current_hash) {
+        LOG("Config hash mismatch: cached=0x%08x current=0x%08x, retraining", cached_hash, current_hash);
+        fclose(f); return false;
+    }
     if (fread(&variant, 4, 1, f) != 1 || variant != (int32_t)transform->variant) {
         LOG("Cache variant mismatch: %d vs %d", variant, (int32_t)transform->variant);
         fclose(f); return false;
@@ -344,6 +359,36 @@ bool SiftMatcher::load_cache(const std::string& path) {
     }
     fclose(f);
     return load_from_cache();
+}
+
+uint32_t SiftMatcher::compute_config_hash() const {
+    uint8_t buf[128];
+    size_t off = 0;
+
+    auto w4 = [&](int32_t v) { memcpy(buf + off, &v, 4); off += 4; };
+    auto w8 = [&](double v) { memcpy(buf + off, &v, 8); off += 8; };
+    auto wf = [&](float v)  { memcpy(buf + off, &v, 4); off += 4; };
+
+    w4(params.siftVariant);
+    w4(params.nfeatures);
+    w4(params.nOctaveLayers);
+    w8(params.contrastThreshold);
+    w8(params.edgeThreshold);
+    w8(params.sigma);
+    w8(params.matchRatioThreshold);
+    w4(params.matchMinCount);
+    w4(params.searchRadius);
+    w4(params.flannKDTreeCount);
+    w4(params.flannSearchChecks);
+    w8(params.ransacReprojThreshold);
+    w4(params.ransacMaxIters);
+    w8(params.ransacConfidence);
+    w4(params.tileSize);
+    w4(params.tileOverlap);
+    w8((double)params.largeMapThreshold);
+    wf(params.dedupDistance);
+
+    return crc32(0, buf, (uInt)off);
 }
 
 bool SiftMatcher::train_direct(cv::Mat& map_gray) {
@@ -480,7 +525,7 @@ void SiftMatcher::build_flann_index() {
     // 直接创建 flann::Index — 仅 1 份 features_clone 拷贝（vs FlannBasedMatcher 的 3 份）
     flann_index = std::make_unique<cv::flann::Index>(
         train_data,
-        cv::flann::KDTreeIndexParams(1),
+        cv::flann::KDTreeIndexParams(params.flannKDTreeCount),
         cvflann::FLANN_DIST_L2
     );
 

@@ -2,6 +2,9 @@ package io.github.kedaya0209.roco.app.ui.component.setting;
 
 import atlantafx.base.theme.Styles;
 import io.github.kedaya0209.roco.app.capture.FullFrameControl;
+import io.github.kedaya0209.roco.app.hook.HookEventType;
+import io.github.kedaya0209.roco.app.hook.IHook;
+import io.github.kedaya0209.roco.app.hook.multicast.HookRegistry;
 import io.github.kedaya0209.roco.app.ui.service.VersionMode;
 import io.github.kedaya0209.roco.app.ui.service.ui.VersionManager;
 import io.github.kedaya0209.roco.app.ui.util.DialogUtils;
@@ -30,6 +33,7 @@ import net.jcip.annotations.NotThreadSafe;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 /**
  * IntelliJ IDEA 风格设置面板 — 左侧分类列表 + 右侧配置面板 + 底部操作栏。
@@ -40,7 +44,7 @@ import java.util.List;
  */
 @NotThreadSafe
 @Slf4j
-public class SettingsStage extends Stage {
+public class SettingsStage extends Stage implements IHook<Object> {
 
     private static volatile SettingsStage instance;
 
@@ -83,6 +87,9 @@ public class SettingsStage extends Stage {
 
         configManager.setPostApplyHook(() -> {
         });
+
+        // 监听外部匹配状态变更，同步设置面板的 CheckBox
+        HookRegistry.INSTANCE.register(this);
 
         // --- 根布局 ---
         VBox root = new VBox();
@@ -236,6 +243,23 @@ public class SettingsStage extends Stage {
      */
     public void showDialog(StackPane ownerRoot) {
         showDialog(ownerRoot, null);
+    }
+
+    @Override
+    public Set<HookEventType> supportedEvents() {
+        return Set.of(HookEventType.STATUS_CAROUSEL);
+    }
+    @Override
+    public void onEvent(HookEventType type, Object data) {
+        Platform.runLater(() -> {
+            Control ctrl = configManager.getControl("SIFT_MATCHING_ENABLED");
+            if (ctrl instanceof CheckBox cb) {
+                Object val = configManager.readField("SIFT_MATCHING_ENABLED");
+                if (val instanceof Boolean b) {
+                    cb.setSelected(b);
+                }
+            }
+        });
     }
 
     /**

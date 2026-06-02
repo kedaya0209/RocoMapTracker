@@ -49,7 +49,7 @@ private:
 // Cache file magic (SIFT-specific)
 // ============================================================================
 static constexpr uint32_t SIFT_CACHE_MAGIC = 0x53494654; // "SIFT"
-static constexpr int32_t SIFT_CACHE_VERSION = 2;
+static constexpr int32_t SIFT_CACHE_VERSION = 7; // v7: config CRC32 validation
 
 // ============================================================================
 // SiftMatcher
@@ -93,6 +93,7 @@ private:
     bool train_tiled(cv::Mat& map_gray, int map_w, int map_h);
     void build_flann_index();
     bool load_from_cache();
+    uint32_t compute_config_hash() const;
 };
 
 #endif // SIFT_MATCHER_H

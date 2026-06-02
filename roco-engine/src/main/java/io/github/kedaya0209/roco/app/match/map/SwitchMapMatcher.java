@@ -34,7 +34,7 @@ public class SwitchMapMatcher {
     private volatile SwitchCallback switchCallback;
 
     private volatile AlgoKindSwitchCallback algoKindCallback;
-    private volatile int lastAlgoKind = SiftConfig.ALGO_KIND;
+    private volatile int lastAlgoKind = 0;
 
     private SwitchMapMatcher() {
     }
@@ -76,7 +76,7 @@ public class SwitchMapMatcher {
 
     public void setAlgoKindCallback(AlgoKindSwitchCallback cb) {
         this.algoKindCallback = cb;
-        this.lastAlgoKind = SiftConfig.ALGO_KIND;
+        this.lastAlgoKind = 0;
     }
 
     /**
@@ -91,7 +91,7 @@ public class SwitchMapMatcher {
      * 自动跳过未变更的情况，防止每次应用设置时重复重启。
      */
     public void triggerAlgoKindRestart() {
-        int currentAlgoKind = SiftConfig.ALGO_KIND;
+        int currentAlgoKind = 0;
         if (currentAlgoKind == lastAlgoKind) return;
         lastAlgoKind = currentAlgoKind;
         AlgoKindSwitchCallback cb = algoKindCallback;

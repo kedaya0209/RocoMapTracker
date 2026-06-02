@@ -487,9 +487,14 @@ public class TitleBar extends HBox implements IHook<Object> {
     @Override
     public void onEvent(HookEventType type, Object data) {
         if (data instanceof StatusCarouselEvent event) {
-            Platform.runLater(() -> updateStatus(event));
-        } else if (data instanceof NavModeEvent navEvent) {
-            Platform.runLater(() -> setNavModeFromExternal(navEvent.enabled()));
+            Platform.runLater(() -> {
+                updateStatus(event);
+                // 同步匹配开关图标（当设置面板或侧边栏外部修改时）
+                boolean on = SiftConfig.SIFT_MATCHING_ENABLED;
+                setSvgFill(matchToggleBtn.getGraphic(), on ? "-color-accent-emphasis" : "-color-fg-muted");
+            });
+        } else if (data instanceof NavModeEvent(boolean enabled)) {
+            Platform.runLater(() -> setNavModeFromExternal(enabled));
         }
     }
 
