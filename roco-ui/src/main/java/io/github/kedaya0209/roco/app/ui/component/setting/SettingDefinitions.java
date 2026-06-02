@@ -19,6 +19,7 @@ import io.github.kedaya0209.roco.app.context.CameraContext;
 import io.github.kedaya0209.roco.app.hook.AppEvents;
 import io.github.kedaya0209.roco.app.hook.HookEventType;
 import io.github.kedaya0209.roco.app.hook.event.NavModeEvent;
+import io.github.kedaya0209.roco.app.hook.event.StatusCarouselEvent;
 import io.github.kedaya0209.roco.app.hook.multicast.HookRegistry;
 import io.github.kedaya0209.roco.app.match.map.SwitchMapMatcher;
 import io.github.kedaya0209.roco.app.ui.component.RouteManagerStage;
@@ -356,6 +357,12 @@ public final class SettingDefinitions {
                         doub("PLAYER_ANGLE_OUTLIER_THRESHOLD", "角度离群阈值(度)",
                                 () -> PlayerConfig.PLAYER_ANGLE_OUTLIER_THRESHOLD,
                                 v -> PlayerConfig.PLAYER_ANGLE_OUTLIER_THRESHOLD = (Double) v),
+                        doub("PLAYER_TELEPORT_THRESHOLD", "瞬移检测阈值",
+                                () -> PlayerConfig.PLAYER_TELEPORT_THRESHOLD,
+                                v -> PlayerConfig.PLAYER_TELEPORT_THRESHOLD = (Double) v),
+                        integer("PLAYER_MAP_LOST_THRESHOLD", "地图丢失容差(帧)",
+                                () -> PlayerConfig.PLAYER_MAP_LOST_THRESHOLD,
+                                v -> PlayerConfig.PLAYER_MAP_LOST_THRESHOLD = (Integer) v),
                         bool("DEFAULT_FOLLOW_MODE", "默认跟踪",
                                 () -> CameraContext.getInstance().setFollowMode(ViewConfig.DEFAULT_FOLLOW_MODE),
                                 () -> ViewConfig.DEFAULT_FOLLOW_MODE,
@@ -383,6 +390,15 @@ public final class SettingDefinitions {
                                 },
                                 () -> SiftConfig.MAP_MATCHAER,
                                 v -> SiftConfig.MAP_MATCHAER = (String) v),
+                        bool("SIFT_MATCHING_ENABLED", "启用SIFT匹配",
+                                () -> {
+                                    boolean now = SiftConfig.SIFT_MATCHING_ENABLED;
+                                    HookRegistry.INSTANCE.publish(HookEventType.STATUS_CAROUSEL,
+                                            now ? StatusCarouselEvent.matchingResumed()
+                                                 : StatusCarouselEvent.matchingPaused());
+                                },
+                                () -> SiftConfig.SIFT_MATCHING_ENABLED,
+                                v -> SiftConfig.SIFT_MATCHING_ENABLED = (Boolean) v),
                         integer("SIFT_N_FEATURES", "SIFT最大特征数", true,
                                 () -> SiftConfig.SIFT_N_FEATURES,
                                 v -> SiftConfig.SIFT_N_FEATURES = (Integer) v),
@@ -433,19 +449,7 @@ public final class SettingDefinitions {
                                 v -> SiftConfig.ROI_MAP_W = (Integer) v),
                         integer("ROI_MAP_H", "小地图ROI高度(万分比)", true,
                                 () -> SiftConfig.ROI_MAP_H,
-                                v -> SiftConfig.ROI_MAP_H = (Integer) v),
-                        long_("MATCH_TIMEOUT_MS", "匹配超时(ms)",
-                                () -> SiftConfig.MATCH_TIMEOUT_MS,
-                                v -> SiftConfig.MATCH_TIMEOUT_MS = (Long) v),
-                        integer("SIFT_TILE_SIZE", "训练瓦片尺寸(px)", true,
-                                () -> SiftConfig.SIFT_TILE_SIZE,
-                                v -> SiftConfig.SIFT_TILE_SIZE = (Integer) v),
-                        integer("SIFT_TILE_OVERLAP", "训练瓦片重叠(px)", true,
-                                () -> SiftConfig.SIFT_TILE_OVERLAP,
-                                v -> SiftConfig.SIFT_TILE_OVERLAP = (Integer) v),
-                        long_("SIFT_LARGE_MAP_THRESHOLD", "分块地图阈值(px²)", true,
-                                () -> SiftConfig.SIFT_LARGE_MAP_THRESHOLD,
-                                v -> SiftConfig.SIFT_LARGE_MAP_THRESHOLD = (Long) v)
+                                v -> SiftConfig.ROI_MAP_H = (Integer) v)
                 ),
                 cat("小地图", "/icon/minimap.svg",
                         integer("MM_SMALL_WIDTH", "缩小检测宽度(px)",

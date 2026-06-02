@@ -173,7 +173,7 @@ public class SiftMatchHandler {
             byte[] body = encodeConfig(variant.variantOrdinal(), cacheSuffix, 0);
             session.send(MSG_CONFIG_DATA, body);
             log.info("CONFIG_DATA 已发送 ({} 字节, algoKind={}, cache={})",
-                    body.length, SiftConfig.ALGO_KIND, cacheSuffix);
+                    body.length, 0, cacheSuffix);
         } catch (RuntimeException e) {
             log.error("序列化 CONFIG_DATA 失败", e);
             byte[] errBody = ("Config error: " + e.getMessage())

@@ -28,7 +28,7 @@ import javafx.scene.layout.StackPane;
  * 从 Sidebar 拆分，遵循单一职责原则。
  */
 @NotThreadSafe
-public class WikiUpdateManager {
+public class WikiUpdateManager implements SidebarComponent {
 
     private static final double ITEM_HEIGHT = UiConfig.WIKI_ITEM_HEIGHT;
 
@@ -147,8 +147,14 @@ public class WikiUpdateManager {
             progressBar.setProgress(t == 0 ? 0 : (double) c / t);
             updateProgressLabel(ctx.getStatusText(), c, t);
 
-            HookRegistry.INSTANCE.publish(HookEventType.INIT_PROGRESS,
-                    new ProgressEvent(t == 0 ? 0 : (double) c / t, "WIKI同步: " + ctx.getStatusText()));
+            if (t > 0 && c >= t) {
+                switchToNormalState();
+                HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION,
+                        new StatusEvent("WIKI资源同步完成", NotificationType.SUCCESS));
+            } else {
+                HookRegistry.INSTANCE.publish(HookEventType.INIT_PROGRESS,
+                        new ProgressEvent(t == 0 ? 0 : (double) c / t, "WIKI同步: " + ctx.getStatusText()));
+            }
         }));
     }
 

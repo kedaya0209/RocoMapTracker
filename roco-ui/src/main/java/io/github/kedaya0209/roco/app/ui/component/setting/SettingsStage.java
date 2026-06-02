@@ -2,6 +2,9 @@ package io.github.kedaya0209.roco.app.ui.component.setting;
 
 import atlantafx.base.theme.Styles;
 import io.github.kedaya0209.roco.app.capture.FullFrameControl;
+import io.github.kedaya0209.roco.app.hook.HookEventType;
+import io.github.kedaya0209.roco.app.hook.IHook;
+import io.github.kedaya0209.roco.app.hook.multicast.HookRegistry;
 import io.github.kedaya0209.roco.app.ui.service.VersionMode;
 import io.github.kedaya0209.roco.app.ui.service.ui.VersionManager;
 import io.github.kedaya0209.roco.app.ui.util.DialogUtils;
@@ -9,6 +12,7 @@ import io.github.kedaya0209.roco.app.ui.util.FxRippleUtil;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.collections.transformation.FilteredList;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Cursor;
@@ -29,6 +33,7 @@ import net.jcip.annotations.NotThreadSafe;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 /**
  * IntelliJ IDEA 风格设置面板 — 左侧分类列表 + 右侧配置面板 + 底部操作栏。
@@ -39,7 +44,7 @@ import java.util.List;
  */
 @NotThreadSafe
 @Slf4j
-public class SettingsStage extends Stage {
+public class SettingsStage extends Stage implements IHook<Object> {
 
     private static volatile SettingsStage instance;
 
@@ -83,6 +88,9 @@ public class SettingsStage extends Stage {
         configManager.setPostApplyHook(() -> {
         });
 
+        // 监听外部匹配状态变更，同步设置面板的 CheckBox
+        HookRegistry.INSTANCE.register(this);
+
         // --- 根布局 ---
         VBox root = new VBox();
         root.setStyle("-fx-background-color: -color-bg-default; -fx-background-radius: 12; " +
@@ -107,7 +115,50 @@ public class SettingsStage extends Stage {
         body.setPadding(new Insets(5, 15, 10, 15));
         VBox.setVgrow(body, Priority.ALWAYS);
 
-        categoryList = buildCategoryList();
+        // 搜索框
+        TextField searchField = new TextField();
+        searchField.setPromptText("搜索设置...");
+        searchField.getStyleClass().add("settings-search-field");
+        searchField.setPrefWidth(180);
+        VBox.setMargin(searchField, new Insets(0, 0, 5, 0));
+
+        // 分类列表（带 FilteredList 支持搜索过滤）
+        FilteredList<SettingCategory> filteredCategories = buildCategoryList();
+        categoryList = new ListView<>(filteredCategories);
+        categoryList.setFocusTraversable(false);
+        categoryList.setPrefWidth(180);
+        categoryList.setMaxWidth(180);
+        categoryList.setMinWidth(140);
+        categoryList.setCellFactory(_ -> new SettingCategoryCell());
+        categoryList.setStyle("-fx-background-color: transparent; -fx-border-color: transparent;");
+
+        categoryList.getSelectionModel().selectedItemProperty().addListener((_, _, selected) -> {
+            if (selected != null) {
+                selectedCategory = selected;
+                refreshCategory(selected);
+            }
+        });
+
+        // 搜索过滤
+        searchField.textProperty().addListener((_, _, text) -> {
+            String t = text.toLowerCase().trim();
+            filteredCategories.setPredicate(cat -> {
+                if (t.isEmpty()) return true;
+                if (cat.name().toLowerCase().contains(t)) return true;
+                return cat.fields().stream().anyMatch(f ->
+                        f.label().toLowerCase().contains(t) ||
+                        f.key().toLowerCase().contains(t));
+            });
+            if (!filteredCategories.isEmpty() && !filteredCategories.contains(selectedCategory)) {
+                categoryList.getSelectionModel().selectFirst();
+            }
+        });
+
+        // 左侧面板：搜索框 + 分类列表
+        VBox leftPanel = new VBox(searchField, categoryList);
+        VBox.setVgrow(categoryList, Priority.ALWAYS);
+        leftPanel.setPrefWidth(180);
+
         rightPanel = new StackPane();
         rightPanel.setStyle("-fx-background-color: -color-bg-inset; -fx-background-radius: 8; " +
                 "-fx-border-color: -color-border-muted; -fx-border-radius: 8; -fx-border-width: 1;");
@@ -120,7 +171,7 @@ public class SettingsStage extends Stage {
         StackPane.setAlignment(placeholder, Pos.CENTER);
         rightPanel.getChildren().add(placeholder);
 
-        body.getChildren().addAll(categoryList, rightPanel);
+        body.getChildren().addAll(leftPanel, rightPanel);
         HBox.setMargin(rightPanel, new Insets(0, 0, 0, 10));
 
         // --- 底部按钮栏 ---
@@ -192,6 +243,23 @@ public class SettingsStage extends Stage {
      */
     public void showDialog(StackPane ownerRoot) {
         showDialog(ownerRoot, null);
+    }
+
+    @Override
+    public Set<HookEventType> supportedEvents() {
+        return Set.of(HookEventType.STATUS_CAROUSEL);
+    }
+    @Override
+    public void onEvent(HookEventType type, Object data) {
+        Platform.runLater(() -> {
+            Control ctrl = configManager.getControl("SIFT_MATCHING_ENABLED");
+            if (ctrl instanceof CheckBox cb) {
+                Object val = configManager.readField("SIFT_MATCHING_ENABLED");
+                if (val instanceof Boolean b) {
+                    cb.setSelected(b);
+                }
+            }
+        });
     }
 
     /**
@@ -271,7 +339,7 @@ public class SettingsStage extends Stage {
     // 分类列表（ListView + AtlanFX 主题）
     // ================================================================
 
-    private ListView<SettingCategory> buildCategoryList() {
+    private FilteredList<SettingCategory> buildCategoryList() {
         List<SettingCategory> items = SettingDefinitions.CATEGORIES.stream()
                 .filter(c -> VersionManager.getInstance().getCurrentMode() == VersionMode.ADVANCED
                         || !"物资面板".equals(c.name()))
@@ -279,24 +347,7 @@ public class SettingsStage extends Stage {
         categoryItems.clear();
         categoryItems.addAll(items);
         ObservableList<SettingCategory> observableItems = FXCollections.observableArrayList(items);
-
-        ListView<SettingCategory> lv = new ListView<>(observableItems);
-        lv.setFocusTraversable(false);
-        lv.setPrefWidth(180);
-        lv.setMaxWidth(180);
-        lv.setMinWidth(140);
-        lv.setCellFactory(_ -> new SettingCategoryCell());
-
-        lv.getSelectionModel().selectedItemProperty().addListener((_, _, selected) -> {
-            if (selected != null) {
-                selectedCategory = selected;
-                refreshCategory(selected);
-            }
-        });
-
-        // 用透明背景，让 root 圆角 clip 生效
-        lv.setStyle("-fx-background-color: transparent; -fx-border-color: transparent;");
-        return lv;
+        return new FilteredList<>(observableItems, _ -> true);
     }
 
     private void selectCategory(SettingCategory cat) {

@@ -86,6 +86,8 @@ public final class RenderConfig {
         RIPPLE_STEP = ConfigHelper.getDouble(prop, "ripple.step", RIPPLE_STEP);
         HALO_BREATHE_FREQ = ConfigHelper.getDouble(prop, "halo.breathe.freq", HALO_BREATHE_FREQ);
         TOAST_DISPLAY_SEC = ConfigHelper.getInt(prop, "toast.display.sec", TOAST_DISPLAY_SEC);
+        TOAST_FADE_IN_MS = ConfigHelper.getInt(prop, "toast.fade.in.ms", TOAST_FADE_IN_MS);
+        TOAST_FADE_OUT_MS = ConfigHelper.getInt(prop, "toast.fade.out.ms", TOAST_FADE_OUT_MS);
         SIDEBAR_ANIM_MS = ConfigHelper.getInt(prop, "sidebar.anim.ms", SIDEBAR_ANIM_MS);
     }
 

@@ -448,7 +448,7 @@ std::vector<uint8_t> serialize_result(bool success, double x, double y, double a
 // CONFIG_DATA parser
 // ============================================================================
 bool parse_config_data(const std::vector<uint8_t>& body, AlgoParams& p) {
-    if (body.size() < 88) {
+    if (body.size() < 108) {
         LOGERR("CONFIG_DATA too short: %zu bytes", body.size());
         return false;
     }
@@ -472,17 +472,24 @@ bool parse_config_data(const std::vector<uint8_t>& body, AlgoParams& p) {
     p.ransacMaxIters   = (int32_t)read_be32(body.data() + off); off += 4;
     p.ransacConfidence = read_double(body.data() + off); off += 8;
 
+    // Tile training params
+    p.tileSize          = (int32_t)read_be32(body.data() + off); off += 4;
+    p.tileOverlap       = (int32_t)read_be32(body.data() + off); off += 4;
+    p.largeMapThreshold = (int64_t)read_be64(body.data() + off); off += 8;
+    p.dedupDistance     = read_float_be(body.data() + off); off += 4;
+
     if (off + 4 > body.size()) return false;
     int32_t cachePathLen = (int32_t)read_be32(body.data() + off); off += 4;
     if (cachePathLen < 0 || off + cachePathLen > body.size()) return false;
     p.cacheFilePath = std::string((const char*)body.data() + off, cachePathLen);
 
-    LOG("CONFIG: kind=%d SIFT(%d,%d,%d,%.4f,%.1f,%.1f) MATCH(%.2f,%d,%d) FLANN(%d,%d) RANSAC(%.1f,%d,%.2f) cache=%s",
+    LOG("CONFIG: kind=%d SIFT(%d,%d,%d,%.4f,%.1f,%.1f) MATCH(%.2f,%d,%d) FLANN(%d,%d) RANSAC(%.1f,%d,%.2f) TILE(%d,%d,%lld,%.1f) cache=%s",
         (int)p.kind,
         (int)p.siftVariant, (int)p.nfeatures, (int)p.nOctaveLayers, p.contrastThreshold, p.edgeThreshold, p.sigma,
         p.matchRatioThreshold, (int)p.matchMinCount, (int)p.searchRadius,
         (int)p.flannKDTreeCount, (int)p.flannSearchChecks,
         p.ransacReprojThreshold, (int)p.ransacMaxIters, p.ransacConfidence,
+        (int)p.tileSize, (int)p.tileOverlap, (long long)p.largeMapThreshold, p.dedupDistance,
         p.cacheFilePath.c_str());
 
     return true;

@@ -9,7 +9,11 @@ import io.github.kedaya0209.roco.app.hook.event.MaterialCollectionEvent;
 import io.github.kedaya0209.roco.app.hook.multicast.HookRegistry;
 import io.github.kedaya0209.roco.app.utils.ResourceUtils;
 import javafx.animation.FadeTransition;
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
 import javafx.application.Platform;
+import javafx.beans.property.IntegerProperty;
+import javafx.beans.property.SimpleIntegerProperty;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Label;
@@ -37,6 +41,8 @@ public class ResourceCounterPanel extends VBox {
     private final FlowPane rowsContainer;
     private final Map<String, Image> iconCache = new HashMap<>();
     /** 最新的待刷新数据（仅保留最新一份） */
+    /** 前一次计数值，用于计数动画 */
+    private final Map<String, Integer> prevCounts = new HashMap<>();
     private final AtomicReference<MaterialCollectionEvent> pendingData = new AtomicReference<>();
     /** 脏标记：表示有待刷新数据 */
     private final AtomicBoolean dirty = new AtomicBoolean(false);
@@ -117,6 +123,7 @@ public class ResourceCounterPanel extends VBox {
 
         if (summary == null || summary.isEmpty()) {
             toggle(false);
+            prevCounts.clear();
             return;
         }
 
@@ -131,16 +138,46 @@ public class ResourceCounterPanel extends VBox {
             iconView.setFitHeight(ICON_SIZE);
 
             int bpTotal = backpackTotals.getOrDefault(name, 0);
-            Label countLabel = new Label(total + " / " + bpTotal);
+            Label countLabel = new Label("0 / " + bpTotal);
             countLabel.setStyle("-fx-text-fill: -color-accent-emphasis; -fx-font-weight: bold;");
 
             row.getChildren().addAll(iconView, countLabel);
             rowsContainer.getChildren().add(row);
+
+            // 计数动画：从旧值平滑过渡到新值
+            int prev = prevCounts.getOrDefault(name, total);
+            prevCounts.put(name, total);
+            animateCountLabel(countLabel, prev, total, bpTotal);
         });
 
         if (!isVisible() || getOpacity() < 1.0) {
             toggle(true);
         }
+    }
+
+    /**
+     * Label 文本计数动画 — 从旧值平滑过渡到新值。
+     */
+    private void animateCountLabel(Label label, int from, int to, int bpTotal) {
+        int diff = Math.abs(to - from);
+        // 大跳变（差 >= 200 或首次设置）直接设值，不做动画
+        if (diff >= 200 || diff == to) {
+            label.setText(to + " / " + bpTotal);
+            return;
+        }
+        IntegerProperty counter = new SimpleIntegerProperty(from);
+        counter.addListener((_, _, val) ->
+                label.setText(val.intValue() + " / " + bpTotal));
+        int frames = Math.min(diff, 30);
+        Timeline tl = new Timeline();
+        for (int i = 1; i <= frames; i++) {
+            double fraction = (double) i / frames;
+            int value = (int) Math.round(from + (to - from) * fraction);
+            KeyFrame kf = new KeyFrame(Duration.millis(i * 10.0),
+                    _ -> counter.set(value));
+            tl.getKeyFrames().add(kf);
+        }
+        tl.play();
     }
 
     private Image loadIcon(String name) {

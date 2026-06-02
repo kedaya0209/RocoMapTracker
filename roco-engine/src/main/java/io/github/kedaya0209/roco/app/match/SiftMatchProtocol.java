@@ -43,6 +43,7 @@ public class SiftMatchProtocol {
      *   [8B]matchRatioThreshold [4B]matchMinCount [4B]searchRadius
      *   [4B]flannKDTreeCount [4B]flannSearchChecks
      *   [8B]ransacReprojThreshold [4B]ransacMaxIters [8B]ransacConfidence
+     *   [4B]tileSize [4B]tileOverlap [8B]largeMapThreshold [4B]dedupDistance
      *   [4B]cacheFilePathLen [NB]cacheFilePath(UTF-8)
      * </pre>
      */
@@ -55,6 +56,7 @@ public class SiftMatchProtocol {
                 + 8 + 4 + 4                          // MATCH
                 + 4 + 4                              // FLANN
                 + 8 + 4 + 8                          // RANSAC
+                + 4 + 4 + 8 + 4                      // TILE
                 + 4 + cachePathBytes.length;         // cache path
 
         ByteBuffer buf = ByteBuffer.allocate(bodyLen).order(ByteOrder.BIG_ENDIAN);
@@ -71,12 +73,18 @@ public class SiftMatchProtocol {
         buf.putInt(SiftConfig.MATCH_MIN_COUNT);
         buf.putInt(SiftConfig.SEARCH_RADIUS);
 
-        buf.putInt(1);  // KDTreeIndexParams(1)
+        buf.putInt(SiftConfig.FLANN_KD_TREES);
         buf.putInt(SiftConfig.FLANN_SEARCH_CHECKS);
 
         buf.putDouble(SiftConfig.RANSAC_REPROJ_THRESHOLD);
         buf.putInt(SiftConfig.RANSAC_MAX_ITERS);
         buf.putDouble(SiftConfig.RANSAC_CONFIDENCE);
+
+        // Tile training params
+        buf.putInt(SiftConfig.SIFT_TILE_SIZE);
+        buf.putInt(SiftConfig.SIFT_TILE_OVERLAP);
+        buf.putLong(SiftConfig.SIFT_LARGE_MAP_THRESHOLD);
+        buf.putFloat(SiftConfig.SIFT_DEDUP_DISTANCE);
 
         buf.putInt(cachePathBytes.length);
         buf.put(cachePathBytes);

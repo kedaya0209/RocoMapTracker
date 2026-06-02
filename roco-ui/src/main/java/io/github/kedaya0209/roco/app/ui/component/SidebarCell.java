@@ -5,8 +5,11 @@ import atlantafx.base.controls.ToggleSwitch;
 import atlantafx.base.theme.Styles;
 import io.github.kedaya0209.roco.app.config.SiftConfig;
 import io.github.kedaya0209.roco.app.hook.HookEventType;
+import io.github.kedaya0209.roco.app.hook.IHook;
 import io.github.kedaya0209.roco.app.hook.event.StatusCarouselEvent;
+import io.github.kedaya0209.roco.app.hook.multicast.HookRegistry;
 import io.github.kedaya0209.roco.app.ui.service.resource.SvgManager;
+import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import javafx.animation.FadeTransition;
@@ -14,6 +17,7 @@ import javafx.animation.Interpolator;
 import javafx.animation.KeyFrame;
 import javafx.animation.KeyValue;
 import javafx.animation.Timeline;
+import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Cursor;
@@ -27,10 +31,13 @@ import javafx.util.Duration;
  * 侧边栏单元格渲染器 — 从 Sidebar 提取，负责 4 种单元格类型的渲染。
  */
 @NotThreadSafe
-class SidebarCell extends ListCell<Sidebar.SidebarItem> {
+class SidebarCell extends ListCell<Sidebar.SidebarItem> implements IHook<Object> {
 
     private static final String BG_STYLE = "-fx-background-color: -color-bg-subtle; -fx-background-radius: 6;";
-    private static final String BG_HOVER = "-fx-background-color: -color-bg-inset; -fx-background-radius: 6;";
+
+    /** 当前显示的匹配开关 ToggleSwitch，供外部 STATUS_CAROUSEL 事件同步 */
+    private static ToggleSwitch activeMatchToggle;
+    private static boolean matchHookRegistered;
 
     private final Supplier<Sidebar.SidebarItem.Category> expandedCategory;
     private final Consumer<Sidebar.SidebarItem> onHeaderClick;
@@ -110,12 +117,11 @@ class SidebarCell extends ListCell<Sidebar.SidebarItem> {
     }
 
     private void addHoverEvent(Node icon, HBox row) {
+        row.getStyleClass().add("sidebar-header-row");
         setOnMouseEntered(e -> {
-            row.setStyle(BG_HOVER);
             SvgManager.animateHoverDrawIcon(icon, true, 400);
         });
         setOnMouseExited(e -> {
-            row.setStyle(BG_STYLE);
             SvgManager.animateHoverDrawIcon(icon, false, 400);
         });
         setCursor(Cursor.HAND);
@@ -126,11 +132,16 @@ class SidebarCell extends ListCell<Sidebar.SidebarItem> {
     private void renderMatchToggle(Sidebar.SidebarItem item, Node icon, Label title) {
         ToggleSwitch toggle = new ToggleSwitch();
         toggle.setSelected(SiftConfig.SIFT_MATCHING_ENABLED);
-        toggle.selectedProperty().addListener((obs, oldVal, newVal) -> {
+        // Guard: 防止 hook 外部同步导致循环发布事件
+        toggle.selectedProperty().addListener((_, _, newVal) -> {
+            if (SiftConfig.SIFT_MATCHING_ENABLED == newVal) return;
             SiftConfig.SIFT_MATCHING_ENABLED = newVal;
-            io.github.kedaya0209.roco.app.hook.multicast.HookRegistry.INSTANCE.publish(HookEventType.STATUS_CAROUSEL,
+            HookRegistry.INSTANCE.publish(HookEventType.STATUS_CAROUSEL,
                     newVal ? StatusCarouselEvent.matchingResumed() : StatusCarouselEvent.matchingPaused());
         });
+
+        activeMatchToggle = toggle;
+        registerMatchHook();
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
@@ -140,13 +151,12 @@ class SidebarCell extends ListCell<Sidebar.SidebarItem> {
         row.setPrefHeight(36);
         row.setPadding(new Insets(0, 12, 0, 12));
         row.setStyle(BG_STYLE);
+        row.getStyleClass().add("sidebar-header-row");
 
         setOnMouseEntered(e -> {
-            row.setStyle(BG_HOVER);
             SvgManager.animateHoverDrawIcon(icon, true, 400);
         });
         setOnMouseExited(e -> {
-            row.setStyle(BG_STYLE);
             SvgManager.animateHoverDrawIcon(icon, false, 400);
         });
 
@@ -154,6 +164,27 @@ class SidebarCell extends ListCell<Sidebar.SidebarItem> {
         wrapper.setPadding(new Insets(2, 0, 2, 0));
         setPadding(new Insets(0));
         setGraphic(wrapper);
+    }
+
+    private void registerMatchHook() {
+        if (matchHookRegistered) return;
+        matchHookRegistered = true;
+        HookRegistry.INSTANCE.register(this);
+    }
+
+
+    @Override
+    public Set<HookEventType> supportedEvents() {
+        return Set.of(HookEventType.STATUS_CAROUSEL);
+    }
+
+    @Override
+    public void onEvent(HookEventType type, Object data) {
+        ToggleSwitch t = activeMatchToggle;
+        if (t != null) {
+            Platform.runLater(() ->
+                    t.setSelected(SiftConfig.SIFT_MATCHING_ENABLED));
+        }
     }
 
     // ── Option ──────────────────────────────────────────
@@ -206,10 +237,7 @@ class SidebarCell extends ListCell<Sidebar.SidebarItem> {
         Node icon = SvgManager.createHoverDrawIcon(item.iconSvg(), 18, 1.5, 400);
 
         Label text = new Label(item.title());
-        text.setStyle(String.format(
-                "-fx-text-fill: %s; -fx-font-size: 13px;",
-                isProgress ? "-color-fg-muted" : "-color-fg-default"
-        ));
+        text.setStyle("-fx-text-fill: -color-fg-default; -fx-font-size: 13px;");
 
         HBox content = new HBox(8, icon, text);
         content.setAlignment(Pos.CENTER_LEFT);
@@ -225,7 +253,21 @@ class SidebarCell extends ListCell<Sidebar.SidebarItem> {
             }
         }
 
-        StackPane wrapper = new StackPane(content);
+        StackPane wrapper = new StackPane();
+        if (isProgress) {
+            // 进度模式：全高进度条作为背景，内容叠加在上方（仿 WIKI 更新样式）
+            ProgressBar progressBar = new ProgressBar(item.progress());
+            progressBar.setPrefWidth(Double.MAX_VALUE);
+            progressBar.setPrefHeight(36);
+            progressBar.setStyle("-fx-accent: -color-accent-emphasis; -fx-background-radius: 6;");
+
+            content.setStyle(null); // 移除背景色，让进度条透出
+            StackPane stack = new StackPane(progressBar, content);
+            stack.setPrefHeight(36);
+            wrapper.getChildren().add(stack);
+        } else {
+            wrapper.getChildren().add(content);
+        }
         wrapper.setPadding(new Insets(2, 0, 2, 0));
         wrapper.setMouseTransparent(true);
         setPadding(new Insets(0));

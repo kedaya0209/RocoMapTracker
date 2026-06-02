@@ -68,8 +68,7 @@ public class FloatToolbox extends VBox {
      */
     private StackPane createFollowButton(String unifiedBlueColor) {
         StackPane btn = new StackPane();
-        btn.setCursor(Cursor.HAND);
-        btn.setPadding(new Insets(10));
+        btn.getStyleClass().add("float-toolbox-btn");
 
         SVGPath icon = new SVGPath();
         icon.setContent(SvgManager.getPath("/icon/follow.svg"));
@@ -82,9 +81,6 @@ public class FloatToolbox extends VBox {
 
         // Group 包裹使 layoutBounds = 变换后尺寸，StackPane 按钮不会撑大
         Group wrapper = new Group(icon);
-
-        btn.setOnMouseEntered(_ -> btn.setStyle("-fx-background-color: rgba(255,255,255,0.15); -fx-background-radius: 8;"));
-        btn.setOnMouseExited(_ -> btn.setStyle("-fx-background-color: transparent;"));
 
         Tooltip tooltip = new Tooltip("自动跟随模式 (Space)");
         tooltip.setShowDelay(Duration.millis(150));
@@ -110,8 +106,7 @@ public class FloatToolbox extends VBox {
 
     private StackPane createVectorIconButton(String hint, String svgPath, boolean isFollowLogic, ResourceCounterPanel panel, String unifiedBlueColor) {
         StackPane btn = new StackPane();
-        btn.setCursor(Cursor.HAND);
-        btn.setPadding(new Insets(10));
+        btn.getStyleClass().add("float-toolbox-btn");
 
         SVGPath icon = new SVGPath();
         icon.setContent(svgPath);
@@ -120,9 +115,6 @@ public class FloatToolbox extends VBox {
         icon.setStrokeWidth(0.2);
         icon.setScaleX(1.3);
         icon.setScaleY(1.3);
-
-        btn.setOnMouseEntered(_ -> btn.setStyle("-fx-background-color: rgba(255,255,255,0.15); -fx-background-radius: 8;"));
-        btn.setOnMouseExited(_ -> btn.setStyle("-fx-background-color: transparent;"));
 
         Tooltip tooltip = new Tooltip(hint);
         tooltip.setShowDelay(Duration.millis(150));

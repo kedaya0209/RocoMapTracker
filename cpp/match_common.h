@@ -99,6 +99,12 @@ struct AlgoParams {
     int32_t ransacMaxIters = 200;
     double ransacConfidence = 0.95;
 
+    // Tile training
+    int32_t tileSize = 2000;
+    int32_t tileOverlap = 200;
+    int64_t largeMapThreshold = 9000000;
+    float dedupDistance = 4.0f;
+
     // Paths
     std::string cacheFilePath;
 };

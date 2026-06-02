@@ -670,6 +670,14 @@ public class UpdateManager {
         }
     }
 
+    public boolean isChecking() {
+        return checking.get();
+    }
+
+    public boolean isDownloading() {
+        return downloading.get();
+    }
+
     public VersionInfo getPendingUpdate() {
         return pendingUpdate.get();
     }

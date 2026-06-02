@@ -15,7 +15,6 @@ import io.github.kedaya0209.roco.app.ui.component.setting.SettingsStage;
 import io.github.kedaya0209.roco.app.ui.service.ui.ThemeManager;
 import io.github.kedaya0209.roco.app.ui.util.DialogUtils;
 import io.github.kedaya0209.roco.app.ui.util.RestartUtils;
-import io.github.kedaya0209.roco.app.update.UpdateManager;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -40,11 +39,14 @@ import java.io.IOException;
 public class Sidebar extends VBox {
 
     private final WikiUpdateManager wikiUpdater;
+    private final CheckUpdateManager checkUpdateMgr;
     private final ListView<SidebarItem> listView;
     private final ObservableList<SidebarItem> items = FXCollections.observableArrayList();
     private RouteManagerStage routeManagerStage;
     private SidebarItem.Category expandedCategory = null;
     private volatile boolean isAlgorithmLoading = false;
+    @Setter
+    private StackPane rootStack;
     @Setter
     private UiAnimator animator;
     @Setter
@@ -70,6 +72,7 @@ public class Sidebar extends VBox {
         listView.setFocusTraversable(false);
         wikiUpdater = new WikiUpdateManager();
         wikiUpdater.checkAndShowProgress();
+        checkUpdateMgr = new CheckUpdateManager();
 
         buildItems();
         listView.setItems(items);
@@ -129,12 +132,7 @@ public class Sidebar extends VBox {
         items.add(new SidebarItem(SidebarItem.Type.ACTION, "路线管理",
                 null, null, null, false, "/icon/route.svg", this::openRouteManager));
         items.add(new SidebarItem(SidebarItem.Type.WIKI, null, null, null, wikiUpdater));
-        items.add(new SidebarItem(SidebarItem.Type.ACTION, "检查更新",
-                null, null, null, false, "/icon/update.svg", () -> {
-            HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION,
-                    new StatusEvent("正在检查更新，请稍候...", NotificationType.INFO));
-            UpdateManager.getInstance().manualCheck(null);
-        }));
+        items.add(new SidebarItem(SidebarItem.Type.WIKI, null, null, null, checkUpdateMgr));
         items.add(new SidebarItem(SidebarItem.Type.ACTION, "插件管理",
                 null, null, null, false, "/icon/plugins.svg",
                 () -> openSettingsCategory("插件管理")));
@@ -281,18 +279,7 @@ public class Sidebar extends VBox {
     }
 
     public void setDownloadProgress(double progress) {
-        Platform.runLater(() -> {
-            for (int i = 0; i < items.size(); i++) {
-                SidebarItem item = items.get(i);
-                if (!"检查更新".equals(item.title())) continue;
-                String title = progress < 0 ? "检查更新"
-                        : String.format("检查更新 (%.0f%%)", progress * 100);
-                items.set(i, new SidebarItem(SidebarItem.Type.ACTION, title,
-                        null, null, null, false, "/icon/update.svg",
-                        item.onAction(), progress));
-                return;
-            }
-        });
+        Platform.runLater(() -> checkUpdateMgr.setProgress(progress));
     }
 
     // ══════════ Dialogs / Windows ══════════
@@ -391,6 +378,7 @@ public class Sidebar extends VBox {
     // ══════════ Item Model ══════════
 
     private StackPane findRootPane() {
+        if (rootStack != null) return rootStack;
         Node node = this;
         while ((node = node.getParent()) != null) {
             if (node instanceof StackPane sp) return sp;
@@ -400,22 +388,22 @@ public class Sidebar extends VBox {
 
     @ThreadSafe
     public record SidebarItem(Type type, String title, Category category, String currentValue,
-                              WikiUpdateManager wikiUpdater, boolean selected, String iconSvg,
+                              SidebarComponent wikiUpdater, boolean selected, String iconSvg,
                               Runnable onAction, double progress) {
 
         public SidebarItem(Type type, String title, Category category, String currentValue,
-                           WikiUpdateManager wikiUpdater, boolean selected, String iconSvg,
+                           SidebarComponent wikiUpdater, boolean selected, String iconSvg,
                            Runnable onAction) {
             this(type, title, category, currentValue, wikiUpdater, selected, iconSvg, onAction, -1);
         }
 
         public SidebarItem(Type type, String title, Category category, String currentValue,
-                           WikiUpdateManager wikiUpdater) {
+                           SidebarComponent wikiUpdater) {
             this(type, title, category, currentValue, wikiUpdater, false, null, null, -1);
         }
 
         public SidebarItem(Type type, String title, Category category, String currentValue,
-                           WikiUpdateManager wikiUpdater, boolean selected) {
+                           SidebarComponent wikiUpdater, boolean selected) {
             this(type, title, category, currentValue, wikiUpdater, selected, null, null, -1);
         }
 

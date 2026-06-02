@@ -1,0 +1,77 @@
+/* ============================================================
+ * RocoMapTracker UI 增强样式表
+ *
+ * 用途：全局 UI 样式增强，配合 AtlanFX 主题系统。
+ * 所有颜色引用 AtlanFX CSS 变量（-color-*），自动跟随主题切换。
+ * ============================================================ */
+
+/* ── 全局字体渲染 ── */
+.root {
+    -fx-font-smoothing-type: gray;
+}
+
+/* ── 按钮通用交互 ── */
+.title-bar-btn {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-padding: 6;
+    -fx-cursor: hand;
+    -fx-background-radius: 6;
+    -fx-min-width: 32;
+    -fx-min-height: 32;
+    -fx-pref-width: 32;
+    -fx-pref-height: 32;
+    -fx-max-width: 32;
+    -fx-max-height: 32;
+}
+.title-bar-btn:hover {
+    -fx-background-color: -color-bg-subtle;
+}
+
+/* ── 浮动工具箱按钮 ── */
+.float-toolbox-btn {
+    -fx-cursor: hand;
+    -fx-padding: 10;
+    -fx-background-radius: 8;
+}
+.float-toolbox-btn:hover {
+    -fx-background-color: rgba(255, 255, 255, 0.15);
+}
+
+/* ── 侧边栏单元格 ── */
+.sidebar-header-cell {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+}
+.sidebar-header-row {
+    -fx-background-color: -color-bg-subtle;
+    -fx-background-radius: 6;
+}
+.sidebar-header-row:hover {
+    -fx-background-color: -color-bg-inset;
+}
+
+/* ── 地图瓦片 shimmer 占位 ── */
+.tile-shimmer {
+    -fx-background-color: linear-gradient(
+        from 0% 0% to 100% 0%,
+        -color-bg-inset 0%,
+        -color-bg-subtle 50%,
+        -color-bg-inset 100%
+    );
+    -fx-opacity: 0.6;
+    -fx-background-radius: 2;
+}
+
+/* ── Toast 通知 ── */
+.toast-notification {
+    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.4), 10, 0, 0, 5);
+    -fx-background-radius: 8;
+    -fx-background-color: -color-bg-default;
+}
+
+/* ── 搜索框 ── */
+.settings-search-field {
+    -fx-background-radius: 6;
+    -fx-padding: 6 10;
+}
