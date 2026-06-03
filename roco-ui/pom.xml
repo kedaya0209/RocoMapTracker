@@ -185,9 +185,9 @@
                             </agent>
                             <buildArgs>
                                 <!-- 指定链接器子系统为 WINDOWS -->
-<!--                                <buildArg>-H:NativeLinkerOption=/SUBSYSTEM:WINDOWS</buildArg>-->
-<!--                                &lt;!&ndash; 指定入口点，确保在无控制台模式下正确启动 &ndash;&gt;-->
-<!--                                <buildArg>-H:NativeLinkerOption=/ENTRY:mainCRTStartup</buildArg>-->
+                                <buildArg>-H:NativeLinkerOption=/SUBSYSTEM:WINDOWS</buildArg>
+                                <!-- 指定入口点，确保在无控制台模式下正确启动 -->
+                                <buildArg>-H:NativeLinkerOption=/ENTRY:mainCRTStartup</buildArg>
                                 <buildArg>-R:MaxHeapSize=512M</buildArg>
                                 <buildArg>-R:MinHeapSize=128M</buildArg>
                                 <buildArg>-R:MaxDirectMemorySize=512M</buildArg>
