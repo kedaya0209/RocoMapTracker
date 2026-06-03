@@ -2,7 +2,6 @@ package io.github.kedaya0209.roco.app.ui.component.dialog;
 
 import net.jcip.annotations.NotThreadSafe;
 import atlantafx.base.theme.Styles;
-import javafx.animation.FadeTransition;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -14,16 +13,11 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.util.Duration;
 
-import io.github.kedaya0209.roco.app.ui.util.FxRippleUtil;
-
 @NotThreadSafe
 public class DownloadProgressDialog {
 
     private DownloadProgressDialog() {}
 
-    /**
-     * 下载进度控制
-     */
     @NotThreadSafe
     public static class ProgressControl {
         private final StackPane mask;
@@ -51,7 +45,8 @@ public class DownloadProgressDialog {
             Platform.runLater(() -> {
                 Node parentNode = mask.getParent();
                 if (!(parentNode instanceof StackPane parent)) return;
-                FadeTransition ft = new FadeTransition(Duration.millis(150), mask);
+                javafx.animation.FadeTransition ft =
+                        new javafx.animation.FadeTransition(Duration.millis(150), mask);
                 ft.setToValue(0);
                 ft.setOnFinished(e -> parent.getChildren().remove(mask));
                 ft.play();
@@ -59,12 +54,8 @@ public class DownloadProgressDialog {
         }
     }
 
-    /**
-     * 下载进度弹窗
-     */
     public static ProgressControl showDownloadProgressDialog(StackPane rootStack, String version, Runnable onBackground) {
-        StackPane mask = new StackPane();
-        mask.setStyle("-fx-background-color: rgba(0, 0, 0, 0.8);");
+        StackPane mask = AbstractDialog.createMask();
 
         VBox dialogBox = new VBox(20);
         dialogBox.setMaxSize(420, 240);
@@ -72,10 +63,10 @@ public class DownloadProgressDialog {
         dialogBox.setAlignment(Pos.CENTER);
         dialogBox.setStyle(
                 "-fx-background-color: -color-bg-default; " +
-                        "-fx-border-color: -color-border-muted; " +
-                        "-fx-border-radius: 12; " +
-                        "-fx-background-radius: 12; " +
-                        "-fx-border-width: 1.5;");
+                "-fx-border-color: -color-border-muted; " +
+                "-fx-border-radius: 12; " +
+                "-fx-background-radius: 12; " +
+                "-fx-border-width: 1.5;");
 
         Label titleLabel = new Label("正在下载 " + version + " ...");
         titleLabel.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: -color-fg-default;");
@@ -90,12 +81,7 @@ public class DownloadProgressDialog {
         dialogBox.getChildren().addAll(titleLabel, progressBar, statusLabel);
 
         if (onBackground != null) {
-            Button bgBtn = new Button("后台下载");
-            bgBtn.setPrefWidth(120);
-            bgBtn.getStyleClass().addAll(Styles.BUTTON_OUTLINED, Styles.ACCENT);
-            FxRippleUtil.install(bgBtn);
-            bgBtn.setOnAction(e -> {
-                mask.setOpacity(0);
+            Button bgBtn = AbstractDialog.createButton("后台下载", Styles.ACCENT, () -> {
                 rootStack.getChildren().remove(mask);
                 onBackground.run();
             });
@@ -103,13 +89,8 @@ public class DownloadProgressDialog {
         }
 
         mask.getChildren().add(dialogBox);
-        mask.setViewOrder(-20);
         rootStack.getChildren().add(mask);
-
-        mask.setOpacity(0);
-        FadeTransition ft = new FadeTransition(Duration.millis(200), mask);
-        ft.setToValue(1);
-        ft.play();
+        AbstractDialog.fadeIn(mask);
 
         return new ProgressControl(mask, progressBar, statusLabel);
     }

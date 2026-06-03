@@ -1,10 +1,7 @@
 package io.github.kedaya0209.roco.app.ui.component.dialog;
 
 import net.jcip.annotations.NotThreadSafe;
-import atlantafx.base.theme.Styles;
-import javafx.animation.FadeTransition;
 import javafx.event.Event;
-import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
@@ -28,36 +25,20 @@ public class AboutDialog {
 
     private AboutDialog() {}
 
-    /**
-     * 关于弹窗
-     */
     public static void showAboutDialog(StackPane rootStack,
                                         String appName,
                                         String version,
                                         String buildTimestamp,
                                         String repoUrl) {
-        StackPane mask = new StackPane();
-        mask.setStyle("-fx-background-color: rgba(0, 0, 0, 0.8);");
+        StackPane mask = AbstractDialog.createMask();
 
-        VBox dialogBox = new VBox(25);
-        dialogBox.setMaxSize(420, 320);
-        dialogBox.setPadding(new Insets(30));
-        dialogBox.setAlignment(Pos.CENTER);
-        dialogBox.setStyle(
-                "-fx-background-color: -color-bg-default; " +
-                "-fx-border-color: -color-border-muted; " +
-                "-fx-border-radius: 12; " +
-                "-fx-background-radius: 12; " +
-                "-fx-border-width: 1.5; " +
-                "-fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.5), 20, 0, 0, 10);");
+        VBox dialogBox = AbstractDialog.createDialogBox();
 
         Node iconNode;
         try {
             iconNode = SvgManager.createIcon("/icon/rmt.svg", 64, null);
         } catch (Exception e) {
-            SVGPath fallback = new SVGPath();
-            fallback.setContent("M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z");
-            fallback.setStyle("-fx-fill: -color-accent-emphasis;");
+            SVGPath fallback = AbstractDialog.createDefaultIcon("-color-accent-emphasis");
             iconNode = fallback;
         }
 
@@ -115,28 +96,22 @@ public class AboutDialog {
 
         HBox btnBox = new HBox(15);
         btnBox.setAlignment(Pos.CENTER);
-        Button confirmBtn = new Button("确定");
-        confirmBtn.getStyleClass().addAll(Styles.BUTTON_OUTLINED, Styles.SUCCESS);
-        confirmBtn.setPrefWidth(120);
-        FxRippleUtil.install(confirmBtn);
-        confirmBtn.setOnAction(e -> rootStack.getChildren().remove(mask));
+        Button confirmBtn = AbstractDialog.createButton("确定", atlantafx.base.theme.Styles.SUCCESS,
+                () -> rootStack.getChildren().remove(mask));
         btnBox.getChildren().add(confirmBtn);
 
         dialogBox.getChildren().addAll(contentContainer, btnBox);
         mask.getChildren().add(dialogBox);
-        mask.setViewOrder(-20);
+
         mask.setOnMouseClicked(e -> {
-            FadeTransition ft = new FadeTransition(Duration.millis(150), mask);
+            javafx.animation.FadeTransition ft = new javafx.animation.FadeTransition(Duration.millis(150), mask);
             ft.setToValue(0);
             ft.setOnFinished(ev -> rootStack.getChildren().remove(mask));
             ft.play();
         });
         dialogBox.setOnMouseClicked(Event::consume);
-        rootStack.getChildren().add(mask);
 
-        mask.setOpacity(0);
-        FadeTransition ft = new FadeTransition(Duration.millis(200), mask);
-        ft.setToValue(1);
-        ft.play();
+        rootStack.getChildren().add(mask);
+        AbstractDialog.fadeIn(mask);
     }
 }
