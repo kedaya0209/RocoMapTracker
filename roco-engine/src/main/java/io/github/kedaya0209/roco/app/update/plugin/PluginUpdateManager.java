@@ -125,8 +125,11 @@ public class PluginUpdateManager {
                             key.reset();
                         }
 
-                        scanPlugins();
-                        cacheVersion.incrementAndGet();
+                        // 下载/解压进行中时跳过扫描，避免读到不完整的插件目录
+                        if (!downloading.get()) {
+                            scanPlugins();
+                            cacheVersion.incrementAndGet();
+                        }
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
                         break;
@@ -397,6 +400,7 @@ public class PluginUpdateManager {
                                 uiDelegate.showUpdateReady(pluginId, msg, () -> {});
                             }
                             scanPlugins();
+                            cacheVersion.incrementAndGet();
                             log.info("插件 {} 更新成功: {}", pluginId, update.version());
                         },
                         error -> {

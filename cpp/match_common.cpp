@@ -578,6 +578,23 @@ int run_match_loop(SOCKET sock, AlgoParams& params, MatcherBase& matcher,
                 continue;
             }
 
+            // 检查裁剪出来的小地图是否是完整圆形（排除过渡动画中未完全显示的情况）
+            if (detection.center_x - detection.radius < 0 ||
+                detection.center_y - detection.radius < 0 ||
+                detection.center_x + detection.radius >= fw ||
+                detection.center_y + detection.radius >= fh) {
+                auto result_buf = serialize_result(false, 0, 0,
+                    std::numeric_limits<double>::quiet_NaN(), t_minimap, 0, 0);
+                if (!send_message(sock, MATCH_RESULT, result_buf.data(), (uint32_t)result_buf.size())) {
+                    LOG("Socket send failed (RESULT)");
+                    break;
+                }
+                if (frame_count % 100 == 0) {
+                    LOG("frames=%lld (incomplete circle)", (long long)frame_count);
+                }
+                continue;
+            }
+
             // 2. ROI crop around minimap (no circle mask — mask boundary creates false
             //    features for AKAZE's nonlinear diffusion; SIFT's edgeThreshold also
             //    doesn't need it since the crop itself isolates the minimap region)

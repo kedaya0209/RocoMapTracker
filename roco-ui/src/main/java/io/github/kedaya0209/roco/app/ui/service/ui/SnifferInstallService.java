@@ -11,12 +11,16 @@ import io.github.kedaya0209.roco.app.update.plugin.PluginUpdateManager;
 import javafx.application.Platform;
 import javafx.scene.layout.StackPane;
 import lombok.extern.slf4j.Slf4j;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @NotThreadSafe
 @Slf4j
 public class SnifferInstallService {
 
     private SnifferInstallService() {}
+
+    /** 会话级安装标记，防止同一 JVM 生命周期内重复下载 */
+    private static final AtomicBoolean installAttempted = new AtomicBoolean(false);
 
     /**
      * 检查并自动安装 sniffer 插件（后台下载）。
@@ -33,7 +37,8 @@ public class SnifferInstallService {
 
         if (snifferReady) {
             pcapBridgeManager.init(port, null);
-        } else {
+        } else if (installAttempted.compareAndSet(false, true)) {
+            // CAS 成功：这是第一次尝试安装
             ProgressControl pc = DownloadProgressDialog.showDownloadProgressDialog(
                     rootStack, "需要下载高级版组件 (sniffer)...", null);
             Thread.ofPlatform().daemon(true).name("sniffer-install").start(() -> pm.checkRemotePlugin("sniffer",
@@ -62,6 +67,8 @@ public class SnifferInstallService {
                                             "无法获取 sniffer 插件信息，请检查网络连接",
                                             "确定", true, () -> {}));
                         }));
+        } else {
+            log.info("sniffer 安装已在之前尝试过，跳过重复下载");
         }
     }
 }
