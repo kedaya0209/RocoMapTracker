@@ -6,6 +6,7 @@ import io.github.kedaya0209.roco.app.hook.HookEventType;
 import io.github.kedaya0209.roco.app.hook.IHook;
 import io.github.kedaya0209.roco.app.hook.multicast.HookRegistry;
 import io.github.kedaya0209.roco.app.ui.service.VersionMode;
+import io.github.kedaya0209.roco.app.ui.service.ui.ThemeManager;
 import io.github.kedaya0209.roco.app.ui.service.ui.VersionManager;
 import io.github.kedaya0209.roco.app.ui.util.DialogUtils;
 import io.github.kedaya0209.roco.app.ui.util.FxRippleUtil;
@@ -209,7 +210,21 @@ public class SettingsStage extends Stage implements IHook<Object> {
 
         Scene scene = new Scene(rootStackPane, 720, 540);
         scene.setFill(Color.TRANSPARENT);
+
+        // 加载主题 CSS，否则 -color-bg-default 等变量无法解析 → 背景透明
+        String themeCss = ThemeManager.getCurrentStylesheetUrl();
+        if (themeCss != null) {
+            scene.getStylesheets().add(themeCss);
+        }
+        scene.getStylesheets().add(getClass().getResource("/styles/ui.css").toExternalForm());
+
         setScene(scene);
+
+        // Native Image 下 StageStyle.TRANSPARENT 窗口不会自动获得焦点
+        setOnShown(_ -> { requestFocus(); toFront(); });
+        scene.addEventFilter(javafx.scene.input.MouseEvent.MOUSE_PRESSED, _ -> {
+            if (!isFocused()) requestFocus();
+        });
 
         // 圆角裁剪，防止子节点（列表高亮、滚动内容等）溢出圆角边界
         Rectangle clip = new Rectangle(0, 0, 720, 540);

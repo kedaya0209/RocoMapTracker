@@ -9,12 +9,16 @@ import io.github.kedaya0209.roco.app.ui.render.MapRenderer;
 import io.github.kedaya0209.roco.app.ui.service.resource.SvgManager;
 import io.github.kedaya0209.roco.app.ui.util.FxRippleUtil;
 import io.github.kedaya0209.roco.app.utils.ResourceUtils;
+import java.util.concurrent.atomic.AtomicBoolean;
+import javafx.animation.FadeTransition;
+import javafx.util.Duration;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.geometry.Side;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.effect.DropShadow;
+import javafx.scene.effect.GaussianBlur;
 import javafx.scene.image.Image;
 import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.Pane;
@@ -97,10 +101,13 @@ public final class MainUiComposer {
         sidebarModal.setPadding(new Insets(0, 0, 0, 0));
         sidebarModal.usePredefinedTransitionFactories(Side.LEFT);
 
+        // 初始化时鼠标穿透，侧边栏关闭时保持穿透以避免拦截标题栏点击
+        sidebarModal.setMouseTransparent(true);
         // 侧边栏打开时地图毛玻璃效果
         // AtomicBoolean 确保首次 showing=true 之后才执行效果，防止初始化阶段误触发
-        var blurReady = new java.util.concurrent.atomic.AtomicBoolean(false);
+        var blurReady = new AtomicBoolean(false);
         sidebarModal.displayProperty().addListener((_, _, showing) -> {
+            sidebarModal.setMouseTransparent(!showing);
             if (!blurReady.get()) {
                 if (showing) {
                     blurReady.set(true);
@@ -110,10 +117,10 @@ public final class MainUiComposer {
                 // 首次 showing=true → 初始化标记 + 继续执行设置 blur
             }
             if (showing) {
-                canvasContainer.setEffect(new javafx.scene.effect.GaussianBlur(6));
+                canvasContainer.setEffect(new GaussianBlur(6));
             } else {
-                javafx.animation.FadeTransition ft = new javafx.animation.FadeTransition(
-                        javafx.util.Duration.millis(200), canvasContainer);
+                FadeTransition ft = new FadeTransition(
+                        Duration.millis(200), canvasContainer);
                 ft.setToValue(1.0);
                 ft.setOnFinished(_ -> canvasContainer.setEffect(null));
                 ft.play();
