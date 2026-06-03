@@ -167,6 +167,8 @@ public class TitleBar extends HBox {
         // 响应式绑定：匹配状态变化时自动更新图标颜色
         appState.matchingEnabledProperty().addListener((_, _, now) ->
                 setSvgFill(matchIcon, now ? "-color-accent-emphasis" : "-color-fg-muted"));
+        // 初始同步当前匹配状态
+        setSvgFill(matchIcon, appState.isMatchingEnabled() ? "-color-accent-emphasis" : "-color-fg-muted");
         matchToggleBtn.setGraphic(matchIcon);
 
         matchToggleBtn.setOnAction(_ ->

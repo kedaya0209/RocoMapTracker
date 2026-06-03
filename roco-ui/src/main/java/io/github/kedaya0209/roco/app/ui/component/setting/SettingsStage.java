@@ -208,9 +208,11 @@ public class SettingsStage extends Stage {
         okBtn.getStyleClass().addAll(Styles.ACCENT);
         FxRippleUtil.install(okBtn);
         okBtn.setOnAction(_ -> {
-            doApply();
+            boolean needsRestart = doApply();
             cleanupPreview();
-            hide();
+            if (!needsRestart) {
+                hide();
+            }
         });
 
         buttonBar.getChildren().addAll(cancelBtn, applyBtn, okBtn);
@@ -472,15 +474,17 @@ public class SettingsStage extends Stage {
     // 操作
     // ================================================================
 
-    private void doApply() {
+    /**
+     * @return true 如果有配置变更需要重启才能生效
+     */
+    private boolean doApply() {
         List<String> restartFields = configManager.applyChanges();
         if (!restartFields.isEmpty()) {
             String msg = "以下配置项需要重启程序才能生效：\n" + String.join("\n", restartFields);
-            if (ownerRoot != null) {
-                ConfirmDialog.showSimpleDialog(rootStackPane, "需要重启", msg, "确定", false, () -> {
-                });
-            }
+            ConfirmDialog.showSimpleDialog(rootStackPane, "需要重启", msg, "确定", false, () -> {});
+            return true;
         }
+        return false;
     }
 
     private void cleanupPreview() {
