@@ -1,4 +1,4 @@
-package io.github.kedaya0209.roco.app.ui.component;
+package io.github.kedaya0209.roco.app.ui.component.canvas;
 
 import net.jcip.annotations.NotThreadSafe;
 import io.github.kedaya0209.roco.app.config.UiConfig;
@@ -9,6 +9,8 @@ import io.github.kedaya0209.roco.app.ui.command.ViewportCommands.DragViewportCom
 import io.github.kedaya0209.roco.app.ui.command.ViewportCommands.SetViewportSizeCommand;
 import io.github.kedaya0209.roco.app.ui.command.ViewportCommands.ZoomViewportCommand;
 import io.github.kedaya0209.roco.app.map.model.ResourcePoint;
+import io.github.kedaya0209.roco.app.ui.component.sidebar.UiAnimator;
+import io.github.kedaya0209.roco.app.ui.component.widget.RouteManagerStage;
 import io.github.kedaya0209.roco.app.ui.render.MapRenderer;
 import io.github.kedaya0209.roco.app.ui.state.ViewportState;
 import io.github.kedaya0209.roco.app.ui.util.CoordinateUtil;

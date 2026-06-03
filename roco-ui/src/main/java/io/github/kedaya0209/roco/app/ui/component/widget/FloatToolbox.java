@@ -1,6 +1,7 @@
-package io.github.kedaya0209.roco.app.ui.component;
+package io.github.kedaya0209.roco.app.ui.component.widget;
 
 import net.jcip.annotations.NotThreadSafe;
+import io.github.kedaya0209.roco.app.ui.component.overlay.ResourceCounterPanel;
 import io.github.kedaya0209.roco.app.ui.command.AppCommands.ToggleMaterialCollectionCommand;
 import io.github.kedaya0209.roco.app.ui.command.AppCommands.SetFollowModeCommand;
 import io.github.kedaya0209.roco.app.ui.command.CommandBus;

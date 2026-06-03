@@ -1,4 +1,4 @@
-package io.github.kedaya0209.roco.app.ui.component;
+package io.github.kedaya0209.roco.app.ui.component.widget;
 
 import atlantafx.base.theme.Styles;
 import com.fasterxml.jackson.databind.JsonNode;

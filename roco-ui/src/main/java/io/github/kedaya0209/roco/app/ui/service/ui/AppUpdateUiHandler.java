@@ -5,7 +5,7 @@ import io.github.kedaya0209.roco.app.config.BuildConfig;
 import io.github.kedaya0209.roco.app.hook.AppEvents;
 import io.github.kedaya0209.roco.app.hook.event.NotificationType;
 import io.github.kedaya0209.roco.app.hook.event.StatusEvent;
-import io.github.kedaya0209.roco.app.ui.component.Sidebar;
+import io.github.kedaya0209.roco.app.ui.component.sidebar.Sidebar;
 import io.github.kedaya0209.roco.app.ui.component.dialog.DownloadProgressDialog.ProgressControl;
 import io.github.kedaya0209.roco.app.ui.component.dialog.UpdateDialog;
 import io.github.kedaya0209.roco.app.update.UpdateManager;

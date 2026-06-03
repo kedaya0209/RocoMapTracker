@@ -1,4 +1,4 @@
-package io.github.kedaya0209.roco.app.ui.component;
+package io.github.kedaya0209.roco.app.ui.component.sidebar;
 
 import atlantafx.base.theme.Styles;
 import io.github.kedaya0209.roco.app.config.*;
@@ -6,6 +6,7 @@ import io.github.kedaya0209.roco.app.context.ResourceConfigContext;
 import io.github.kedaya0209.roco.app.match.map.SwitchMapMatcher;
 import io.github.kedaya0209.roco.app.ui.component.dialog.AboutDialog;
 import io.github.kedaya0209.roco.app.ui.component.setting.SettingsStage;
+import io.github.kedaya0209.roco.app.ui.component.widget.RouteManagerStage;
 import io.github.kedaya0209.roco.app.ui.service.ui.ThemeManager;
 import io.github.kedaya0209.roco.app.ui.state.AppState;
 import io.github.kedaya0209.roco.app.ui.state.ViewportState;

@@ -1,8 +1,9 @@
-package io.github.kedaya0209.roco.app.ui.component;
+package io.github.kedaya0209.roco.app.ui.component.canvas;
 
 import net.jcip.annotations.NotThreadSafe;
 import io.github.kedaya0209.roco.app.context.ResourcePointContext;
 import io.github.kedaya0209.roco.app.map.model.ResourcePoint;
+import io.github.kedaya0209.roco.app.ui.component.dialog.AddPointDialog;
 import io.github.kedaya0209.roco.app.ui.component.dialog.ConfirmDialog;
 import javafx.scene.Node;
 import javafx.scene.control.ContextMenu;

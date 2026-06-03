@@ -21,7 +21,7 @@ AI 协作专用 – 依赖 roco-engine（以及传递依赖），是最终应用
 - 窗口管理：WindowManager 支持 8 方向边缘拖拽缩放。
 
 
-## 类清单 (60 个)
+## 类清单
 
 
 入口 (2 个)：
@@ -39,22 +39,43 @@ SidebarCommands        4 个侧边栏 Command record
 ui.hook – Hook 实现 (1 个)：
 UiResponseHook         监听 UI_NOTIFICATION / INIT_PROGRESS / CAPTURE_STATE
 
-component – UI 组件 (16 个)：
+component/canvas – 画布交互 (4 个)：
 InteractiveCanvas      交互画布：鼠标/键盘事件 → 委托 PathEditor/HoverManager
-Sidebar                左侧分类侧边栏：算法/资源/主题/路线/WIKI 更新
-SidebarCell            侧边栏分类单元格（从 Sidebar 内联类提取）
-TitleBar               标题栏 + 状态轮播 + 幽灵模式（透明度+置顶）
-RouteManagerStage      路线管理窗口：保存/编辑/导入/导出
-FloatToolbox           浮动工具栏：自动跟随/物资计数开关
-HoverManager           鼠标 hover 检测 + 提示框
 PathEditor             路线绘制/编辑：节点增删拖拽 + Ctrl+Z 撤销
-LoadingOverlay         全屏加载遮罩 + 进度条
-NotificationToast      滑入/滑出 Toast 通知
-ResourceCounterPanel   物资采集统计面板（订阅 Hook 事件）
-StatsOverlay           实时性能覆盖层：匹配耗时/FPS
+HoverManager           鼠标 hover 检测 + 提示框
 ContextMenuManager     右键菜单：添加标记/重置视口/资源点操作
+
+component/sidebar – 侧边栏 (7 个)：
+Sidebar                左侧分类侧边栏：算法/资源/主题/路线/WIKI 更新
+SidebarCell            侧边栏分类单元格
+SidebarActionHandler   侧边栏业务逻辑
+SidebarComponent       侧边栏组件接口
 UiAnimator             侧边栏滑入/滑出动画
+CheckUpdateManager     检查更新管理器
 WikiUpdateManager      WIKI 资源更新：下载按钮 + 进度条
+
+component/overlay – 覆盖层 (5 个)：
+LoadingOverlay         全屏加载遮罩 + 进度条
+StatsOverlay           实时性能覆盖层：匹配耗时/FPS
+NotificationToast      滑入/滑出 Toast 通知
+ToastManager           Toast 队列管理
+ResourceCounterPanel   物资采集统计面板（订阅 Hook 事件）
+
+component/widget – 独立控件 (4 个)：
+TitleBar               标题栏 + 状态轮播 + 幽灵模式（透明度+置顶）
+FloatToolbox           浮动工具栏：自动跟随/物资计数开关
+VersionSelectorPanel   版本选择覆盖面板
+RouteManagerStage      路线管理窗口：保存/编辑/导入/导出
+
+component/dialog – 对话框 (9 个)：
+AbstractDialog         对话框原语基类（10 个静态原语方法）
+ConfirmDialog          确认对话框（3 种模式）
+ModalConfirmDialog     模态确认对话框（Stage 独立窗口）
+AboutDialog            关于对话框
+FirstRunDialog         首次运行对话框
+UpdateDialog           应用更新对话框
+DownloadProgressDialog 下载进度对话框
+PluginUpdateDialog     插件更新对话框
 AddPointDialog         添加地图标记对话框 + 自动补全
 
 component/setting – 设置面板 (11 个)：

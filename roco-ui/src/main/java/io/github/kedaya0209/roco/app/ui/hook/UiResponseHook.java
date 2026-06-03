@@ -6,9 +6,9 @@ import io.github.kedaya0209.roco.app.hook.event.CaptureStateEvent;
 import io.github.kedaya0209.roco.app.hook.event.NotificationType;
 import io.github.kedaya0209.roco.app.hook.event.ProgressEvent;
 import io.github.kedaya0209.roco.app.hook.event.StatusEvent;
-import io.github.kedaya0209.roco.app.ui.component.LoadingOverlay;
-import io.github.kedaya0209.roco.app.ui.component.StatsOverlay;
-import io.github.kedaya0209.roco.app.ui.component.ToastManager;
+import io.github.kedaya0209.roco.app.ui.component.overlay.LoadingOverlay;
+import io.github.kedaya0209.roco.app.ui.component.overlay.StatsOverlay;
+import io.github.kedaya0209.roco.app.ui.component.overlay.ToastManager;
 import javafx.application.Platform;
 import javafx.scene.layout.StackPane;
 

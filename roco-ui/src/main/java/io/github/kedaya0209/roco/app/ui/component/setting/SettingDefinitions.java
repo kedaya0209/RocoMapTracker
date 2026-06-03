@@ -19,7 +19,7 @@ import io.github.kedaya0209.roco.app.context.CameraContext;
 import io.github.kedaya0209.roco.app.ui.state.AppState;
 import io.github.kedaya0209.roco.app.ui.state.ViewportState;
 import io.github.kedaya0209.roco.app.match.map.SwitchMapMatcher;
-import io.github.kedaya0209.roco.app.ui.component.RouteManagerStage;
+import io.github.kedaya0209.roco.app.ui.component.widget.RouteManagerStage;
 import io.github.kedaya0209.roco.app.ui.service.ui.ThemeManager;
 import io.github.kedaya0209.roco.app.update.UpdateManager;
 import lombok.extern.slf4j.Slf4j;

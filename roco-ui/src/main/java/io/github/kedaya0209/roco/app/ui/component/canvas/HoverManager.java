@@ -1,4 +1,4 @@
-package io.github.kedaya0209.roco.app.ui.component;
+package io.github.kedaya0209.roco.app.ui.component.canvas;
 
 import net.jcip.annotations.NotThreadSafe;
 import io.github.kedaya0209.roco.app.config.UiConfig;

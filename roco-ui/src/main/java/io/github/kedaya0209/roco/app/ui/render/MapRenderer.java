@@ -6,7 +6,7 @@ import io.github.kedaya0209.roco.app.config.RenderConfig;
 import io.github.kedaya0209.roco.app.context.CameraContext;
 import io.github.kedaya0209.roco.app.context.MapContext;
 import io.github.kedaya0209.roco.app.map.model.ResourcePoint;
-import io.github.kedaya0209.roco.app.ui.component.StatsOverlay;
+import io.github.kedaya0209.roco.app.ui.component.overlay.StatsOverlay;
 import io.github.kedaya0209.roco.app.ui.service.resource.TileManager;
 import io.github.kedaya0209.roco.app.ui.state.ViewportState;
 import javafx.animation.KeyFrame;
