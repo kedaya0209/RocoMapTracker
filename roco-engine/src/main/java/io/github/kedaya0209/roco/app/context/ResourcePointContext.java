@@ -4,10 +4,10 @@ import net.jcip.annotations.ThreadSafe;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.kedaya0209.roco.app.config.PathConfig;
-import io.github.kedaya0209.roco.app.hook.HookEventType;
+import io.github.kedaya0209.roco.app.hook.AppEvents;
 import io.github.kedaya0209.roco.app.hook.event.NotificationType;
+import io.github.kedaya0209.roco.app.hook.event.ResourcePointChangedEvent;
 import io.github.kedaya0209.roco.app.hook.event.StatusEvent;
-import io.github.kedaya0209.roco.app.hook.multicast.HookRegistry;
 import io.github.kedaya0209.roco.app.map.model.Point;
 import io.github.kedaya0209.roco.app.map.model.ResourceConfig;
 import io.github.kedaya0209.roco.app.map.model.ResourcePoint;
@@ -70,7 +70,7 @@ public class ResourcePointContext {
             typeTemplates.putIfAbsent(config.getMarkTypeName(), config);
         }
         gridIndex.buildIndex(pointList);
-        HookRegistry.INSTANCE.publish(HookEventType.RESOURCE_POINT_CHANGED, null);
+        AppEvents.publish(ResourcePointChangedEvent.class, ResourcePointChangedEvent.INSTANCE);
     }
 
     /**
@@ -97,11 +97,11 @@ public class ResourcePointContext {
             saveToFile();
             preprocessPoints(); // 刷新内存
 
-            HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION,
+            AppEvents.publish(StatusEvent.class,
                     new StatusEvent("新增点位成功", NotificationType.SUCCESS));
         } catch (IOException e) {
             log.error("新增点位失败", e);
-            HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION,
+            AppEvents.publish(StatusEvent.class,
                     new StatusEvent("新增点位失败", NotificationType.ERROR));
         }
     }
@@ -118,12 +118,12 @@ public class ResourcePointContext {
                 saveToFile();
                 preprocessPoints(); // 刷新内存及网格索引
                 log.info("删除点位成功: {}", point.getConfig().getMarkTypeName());
-                HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION,
+                AppEvents.publish(StatusEvent.class,
                         new StatusEvent("点位移除成功", NotificationType.SUCCESS));
             }
         } catch (IOException e) {
             log.error("删除点位失败", e);
-            HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION,
+            AppEvents.publish(StatusEvent.class,
                     new StatusEvent("点位移除失败", NotificationType.ERROR));
         }
     }

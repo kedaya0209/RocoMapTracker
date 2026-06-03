@@ -7,7 +7,6 @@ import io.github.kedaya0209.roco.app.capture.frame.ROIData;
 import io.github.kedaya0209.roco.app.capture.pipeline.MapMatcherProcessor;
 import io.github.kedaya0209.roco.app.config.CaptureConfig;
 import io.github.kedaya0209.roco.app.context.StatsContext;
-import io.github.kedaya0209.roco.app.hook.multicast.HookRegistry;
 import io.github.kedaya0209.roco.app.match.SiftMatchHandler;
 import io.github.kedaya0209.roco.app.match.PlayerStateTracker;
 import io.github.kedaya0209.roco.app.ui.component.setting.SettingsStage;
@@ -45,7 +44,7 @@ public class CaptureServiceManager {
         if (captureService == null) return;
         MapMatcherProcessor siftProcessor = new MapMatcherProcessor(0, siftMatchClient,
                 CaptureFrameBuffer.getInstance(), StatsContext.getInstance(),
-                HookRegistry.INSTANCE::publish, new PlayerStateTracker());
+                new PlayerStateTracker());
         captureService.addProcessors(siftProcessor);
 
         List<ROIData> rois = new ArrayList<>();

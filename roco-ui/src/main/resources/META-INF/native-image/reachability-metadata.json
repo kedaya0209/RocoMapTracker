@@ -1454,6 +1454,22 @@
       ]
     },
     {
+      "type": "com.sun.prism.BaseContext",
+      "jniAccessible": true
+    },
+    {
+      "type": "com.sun.prism.BaseGraphics",
+      "jniAccessible": true
+    },
+    {
+      "type": "com.sun.prism.BaseShaderContext",
+      "jniAccessible": true
+    },
+    {
+      "type": "com.sun.prism.BaseShaderGraphics",
+      "jniAccessible": true
+    },
+    {
       "type": "com.sun.prism.GraphicsPipeline",
       "methods": [
         {
@@ -1467,6 +1483,18 @@
       ]
     },
     {
+      "type": "com.sun.prism.VertexBuffer",
+      "jniAccessible": true
+    },
+    {
+      "type": "com.sun.prism.d3d.D3DContext",
+      "jniAccessible": true
+    },
+    {
+      "type": "com.sun.prism.d3d.D3DGraphics",
+      "jniAccessible": true
+    },
+    {
       "type": "com.sun.prism.d3d.D3DPipeline",
       "methods": [
         {
@@ -1474,6 +1502,22 @@
           "parameterTypes": []
         }
       ]
+    },
+    {
+      "type": "com.sun.prism.d3d.D3DRTTexture",
+      "jniAccessible": true
+    },
+    {
+      "type": "com.sun.prism.d3d.D3DResource",
+      "jniAccessible": true
+    },
+    {
+      "type": "com.sun.prism.d3d.D3DResourceFactory",
+      "jniAccessible": true
+    },
+    {
+      "type": "com.sun.prism.d3d.D3DTexture",
+      "jniAccessible": true
     },
     {
       "type": "com.sun.prism.impl.PrismSettings",

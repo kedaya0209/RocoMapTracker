@@ -1,66 +1,40 @@
 package io.github.kedaya0209.roco.app.ui.hook;
 
 import net.jcip.annotations.NotThreadSafe;
-import io.github.kedaya0209.roco.app.hook.AbstractGenericHook;
-import io.github.kedaya0209.roco.app.hook.HookEventType;
+import io.github.kedaya0209.roco.app.hook.AppEvents;
 import io.github.kedaya0209.roco.app.hook.event.CaptureStateEvent;
 import io.github.kedaya0209.roco.app.hook.event.NotificationType;
 import io.github.kedaya0209.roco.app.hook.event.ProgressEvent;
 import io.github.kedaya0209.roco.app.hook.event.StatusEvent;
-import io.github.kedaya0209.roco.app.ui.component.LoadingOverlay;
-import io.github.kedaya0209.roco.app.ui.component.StatsOverlay;
-import io.github.kedaya0209.roco.app.ui.component.ToastManager;
+import io.github.kedaya0209.roco.app.ui.component.overlay.LoadingOverlay;
+import io.github.kedaya0209.roco.app.ui.component.overlay.StatsOverlay;
+import io.github.kedaya0209.roco.app.ui.component.overlay.ToastManager;
 import javafx.application.Platform;
 import javafx.scene.layout.StackPane;
 
-import java.util.Set;
 
 @NotThreadSafe
-public class UiResponseHook extends AbstractGenericHook<Object> {
-
-    private final StackPane rootStack;
-    private final LoadingOverlay globalLoading;
+public class UiResponseHook {
 
     public UiResponseHook(StackPane rootStack, LoadingOverlay globalLoading) {
-        this.rootStack = rootStack;
-        this.globalLoading = globalLoading;
-    }
-
-    @Override
-    public Set<HookEventType> supportedEvents() {
-        return Set.of(
-                HookEventType.UI_NOTIFICATION,
-                HookEventType.INIT_PROGRESS,
-                HookEventType.CAPTURE_STATE
-        );
-    }
-
-    @Override
-    public void onEvent(HookEventType type, Object data) {
-        Platform.runLater(() -> {
-            switch (type) {
-                case UI_NOTIFICATION -> {
-                    if (data instanceof StatusEvent(String message, NotificationType type1)) {
-                        ToastManager.show(rootStack, message, type1);
-                    }
-                }
-                case INIT_PROGRESS -> {
-                    if (data instanceof ProgressEvent(double value, String text) && globalLoading != null) {
-                        globalLoading.updateProgress(value, text);
-                    }
-                }
-                case CAPTURE_STATE -> {
-                    if (data instanceof CaptureStateEvent state) {
-                        if (state.connected()) {
-                            ToastManager.show(rootStack, "窗口连接成功 ID: " + state.id(), NotificationType.SUCCESS);
-                        } else {
-                            ToastManager.show(rootStack, "游戏连接断开，等待重连", NotificationType.ERROR);
-                        }
-                        // 这里调用你实际拥有的 update 方法来刷新显示逻辑
-                        StatsOverlay.getInstance().update();
-                    }
-                }
-            }
+        AppEvents.subscribe(StatusEvent.class, event -> {
+            if (event.displayMode() == StatusEvent.DisplayMode.CAROUSEL) return;
+            Platform.runLater(() -> ToastManager.show(rootStack, event.message(), event.type()));
         });
+        AppEvents.subscribe(ProgressEvent.class, event ->
+                Platform.runLater(() -> {
+                    if (globalLoading != null) {
+                        globalLoading.updateProgress(event.value(), event.text());
+                    }
+                }));
+        AppEvents.subscribe(CaptureStateEvent.class, event ->
+                Platform.runLater(() -> {
+                    if (event.connected()) {
+                        ToastManager.show(rootStack, "窗口连接成功 ID: " + event.id(), NotificationType.SUCCESS);
+                    } else {
+                        ToastManager.show(rootStack, "游戏连接断开，等待重连", NotificationType.ERROR);
+                    }
+                    StatsOverlay.getInstance().update();
+                }));
     }
 }

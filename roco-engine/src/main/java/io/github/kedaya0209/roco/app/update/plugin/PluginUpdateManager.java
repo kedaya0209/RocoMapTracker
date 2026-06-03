@@ -71,6 +71,8 @@ public class PluginUpdateManager {
     private volatile Consumer<String> onPluginDisabled;
     /** 插件启用回调 — 在 .disabled 标记删除后调用，参数为 pluginId */
     private volatile Consumer<String> onPluginEnabled;
+    /** 更新检查完成回调 — checkAllPlugins 后台线程结束后调用 */
+    private volatile Runnable onCheckComplete;
 
     public void setOnPluginDisabled(Consumer<String> callback) { this.onPluginDisabled = callback; }
     public void setOnPluginEnabled(Consumer<String> callback) { this.onPluginEnabled = callback; }
@@ -123,8 +125,11 @@ public class PluginUpdateManager {
                             key.reset();
                         }
 
-                        scanPlugins();
-                        cacheVersion.incrementAndGet();
+                        // 下载/解压进行中时跳过扫描，避免读到不完整的插件目录
+                        if (!downloading.get()) {
+                            scanPlugins();
+                            cacheVersion.incrementAndGet();
+                        }
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
                         break;
@@ -299,8 +304,19 @@ public class PluginUpdateManager {
 
             } finally {
                 checking.set(false);
+                Runnable cb = onCheckComplete;
+                if (cb != null) {
+                    cb.run();
+                }
             }
         });
+    }
+
+    /**
+     * 设置更新检查完成回调（一次性，checkAllPlugins 完成后自动清除）。
+     */
+    public void setOnCheckComplete(Runnable callback) {
+        this.onCheckComplete = callback;
     }
 
     /**
@@ -384,6 +400,7 @@ public class PluginUpdateManager {
                                 uiDelegate.showUpdateReady(pluginId, msg, () -> {});
                             }
                             scanPlugins();
+                            cacheVersion.incrementAndGet();
                             log.info("插件 {} 更新成功: {}", pluginId, update.version());
                         },
                         error -> {

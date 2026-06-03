@@ -2,13 +2,12 @@ package io.github.kedaya0209.roco.app.ui.component.setting;
 
 import atlantafx.base.theme.Styles;
 import io.github.kedaya0209.roco.app.capture.FullFrameControl;
-import io.github.kedaya0209.roco.app.hook.HookEventType;
-import io.github.kedaya0209.roco.app.hook.IHook;
-import io.github.kedaya0209.roco.app.hook.multicast.HookRegistry;
+import io.github.kedaya0209.roco.app.ui.component.setting.strategy.*;
 import io.github.kedaya0209.roco.app.ui.service.VersionMode;
 import io.github.kedaya0209.roco.app.ui.service.ui.ThemeManager;
 import io.github.kedaya0209.roco.app.ui.service.ui.VersionManager;
-import io.github.kedaya0209.roco.app.ui.util.DialogUtils;
+import io.github.kedaya0209.roco.app.ui.component.dialog.ConfirmDialog;
+import io.github.kedaya0209.roco.app.ui.state.AppState;
 import io.github.kedaya0209.roco.app.ui.util.FxRippleUtil;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
@@ -33,8 +32,9 @@ import lombok.extern.slf4j.Slf4j;
 import net.jcip.annotations.NotThreadSafe;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 
 /**
  * IntelliJ IDEA 风格设置面板 — 左侧分类列表 + 右侧配置面板 + 底部操作栏。
@@ -45,7 +45,7 @@ import java.util.Set;
  */
 @NotThreadSafe
 @Slf4j
-public class SettingsStage extends Stage implements IHook<Object> {
+public class SettingsStage extends Stage {
 
     private static volatile SettingsStage instance;
 
@@ -63,8 +63,8 @@ public class SettingsStage extends Stage implements IHook<Object> {
     private StackPane ownerRoot;
     private Button applyBtn;
     private Label titleLabel;
-    private PlayerPreview playerPreview;
-    private RoiPreview currentRoiPreview;
+    private final Map<String, CategoryRenderer> rendererMap = new HashMap<>();
+    private CategoryRenderer currentRenderer;
     private double dragX, dragY;
     /**
      * 首次打开标记：构造器不刷新分类，延迟到 showDialog 中执行
@@ -90,7 +90,12 @@ public class SettingsStage extends Stage implements IHook<Object> {
         });
 
         // 监听外部匹配状态变更，同步设置面板的 CheckBox
-        HookRegistry.INSTANCE.register(this);
+        AppState.getInstance().matchingEnabledProperty().addListener((_, _, now) -> {
+            Control ctrl = configManager.getControl("SIFT_MATCHING_ENABLED");
+            if (ctrl instanceof CheckBox cb) {
+                cb.setSelected(now);
+            }
+        });
 
         // --- 根布局 ---
         VBox root = new VBox();
@@ -139,6 +144,12 @@ public class SettingsStage extends Stage implements IHook<Object> {
                 refreshCategory(selected);
             }
         });
+
+        // 注册分类渲染策略
+        rendererMap.put("玩家", new PlayerCategoryRenderer());
+        rendererMap.put("匹配", new RoiCategoryRenderer());
+        rendererMap.put("OCR", new RoiCategoryRenderer());
+        rendererMap.put("插件管理", new PluginCategoryRenderer());
 
         // 搜索过滤
         searchField.textProperty().addListener((_, _, text) -> {
@@ -197,9 +208,11 @@ public class SettingsStage extends Stage implements IHook<Object> {
         okBtn.getStyleClass().addAll(Styles.ACCENT);
         FxRippleUtil.install(okBtn);
         okBtn.setOnAction(_ -> {
-            doApply();
+            boolean needsRestart = doApply();
             cleanupPreview();
-            hide();
+            if (!needsRestart) {
+                hide();
+            }
         });
 
         buttonBar.getChildren().addAll(cancelBtn, applyBtn, okBtn);
@@ -216,7 +229,10 @@ public class SettingsStage extends Stage implements IHook<Object> {
         if (themeCss != null) {
             scene.getStylesheets().add(themeCss);
         }
-        scene.getStylesheets().add(getClass().getResource("/styles/ui.css").toExternalForm());
+        java.net.URL uiCss = getClass().getResource("/styles/ui.css");
+        if (uiCss != null) {
+            scene.getStylesheets().add(uiCss.toExternalForm());
+        }
 
         setScene(scene);
 
@@ -260,22 +276,6 @@ public class SettingsStage extends Stage implements IHook<Object> {
         showDialog(ownerRoot, null);
     }
 
-    @Override
-    public Set<HookEventType> supportedEvents() {
-        return Set.of(HookEventType.STATUS_CAROUSEL);
-    }
-    @Override
-    public void onEvent(HookEventType type, Object data) {
-        Platform.runLater(() -> {
-            Control ctrl = configManager.getControl("SIFT_MATCHING_ENABLED");
-            if (ctrl instanceof CheckBox cb) {
-                Object val = configManager.readField("SIFT_MATCHING_ENABLED");
-                if (val instanceof Boolean b) {
-                    cb.setSelected(b);
-                }
-            }
-        });
-    }
 
     /**
      * 打开设置面板并选中指定分类
@@ -380,41 +380,39 @@ public class SettingsStage extends Stage implements IHook<Object> {
     private void refreshCategory(SettingCategory category) {
         configManager.clearControls();
 
-        // 停止上一个玩家预览（如有）
-        if (playerPreview != null) {
-            playerPreview.stop();
-            playerPreview = null;
+        // 清理上一个渲染策略
+        if (currentRenderer != null) {
+            currentRenderer.onHide(captureService);
+            currentRenderer = null;
         }
 
-        // 停止上一个 ROI 预览并关闭全帧模式
-        if (currentRoiPreview != null) {
-            currentRoiPreview.stop();
-            currentRoiPreview = null;
-        }
-        if (captureService != null) {
-            captureService.setFullFrameMode(false);
-        }
+        SettingFieldBuilder fieldBuilder = new SettingFieldBuilder(configManager, rootStackPane);
+        ScrollPane scroll = buildFieldScrollPane(category, fieldBuilder);
 
+        CategoryRenderer renderer = rendererMap.getOrDefault(category.name(), defaultRenderer);
+        rightPanel.getChildren().setAll(
+                renderer.render(category, scroll, configManager, fieldBuilder,
+                        rootStackPane, this, captureService));
+        currentRenderer = renderer;
+    }
+
+    private static final CategoryRenderer defaultRenderer = new DefaultCategoryRenderer();
+
+    private ScrollPane buildFieldScrollPane(SettingCategory category, SettingFieldBuilder fieldBuilder) {
         ScrollPane scroll = new ScrollPane();
         scroll.setFitToWidth(true);
         scroll.setStyle("-fx-background: transparent; -fx-background-color: transparent; -fx-border-color: transparent;");
         scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
 
-        SettingFieldBuilder fieldBuilder = new SettingFieldBuilder(configManager, rootStackPane);
-        VBox content = new VBox(6);
-        content.setPadding(new Insets(5, 10, 10, 10));
-
-        // 两栏布局：匹配分类配置项较多，使用 GridPane 两列排列
-        boolean twoColumns = "匹配".equals(category.name());
-
-        // 过滤掉 ROI 坐标字段（已显示在右侧面板中）
+        // 过滤掉 ROI 坐标字段（已由 RoiCategoryRenderer 在独立面板中显示）
         String roiPrefix = "匹配".equals(category.name()) ? "ROI_MAP_"
                 : "OCR".equals(category.name()) ? "ROI_OCR_" : null;
         List<SettingDef> fields = roiPrefix != null
                 ? category.fields().stream().filter(d -> !d.key().startsWith(roiPrefix)).toList()
                 : category.fields();
 
-        if (twoColumns) {
+        if ("匹配".equals(category.name()) && fields.size() > 6) {
+            // 两栏布局：匹配分类配置项较多，使用 GridPane 两列排列
             GridPane grid = new GridPane();
             grid.setHgap(20);
             grid.setVgap(6);
@@ -427,170 +425,71 @@ public class SettingsStage extends Stage implements IHook<Object> {
                 SettingDef def = fields.get(i);
                 int col = i % 2;
                 int row = i / 2;
-
-                Label label = new Label(def.label());
-                label.setStyle("-fx-text-fill: -color-fg-default; -fx-font-size: 13px;");
-                if (def.restartRequired()) {
-                    label.setText(label.getText() + " *");
-                    label.setStyle(label.getStyle() + " -fx-text-fill: -color-warning-fg;");
-                }
-
-                Node control = fieldBuilder.buildControl(def);
-                if (control instanceof Control c) {
-                    configManager.registerControl(def.key(), c);
-                }
-
-                HBox container = new HBox();
-                container.setAlignment(Pos.CENTER_LEFT);
-                Region spacer = new Region();
-                HBox.setHgrow(spacer, Priority.ALWAYS);
-                container.getChildren().addAll(label, spacer, control);
+                HBox container = buildFieldRow(def, fieldBuilder);
                 grid.add(container, col, row);
             }
             scroll.setContent(grid);
         } else {
+            VBox content = new VBox(6);
+            content.setPadding(new Insets(5, 10, 10, 10));
 
-            for (SettingDef def : fields) {
-                // 标签
-                Label label = new Label(def.label());
-                label.setStyle("-fx-text-fill: -color-fg-default; -fx-font-size: 13px;");
-                if (def.restartRequired()) {
-                    label.setText(label.getText() + " *");
-                    label.setStyle(label.getStyle() + " -fx-text-fill: -color-warning-fg;");
-                }
+            for (int i = 0; i < fields.size(); i++) {
+                SettingDef def = fields.get(i);
+                content.getChildren().add(buildFieldRow(def, fieldBuilder));
 
-                Node control = fieldBuilder.buildControl(def);
-                if (control instanceof Control c) {
-                    configManager.registerControl(def.key(), c);
-                }
-
-                // 标签左对齐，控件右对齐
-                HBox container = new HBox();
-                container.setAlignment(Pos.CENTER_LEFT);
-                Region spacer = new Region();
-                HBox.setHgrow(spacer, Priority.ALWAYS);
-                container.getChildren().addAll(label, spacer, control);
-                content.getChildren().add(container);
-
-                // 分隔线
-                if (def != fields.getLast()) {
+                if (i < fields.size() - 1) {
                     Region sep = new Region();
                     sep.setStyle("-fx-border-color: -color-border-muted; -fx-border-width: 0 0 0.5 0;");
                     sep.setPrefHeight(1);
                     content.getChildren().add(sep);
                 }
             }
-
             scroll.setContent(content);
-
-        } // end else (单列布局)
-
-        // 「玩家」分类：预览固定在顶部，不随列表滚动
-        if ("玩家".equals(category.name())) {
-            playerPreview = new PlayerPreview(configManager);
-            playerPreview.start();
-
-            VBox container = new VBox();
-            container.getChildren().addAll(playerPreview.getNode(), scroll);
-            VBox.setVgrow(scroll, Priority.ALWAYS);
-            rightPanel.getChildren().setAll(container);
-        } else if ("匹配".equals(category.name()) || "OCR".equals(category.name())) {
-            // ROI 分类：左侧截帧预览 + 右侧 ROI 坐标参数（万分比）
-            boolean isMatch = "匹配".equals(category.name());
-            int roiIdx = isMatch ? 0 : 1;
-            String prefix = isMatch ? "ROI_MAP_" : "ROI_OCR_";
-            Color accent = isMatch ? Color.rgb(0, 160, 255, 0.8) : Color.rgb(0, 200, 80, 0.8);
-            String title = "预览";
-
-            RoiPreview roiPreview = new RoiPreview(roiIdx, title, accent);
-            roiPreview.setOwnerStage(this);
-            roiPreview.start();
-            // 拖拽调整 ROI 后同步刷新右侧 Spinner 控件
-            roiPreview.setOnRoiChanged(() -> configManager.syncRoiControls(prefix));
-
-            // 全帧模式：显示完整窗口画面 + ROI 矩形叠加
-            roiPreview.setFullFrameMode(true, prefix);
-            currentRoiPreview = roiPreview;
-            if (captureService != null) {
-                captureService.setFullFrameMode(true);
-            }
-
-            // 右侧 ROI 坐标参数面板
-            VBox roiParamPanel = new VBox(8);
-            roiParamPanel.setPadding(new Insets(8, 10, 8, 10));
-            roiParamPanel.setPrefWidth(260);
-            roiParamPanel.setMinWidth(200);
-            roiParamPanel.setStyle("-fx-background-color: -color-bg-inset; -fx-background-radius: 6; " +
-                    "-fx-border-color: -color-border-muted; -fx-border-radius: 6; -fx-border-width: 0.5;");
-
-            Label roiParamTitle = new Label("ROI 坐标 (万分比)");
-            roiParamTitle.setStyle("-fx-text-fill: -color-fg-default; -fx-font-weight: bold; -fx-font-size: 12px;");
-            roiParamPanel.getChildren().add(roiParamTitle);
-
-            for (SettingDef def : category.fields()) {
-                if (!def.key().startsWith(prefix)) continue;
-                Label l = new Label(def.label());
-                l.setStyle("-fx-text-fill: -color-fg-default; -fx-font-size: 12px;");
-                Node ctrl = fieldBuilder.buildControl(def);
-                if (ctrl instanceof Control c) {
-                    configManager.registerControl(def.key(), c);
-                    if (c instanceof Spinner<?> sp) {
-                        sp.getValueFactory().valueProperty().addListener((_, _, newVal) -> {
-                            if (newVal != null) configManager.writeField(def.key(), newVal);
-                        });
-                        sp.getEditor().textProperty().addListener((_, _, _) -> {
-                            try {
-                                configManager.writeField(def.key(),
-                                        Integer.parseInt(sp.getEditor().getText()));
-                            } catch (NumberFormatException ignored) {
-                            }
-                        });
-                    }
-                }
-                HBox row = new HBox(8);
-                row.setAlignment(Pos.CENTER_LEFT);
-                row.getChildren().addAll(l, ctrl);
-                roiParamPanel.getChildren().add(row);
-            }
-
-            HBox topRow = new HBox(12);
-            HBox.setHgrow(roiPreview.getNode(), Priority.ALWAYS);
-            topRow.getChildren().addAll(roiPreview.getNode(), roiParamPanel);
-
-            VBox container = new VBox();
-            container.getChildren().addAll(topRow, scroll);
-            VBox.setVgrow(scroll, Priority.ALWAYS);
-            rightPanel.getChildren().setAll(container);
-        } else if ("插件管理".equals(category.name())) {
-            PluginManagementView pmv = new PluginManagementView();
-            pmv.setDialogRoot(rootStackPane);
-            pmv.refresh();
-            scroll.setContent(pmv.getNode());
-            rightPanel.getChildren().setAll(scroll);
-        } else {
-            rightPanel.getChildren().setAll(scroll);
         }
+        return scroll;
+    }
+
+    private HBox buildFieldRow(SettingDef def, SettingFieldBuilder fieldBuilder) {
+        Label label = new Label(def.label());
+        label.setStyle("-fx-text-fill: -color-fg-default; -fx-font-size: 13px;");
+        if (def.restartRequired()) {
+            label.setText(label.getText() + " *");
+            label.setStyle(label.getStyle() + " -fx-text-fill: -color-warning-fg;");
+        }
+
+        Node control = fieldBuilder.buildControl(def);
+        if (control instanceof Control c) {
+            configManager.registerControl(def.key(), c);
+        }
+
+        HBox container = new HBox();
+        container.setAlignment(Pos.CENTER_LEFT);
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+        container.getChildren().addAll(label, spacer, control);
+        return container;
     }
 
     // ================================================================
     // 操作
     // ================================================================
 
-    private void doApply() {
+    /**
+     * @return true 如果有配置变更需要重启才能生效
+     */
+    private boolean doApply() {
         List<String> restartFields = configManager.applyChanges();
         if (!restartFields.isEmpty()) {
             String msg = "以下配置项需要重启程序才能生效：\n" + String.join("\n", restartFields);
-            if (ownerRoot != null) {
-                DialogUtils.showSimpleDialog(rootStackPane, "需要重启", msg, "确定", false, () -> {
-                });
-            }
+            ConfirmDialog.showSimpleDialog(rootStackPane, "需要重启", msg, "确定", false, () -> {});
+            return true;
         }
+        return false;
     }
 
     private void cleanupPreview() {
-        if (currentRoiPreview != null) {
-            currentRoiPreview.stop();
-            currentRoiPreview = null;
+        if (currentRenderer != null) {
+            currentRenderer.onHide(captureService);
         }
         if (captureService != null) {
             captureService.setFullFrameMode(false);
@@ -603,7 +502,7 @@ public class SettingsStage extends Stage implements IHook<Object> {
 
         if (configManager.isModified()) {
             if (ownerRoot != null) {
-                DialogUtils.showConfirmDialog(rootStackPane, "未保存的更改",
+                ConfirmDialog.showConfirmDialog(rootStackPane, "未保存的更改",
                         "有未保存的更改，是否放弃？",
                         "放弃",
                         this::hide, () -> {

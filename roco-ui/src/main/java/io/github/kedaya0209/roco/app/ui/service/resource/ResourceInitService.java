@@ -9,11 +9,10 @@ import io.github.kedaya0209.roco.app.config.DownloadConfig;
 import io.github.kedaya0209.roco.app.context.MapContext;
 import io.github.kedaya0209.roco.app.context.ResourceConfigContext;
 import io.github.kedaya0209.roco.app.context.ResourcePointContext;
-import io.github.kedaya0209.roco.app.hook.HookEventType;
+import io.github.kedaya0209.roco.app.hook.AppEvents;
 import io.github.kedaya0209.roco.app.hook.event.NotificationType;
 import io.github.kedaya0209.roco.app.hook.event.ProgressEvent;
 import io.github.kedaya0209.roco.app.hook.event.StatusEvent;
-import io.github.kedaya0209.roco.app.hook.multicast.HookRegistry;
 import io.github.kedaya0209.roco.app.map.MapResourceUpdater;
 import io.github.kedaya0209.roco.app.map.core.DownloadProgressContext;
 import io.github.kedaya0209.roco.app.map.core.IconDownloader;
@@ -74,7 +73,7 @@ public class ResourceInitService {
                         initWithInternalProfile(onReady);
                     } catch (Exception e) {
                         log.error("内置资源初始化异常: ", e);
-                        HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION,
+                        AppEvents.publish(StatusEvent.class,
                                 new StatusEvent("内置资源初始化失败: " + e.getMessage(), NotificationType.ERROR));
                     }
                 });
@@ -83,7 +82,7 @@ public class ResourceInitService {
             }
         } catch (Exception e) {
             log.error("环境初始化致命异常: ", e);
-            HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION,
+            AppEvents.publish(StatusEvent.class,
                     new StatusEvent("核心服务启动失败: " + e.getMessage(), NotificationType.ERROR));
         }
     }
@@ -224,7 +223,7 @@ public class ResourceInitService {
                     initWithInternalProfile(onReady);
                 } catch (Exception e) { // initWithInternalProfile 声明 throws Exception，包含文件 I/O 和自定义异常
                     log.error("内置资源初始化异常: ", e);
-                    HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION,
+                    AppEvents.publish(StatusEvent.class,
                             new StatusEvent("内置资源初始化失败: " + e.getMessage(), NotificationType.ERROR));
                 }
             });
@@ -250,7 +249,7 @@ public class ResourceInitService {
 
         DownloadProgressContext.getInstance().setOnProgressUpdate((completed, total) -> {
             double progress = total <= 0 ? 0 : (double) completed / total;
-            HookRegistry.INSTANCE.publish(HookEventType.INIT_PROGRESS, new ProgressEvent(progress,
+            AppEvents.publish(ProgressEvent.class, new ProgressEvent(progress,
                     String.format("%s (%d/%d)", DownloadProgressContext.getInstance().getStatusText(), completed, total)));
         });
 
@@ -264,13 +263,13 @@ public class ResourceInitService {
                         initWithExternalProfile(onReady);
                     } else {
                         log.error("资源下载失败");
-                        HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION,
+                        AppEvents.publish(StatusEvent.class,
                                 new StatusEvent("资源同步失败，请检查网络", NotificationType.ERROR));
                     }
                 }
             } catch (Exception e) { // 包含网络 I/O 和 initWithExternalProfile（声明 throws Exception）
                 log.error("地图资源下载异常", e);
-                HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION,
+                AppEvents.publish(StatusEvent.class,
                         new StatusEvent("资源同步中断，请检查网络", NotificationType.ERROR));
             }
         });
@@ -359,7 +358,7 @@ public class ResourceInitService {
     // ================================================================
 
     private void publishInitStep(double progress, String message) {
-        HookRegistry.INSTANCE.publish(HookEventType.INIT_PROGRESS, new ProgressEvent(progress, message));
+        AppEvents.publish(ProgressEvent.class, new ProgressEvent(progress, message));
     }
 
     @ThreadSafe

@@ -1,5 +1,7 @@
 package io.github.kedaya0209.roco.app.ui.service.ui;
 
+import lombok.Getter;
+import lombok.Setter;
 import net.jcip.annotations.NotThreadSafe;
 import io.github.kedaya0209.roco.app.ui.service.VersionMode;
 import lombok.extern.slf4j.Slf4j;
@@ -17,7 +19,13 @@ public class VersionManager {
 
     private static final VersionManager INSTANCE = new VersionManager();
 
+    @Getter
     private volatile VersionMode currentMode = VersionMode.STANDARD;
+    /**
+     * -- SETTER --
+     *  注册切换回调（在 JavaFX Application 线程中调用）。
+     */
+    @Setter
     private Consumer<VersionMode> onSwitch;
 
     private VersionManager() {
@@ -25,17 +33,6 @@ public class VersionManager {
 
     public static VersionManager getInstance() {
         return INSTANCE;
-    }
-
-    public VersionMode getCurrentMode() {
-        return currentMode;
-    }
-
-    /**
-     * 注册切换回调（在 JavaFX Application 线程中调用）。
-     */
-    public void setOnSwitch(Consumer<VersionMode> callback) {
-        this.onSwitch = callback;
     }
 
     /**

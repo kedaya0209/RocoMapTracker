@@ -16,13 +16,10 @@ import io.github.kedaya0209.roco.app.config.NavigConfig;
 import io.github.kedaya0209.roco.app.config.UpdateConfig;
 import io.github.kedaya0209.roco.app.config.BuildConfig;
 import io.github.kedaya0209.roco.app.context.CameraContext;
-import io.github.kedaya0209.roco.app.hook.AppEvents;
-import io.github.kedaya0209.roco.app.hook.HookEventType;
-import io.github.kedaya0209.roco.app.hook.event.NavModeEvent;
-import io.github.kedaya0209.roco.app.hook.event.StatusCarouselEvent;
-import io.github.kedaya0209.roco.app.hook.multicast.HookRegistry;
+import io.github.kedaya0209.roco.app.ui.state.AppState;
+import io.github.kedaya0209.roco.app.ui.state.ViewportState;
 import io.github.kedaya0209.roco.app.match.map.SwitchMapMatcher;
-import io.github.kedaya0209.roco.app.ui.component.RouteManagerStage;
+import io.github.kedaya0209.roco.app.ui.component.widget.RouteManagerStage;
 import io.github.kedaya0209.roco.app.ui.service.ui.ThemeManager;
 import io.github.kedaya0209.roco.app.update.UpdateManager;
 import lombok.extern.slf4j.Slf4j;
@@ -269,8 +266,8 @@ public final class SettingDefinitions {
                 ),
                 cat("物资面板", "/icon/summary.svg",
                         bool("MATERIAL_COLLECTION", "物资采集统计",
-                                () -> ViewConfig.MATERIAL_COLLECTION,
-                                v -> ViewConfig.MATERIAL_COLLECTION = (Boolean) v),
+                                () -> AppState.getInstance().isMaterialCollection(),
+                                v -> AppState.getInstance().setMaterialCollection((Boolean) v)),
                         doub("RESOURCE_COUNTER_WIDTH", "面板宽度", true,
                                 () -> UiConfig.RESOURCE_COUNTER_WIDTH,
                                 v -> UiConfig.RESOURCE_COUNTER_WIDTH = (Double) v),
@@ -281,13 +278,11 @@ public final class SettingDefinitions {
                 cat("视角跟随", "/icon/navigation.svg",
                         bool("NAVIGATION_ENABLED", "启用视角跟随",
                                 () -> {
-                                    boolean enabled = NavigConfig.NAVIGATION_ENABLED;
+                                    boolean enabled = ViewportState.getInstance().isNavMode();
                                     CameraContext.getInstance().setNavMode(enabled);
-                                    HookRegistry.INSTANCE.publish(HookEventType.NAV_MODE_CHANGED, new NavModeEvent(enabled));
-                                    AppEvents.publish(NavModeEvent.class, new NavModeEvent(enabled));
                                     ConfigPersistence.save();
                                 },
-                                () -> NavigConfig.NAVIGATION_ENABLED,
+                                () -> ViewportState.getInstance().isNavMode(),
                                 v -> NavigConfig.NAVIGATION_ENABLED = (Boolean) v),
                         bool("AUTO_FOLLOW_MODE", "进入视角跟随时自动开启跟随",
                                 ConfigPersistence::save,
@@ -345,28 +340,16 @@ public final class SettingDefinitions {
                                 v -> ViewConfig.GRAY_DISTANCE = (Double) v)
                 ),
                 cat("玩家追踪", "/icon/follow.svg",
-                        doub("PLAYER_EMA_ALPHA", "位置平滑因子",
-                                () -> PlayerConfig.PLAYER_EMA_ALPHA,
-                                v -> PlayerConfig.PLAYER_EMA_ALPHA = (Double) v),
-                        doub("PLAYER_VELOCITY_EMA_ALPHA", "速度平滑因子",
-                                () -> PlayerConfig.PLAYER_VELOCITY_EMA_ALPHA,
-                                v -> PlayerConfig.PLAYER_VELOCITY_EMA_ALPHA = (Double) v),
-                        doub("PLAYER_ANGLE_EMA_ALPHA", "角度平滑因子",
-                                () -> PlayerConfig.PLAYER_ANGLE_EMA_ALPHA,
-                                v -> PlayerConfig.PLAYER_ANGLE_EMA_ALPHA = (Double) v),
-                        doub("PLAYER_ANGLE_OUTLIER_THRESHOLD", "角度离群阈值(度)",
-                                () -> PlayerConfig.PLAYER_ANGLE_OUTLIER_THRESHOLD,
-                                v -> PlayerConfig.PLAYER_ANGLE_OUTLIER_THRESHOLD = (Double) v),
+                        bool("DEFAULT_FOLLOW_MODE", "默认跟踪",
+                                () -> CameraContext.getInstance().setFollowMode(ViewConfig.DEFAULT_FOLLOW_MODE),
+                                () -> ViewConfig.DEFAULT_FOLLOW_MODE,
+                                v -> ViewConfig.DEFAULT_FOLLOW_MODE = (Boolean) v),
                         doub("PLAYER_TELEPORT_THRESHOLD", "瞬移检测阈值",
                                 () -> PlayerConfig.PLAYER_TELEPORT_THRESHOLD,
                                 v -> PlayerConfig.PLAYER_TELEPORT_THRESHOLD = (Double) v),
                         integer("PLAYER_MAP_LOST_THRESHOLD", "地图丢失容差(帧)",
                                 () -> PlayerConfig.PLAYER_MAP_LOST_THRESHOLD,
                                 v -> PlayerConfig.PLAYER_MAP_LOST_THRESHOLD = (Integer) v),
-                        bool("DEFAULT_FOLLOW_MODE", "默认跟踪",
-                                () -> CameraContext.getInstance().setFollowMode(ViewConfig.DEFAULT_FOLLOW_MODE),
-                                () -> ViewConfig.DEFAULT_FOLLOW_MODE,
-                                v -> ViewConfig.DEFAULT_FOLLOW_MODE = (Boolean) v),
                         doub("DEFAULT_FOLLOW_SCALE", "地图缩放值",
                                 () -> CameraContext.getInstance().setFollowScale(ViewConfig.DEFAULT_FOLLOW_SCALE),
                                 () -> ViewConfig.DEFAULT_FOLLOW_SCALE,
@@ -391,14 +374,9 @@ public final class SettingDefinitions {
                                 () -> SiftConfig.MAP_MATCHAER,
                                 v -> SiftConfig.MAP_MATCHAER = (String) v),
                         bool("SIFT_MATCHING_ENABLED", "启用SIFT匹配",
-                                () -> {
-                                    boolean now = SiftConfig.SIFT_MATCHING_ENABLED;
-                                    HookRegistry.INSTANCE.publish(HookEventType.STATUS_CAROUSEL,
-                                            now ? StatusCarouselEvent.matchingResumed()
-                                                 : StatusCarouselEvent.matchingPaused());
-                                },
-                                () -> SiftConfig.SIFT_MATCHING_ENABLED,
-                                v -> SiftConfig.SIFT_MATCHING_ENABLED = (Boolean) v),
+                                () -> {},
+                                () -> AppState.getInstance().isMatchingEnabled(),
+                                v -> AppState.getInstance().setMatchingEnabled((Boolean) v)),
                         integer("SIFT_N_FEATURES", "SIFT最大特征数", true,
                                 () -> SiftConfig.SIFT_N_FEATURES,
                                 v -> SiftConfig.SIFT_N_FEATURES = (Integer) v),

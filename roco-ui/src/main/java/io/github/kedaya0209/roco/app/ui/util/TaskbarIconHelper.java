@@ -93,7 +93,7 @@ public class TaskbarIconHelper {
             Method getWindows = windowClass.getMethod("getWindows");
             Object windows = getWindows.invoke(null);
             if (windows instanceof List<?> list && !list.isEmpty()) {
-                Object first = list.get(0);
+                Object first = list.getFirst();
                 Method getNativeWindow = first.getClass().getMethod("getNativeWindow");
                 Object result = getNativeWindow.invoke(first);
                 if (result instanceof Long hwndVal && hwndVal != 0) {

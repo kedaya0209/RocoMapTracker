@@ -4,7 +4,14 @@ import atlantafx.base.controls.ModalPane;
 import io.github.kedaya0209.roco.app.config.RenderConfig;
 import io.github.kedaya0209.roco.app.context.MapContext;
 import io.github.kedaya0209.roco.app.context.ResourceConfigContext;
-import io.github.kedaya0209.roco.app.ui.component.*;
+import io.github.kedaya0209.roco.app.ui.component.canvas.InteractiveCanvas;
+import io.github.kedaya0209.roco.app.ui.component.overlay.ResourceCounterPanel;
+import io.github.kedaya0209.roco.app.ui.component.overlay.StatsOverlay;
+import io.github.kedaya0209.roco.app.ui.component.sidebar.Sidebar;
+import io.github.kedaya0209.roco.app.ui.component.sidebar.UiAnimator;
+import io.github.kedaya0209.roco.app.ui.component.widget.FloatToolbox;
+import io.github.kedaya0209.roco.app.ui.component.widget.TitleBar;
+import io.github.kedaya0209.roco.app.ui.component.widget.VersionSelectorPanel;
 import io.github.kedaya0209.roco.app.ui.render.MapRenderer;
 import io.github.kedaya0209.roco.app.ui.service.resource.SvgManager;
 import io.github.kedaya0209.roco.app.ui.util.FxRippleUtil;
@@ -81,10 +88,6 @@ public final class MainUiComposer {
         interactiveCanvas.widthProperty().bind(canvasContainer.widthProperty());
         interactiveCanvas.heightProperty().bind(canvasContainer.heightProperty());
         canvasContainer.getChildren().add(interactiveCanvas);
-
-        // 视口大小变化 → 标记脏
-        canvasContainer.widthProperty().addListener(e -> renderer.markDirty());
-        canvasContainer.heightProperty().addListener(e -> renderer.markDirty());
 
         // 覆盖层组件
         StatsOverlay statsOverlay = StatsOverlay.getInstance();

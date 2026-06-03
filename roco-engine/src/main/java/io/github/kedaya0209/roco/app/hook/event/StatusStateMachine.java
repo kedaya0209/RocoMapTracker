@@ -8,7 +8,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * {@link StatusCarouselEvent} 状态机 — 确保状态轮播消息按合法生命周期流转。
+ * 状态机 — 确保状态轮播消息按合法生命周期流转。
  *
  * <p>每个状态键（capture/sift/minimap）独立跟踪当前状态，非法转换跳过并警告。
  * 状态机无副作用，仅维护状态和校验规则；事件发布由调用方负责。</p>
@@ -165,18 +165,4 @@ public final class StatusStateMachine {
         }
     }
 
-    // ======================== 键映射 ========================
-
-    /**
-     * 将 StatusCarouselEvent 的 key 字符串映射为 StatusKey 枚举。
-     */
-    public static StatusKey statusKeyOf(String key) {
-        return switch (key) {
-            case StatusCarouselEvent.KEY_CAPTURE -> StatusKey.CAPTURE;
-            case StatusCarouselEvent.KEY_SIFT -> StatusKey.SIFT;
-            case StatusCarouselEvent.KEY_MINIMAP -> StatusKey.MINIMAP;
-            case StatusCarouselEvent.KEY_MATCH -> StatusKey.MATCH;
-            default -> null;
-        };
-    }
 }

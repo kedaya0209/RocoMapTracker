@@ -4,5 +4,5 @@ import net.jcip.annotations.ThreadSafe;
 
 @ThreadSafe
 public enum NotificationType {
-    SUCCESS, ERROR, INFO
+    SUCCESS, ERROR, INFO, LOADING
 }
