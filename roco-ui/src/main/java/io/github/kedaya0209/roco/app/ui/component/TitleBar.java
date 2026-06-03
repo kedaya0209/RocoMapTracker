@@ -456,23 +456,17 @@ public class TitleBar extends HBox implements IHook<Object> {
             closeIcon.setStyle("-fx-stroke: -color-fg-muted; -fx-stroke-width: 2; -fx-stroke-line-cap: round;");
         });
 
-        // ===================== 【核心：添加关闭确认弹窗】 =====================
+        // ============ 【关闭确认弹窗 — 使用模态 Stage 确保置顶】 ============
         closeBtn.setOnAction(_ -> {
-            if (this.getParent() != null && this.getParent().getParent() instanceof StackPane rootStack) {
-                DialogUtils.showConfirmDialog(
-                        rootStack,
-                        "确认退出",
-                        "确定要关闭程序吗？\n所有识别与渲染服务将会停止运行。",
-                        "立即退出",
-                        // 确认：显式退出 JavaFX 应用
-                        () -> Platform.exit(),
-                        // 取消：什么都不做，直接关闭弹窗
-                        () -> {
-                        }
-                );
-            } else {
-                Platform.exit();
-            }
+            DialogUtils.showModalConfirmDialog(
+                    stage,
+                    "确认退出",
+                    "确定要关闭程序吗？\n所有识别与渲染服务将会停止运行。",
+                    "立即退出",
+                    () -> Platform.exit(),
+                    () -> {
+                    }
+            );
         });
         // ====================================================================
 
