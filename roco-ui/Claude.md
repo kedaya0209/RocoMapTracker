@@ -16,16 +16,25 @@ AI 协作专用 – 依赖 roco-engine（以及传递依赖），是最终应用
 - 瓦片管理：TileManager 管理多分辨率地图瓦片 ImageView 生命周期。
 - 设置面板：SettingsStage IntelliJ 风格设置窗口，支持 11 分类配置。
 - UI 组件：侧边栏、标题栏、路线管理、悬浮工具栏、右键菜单、通知 Toast 等。
+- **Command 系统**：CommandBus + 14 个 Command record + CommandHandlers 注册中心，统一状态变更入口。
 - 服务协调：ResourceInitService 资源初始化验证，CaptureServiceManager 截图服务看门狗，SiftClientManager SIFT 客户端管理。
 - 窗口管理：WindowManager 支持 8 方向边缘拖拽缩放。
 
 
-## 类清单 (54 个)
+## 类清单 (60 个)
 
 
 入口 (2 个)：
 Main                   入口点：初始化 OpenCV → launch JavaFX
 ModernCanvasApp        主 Application：初始化 + UI 构建 + 截图守护
+
+ui.command – Command 系统 (6 个)：
+UiCommand              标记接口，所有 Command record 实现它
+CommandBus             静态 dispatch 门面，封装 EventBus 独立实例
+CommandHandlers        集中注册 14 个 handler，统一状态写入 → Config → 通知 → 服务
+AppCommands            6 个应用级 Command record
+ViewportCommands       4 个视口 Command record
+SidebarCommands        4 个侧边栏 Command record
 
 ui.hook – Hook 实现 (1 个)：
 UiResponseHook         监听 UI_NOTIFICATION / INIT_PROGRESS / CAPTURE_STATE
@@ -95,8 +104,7 @@ VersionManager         版本切换管理
 service – 服务 (1 个)：
 VersionMode            版本模式枚举
 
-util (4 个)：
-DialogUtils            模态覆盖对话框工具
+util (3 个)：
 FxRippleUtil           Material Design 涟漪效果
 RestartUtils           Native Image 兼容的重启工具
 Win32TraySymbols       Win32 托盘图标和常量（TrayManager 静态符号）
@@ -117,6 +125,7 @@ Win32TraySymbols       Win32 托盘图标和常量（TrayManager 静态符号）
 | SiftClientManager    | 饿汉式        | siftMatchHandler 引用             |
 | InfrastructureManager| 饿汉式        | jobObject, socketServer           |
 | ThemeManager         | 饿汉式        | currentTheme                      |
+| FloatToolbox         | volatile 字段 | 浮动工具栏实例（CommandHandlers 访问）|
 
 注：MapRenderer、PlayerRenderer 等为 DCL 单例，由渲染循环持有。
 
@@ -128,11 +137,11 @@ Win32TraySymbols       Win32 托盘图标和常量（TrayManager 静态符号）
 
 | 类名                     | 用途                                       |
 |-------------------------|-------------------------------------------|
+| CommandBus              | 状态变更统一入口（dispatch/subscribe）       |
 | SvgManager              | SVG 门面：加载/缓存/构建/画线动画（委托子类）|
 | IconCache               | 图标纹理图集（彩色+灰度）                   |
 | TileManager             | 地图瓦片管理（多分辨率）                    |
 | MapRenderer             | 渲染循环协调（强制刷新 viewport）           |
-| DialogUtils             | 模态对话框（确认/警告/错误）                |
 | FxRippleUtil            | Material Design 涟漪动画                   |
 | RestartUtils            | Native Image 安全重启                      |
 | ThemeManager            | 主题切换                                   |
@@ -142,19 +151,47 @@ Win32TraySymbols       Win32 托盘图标和常量（TrayManager 静态符号）
 | ResourceInitService     | 资源初始化（首次运行复制外部文件）          |
 
 **使用示例**：
+- 状态变更：`CommandBus.dispatch(new ToggleMatchingCommand())`
 - SVG 加载：`SvgManager.getInstance().loadSvg("/icon/example.svg")`
 - 图标图集：`IconCache.getInstance().getIconView(resourceId, gray)`
-- 显示对话框：`DialogUtils.showConfirmDialog(title, message)`
 - 重启应用：`RestartUtils.restartApplication()`
 - 切换主题：`ThemeManager.getInstance().setTheme("Dark")`
 
 
+## UI 层架构 — 状态流统一
+
+状态流遵循两条纯净单向路径：
+
+```
+Command → State    |   State → UI
+(单一写入入口)     |   (仅 Property 绑定)
+```
+
+- **Command 路径**：UI 组件收到用户操作后，唯一动作是 `CommandBus.dispatch(command)`。CommandHandler 同步执行，统一完成：State Property 写入 → Config 写入 → EventBus 通知 → 服务调用。
+- **State 路径**：UI 组件通过 JavaFX Property binding / listener 响应状态变更（图标颜色、面板显隐、窗口透明度等），不直接修改状态。
+
+**数据流全景**：
+
+```
+用户操作 → UI 组件 → CommandBus.dispatch(command)
+                        ↓
+                CommandHandlers (同步，FX 线程)
+                        ↓
+        ┌─ State Property 写入 (AppState / ViewportState)
+        ├─ Config 静态字段写入 + 持久化
+        ├─ AppEvents.publish (Toast / 状态轮播)
+        └─ 服务调用 (CameraContext / SwitchMapMatcher 等)
+                        ↓
+              Property listener 触发 → UI 副作用
+```
+
+**核心约束**：
+- UI 组件只做两件事：读取 State 的 Property / dispatch Command
+- 禁止在 UI 组件中混用：Property 写入 + EventBus 发布 + 直接服务调用 + Config 写入
+- `CommandBus.dispatch` 在调用者线程同步执行，所有 handler 跑在 FX 线程
+
+
 ## 特殊约束
-
-
-UI 线程
-- 所有 JavaFX Node 操作必须在 `Platform.runLater()` 中执行。
-- Hook 回调中更新 UI 必须使用 `Platform.runLater()`。
 
 图标缓存
 - IconCache 使用纹理图集（彩色+灰度），GPU 槽位有限，不可无限添加图标。
@@ -194,31 +231,40 @@ Native Image 兼容
 ## 典型使用示例
 
 
+// 切换匹配开关（UI 组件只 dispatch command）
+CommandBus.dispatch(new ToggleMatchingCommand());
+
+// 切换幽灵模式
+CommandBus.dispatch(new ToggleGhostModeCommand());
+
+// 切换导航模式
+CommandBus.dispatch(new ToggleNavModeCommand());
+
+// 物资面板切换
+CommandBus.dispatch(new ToggleMaterialCollectionCommand());
+
+// 拖拽/缩放视口
+CommandBus.dispatch(new DragViewportCommand(dx, dy));
+CommandBus.dispatch(new ZoomViewportCommand(factor, mx, my));
+
+// 切换主题/算法/资源模式
+CommandBus.dispatch(new SwitchThemeCommand("NordDark"));
+CommandBus.dispatch(new SwitchAlgorithmCommand("SIFT"));
+CommandBus.dispatch(new SwitchResourceCommand(true));
+
+// 直接读取 State（Property binding）
+AppState.getInstance().matchingEnabledProperty().addListener(...);
+ViewportState.getInstance().navModeProperty().bind(...);
+
 // 显示通知
-HookRegistry.getInstance().publish(HookEventType.UI_NOTIFICATION, "匹配成功");
-
-// 更新加载进度
-HookRegistry.getInstance().publish(HookEventType.INIT_PROGRESS, 50);
-
-// 强制刷新地图渲染
-MapRenderer.getInstance().markDirty();
-
-// 获取玩家渲染器
-PlayerRenderer.getInstance().setAngle(45.0);
+AppEvents.publish(StatusEvent.class,
+        new StatusEvent("匹配已开启", NotificationType.SUCCESS, StatusEvent.DisplayMode.CAROUSEL));
 
 // 启动截图服务
 CaptureServiceManager.getInstance().startCapture();
 
-// 切换 SIFT 变体
-SiftClientManager.getInstance().switchVariant(SiftVariant.PCA_ULTRA);
-
 // 显示设置面板
 SettingsStage.getInstance().show();
-
-// 添加地图标记
-AddPointDialog.showAndWait(point -> {
-ResourcePointContext.getInstance().addPoint(point);
-});
 
 // 退出应用
 Platform.exit();

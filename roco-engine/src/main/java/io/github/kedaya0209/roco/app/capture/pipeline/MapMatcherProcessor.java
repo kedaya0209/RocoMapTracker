@@ -6,8 +6,9 @@ import io.github.kedaya0209.roco.app.capture.frame.ROIData;
 import io.github.kedaya0209.roco.app.config.CaptureConfig;
 import io.github.kedaya0209.roco.app.config.SiftConfig;
 import io.github.kedaya0209.roco.app.context.StatsContext;
-import io.github.kedaya0209.roco.app.hook.HookEventType;
-import io.github.kedaya0209.roco.app.hook.event.StatusCarouselEvent;
+import io.github.kedaya0209.roco.app.hook.AppEvents;
+import io.github.kedaya0209.roco.app.hook.event.NotificationType;
+import io.github.kedaya0209.roco.app.hook.event.StatusEvent;
 import io.github.kedaya0209.roco.app.hook.event.StatusStateMachine;
 import io.github.kedaya0209.roco.app.match.SiftMatchHandler;
 import io.github.kedaya0209.roco.app.match.SiftMatchProtocol;
@@ -18,7 +19,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.function.BiConsumer;
 
 /**
  * 地图匹配处理器 — 通过独立 C++ 进程 (sift_match.exe) 执行 SIFT 匹配。
@@ -41,7 +41,6 @@ public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
     private final PlayerStateTracker stateTracker;
     private final CaptureFrameBuffer frameBuffer;
     private final StatsContext stats;
-    private final BiConsumer<HookEventType, Object> hookPublisher;
     private final MatchingWatchdog watchdog;
 
     // 专用单线程池：SynchronousQueue 无缓冲，忙时新任务直接丢弃（只保留最新帧）
@@ -61,13 +60,11 @@ public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
     public MapMatcherProcessor(int targetRoiIndex, SiftMatchHandler matchClient,
                                 CaptureFrameBuffer frameBuffer,
                                 StatsContext stats,
-                                BiConsumer<HookEventType, Object> hookPublisher,
                                 PlayerStateTracker stateTracker) {
         this.targetRoiIndex = targetRoiIndex;
         this.matchClient = matchClient;
         this.frameBuffer = frameBuffer;
         this.stats = stats;
-        this.hookPublisher = hookPublisher;
         this.stateTracker = stateTracker;
         this.wasMatchingEnabled = SiftConfig.SIFT_MATCHING_ENABLED;
         long watchdogTimeout = Math.max(3000L, SiftConfig.MATCH_TIMEOUT_MS * 3);
@@ -91,14 +88,13 @@ public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
         boolean enabled = SiftConfig.SIFT_MATCHING_ENABLED;
         if (enabled != wasMatchingEnabled) {
             wasMatchingEnabled = enabled;
-            StatusStateMachine.State matchState = StatusStateMachine.getInstance()
-                    .currentState(StatusStateMachine.StatusKey.MATCH);
-            StatusCarouselEvent event = enabled
-                    ? StatusCarouselEvent.matchingResumed()
-                    : (matchState == StatusStateMachine.State.ACTIVE
-                            ? StatusCarouselEvent.matchingPaused() : null);
-            if (event != null) {
-                hookPublisher.accept(HookEventType.STATUS_CAROUSEL, event);
+            if (enabled) {
+                AppEvents.publish(StatusEvent.class,
+                        new StatusEvent("匹配已开启", NotificationType.SUCCESS, StatusEvent.DisplayMode.CAROUSEL));
+            } else if (StatusStateMachine.getInstance()
+                    .currentState(StatusStateMachine.StatusKey.MATCH) == StatusStateMachine.State.ACTIVE) {
+                AppEvents.publish(StatusEvent.class,
+                        new StatusEvent("匹配已暂停", NotificationType.INFO, StatusEvent.DisplayMode.CAROUSEL));
             }
         }
         if (!enabled) return;

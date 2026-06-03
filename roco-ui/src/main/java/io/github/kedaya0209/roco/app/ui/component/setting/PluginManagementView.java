@@ -2,7 +2,7 @@ package io.github.kedaya0209.roco.app.ui.component.setting;
 
 import atlantafx.base.theme.Styles;
 import io.github.kedaya0209.roco.app.ui.service.resource.SvgManager;
-import io.github.kedaya0209.roco.app.ui.util.DialogUtils;
+import io.github.kedaya0209.roco.app.ui.component.dialog.ConfirmDialog;
 import io.github.kedaya0209.roco.app.ui.util.FxRippleUtil;
 import io.github.kedaya0209.roco.app.update.plugin.PluginInfo;
 import io.github.kedaya0209.roco.app.update.plugin.PluginStatus;
@@ -302,7 +302,7 @@ public class PluginManagementView {
                 mgr.setUpdateCompletionCallback(pid, message ->
                         Platform.runLater(() -> {
                             if (dialogRoot != null) {
-                                DialogUtils.showSimpleDialog(dialogRoot, "插件更新", message,
+                                ConfirmDialog.showSimpleDialog(dialogRoot, "插件更新", message,
                                         "确定", false, this::refresh);
                             }
                         }));
@@ -327,7 +327,7 @@ public class PluginManagementView {
         });
         deleteBtn.setOnMouseClicked(e -> {
             if (dialogRoot != null) {
-                DialogUtils.showConfirmDialog(dialogRoot,
+                ConfirmDialog.showConfirmDialog(dialogRoot,
                         "卸载插件",
                         "确定要卸载「" + plugin.title() + "」吗？\n插件目录和下载缓存将被删除。",
                         "确认卸载",

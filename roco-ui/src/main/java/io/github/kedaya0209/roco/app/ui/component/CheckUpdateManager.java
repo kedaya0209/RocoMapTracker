@@ -1,9 +1,5 @@
 package io.github.kedaya0209.roco.app.ui.component;
 
-import io.github.kedaya0209.roco.app.hook.event.NotificationType;
-import io.github.kedaya0209.roco.app.hook.event.StatusEvent;
-import io.github.kedaya0209.roco.app.hook.multicast.HookRegistry;
-import io.github.kedaya0209.roco.app.hook.HookEventType;
 import io.github.kedaya0209.roco.app.ui.service.resource.SvgManager;
 import io.github.kedaya0209.roco.app.ui.util.FxRippleUtil;
 import io.github.kedaya0209.roco.app.update.UpdateManager;

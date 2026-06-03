@@ -2,19 +2,13 @@ package io.github.kedaya0209.roco.app.ui.component;
 
 import atlantafx.base.theme.Styles;
 import io.github.kedaya0209.roco.app.config.*;
-import io.github.kedaya0209.roco.app.context.CameraContext;
 import io.github.kedaya0209.roco.app.context.ResourceConfigContext;
-import io.github.kedaya0209.roco.app.hook.AppEvents;
-import io.github.kedaya0209.roco.app.hook.HookEventType;
-import io.github.kedaya0209.roco.app.hook.event.NavModeEvent;
-import io.github.kedaya0209.roco.app.hook.event.NotificationType;
-import io.github.kedaya0209.roco.app.hook.event.StatusEvent;
-import io.github.kedaya0209.roco.app.hook.multicast.HookRegistry;
 import io.github.kedaya0209.roco.app.match.map.SwitchMapMatcher;
+import io.github.kedaya0209.roco.app.ui.component.dialog.AboutDialog;
 import io.github.kedaya0209.roco.app.ui.component.setting.SettingsStage;
 import io.github.kedaya0209.roco.app.ui.service.ui.ThemeManager;
-import io.github.kedaya0209.roco.app.ui.util.DialogUtils;
-import io.github.kedaya0209.roco.app.ui.util.RestartUtils;
+import io.github.kedaya0209.roco.app.ui.state.AppState;
+import io.github.kedaya0209.roco.app.ui.state.ViewportState;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -44,7 +38,7 @@ public class Sidebar extends VBox {
     private final ObservableList<SidebarItem> items = FXCollections.observableArrayList();
     private RouteManagerStage routeManagerStage;
     private SidebarItem.Category expandedCategory = null;
-    private volatile boolean isAlgorithmLoading = false;
+    private final SidebarActionHandler actionHandler = new SidebarActionHandler();
     @Setter
     private StackPane rootStack;
     @Setter
@@ -119,13 +113,13 @@ public class Sidebar extends VBox {
                 null, false, "/icon/theme.svg", null));
         items.add(new SidebarItem(SidebarItem.Type.HEADER, "视角跟随",
                 SidebarItem.Category.NAVIGATION,
-                NavigConfig.NAVIGATION_ENABLED ? "已开启" : "已关闭",
+                ViewportState.getInstance().isNavMode() ? "已开启" : "已关闭",
                 null, false, "/icon/navigation.svg", null));
 
         // 匹配开关
         items.add(new SidebarItem(SidebarItem.Type.HEADER, "匹配开关",
                 SidebarItem.Category.MATCH,
-                SiftConfig.SIFT_MATCHING_ENABLED ? "已开启" : "已关闭",
+                AppState.getInstance().isMatchingEnabled() ? "已开启" : "已关闭",
                 null, false, "/icon/match_toggle.svg", null));
 
         // 操作项
@@ -184,35 +178,24 @@ public class Sidebar extends VBox {
         if (header == null) return;
 
         switch (cat) {
-            case ALGORITHM -> switchAlgorithm(value, header);
-            case RESOURCE -> switchResource(value, header);
-            case THEME -> switchTheme(value, header);
-            case NAVIGATION -> handleNavOption(value, header);
+            case ALGORITHM -> actionHandler.switchAlgorithm(value,
+                    () -> updateHeaderValue(header, value), this::closeSidebarAfterDelay);
+            case RESOURCE -> actionHandler.switchResource(value, findRootPane());
+            case THEME -> actionHandler.switchTheme(value,
+                    () -> updateHeaderValue(header, value));
+            case NAVIGATION -> {
+                if ("打开导航设置".equals(value)) {
+                    openSettingsCategory("视角跟随");
+                } else {
+                    actionHandler.handleNavToggle(
+                            newVal -> updateHeaderValue(header, newVal),
+                            this::closeSidebarAfterDelay);
+                }
+            }
             case MATCH -> {
             }
         }
         collapseCurrent();
-    }
-
-    private void handleNavOption(String value, SidebarItem header) {
-        switch (value) {
-            case "启用视角跟随" -> {
-                boolean enabled = !NavigConfig.NAVIGATION_ENABLED;
-                NavigConfig.NAVIGATION_ENABLED = enabled;
-                CameraContext.getInstance().setNavMode(enabled);
-                HookRegistry.INSTANCE.publish(HookEventType.NAV_MODE_CHANGED, new NavModeEvent(enabled));
-                AppEvents.publish(NavModeEvent.class, new NavModeEvent(enabled));
-                updateHeaderValue(header, enabled ? "已开启" : "已关闭");
-                closeSidebarAfterDelay();
-            }
-            case "打开导航设置" -> openSettingsCategory("视角跟随");
-        }
-    }
-
-    private void closeSidebarAfterDelay() {
-        Platform.runLater(() -> {
-            if (animator != null) animator.closeSidebar();
-        });
     }
 
     private void collapseCurrent() {
@@ -221,51 +204,10 @@ public class Sidebar extends VBox {
         expandedCategory = null;
     }
 
-    // ══════════ 算法/资源/主题 切换 ══════════
-
-    private void switchAlgorithm(String algo, SidebarItem header) {
-        if (isAlgorithmLoading) return;
-        isAlgorithmLoading = true;
-        updateHeaderValue(header, algo);
-
-        Thread.ofPlatform().daemon(true).name("sidebar-switch-algo").start(() -> {
-            try {
-                SwitchMapMatcher.getInstance().switchMapMatcher(algo);
-                HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION,
-                        new StatusEvent("正在重启匹配引擎: " + algo + " ...", NotificationType.INFO));
-            } catch (Exception e) {
-                HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION,
-                        new StatusEvent("切换算法失败", NotificationType.ERROR));
-            } finally {
-                Platform.runLater(() -> isAlgorithmLoading = false);
-            }
+    private void closeSidebarAfterDelay() {
+        Platform.runLater(() -> {
+            if (animator != null) animator.closeSidebar();
         });
-    }
-
-    private void switchResource(String resource, SidebarItem header) {
-        boolean isInternal = resource.equals("内置资源");
-        if (isInternal == DownloadConfig.INTERNAL_RESOURCE) return;
-
-        DialogUtils.showConfirmDialog(
-                findRootPane(),
-                "模式切换",
-                "切换资源模式需要重启程序生效，是否继续？",
-                "立即重启",
-                () -> {
-                    DownloadConfig.INTERNAL_RESOURCE = isInternal;
-                    ConfigPersistence.save();
-                    RestartUtils.restart();
-                },
-                () -> {
-                }
-        );
-    }
-
-    private void switchTheme(String name, SidebarItem header) {
-        updateHeaderValue(header, name);
-        ThemeManager.switchTheme(name);
-        HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION,
-                new StatusEvent("主题已切换: " + name, NotificationType.SUCCESS));
     }
 
     // ══════════ 工具方法 ══════════
@@ -325,7 +267,7 @@ public class Sidebar extends VBox {
     private void openAboutDialog() {
         StackPane rootPane = findRootPane();
         if (rootPane == null) return;
-        DialogUtils.showAboutDialog(rootPane,
+        AboutDialog.showAboutDialog(rootPane,
                 BuildConfig.APP_NAME,
                 BuildConfig.APP_VERSION,
                 BuildConfig.BUILD_TIMESTAMP,

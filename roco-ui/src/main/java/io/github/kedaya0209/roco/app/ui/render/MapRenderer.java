@@ -5,14 +5,11 @@ import io.github.kedaya0209.roco.app.ui.service.NavigationController;
 import io.github.kedaya0209.roco.app.config.RenderConfig;
 import io.github.kedaya0209.roco.app.context.CameraContext;
 import io.github.kedaya0209.roco.app.context.MapContext;
-import io.github.kedaya0209.roco.app.hook.HookEventType;
-import io.github.kedaya0209.roco.app.hook.IHook;
-import io.github.kedaya0209.roco.app.hook.multicast.HookRegistry;
 import io.github.kedaya0209.roco.app.map.model.ResourcePoint;
 import io.github.kedaya0209.roco.app.ui.component.StatsOverlay;
 import io.github.kedaya0209.roco.app.ui.service.resource.TileManager;
+import io.github.kedaya0209.roco.app.ui.state.ViewportState;
 import javafx.animation.KeyFrame;
-import javafx.application.Platform;
 import javafx.animation.Timeline;
 import javafx.scene.Group;
 import javafx.scene.image.Image;
@@ -25,7 +22,6 @@ import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
-import java.util.Set;
 
 /**
  * 地图渲染器编排器 — 维护帧循环 + 世界 GPU 变换 + 瓦片调度，
@@ -50,7 +46,7 @@ import java.util.Set;
  */
 @NotThreadSafe
 @Slf4j
-public class MapRenderer implements IHook<Object> {
+public class MapRenderer {
 
     @Getter
     private final Pane parent;
@@ -113,8 +109,6 @@ public class MapRenderer implements IHook<Object> {
         loop = new Timeline(new KeyFrame(Duration.millis(RenderConfig.RENDER_FRAME_INTERVAL_MS), _ -> onFrame()));
         loop.setCycleCount(Timeline.INDEFINITE);
 
-        // 资源点位变更 → 标记脏缓存，下次帧循环重绘
-        HookRegistry.INSTANCE.register(this);
     }
 
     /**
@@ -140,12 +134,6 @@ public class MapRenderer implements IHook<Object> {
         tileManager.reset();
     }
 
-    /**
-     * 通知路线/资源点变化（路线层已改为每帧重绘，此方法保留兼容调用方）
-     */
-    public void markDirty() {
-    }
-
     private void onFrame() {
         try {
             onFrameInternal();
@@ -159,15 +147,21 @@ public class MapRenderer implements IHook<Object> {
     private void onFrameInternal() {
         StatsOverlay.getInstance().update();
 
-        MapContext mm = MapContext.getInstance();
         CameraContext cam = CameraContext.getInstance();
-
         cam.updateViewport();
 
+        // offset/scale 从 MapContext 读取（引擎源，每帧随拖拽/缩放变化）
+        MapContext mm = MapContext.getInstance();
+        // nav/follow/player 状态从 ViewportState 读取
+        ViewportState vp = ViewportState.getInstance();
+
         // 导航模式：每帧更新旋转控制
-        if (mm.isPlayerInitialized()) {
-            navigationController.update(mm.getPlayerAngle(), cam.isNavMode());
+        if (vp.isPlayerInitialized()) {
+            navigationController.update(vp.getPlayerAngle(), vp.isNavMode());
         }
+
+        // 帧同步：navAngle 从 CameraContext → ViewportState（不经过 EventBus，避免每帧发布）
+        vp.setNavAngle(cam.getNavAngle());
 
         double ox = mm.getOffsetX();
         double oy = mm.getOffsetY();
@@ -181,6 +175,7 @@ public class MapRenderer implements IHook<Object> {
                 ox = mm.getOffsetX();
                 oy = mm.getOffsetY();
                 scale = mm.getScale();
+                vp.syncFromMapContext();
                 log.info("首帧 view={}x{} scale={} ox={} oy={}",
                         (int) parent.getWidth(), (int) parent.getHeight(),
                         String.format("%.4f", scale), (int) ox, (int) oy);
@@ -190,7 +185,7 @@ public class MapRenderer implements IHook<Object> {
         boolean scaleChanged = Math.abs(scale - lastScale) > 1e-9;
         boolean viewportMoved = firstFrame || Math.abs(ox - lastOx) > 1e-9 || Math.abs(oy - lastOy) > 1e-9;
 
-        // ====== GPU 变换（跳过未改变的 setter，避免触发 JavaFX 属性失效/布局重新计算） ======
+        // ====== GPU 变换 ======
         if (scaleChanged) {
             worldScale.setX(scale);
             worldScale.setY(scale);
@@ -201,10 +196,10 @@ public class MapRenderer implements IHook<Object> {
         }
 
         // ====== 导航模式旋转 ======
-        if (cam.isNavMode()) {
+        if (vp.isNavMode()) {
             double pivotX = parent.getWidth() / 2;
             double pivotY = parent.getHeight() / 2;
-            double navAngle = cam.getNavAngle();
+            double navAngle = vp.getNavAngle();
             worldRotate.setPivotX(pivotX);
             worldRotate.setPivotY(pivotY);
             worldRotate.setAngle(-navAngle);
@@ -212,20 +207,26 @@ public class MapRenderer implements IHook<Object> {
             worldRotate.setAngle(0);
         }
 
-        // ====== 子渲染器（各层从上下文单例自行读取数据） ======
-        // 写入快照，避免子渲染器多次 volatile 读取引入数据竞争
+        // ====== 帧同步 ViewportState（仅在值变化时 set，避免无效 listener 触发） ======
+        if (scaleChanged) {
+            vp.setScale(scale);
+        }
+        if (viewportMoved) {
+            vp.setOffsetX(ox);
+            vp.setOffsetY(oy);
+        }
+
+        // ====== 子渲染器 ======
         playerRenderer.snapshotScale = scale;
         playerRenderer.snapshotOx = ox;
         playerRenderer.snapshotOy = oy;
-        playerRenderer.snapshotPlayerX = mm.getPlayerX();
-        playerRenderer.snapshotPlayerY = mm.getPlayerY();
         playerRenderer.snapshotPivotX = parent.getWidth() / 2;
         playerRenderer.snapshotPivotY = parent.getHeight() / 2;
         for (RenderLayer layer : renderLayers) {
             layer.onFrame();
         }
 
-        // ====== 瓦片加载（缩放稳定后执行） ======
+        // ====== 瓦片加载 ======
         if (scaleChanged) {
             tileManager.onScaleChanged();
         } else {
@@ -260,18 +261,6 @@ public class MapRenderer implements IHook<Object> {
         mm.setScale(s);
         mm.setOffsetX(tx);
         mm.setOffsetY(ty);
-    }
-
-    // ==================== IHook ====================
-
-    @Override
-    public Set<HookEventType> supportedEvents() {
-        return Set.of(HookEventType.RESOURCE_POINT_CHANGED);
-    }
-
-    @Override
-    public void onEvent(HookEventType eventType, Object data) {
-        Platform.runLater(this::markDirty);
     }
 
     // ==================== 公开 API ====================

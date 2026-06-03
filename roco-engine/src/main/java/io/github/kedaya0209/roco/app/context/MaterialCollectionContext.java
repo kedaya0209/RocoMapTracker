@@ -1,9 +1,8 @@
 package io.github.kedaya0209.roco.app.context;
 
 import net.jcip.annotations.ThreadSafe;
-import io.github.kedaya0209.roco.app.hook.HookEventType;
+import io.github.kedaya0209.roco.app.hook.AppEvents;
 import io.github.kedaya0209.roco.app.hook.event.MaterialCollectionEvent;
-import io.github.kedaya0209.roco.app.hook.multicast.HookRegistry;
 import io.github.kedaya0209.roco.app.map.model.ResourceConfig;
 import io.github.kedaya0209.roco.app.map.model.ResourcePoint;
 import lombok.Data;
@@ -60,7 +59,7 @@ public class MaterialCollectionContext {
         log.info("📦 [采集记录] {} +{}, 当前累计: {}", name, amount, summaryMap.get(name));
 
         // 2. 通过事件总线通知 UI 层刷新
-        HookRegistry.INSTANCE.publish(HookEventType.MATERIAL_COLLECTION_UPDATED,
+        AppEvents.publish(MaterialCollectionEvent.class,
                 new MaterialCollectionEvent(new TreeMap<>(summaryMap), new HashMap<>(backpackTotals)));
     }
 
@@ -85,7 +84,7 @@ public class MaterialCollectionContext {
 
         log.info("📦 [网络拾取] {} +{}, 背包:{}, 累计:{}", itemName, pickupNum, backpackTotal, summaryMap.get(itemName));
 
-        HookRegistry.INSTANCE.publish(HookEventType.MATERIAL_COLLECTION_UPDATED,
+        AppEvents.publish(MaterialCollectionEvent.class,
                 new MaterialCollectionEvent(new TreeMap<>(summaryMap), new HashMap<>(backpackTotals)));
     }
 
@@ -99,7 +98,7 @@ public class MaterialCollectionContext {
         firstLootTimestamp.set(0);
 
         // 通知 UI 数据已清空（面板内部会处理 hide 逻辑）
-        HookRegistry.INSTANCE.publish(HookEventType.MATERIAL_COLLECTION_UPDATED,
+        AppEvents.publish(MaterialCollectionEvent.class,
                 new MaterialCollectionEvent(Collections.emptyMap()));
 
         log.info("♻️ 采集上下文已重置");

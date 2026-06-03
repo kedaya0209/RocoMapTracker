@@ -5,19 +5,19 @@ import net.jcip.annotations.NotThreadSafe;
 import net.jcip.annotations.ThreadSafe;
 import atlantafx.base.theme.Styles;
 import io.github.kedaya0209.roco.app.config.CaptureConfig;
-import io.github.kedaya0209.roco.app.config.ConfigPersistence;
 import io.github.kedaya0209.roco.app.config.NavigConfig;
 import io.github.kedaya0209.roco.app.config.PathConfig;
-import io.github.kedaya0209.roco.app.config.SiftConfig;
-import io.github.kedaya0209.roco.app.context.CameraContext;
-import io.github.kedaya0209.roco.app.context.MapContext;
-import io.github.kedaya0209.roco.app.hook.HookEventType;
-import io.github.kedaya0209.roco.app.hook.IHook;
-import io.github.kedaya0209.roco.app.hook.event.NavModeEvent;
-import io.github.kedaya0209.roco.app.hook.event.StatusCarouselEvent;
-import io.github.kedaya0209.roco.app.hook.multicast.HookRegistry;
+import io.github.kedaya0209.roco.app.hook.AppEvents;
+import io.github.kedaya0209.roco.app.hook.event.StatusEvent;
 import io.github.kedaya0209.roco.app.ui.service.resource.SvgManager;
-import io.github.kedaya0209.roco.app.ui.util.DialogUtils;
+import io.github.kedaya0209.roco.app.ui.command.AppCommands.SetWindowOpacityCommand;
+import io.github.kedaya0209.roco.app.ui.command.AppCommands.ToggleGhostModeCommand;
+import io.github.kedaya0209.roco.app.ui.command.AppCommands.ToggleMatchingCommand;
+import io.github.kedaya0209.roco.app.ui.command.AppCommands.ToggleNavModeCommand;
+import io.github.kedaya0209.roco.app.ui.command.CommandBus;
+import io.github.kedaya0209.roco.app.ui.state.AppState;
+import io.github.kedaya0209.roco.app.ui.state.ViewportState;
+import io.github.kedaya0209.roco.app.ui.component.dialog.ModalConfirmDialog;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Group;
@@ -38,12 +38,11 @@ import javafx.util.Duration;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
-import java.util.Set;
 
 @NotThreadSafe
 @Slf4j
 
-public class TitleBar extends HBox implements IHook<Object> {
+public class TitleBar extends HBox {
 
     private double xOffset = 0;
     private double yOffset = 0;
@@ -53,10 +52,8 @@ public class TitleBar extends HBox implements IHook<Object> {
     private boolean navMode = false;
     /** 导航模式按钮，供外部引用图标着色 */
     private final Button navBtn;
-    /** 匹配开关按钮 */
-    private final Button matchToggleBtn;
-    /** 幽灵模式按钮 */
-    private final Button ghostBtn;
+    /** 窗口引用，供 syncNavUi 设置透明度 */
+    private final Stage stageRef;
     /** 幽灵模式图标 */
     private final Node ghostIcon;
     /** 幽灵模式透明度滑块 */
@@ -64,8 +61,6 @@ public class TitleBar extends HBox implements IHook<Object> {
     /** 标题栏内联状态轮播标签 */
     private final Label statusLabel = new Label();
     private static final double STATUS_H = 20;
-    /** 最小化按钮 */
-    private final Button minimizeBtn;
     /** 最小化至托盘回调
      * -- SETTER --
      *  设置最小化至托盘回调。
@@ -75,6 +70,7 @@ public class TitleBar extends HBox implements IHook<Object> {
 
     private TitleBar(Stage stage, Button menuBtn, Node... overlayNodes) {
         super(12);
+        this.stageRef = stage;
 
         setAlignment(Pos.CENTER_LEFT);
         setPadding(new Insets(5, 10, 5, 10));
@@ -107,39 +103,35 @@ public class TitleBar extends HBox implements IHook<Object> {
         opacitySlider.setDisable(true); // 非幽灵模式下禁用，防止误触
         opacitySlider.setStyle("-fx-control-inner-background: -color-accent-emphasis;");
         // 滑块值变化 → 设置窗口透明度；导航模式下同步回 NavigConfig
-        opacitySlider.valueProperty().addListener((_, _, val) -> {
-            stage.setOpacity(val.doubleValue());
-            if (navMode) {
-                NavigConfig.NAV_WINDOW_OPACITY = val.doubleValue();
-            }
-        });
+        opacitySlider.valueProperty().addListener((_, _, val) ->
+                stage.setOpacity(val.doubleValue()));
         // 拖动结束 → 持久化透明度
-        opacitySlider.setOnMouseReleased(_ -> ConfigPersistence.save());
+        opacitySlider.setOnMouseReleased(_ ->
+                CommandBus.dispatch(new SetWindowOpacityCommand(opacitySlider.getValue())));
 
         // --- 2. 幽灵模式锚点图标 ---
-        ghostBtn = new Button();
+        /** 幽灵模式按钮 */
+        Button ghostBtn = new Button();
+        ghostBtn.setFocusTraversable(false);
         ghostBtn.getStyleClass().add("title-bar-btn");
 
         ghostIcon = createGhostIcon();
         setSvgFill(ghostIcon, "-color-fg-muted");
         ghostBtn.setGraphic(ghostIcon);
 
-        ghostBtn.setOnAction(_ -> {
-            ghostMode = !ghostMode;
+        ghostBtn.setOnAction(_ ->
+                CommandBus.dispatch(new ToggleGhostModeCommand()));
 
-            // 切换状态显示：激活态使用 accent，非激活恢复 fg-muted
-            setSvgFill(ghostIcon, ghostMode ? "-color-accent-emphasis" : "-color-fg-muted");
-
-            // --- 核心改动：滑块显示切换 ---
+        // 幽灵模式 Property → UI 副作用
+        AppState.getInstance().ghostModeProperty().addListener((_, _, now) -> {
+            ghostMode = now;
+            setSvgFill(ghostIcon, now ? "-color-accent-emphasis" : "-color-fg-muted");
             updateSliderVisibility();
-            opacitySlider.setDisable(!ghostMode && !navMode);
-
-            stage.setAlwaysOnTop(ghostMode);
-            menuBtn.setMouseTransparent(ghostMode);
-            for (Node node : overlayNodes) node.setMouseTransparent(ghostMode);
-
-            if (!ghostMode) {
-                // 关闭幽灵模式：若导航模式处于激活状态则恢复导航透明度，否则恢复全透明
+            opacitySlider.setDisable(!now && !navMode);
+            stage.setAlwaysOnTop(now);
+            menuBtn.setMouseTransparent(now);
+            for (Node node : overlayNodes) node.setMouseTransparent(now);
+            if (!now) {
                 if (navMode) {
                     stage.setOpacity(NavigConfig.NAV_WINDOW_OPACITY);
                     opacitySlider.setValue(NavigConfig.NAV_WINDOW_OPACITY);
@@ -148,7 +140,6 @@ public class TitleBar extends HBox implements IHook<Object> {
                     opacitySlider.setValue(1.0);
                 }
             } else if (navMode) {
-                // 进入幽灵模式且导航模式已启用 → 应用导航透明度
                 stage.setOpacity(NavigConfig.NAV_WINDOW_OPACITY);
                 opacitySlider.setValue(NavigConfig.NAV_WINDOW_OPACITY);
             }
@@ -156,35 +147,34 @@ public class TitleBar extends HBox implements IHook<Object> {
 
         // --- 3. 导航模式按钮 ---
         navBtn = new Button();
+        navBtn.setFocusTraversable(false);
         navBtn.getStyleClass().add("title-bar-btn");
 
         Node navIcon = createNavIcon();
         setSvgFill(navIcon, "-color-fg-muted");
         navBtn.setGraphic(navIcon);
 
-        navBtn.setOnAction(_ -> toggleNavMode(stage, menuBtn, overlayNodes));
+        navBtn.setOnAction(_ -> CommandBus.dispatch(new ToggleNavModeCommand()));
 
         // --- 3.5 匹配开关按钮 ---
-        matchToggleBtn = new Button();
+        /** 匹配开关按钮 */
+        Button matchToggleBtn = new Button();
+        matchToggleBtn.setFocusTraversable(false);
         matchToggleBtn.getStyleClass().add("title-bar-btn");
 
         Node matchIcon = createMatchToggleIcon();
-        boolean matchOn = SiftConfig.SIFT_MATCHING_ENABLED;
-        setSvgFill(matchIcon, matchOn ? "-color-accent-emphasis" : "-color-fg-muted");
+        AppState appState = AppState.getInstance();
+        // 响应式绑定：匹配状态变化时自动更新图标颜色
+        appState.matchingEnabledProperty().addListener((_, _, now) ->
+                setSvgFill(matchIcon, now ? "-color-accent-emphasis" : "-color-fg-muted"));
         matchToggleBtn.setGraphic(matchIcon);
 
-        matchToggleBtn.setOnAction(_ -> {
-            SiftConfig.SIFT_MATCHING_ENABLED = !SiftConfig.SIFT_MATCHING_ENABLED;
-            boolean nowOn = SiftConfig.SIFT_MATCHING_ENABLED;
-            setSvgFill(matchIcon, nowOn ? "-color-accent-emphasis" : "-color-fg-muted");
-            // 发布轮播事件
-            HookRegistry.INSTANCE.publish(HookEventType.STATUS_CAROUSEL,
-                    nowOn ? StatusCarouselEvent.matchingResumed()
-                          : StatusCarouselEvent.matchingPaused());
-        });
+        matchToggleBtn.setOnAction(_ ->
+                CommandBus.dispatch(new ToggleMatchingCommand()));
 
         Button closeBtn = getCloseButton(stage);
-        minimizeBtn = createMinimizeButton();
+        /** 最小化按钮 */
+        Button minimizeBtn = createMinimizeButton();
 
         // --- 4. 调整子组件顺序：滑块在图标左侧，图标靠右锚定 ---
         getChildren().addAll(menuBtn, titleLabel, statusContainer, spacer, opacitySlider, ghostBtn, matchToggleBtn, navBtn, minimizeBtn, closeBtn);
@@ -204,10 +194,14 @@ public class TitleBar extends HBox implements IHook<Object> {
         });
 
         // 注册状态轮播事件
-        HookRegistry.INSTANCE.register(this);
-        // 双写：新 EventBus（迁移完成后移除上方 HookRegistry）
-        io.github.kedaya0209.roco.app.hook.AppEvents.subscribe(NavModeEvent.class,
-                evt -> Platform.runLater(() -> setNavModeFromExternal(evt.enabled())));
+        AppEvents.subscribe(StatusEvent.class,
+                event -> {
+                    if (event.displayMode() == StatusEvent.DisplayMode.TOAST) return;
+                    Platform.runLater(() -> updateStatus(event));
+                });
+        // 导航模式通过 ViewportState property 响应外部变更
+        ViewportState.getInstance().navModeProperty().addListener((_, _, now) ->
+                syncNavUi(now));
     }
 
     public static TitleBar getInstance(Stage stage, Button menuBtn, Node... overlayNodes) {
@@ -282,63 +276,28 @@ public class TitleBar extends HBox implements IHook<Object> {
         }
     }
 
+
     /**
-     * 切换导航模式
+     * 同步导航模式 UI（图标、滑块、透明度）。
+     * 来自用户点击（toggleNavMode 内部调用）或 ViewportState 外部变更。
      */
-    private void toggleNavMode(Stage stage, Button menuBtn, Node... overlayNodes) {
-        navMode = !navMode;
-        NavigConfig.NAVIGATION_ENABLED = navMode;
+    private void syncNavUi(boolean enabled) {
+        if (enabled == navMode) return;
+        navMode = enabled;
 
         Node navGraphic = navBtn.getGraphic();
-        setSvgFill(navGraphic, navMode ? "-color-accent-emphasis" : "-color-fg-muted");
+        setSvgFill(navGraphic, enabled ? "-color-accent-emphasis" : "-color-fg-muted");
 
-        CameraContext cam = CameraContext.getInstance();
-        cam.setNavMode(navMode);
+        updateSliderVisibility();
+        opacitySlider.setDisable(!ghostMode && !enabled);
 
-        if (navMode) {
-            // 显示透明度滑块
-            updateSliderVisibility();
-            opacitySlider.setDisable(false);
-
-            // 应用导航透明度
-            stage.setOpacity(NavigConfig.NAV_WINDOW_OPACITY);
+        if (enabled) {
+            stageRef.setOpacity(NavigConfig.NAV_WINDOW_OPACITY);
             opacitySlider.setValue(NavigConfig.NAV_WINDOW_OPACITY);
-
-            // 自动开启跟随模式（updateViewport 内部有 hasValidPlayerPosition 保护）
-            if (NavigConfig.AUTO_FOLLOW_MODE) {
-                CameraContext.getInstance().setFollowMode(true);
-            }
-        } else {
-            // 恢复窗口正常状态
-            if (!ghostMode) {
-                stage.setOpacity(1.0);
-                opacitySlider.setValue(1.0);
-            }
-            updateSliderVisibility();
-            opacitySlider.setDisable(!ghostMode);
-            cam.setNavAngle(0);
+        } else if (!ghostMode) {
+            stageRef.setOpacity(1.0);
+            opacitySlider.setValue(1.0);
         }
-    }
-
-    /**
-     * 当外部切换导航模式时同步 UI（通过 Hook 事件触发）
-     */
-    private void setNavModeFromExternal(boolean enabled) {
-        if (enabled == navMode) return;
-        navBtn.fire();
-    }
-
-    /**
-     * 同步匹配开关图标与轮播事件
-     */
-    @Deprecated
-    public void publishMatchToggleEvent() {
-        boolean on = SiftConfig.SIFT_MATCHING_ENABLED;
-        Node icon = matchToggleBtn.getGraphic();
-        setSvgFill(icon, on ? "-color-accent-emphasis" : "-color-fg-muted");
-        HookRegistry.INSTANCE.publish(HookEventType.STATUS_CAROUSEL,
-                on ? StatusCarouselEvent.matchingResumed()
-                    : StatusCarouselEvent.matchingPaused());
     }
 
     // ============================================================
@@ -349,9 +308,9 @@ public class TitleBar extends HBox implements IHook<Object> {
      * 更新标题栏内联状态文本，附带从下至上的滚动动画效果。
      * 每个新状态文本从下方滚入，旧状态从上方滚出。
      */
-    public void updateStatus(StatusCarouselEvent event) {
+    public void updateStatus(StatusEvent event) {
         if (event == null) return;
-        if (event.text() == null || event.text().isBlank()) {
+        if (event.message() == null || event.message().isBlank()) {
             statusLabel.setText("");
             statusLabel.setStyle("-fx-text-fill: -color-fg-muted; -fx-font-size: 12px;");
             return;
@@ -367,13 +326,13 @@ public class TitleBar extends HBox implements IHook<Object> {
 
         // 首次设置 / 当前为空 → 直接显示，不动画
         if (statusLabel.getText().isEmpty()) {
-            statusLabel.setText(event.text());
+            statusLabel.setText(event.message());
             statusLabel.setStyle(newStyle);
             return;
         }
 
         // 文本未变 → 忽略
-        if (event.text().equals(statusLabel.getText())) return;
+        if (event.message().equals(statusLabel.getText())) return;
 
         // 从下至上滚动动画：旧文本向上滚出，新文本从下方滚入
         // Step 1: 旧文本向上平移移出 clip
@@ -381,12 +340,12 @@ public class TitleBar extends HBox implements IHook<Object> {
         exit.play();
     }
 
-    private TranslateTransition getTranslateTransition(StatusCarouselEvent event, String newStyle) {
+    private TranslateTransition getTranslateTransition(StatusEvent event, String newStyle) {
         TranslateTransition exit = new TranslateTransition(Duration.millis(120), statusLabel);
         exit.setToY(-STATUS_H);
         exit.setOnFinished(_ -> {
             // Step 2: 在 clip 外更换文本 + 重置到下方
-            statusLabel.setText(event.text());
+            statusLabel.setText(event.message());
             statusLabel.setStyle(newStyle);
             statusLabel.setTranslateY(STATUS_H);
 
@@ -417,6 +376,7 @@ public class TitleBar extends HBox implements IHook<Object> {
         minimizeGraphic.setMaxSize(20, 20);
 
         Button btn = new Button();
+        btn.setFocusTraversable(false);
         btn.setGraphic(minimizeGraphic);
         btn.getStyleClass().add("title-bar-btn");
 
@@ -445,6 +405,7 @@ public class TitleBar extends HBox implements IHook<Object> {
         closeGraphic.setMaxSize(20, 20);
 
         Button closeBtn = new Button();
+        closeBtn.setFocusTraversable(false);
         closeBtn.setGraphic(closeGraphic);
         closeBtn.getStyleClass().add("title-bar-btn");
 
@@ -458,12 +419,12 @@ public class TitleBar extends HBox implements IHook<Object> {
 
         // ============ 【关闭确认弹窗 — 使用模态 Stage 确保置顶】 ============
         closeBtn.setOnAction(_ -> {
-            DialogUtils.showModalConfirmDialog(
+            ModalConfirmDialog.showModalConfirmDialog(
                     stage,
                     "确认退出",
                     "确定要关闭程序吗？\n所有识别与渲染服务将会停止运行。",
                     "立即退出",
-                    () -> Platform.exit(),
+                    Platform::exit,
                     () -> {
                     }
             );
@@ -471,25 +432,6 @@ public class TitleBar extends HBox implements IHook<Object> {
         // ====================================================================
 
         return closeBtn;
-    }
-
-    @Override
-    public Set<HookEventType> supportedEvents() {
-        return Set.of(HookEventType.STATUS_CAROUSEL, HookEventType.NAV_MODE_CHANGED);
-    }
-
-    @Override
-    public void onEvent(HookEventType type, Object data) {
-        if (data instanceof StatusCarouselEvent event) {
-            Platform.runLater(() -> {
-                updateStatus(event);
-                // 同步匹配开关图标（当设置面板或侧边栏外部修改时）
-                boolean on = SiftConfig.SIFT_MATCHING_ENABLED;
-                setSvgFill(matchToggleBtn.getGraphic(), on ? "-color-accent-emphasis" : "-color-fg-muted");
-            });
-        } else if (data instanceof NavModeEvent(boolean enabled)) {
-            Platform.runLater(() -> setNavModeFromExternal(enabled));
-        }
     }
 
     @ThreadSafe

@@ -3,10 +3,9 @@ package io.github.kedaya0209.roco.app.ui.render;
 import net.jcip.annotations.NotThreadSafe;
 import io.github.kedaya0209.roco.app.config.PathConfig;
 import io.github.kedaya0209.roco.app.config.RenderConfig;
-import io.github.kedaya0209.roco.app.context.CameraContext;
-import io.github.kedaya0209.roco.app.context.MapContext;
 import io.github.kedaya0209.roco.app.map.model.Point;
 import io.github.kedaya0209.roco.app.map.model.ResourcePoint;
+import io.github.kedaya0209.roco.app.ui.state.ViewportState;
 import io.github.kedaya0209.roco.app.ui.service.resource.IconCache;
 import io.github.kedaya0209.roco.app.ui.util.CoordinateUtil;
 import javafx.scene.Node;
@@ -59,11 +58,9 @@ public class HoverRenderer implements RenderLayer {
     @Override
     public void onFrame() {
         if (hoveredPoint != null) {
-            // 有活跃 hover 点时每帧重绘，确保跟随地图平移/缩放/旋转
-            MapContext mm = MapContext.getInstance();
-            redrawHover(mm.getOffsetX(), mm.getOffsetY(), mm.getScale());
+            ViewportState vp = ViewportState.getInstance();
+            redrawHover(vp.getOffsetX(), vp.getOffsetY(), vp.getScale(), vp);
         } else if (hoverDirty) {
-            // hover 结束时清除一次 Canvas
             double w = hoverCanvas.getWidth();
             double h = hoverCanvas.getHeight();
             if (w > 0 && h > 0) hoverGc.clearRect(0, 0, w, h);
@@ -74,7 +71,7 @@ public class HoverRenderer implements RenderLayer {
     /**
      * hover 光环绘制 — 世界坐标转屏幕坐标（含导航模式旋转补偿）
      */
-    private void redrawHover(double ox, double oy, double scale) {
+    private void redrawHover(double ox, double oy, double scale, ViewportState vp) {
         double w = hoverCanvas.getWidth();
         double h = hoverCanvas.getHeight();
         if (w <= 0 || h <= 0) return;
@@ -82,8 +79,7 @@ public class HoverRenderer implements RenderLayer {
         hoverGc.clearRect(0, 0, w, h);
         if (hoveredPoint == null) return;
 
-        CameraContext cam = CameraContext.getInstance();
-        double navAngle = cam.isNavMode() ? cam.getNavAngle() : 0;
+        double navAngle = vp.isNavMode() ? vp.getNavAngle() : 0;
         double pivotX = hoverCanvas.getWidth() / 2;
         double pivotY = hoverCanvas.getHeight() / 2;
 

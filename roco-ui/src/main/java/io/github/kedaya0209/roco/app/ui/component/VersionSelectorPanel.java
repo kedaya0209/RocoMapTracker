@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import io.github.kedaya0209.roco.app.config.SnifferConfig;
 import io.github.kedaya0209.roco.app.ui.service.VersionMode;
 import io.github.kedaya0209.roco.app.ui.service.ui.VersionManager;
-import io.github.kedaya0209.roco.app.ui.util.DialogUtils;
+import io.github.kedaya0209.roco.app.ui.component.dialog.ConfirmDialog;
 import io.github.kedaya0209.roco.app.ui.util.FxRippleUtil;
 import io.github.kedaya0209.roco.app.utils.FilePathUtil;
 import io.github.kedaya0209.roco.app.utils.JsonUtils;
@@ -151,7 +151,7 @@ public class VersionSelectorPanel extends StackPane {
     // ── 弹窗通用组件 ──────────────────────────────────────────
 
     private void showAlert(String msg) {
-        DialogUtils.showSimpleDialog(rootStack, "提示", msg, "确定", true, () -> {});
+        ConfirmDialog.showSimpleDialog(rootStack, "提示", msg, "确定", true, () -> {});
     }
 
     /** 创建统一样式的遮罩并淡入 */

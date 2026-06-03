@@ -5,27 +5,24 @@ import io.github.kedaya0209.roco.app.utils.EnvironmentUtil;
 import io.github.kedaya0209.roco.app.utils.FilePathUtil;
 import io.github.kedaya0209.roco.app.utils.ResourceUtils;
 import net.jcip.annotations.NotThreadSafe;
-import io.github.kedaya0209.roco.app.config.BuildConfig;
 import io.github.kedaya0209.roco.app.config.CaptureConfig;
 import io.github.kedaya0209.roco.app.config.ConfigPersistence;
-import io.github.kedaya0209.roco.app.config.SnifferConfig;
 import io.github.kedaya0209.roco.app.config.PathConfig;
-import io.github.kedaya0209.roco.app.config.SiftConfig;
 import io.github.kedaya0209.roco.app.config.UiConfig;
 import io.github.kedaya0209.roco.app.config.UpdateConfig;
 import io.github.kedaya0209.roco.app.config.ViewConfig;
-import io.github.kedaya0209.roco.app.hook.HookEventType;
-import io.github.kedaya0209.roco.app.hook.event.NotificationType;
+import io.github.kedaya0209.roco.app.hook.AppEvents;
 import io.github.kedaya0209.roco.app.hook.event.ProgressEvent;
-import io.github.kedaya0209.roco.app.hook.event.StatusEvent;
+import io.github.kedaya0209.roco.app.ui.command.CommandBus;
+import io.github.kedaya0209.roco.app.ui.command.CommandHandlers;
+import io.github.kedaya0209.roco.app.ui.command.SidebarCommands.SwitchVersionCommand;
 import io.github.kedaya0209.roco.app.ui.hook.UiResponseHook;
-import io.github.kedaya0209.roco.app.hook.multicast.HookRegistry;
+import io.github.kedaya0209.roco.app.ui.state.AppState;
+import io.github.kedaya0209.roco.app.ui.state.StateBridge;
 import io.github.kedaya0209.roco.app.match.map.SwitchMapMatcher;
 import io.github.kedaya0209.roco.app.socket.SocketServer;
-import io.github.kedaya0209.roco.app.ui.component.FloatToolbox;
 import io.github.kedaya0209.roco.app.ui.component.LoadingOverlay;
 import io.github.kedaya0209.roco.app.ui.component.setting.SettingsStage;
-import io.github.kedaya0209.roco.app.ui.component.ResourceCounterPanel;
 import io.github.kedaya0209.roco.app.ui.component.Sidebar;
 import io.github.kedaya0209.roco.app.ui.component.TitleBar;
 import io.github.kedaya0209.roco.app.ui.component.UiAnimator;
@@ -36,28 +33,20 @@ import io.github.kedaya0209.roco.app.ui.service.lifecycle.PcapBridgeManager;
 import io.github.kedaya0209.roco.app.ui.service.lifecycle.SiftClientManager;
 import io.github.kedaya0209.roco.app.ui.service.resource.ResourceInitService;
 import io.github.kedaya0209.roco.app.ui.service.resource.ResourceInitUiDelegate;
+import io.github.kedaya0209.roco.app.ui.component.dialog.FirstRunDialog;
 import io.github.kedaya0209.roco.app.ui.service.ui.MainUiComposer;
 import io.github.kedaya0209.roco.app.ui.service.ui.ThemeManager;
 import io.github.kedaya0209.roco.app.ui.service.ui.VersionManager;
 import io.github.kedaya0209.roco.app.ui.service.ui.WindowManager;
-import io.github.kedaya0209.roco.app.ui.util.DialogUtils;
+import io.github.kedaya0209.roco.app.ui.service.ui.AppUpdateUiHandler;
+import io.github.kedaya0209.roco.app.ui.service.ui.PluginUpdateHandler;
 import io.github.kedaya0209.roco.app.ui.util.TrayManager;
 import io.github.kedaya0209.roco.app.update.UpdateManager;
-import io.github.kedaya0209.roco.app.update.UpdateUiDelegate;
-import io.github.kedaya0209.roco.app.update.VersionInfo;
-import io.github.kedaya0209.roco.app.update.plugin.PluginInfo;
-import io.github.kedaya0209.roco.app.update.plugin.PluginSource;
-import io.github.kedaya0209.roco.app.update.plugin.PluginStatus;
-import io.github.kedaya0209.roco.app.update.plugin.PluginUpdateInfo;
 import io.github.kedaya0209.roco.app.update.plugin.PluginUpdateManager;
-import io.github.kedaya0209.roco.app.update.plugin.PluginUpdateUiDelegate;
 
 import java.io.File;
 import java.io.InputStream;
 import java.nio.file.Files;
-import java.util.List;
-import java.util.Map;
-import java.util.function.Consumer;
 import java.nio.file.StandardCopyOption;
 import io.github.kedaya0209.roco.app.utils.ResourceExtractor;
 
@@ -114,6 +103,7 @@ public class ModernCanvasApp extends Application {
     @Override
     public void start(Stage primaryStage) {
         ConfigPersistence.init(); // 配置加载必须在所有 Config 字段读取之前
+        ConfigPersistence.setOnConfigLoaded(() -> Platform.runLater(() -> AppState.getInstance().reloadFromConfig()));
         appHostServices = getHostServices();
         this.primaryStage = primaryStage;
         this.trayManager = new TrayManager(primaryStage);
@@ -152,8 +142,8 @@ public class ModernCanvasApp extends Application {
             ResourceExtractor.extractAll((total, done) -> {
                 double progress = 0.15 * done / total;
                 String text = String.format("正在校验&释放内嵌资源 (%d/%d)...", done, total);
-                Platform.runLater(() -> HookRegistry.INSTANCE.publish(
-                        HookEventType.INIT_PROGRESS, new ProgressEvent(progress, text)));
+                Platform.runLater(() -> AppEvents.publish(
+                        ProgressEvent.class, new ProgressEvent(progress, text)));
             });
             Platform.runLater(this::initAfterResourcesReady);
         });
@@ -169,7 +159,7 @@ public class ModernCanvasApp extends Application {
             log.info("算法变体切换: {}", newVariant);
             siftClientManager.restartClient(newVariant);
         });
-        SwitchMapMatcher.getInstance().setAlgoKindCallback(newAlgoKind -> {
+        SwitchMapMatcher.getInstance().setAlgoKindCallback(_ -> {
             log.info("算法类型固定为 SIFT");
         });
 
@@ -181,7 +171,7 @@ public class ModernCanvasApp extends Application {
         ResourceInitUiDelegate uiDelegate = new ResourceInitUiDelegate() {
             @Override
             public void showFirstRunDialog(Runnable onDownload, Runnable onBuiltIn, Runnable onExit) {
-                DialogUtils.showFirstRunDialog(
+                FirstRunDialog.showFirstRunDialog(
                         rootStack, "资源准备", "本地资源未准备好，选择启动方式：",
                         onDownload, onBuiltIn, onExit);
             }
@@ -237,7 +227,7 @@ public class ModernCanvasApp extends Application {
 
         LoadingOverlay globalLoading = new LoadingOverlay(null);
         rootStack.getChildren().add(globalLoading);
-        HookRegistry.INSTANCE.register(new UiResponseHook(rootStack, globalLoading));
+        new UiResponseHook(rootStack, globalLoading);
 
         Scene scene = new Scene(wrapper, ViewConfig.INITIAL_WINDOW_WIDTH, ViewConfig.INITIAL_WINDOW_HEIGHT);
         scene.setFill(Color.TRANSPARENT);
@@ -293,6 +283,8 @@ public class ModernCanvasApp extends Application {
      * 由 ResourceInitService 资源就绪后回调。
      */
     private void buildMainUi() {
+        StateBridge.init();
+        CommandHandlers.init(rootStack, pcapBridgeManager);
         MainUiComposer.UiBuildResult result = MainUiComposer.buildMainUI(primaryStage, rootStack, windowManager, uiAnimator);
 
         siftClientManager.init();
@@ -301,79 +293,15 @@ public class ModernCanvasApp extends Application {
         // 预初始化设置面板，避免首次点击时 FX 线程阻塞导致卡顿
         SettingsStage.getInstance();
 
-        FloatToolbox floatToolbox = result.floatToolbox();
-
-        // 版本切换回调 — 控制 pcap/物资面板/浮动按钮/匹配
-        VersionManager.getInstance().setOnSwitch(mode -> {
-            if (mode == VersionMode.ADVANCED) {
-                int port = SocketServer.instance().getPort();
-                PluginUpdateManager pm = PluginUpdateManager.getInstance();
-
-                // 确保 sniffer 插件已安装
-                pm.scanPlugins();
-                boolean snifferReady = pm.getPlugin("sniffer")
-                        .filter(p -> p.status() != PluginStatus.DAMAGED
-                                && p.status() != PluginStatus.DISABLED)
-                        .isPresent();
-
-                if (snifferReady) {
-                    pcapBridgeManager.init(port, null);
-                } else {
-                    // 后台自动下载安装
-                    var pc = DialogUtils.showDownloadProgressDialog(
-                            rootStack, "需要下载高级版组件 (sniffer)...", null);
-                    Thread.ofPlatform().daemon(true).name("sniffer-install").start(() -> {
-                        pm.checkRemotePlugin("sniffer",
-                                new PluginSource("github-release", SnifferConfig.SNIFFER_REPO))
-                            .ifPresentOrElse(update ->
-                                    pm.downloadPlugin(update,
-                                        prog -> pc.updateProgress(prog, "下载中..."),
-                                        () -> {
-                                            pc.close();
-                                            pm.scanPlugins();
-                                            pcapBridgeManager.init(port, null);
-                                        },
-                                        err -> {
-                                            pc.close();
-                                            Platform.runLater(() ->
-                                                    DialogUtils.showSimpleDialog(rootStack,
-                                                            "安装失败",
-                                                            "sniffer 插件安装失败: " + err,
-                                                            "确定", true, () -> {}));
-                                        }),
-                                    () -> {
-                                        pc.close();
-                                        Platform.runLater(() ->
-                                                DialogUtils.showSimpleDialog(rootStack,
-                                                        "安装失败",
-                                                        "无法获取 sniffer 插件信息，请检查网络连接",
-                                                        "确定", true, () -> {}));
-                                    });
-                    });
-                }
-
-                ResourceCounterPanel.getInstance().toggle(false);
-                floatToolbox.setCollectButtonVisible(true);
-                SiftConfig.SIFT_MATCHING_ENABLED = true;
-                Platform.runLater(() ->
-                        DialogUtils.showSimpleDialog(rootStack, "提示",
-                                "高级版组件 (sniffer) 已就绪，请手动断开游戏网络连接后重连，以便抓包组件捕获通信密钥。", "确定", true, () -> {}));
-
-                // 切换到高级模式时检查插件更新
-                pm.checkAllPlugins(true);
-            } else {
-                pcapBridgeManager.stop();
-                ResourceCounterPanel.getInstance().toggle(false);
-                floatToolbox.setCollectButtonVisible(false);
-                SiftConfig.SIFT_MATCHING_ENABLED = false;
-            }
-        });
+        // 版本切换回调
+        VersionManager.getInstance().setOnSwitch(mode ->
+                CommandBus.dispatch(new SwitchVersionCommand(mode)));
 
         result.renderer().start();
         this.sidebar = result.sidebar();
 
         // 设置更新 UI 回调
-        UpdateManager.getInstance().setUiDelegate(createUpdateUiDelegate());
+        UpdateManager.getInstance().setUiDelegate(new AppUpdateUiHandler(rootStack, sidebar));
 
         // 启动定时更新检查（仅 Native Image 环境）
         if (EnvironmentUtil.isNative() && UpdateConfig.CHECK_ENABLED) {
@@ -382,7 +310,7 @@ public class ModernCanvasApp extends Application {
 
         // 插件更新管理器
         PluginUpdateManager pm = PluginUpdateManager.getInstance();
-        pm.setUiDelegate(createPluginUpdateUiDelegate());
+        pm.setUiDelegate(new PluginUpdateHandler(rootStack));
         pm.checkAllPlugins(true);
 
         // 插件启用/禁用与 NativeProcess 联动
@@ -407,105 +335,7 @@ public class ModernCanvasApp extends Application {
         log.info("主界面构建完成");
     }
 
-    private UpdateUiDelegate createUpdateUiDelegate() {
-        return new UpdateUiDelegate() {
-            private volatile DialogUtils.ProgressControl downloadProgress;
-            private volatile boolean backgroundMode;
 
-            @Override
-            public void showNotification(String message, NotificationType type) {
-                Platform.runLater(() ->
-                        HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION,
-                                new StatusEvent(message, type)));
-            }
-
-            @Override
-            public void showUpdateAvailable(VersionInfo info) {
-                Platform.runLater(() ->
-                        DialogUtils.showUpdateDialog(rootStack,
-                                "发现新版本 " + info.version(),
-                                BuildConfig.APP_VERSION,
-                                info.version(),
-                                info.releaseNotes(),
-                                () -> UpdateManager.getInstance().startDownload(info),
-                                () -> UpdateManager.getInstance().resetUpdateDialogShowing()));
-            }
-
-            @Override
-            public void showDownloadProgress(String version, double progress) {
-                Platform.runLater(() -> {
-                    sidebar.setDownloadProgress(progress);
-                    if (backgroundMode) {
-                        return;
-                    }
-                    if (downloadProgress == null) {
-                        downloadProgress = DialogUtils.showDownloadProgressDialog(rootStack, version, () -> {
-                            backgroundMode = true;
-                            sidebar.setDownloadProgress(0);
-                        });
-                    }
-                    downloadProgress.updateProgress(progress,
-                            String.format("%.1f%%", progress * 100));
-                });
-            }
-
-            @Override
-            public void hideDownloadProgress() {
-                Platform.runLater(() -> {
-                    sidebar.setDownloadProgress(-1);
-                    if (downloadProgress != null) {
-                        downloadProgress.close();
-                        downloadProgress = null;
-                    }
-                    if (backgroundMode) {
-                        backgroundMode = false;
-                    }
-                });
-            }
-
-            @Override
-            public void showUpdateReadyDialog(VersionInfo info, Runnable onInstallNow, Runnable onLater) {
-                Platform.runLater(() ->
-                        DialogUtils.showUpdateReadyDialog(rootStack,
-                                info.version(), onInstallNow, onLater));
-            }
-
-            @Override
-            public void restartApplication() {
-                Platform.runLater(() -> {
-                    Platform.exit();
-                    System.exit(0);
-                });
-            }
-        };
-    }
-
-    private PluginUpdateUiDelegate createPluginUpdateUiDelegate() {
-        return new PluginUpdateUiDelegate() {
-            @Override
-            public void showPluginUpdatesAvailable(Map<PluginInfo, PluginUpdateInfo> updates,
-                                                    Consumer<List<String>> onDownloadSelected) {
-                Platform.runLater(() ->
-                        DialogUtils.showPluginUpdatesDialog(rootStack, updates, onDownloadSelected));
-            }
-
-            @Override
-            public void showDownloadProgress(String pluginId, String version, double progress) {
-                // 插件进度由 PluginManagementView 自己的轮询处理，不需要更新 sidebar
-            }
-
-            @Override
-            public void hideDownloadProgress(String pluginId) {
-            }
-
-            @Override
-            public void showUpdateReady(String pluginId, String message, Runnable onOk) {
-                Platform.runLater(() ->
-                        DialogUtils.showSimpleDialog(rootStack, "插件更新", message,
-                                "确定", false, onOk));
-            }
-        };
-    }
 
     @Override
     public void stop() {
@@ -517,7 +347,6 @@ public class ModernCanvasApp extends Application {
         pcapBridgeManager.stop();
         siftClientManager.stop();
         InfrastructureManager.destroy();
-        HookRegistry.INSTANCE.destroy();
         SocketServer.instance().stop();
 
         Platform.exit();

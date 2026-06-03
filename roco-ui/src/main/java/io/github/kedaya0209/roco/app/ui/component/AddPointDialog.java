@@ -3,7 +3,7 @@ package io.github.kedaya0209.roco.app.ui.component;
 import net.jcip.annotations.NotThreadSafe;
 import io.github.kedaya0209.roco.app.context.ResourcePointContext;
 import io.github.kedaya0209.roco.app.map.model.ResourcePoint;
-import io.github.kedaya0209.roco.app.ui.util.DialogUtils;
+import io.github.kedaya0209.roco.app.ui.component.dialog.ConfirmDialog;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Point2D;
@@ -139,7 +139,7 @@ public class AddPointDialog {
         VBox content = new VBox(10, new Label("选择或输入新的点位名称:"), input);
         content.setAlignment(Pos.CENTER);
         content.setStyle("-fx-padding: 20 10 10 10;");
-        DialogUtils.showConfirmDialog(rootStack, "新增标记点", content, () -> {
+        ConfirmDialog.showConfirmDialog(rootStack, "新增标记点", content, () -> {
             String selected = input.getText();
             if (selected != null && !selected.isBlank())
                 ResourcePointContext.getInstance().savePoint(selected, logicX, logicY);

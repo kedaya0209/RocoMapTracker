@@ -3,14 +3,12 @@ package io.github.kedaya0209.roco.app.ui.component;
 import net.jcip.annotations.NotThreadSafe;
 import atlantafx.base.theme.Styles;
 import io.github.kedaya0209.roco.app.context.PathContext;
-import io.github.kedaya0209.roco.app.hook.AbstractGenericHook;
-import io.github.kedaya0209.roco.app.hook.HookEventType;
+import io.github.kedaya0209.roco.app.hook.AppEvents;
 import io.github.kedaya0209.roco.app.hook.event.NotificationType;
 import io.github.kedaya0209.roco.app.hook.event.RouteListEvent;
 import io.github.kedaya0209.roco.app.hook.event.StatusEvent;
-import io.github.kedaya0209.roco.app.hook.multicast.HookRegistry;
 import io.github.kedaya0209.roco.app.map.model.RoutePath;
-import io.github.kedaya0209.roco.app.ui.util.DialogUtils;
+import io.github.kedaya0209.roco.app.ui.component.dialog.ConfirmDialog;
 import io.github.kedaya0209.roco.app.ui.util.FxRippleUtil;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
@@ -175,17 +173,8 @@ public class RouteManagerStage extends Stage {
         // --- 路线列表 ---
         PathContext pc = PathContext.getInstance();
         ObservableList<RoutePath> routeItems = FXCollections.observableArrayList(pc.getSavedRoutes());
-        HookRegistry.INSTANCE.register(new AbstractGenericHook<RouteListEvent>() {
-            @Override
-            public void onEvent(HookEventType eventType, RouteListEvent data) {
-                Platform.runLater(() -> routeItems.setAll(data.routes()));
-            }
-
-            @Override
-            public Set<HookEventType> supportedEvents() {
-                return Set.of(HookEventType.ROUTE_LIST_CHANGED);
-            }
-        });
+        AppEvents.subscribe(RouteListEvent.class,
+                _ -> Platform.runLater(() -> routeItems.setAll(PathContext.getInstance().getSavedRoutes())));
         listView.setItems(routeItems);
         listView.setPrefHeight(200);
         VBox.setVgrow(listView, Priority.ALWAYS);
@@ -338,7 +327,7 @@ public class RouteManagerStage extends Stage {
 
         content.getChildren().addAll(label, nameField);
 
-        DialogUtils.showConfirmDialog(
+        ConfirmDialog.showConfirmDialog(
                 rootContainer, // 此时在画布上弹
                 "保存路线",
                 content,
@@ -349,9 +338,9 @@ public class RouteManagerStage extends Stage {
                         if (PathContext.getInstance().saveToLocal()) {
                             refreshList();
                             PathContext.getInstance().setCurrentMode(PathContext.Mode.VIEW);
-                            HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION, new StatusEvent("保存成功", NotificationType.SUCCESS));
+                            AppEvents.publish(StatusEvent.class, new StatusEvent("保存成功", NotificationType.SUCCESS));
                         } else {
-                            HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION, new StatusEvent("保存失败", NotificationType.ERROR));
+                            AppEvents.publish(StatusEvent.class, new StatusEvent("保存失败", NotificationType.ERROR));
                         }
                     }
                 },
@@ -363,7 +352,7 @@ public class RouteManagerStage extends Stage {
     private void handleDelete(RoutePath target) {
         if (target == null) return;
 
-        DialogUtils.showConfirmDialog(
+        ConfirmDialog.showConfirmDialog(
                 rootContainer,
                 "确认删除",
                 "确定要永久删除路线 [" + target.getName() + "] 吗？",
@@ -375,7 +364,7 @@ public class RouteManagerStage extends Stage {
                         PathContext.getInstance().setCurrentMode(PathContext.Mode.VIEW);
                     }
                     if (PathContext.getInstance().saveToLocal()) {
-                        HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION, new StatusEvent("删除成功", NotificationType.SUCCESS));
+                        AppEvents.publish(StatusEvent.class, new StatusEvent("删除成功", NotificationType.SUCCESS));
                     }
                 },
                 () -> {
@@ -390,7 +379,7 @@ public class RouteManagerStage extends Stage {
 
         List<RoutePath> importedPaths = PathContext.getInstance().resolve(selectedFile);
         if (importedPaths == null || importedPaths.isEmpty()) {
-            HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION, new StatusEvent("文件解析失败", NotificationType.ERROR));
+            AppEvents.publish(StatusEvent.class, new StatusEvent("文件解析失败", NotificationType.ERROR));
             return;
         }
 
@@ -437,14 +426,14 @@ public class RouteManagerStage extends Stage {
         confirmLabel.setStyle("-fx-text-fill: -color-fg-muted; -fx-font-size: 13px;");
         content.getChildren().add(confirmLabel);
 
-        DialogUtils.showConfirmDialog(
+        ConfirmDialog.showConfirmDialog(
                 rootContainer, // 在画布上弹
                 "确认导入",
                 content,
                 () -> {
                     PathContext.getInstance().addRoutes(importedPaths);
                     if (PathContext.getInstance().saveToLocal()) {
-                        HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION, new StatusEvent("成功导入路线", NotificationType.SUCCESS));
+                        AppEvents.publish(StatusEvent.class, new StatusEvent("成功导入路线", NotificationType.SUCCESS));
                     }
                 },
                 () -> {
@@ -460,9 +449,9 @@ public class RouteManagerStage extends Stage {
         File saveFile = fileChooser.showSaveDialog(this);
         if (saveFile != null) {
             if (PathContext.getInstance().exportPaths(selected, saveFile)) {
-                HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION, new StatusEvent("导出成功", NotificationType.SUCCESS));
+                AppEvents.publish(StatusEvent.class, new StatusEvent("导出成功", NotificationType.SUCCESS));
             } else {
-                HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION, new StatusEvent("导出失败", NotificationType.ERROR));
+                AppEvents.publish(StatusEvent.class, new StatusEvent("导出失败", NotificationType.ERROR));
             }
         }
     }

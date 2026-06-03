@@ -22,6 +22,7 @@ public final class DownloadProgressContext {
     @Getter
     @Setter
     private volatile String statusText = "等待中...";
+    @Setter
     private BiConsumer<Integer, Integer> onProgressUpdate;
 
     private DownloadProgressContext() {
@@ -46,10 +47,6 @@ public final class DownloadProgressContext {
     public void finishTask() {
         completedTasks.incrementAndGet();
         notifyListener();
-    }
-
-    public void setOnProgressUpdate(BiConsumer<Integer, Integer> listener) {
-        this.onProgressUpdate = listener;
     }
 
     private void notifyListener() {

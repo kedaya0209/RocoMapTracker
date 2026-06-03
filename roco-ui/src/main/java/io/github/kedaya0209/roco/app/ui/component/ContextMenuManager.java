@@ -3,7 +3,7 @@ package io.github.kedaya0209.roco.app.ui.component;
 import net.jcip.annotations.NotThreadSafe;
 import io.github.kedaya0209.roco.app.context.ResourcePointContext;
 import io.github.kedaya0209.roco.app.map.model.ResourcePoint;
-import io.github.kedaya0209.roco.app.ui.util.DialogUtils;
+import io.github.kedaya0209.roco.app.ui.component.dialog.ConfirmDialog;
 import javafx.scene.Node;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.MenuItem;
@@ -76,7 +76,7 @@ public class ContextMenuManager {
         del.setOnAction(_ -> {
             StackPane rootStack = findRootStack();
             if (rootStack != null) {
-                DialogUtils.showConfirmDialog(rootStack, "删除标记",
+                ConfirmDialog.showConfirmDialog(rootStack, "删除标记",
                         "确定要永久删除吗？",
                         "确认删除",
                         () -> ResourcePointContext.getInstance().deletePoint(p), null);

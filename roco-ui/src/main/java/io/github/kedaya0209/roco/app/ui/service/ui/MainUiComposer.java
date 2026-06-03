@@ -82,10 +82,6 @@ public final class MainUiComposer {
         interactiveCanvas.heightProperty().bind(canvasContainer.heightProperty());
         canvasContainer.getChildren().add(interactiveCanvas);
 
-        // 视口大小变化 → 标记脏
-        canvasContainer.widthProperty().addListener(e -> renderer.markDirty());
-        canvasContainer.heightProperty().addListener(e -> renderer.markDirty());
-
         // 覆盖层组件
         StatsOverlay statsOverlay = StatsOverlay.getInstance();
         ResourceCounterPanel resourcePanel = ResourceCounterPanel.getInstance();

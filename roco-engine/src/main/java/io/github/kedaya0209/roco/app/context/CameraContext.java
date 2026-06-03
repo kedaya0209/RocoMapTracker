@@ -3,9 +3,9 @@ package io.github.kedaya0209.roco.app.context;
 import net.jcip.annotations.ThreadSafe;
 import io.github.kedaya0209.roco.app.config.UiConfig;
 import io.github.kedaya0209.roco.app.config.ViewConfig;
-import io.github.kedaya0209.roco.app.hook.HookEventType;
+import io.github.kedaya0209.roco.app.hook.AppEvents;
 import io.github.kedaya0209.roco.app.hook.event.FollowModeEvent;
-import io.github.kedaya0209.roco.app.hook.multicast.HookRegistry;
+import io.github.kedaya0209.roco.app.hook.event.NavModeEvent;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -42,6 +42,7 @@ public class CameraContext {
         if (!navMode) {
             this.navAngle = 0;
         }
+        AppEvents.publish(NavModeEvent.class, new NavModeEvent(navMode));
     }
 
     public static CameraContext getInstance() {
@@ -57,8 +58,7 @@ public class CameraContext {
             if (followMode) {
                 applyFollowViewport();
             }
-            HookRegistry.INSTANCE.publish(HookEventType.FOLLOW_MODE_CHANGED,
-                    new FollowModeEvent(followMode));
+            AppEvents.publish(FollowModeEvent.class, new FollowModeEvent(followMode));
         }
     }
 

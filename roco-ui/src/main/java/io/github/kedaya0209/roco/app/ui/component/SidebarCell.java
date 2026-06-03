@@ -3,13 +3,11 @@ package io.github.kedaya0209.roco.app.ui.component;
 import net.jcip.annotations.NotThreadSafe;
 import atlantafx.base.controls.ToggleSwitch;
 import atlantafx.base.theme.Styles;
-import io.github.kedaya0209.roco.app.config.SiftConfig;
-import io.github.kedaya0209.roco.app.hook.HookEventType;
-import io.github.kedaya0209.roco.app.hook.IHook;
-import io.github.kedaya0209.roco.app.hook.event.StatusCarouselEvent;
-import io.github.kedaya0209.roco.app.hook.multicast.HookRegistry;
+import io.github.kedaya0209.roco.app.hook.AppEvents;
+import io.github.kedaya0209.roco.app.ui.state.AppState;
+import io.github.kedaya0209.roco.app.hook.event.NotificationType;
+import io.github.kedaya0209.roco.app.hook.event.StatusEvent;
 import io.github.kedaya0209.roco.app.ui.service.resource.SvgManager;
-import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import javafx.animation.FadeTransition;
@@ -31,13 +29,9 @@ import javafx.util.Duration;
  * 侧边栏单元格渲染器 — 从 Sidebar 提取，负责 4 种单元格类型的渲染。
  */
 @NotThreadSafe
-class SidebarCell extends ListCell<Sidebar.SidebarItem> implements IHook<Object> {
+class SidebarCell extends ListCell<Sidebar.SidebarItem> {
 
     private static final String BG_STYLE = "-fx-background-color: -color-bg-subtle; -fx-background-radius: 6;";
-
-    /** 当前显示的匹配开关 ToggleSwitch，供外部 STATUS_CAROUSEL 事件同步 */
-    private static ToggleSwitch activeMatchToggle;
-    private static boolean matchHookRegistered;
 
     private final Supplier<Sidebar.SidebarItem.Category> expandedCategory;
     private final Consumer<Sidebar.SidebarItem> onHeaderClick;
@@ -131,17 +125,16 @@ class SidebarCell extends ListCell<Sidebar.SidebarItem> implements IHook<Object>
 
     private void renderMatchToggle(Sidebar.SidebarItem item, Node icon, Label title) {
         ToggleSwitch toggle = new ToggleSwitch();
-        toggle.setSelected(SiftConfig.SIFT_MATCHING_ENABLED);
+        toggle.setSelected(AppState.getInstance().isMatchingEnabled());
         // Guard: 防止 hook 外部同步导致循环发布事件
         toggle.selectedProperty().addListener((_, _, newVal) -> {
-            if (SiftConfig.SIFT_MATCHING_ENABLED == newVal) return;
-            SiftConfig.SIFT_MATCHING_ENABLED = newVal;
-            HookRegistry.INSTANCE.publish(HookEventType.STATUS_CAROUSEL,
-                    newVal ? StatusCarouselEvent.matchingResumed() : StatusCarouselEvent.matchingPaused());
+            if (AppState.getInstance().isMatchingEnabled() == newVal) return;
+            AppState.getInstance().setMatchingEnabled(newVal);
+            AppEvents.publish(StatusEvent.class,
+                    newVal
+                            ? new StatusEvent("匹配已开启", NotificationType.SUCCESS, StatusEvent.DisplayMode.CAROUSEL)
+                            : new StatusEvent("匹配已暂停", NotificationType.INFO, StatusEvent.DisplayMode.CAROUSEL));
         });
-
-        activeMatchToggle = toggle;
-        registerMatchHook();
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
@@ -164,27 +157,6 @@ class SidebarCell extends ListCell<Sidebar.SidebarItem> implements IHook<Object>
         wrapper.setPadding(new Insets(2, 0, 2, 0));
         setPadding(new Insets(0));
         setGraphic(wrapper);
-    }
-
-    private void registerMatchHook() {
-        if (matchHookRegistered) return;
-        matchHookRegistered = true;
-        HookRegistry.INSTANCE.register(this);
-    }
-
-
-    @Override
-    public Set<HookEventType> supportedEvents() {
-        return Set.of(HookEventType.STATUS_CAROUSEL);
-    }
-
-    @Override
-    public void onEvent(HookEventType type, Object data) {
-        ToggleSwitch t = activeMatchToggle;
-        if (t != null) {
-            Platform.runLater(() ->
-                    t.setSelected(SiftConfig.SIFT_MATCHING_ENABLED));
-        }
     }
 
     // ── Option ──────────────────────────────────────────

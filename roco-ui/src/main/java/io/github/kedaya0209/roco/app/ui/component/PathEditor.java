@@ -3,8 +3,8 @@ package io.github.kedaya0209.roco.app.ui.component;
 import javafx.scene.input.MouseEvent;
 import net.jcip.annotations.NotThreadSafe;
 import io.github.kedaya0209.roco.app.config.ViewConfig;
-import io.github.kedaya0209.roco.app.context.MapContext;
 import io.github.kedaya0209.roco.app.context.PathContext;
+import io.github.kedaya0209.roco.app.ui.state.ViewportState;
 import io.github.kedaya0209.roco.app.map.model.Point;
 import io.github.kedaya0209.roco.app.map.model.ResourcePoint;
 import io.github.kedaya0209.roco.app.map.model.RoutePath;
@@ -21,7 +21,6 @@ import java.util.List;
 public class PathEditor {
 
     private final PathContext pathContext = PathContext.getInstance();
-    private final MapContext mapContext = MapContext.getInstance();
 
     private int draggedNodeIndex = -1;
 
@@ -155,7 +154,7 @@ public class PathEditor {
         if (active == null) return -1;
         double lx = toLogicX(mx);
         double ly = toLogicY(my);
-        double threshold = ViewConfig.NODE_CLICK_THRESHOLD / mapContext.getScale();
+        double threshold = ViewConfig.NODE_CLICK_THRESHOLD / ViewportState.getInstance().getScale();
         List<Point> nodes = active.getNodes();
         for (int i = 0; i < nodes.size(); i++) {
             if (nodes.get(i).distance(lx, ly) < threshold) return i;
@@ -168,7 +167,7 @@ public class PathEditor {
         if (active == null || active.getNodes().size() < 2) return -1;
         double lx = toLogicX(mx);
         double ly = toLogicY(my);
-        double threshold = ViewConfig.NODE_INSERT_THRESHOLD / mapContext.getScale();
+        double threshold = ViewConfig.NODE_INSERT_THRESHOLD / ViewportState.getInstance().getScale();
         List<Point> nodes = active.getNodes();
         for (int i = 0; i < nodes.size() - 1; i++) {
             if (distancePointToSegment(lx, ly,
@@ -191,10 +190,10 @@ public class PathEditor {
     }
 
     private double toLogicX(double canvasX) {
-        return (canvasX - mapContext.getOffsetX()) / mapContext.getScale();
+        return (canvasX - ViewportState.getInstance().getOffsetX()) / ViewportState.getInstance().getScale();
     }
 
     private double toLogicY(double canvasY) {
-        return (canvasY - mapContext.getOffsetY()) / mapContext.getScale();
+        return (canvasY - ViewportState.getInstance().getOffsetY()) / ViewportState.getInstance().getScale();
     }
 }

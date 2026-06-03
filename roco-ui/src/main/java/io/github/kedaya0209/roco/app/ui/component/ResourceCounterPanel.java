@@ -3,10 +3,8 @@ package io.github.kedaya0209.roco.app.ui.component;
 import net.jcip.annotations.NotThreadSafe;
 import atlantafx.base.theme.Styles;
 import io.github.kedaya0209.roco.app.config.UiConfig;
-import io.github.kedaya0209.roco.app.hook.AbstractGenericHook;
-import io.github.kedaya0209.roco.app.hook.HookEventType;
+import io.github.kedaya0209.roco.app.hook.AppEvents;
 import io.github.kedaya0209.roco.app.hook.event.MaterialCollectionEvent;
-import io.github.kedaya0209.roco.app.hook.multicast.HookRegistry;
 import io.github.kedaya0209.roco.app.utils.ResourceUtils;
 import javafx.animation.FadeTransition;
 import javafx.animation.KeyFrame;
@@ -27,7 +25,6 @@ import javafx.util.Duration;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -79,18 +76,10 @@ public class ResourceCounterPanel extends VBox {
         setVisible(false);
         setOpacity(0);
 
-        HookRegistry.INSTANCE.register(new AbstractGenericHook<MaterialCollectionEvent>() {
-            @Override
-            public void onEvent(HookEventType eventType, MaterialCollectionEvent data) {
-                pendingData.set(data);
-                if (dirty.compareAndSet(false, true)) {
-                    Platform.runLater(ResourceCounterPanel.this::flushPending);
-                }
-            }
-
-            @Override
-            public Set<HookEventType> supportedEvents() {
-                return Set.of(HookEventType.MATERIAL_COLLECTION_UPDATED);
+        AppEvents.subscribe(MaterialCollectionEvent.class, data -> {
+            pendingData.set(data);
+            if (dirty.compareAndSet(false, true)) {
+                Platform.runLater(ResourceCounterPanel.this::flushPending);
             }
         });
     }

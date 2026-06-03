@@ -2,16 +2,15 @@ package io.github.kedaya0209.roco.app.ui.component;
 
 import net.jcip.annotations.NotThreadSafe;
 import io.github.kedaya0209.roco.app.config.UiConfig;
-import io.github.kedaya0209.roco.app.hook.HookEventType;
+import io.github.kedaya0209.roco.app.hook.AppEvents;
 import io.github.kedaya0209.roco.app.hook.event.NotificationType;
 import io.github.kedaya0209.roco.app.hook.event.ProgressEvent;
 import io.github.kedaya0209.roco.app.hook.event.StatusEvent;
-import io.github.kedaya0209.roco.app.hook.multicast.HookRegistry;
 import io.github.kedaya0209.roco.app.map.MapResourceUpdater;
 import io.github.kedaya0209.roco.app.map.core.DownloadProgressContext;
 import java.io.IOException;
 import io.github.kedaya0209.roco.app.ui.service.resource.SvgManager;
-import io.github.kedaya0209.roco.app.ui.util.DialogUtils;
+import io.github.kedaya0209.roco.app.ui.component.dialog.ConfirmDialog;
 import io.github.kedaya0209.roco.app.ui.util.FxRippleUtil;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
@@ -62,7 +61,7 @@ public class WikiUpdateManager implements SidebarComponent {
 
         updateBtn.setOnAction(_ -> {
             StackPane root = (StackPane) updateBtn.getScene().getRoot();
-            DialogUtils.showConfirmDialog(
+            ConfirmDialog.showConfirmDialog(
                     root,
                     "确认更新",
                     "确认同步最新WIKI数据？下载过程中请保持网络畅通。",
@@ -114,17 +113,17 @@ public class WikiUpdateManager implements SidebarComponent {
                 Platform.runLater(() -> {
                     switchToNormalState();
                     if (success) {
-                        HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION,
+                        AppEvents.publish(StatusEvent.class,
                                 new StatusEvent("WIKI资源同步完成", NotificationType.SUCCESS));
                     } else {
-                        HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION,
+                        AppEvents.publish(StatusEvent.class,
                                 new StatusEvent("资源同步失败，请检查网络", NotificationType.ERROR));
                     }
                 });
             } catch (RuntimeException e) {
                 Platform.runLater(() -> {
                     switchToNormalState();
-                    HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION,
+                    AppEvents.publish(StatusEvent.class,
                             new StatusEvent("资源同步异常: " + e.getMessage(), NotificationType.ERROR));
                 });
             }
@@ -149,10 +148,10 @@ public class WikiUpdateManager implements SidebarComponent {
 
             if (t > 0 && c >= t) {
                 switchToNormalState();
-                HookRegistry.INSTANCE.publish(HookEventType.UI_NOTIFICATION,
+                AppEvents.publish(StatusEvent.class,
                         new StatusEvent("WIKI资源同步完成", NotificationType.SUCCESS));
             } else {
-                HookRegistry.INSTANCE.publish(HookEventType.INIT_PROGRESS,
+                AppEvents.publish(ProgressEvent.class,
                         new ProgressEvent(t == 0 ? 0 : (double) c / t, "WIKI同步: " + ctx.getStatusText()));
             }
         }));

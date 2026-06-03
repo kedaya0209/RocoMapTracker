@@ -1,19 +1,17 @@
 package io.github.kedaya0209.roco.app.ui.component;
 
 import net.jcip.annotations.NotThreadSafe;
-import io.github.kedaya0209.roco.app.config.ViewConfig;
-import io.github.kedaya0209.roco.app.context.CameraContext;
-import io.github.kedaya0209.roco.app.hook.AbstractGenericHook;
-import io.github.kedaya0209.roco.app.hook.HookEventType;
-import io.github.kedaya0209.roco.app.hook.event.FollowModeEvent;
-import io.github.kedaya0209.roco.app.hook.multicast.HookRegistry;
+import io.github.kedaya0209.roco.app.ui.command.AppCommands.ToggleMaterialCollectionCommand;
+import io.github.kedaya0209.roco.app.ui.command.AppCommands.SetFollowModeCommand;
+import io.github.kedaya0209.roco.app.ui.command.CommandBus;
+import io.github.kedaya0209.roco.app.ui.state.AppState;
+import javafx.beans.binding.Bindings;
 import io.github.kedaya0209.roco.app.ui.service.VersionMode;
 import io.github.kedaya0209.roco.app.ui.service.resource.SvgManager;
 import io.github.kedaya0209.roco.app.ui.service.ui.VersionManager;
-import javafx.application.Platform;
+import io.github.kedaya0209.roco.app.ui.state.ViewportState;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
-import javafx.scene.Cursor;
 import javafx.scene.Group;
 import javafx.scene.control.Tooltip;
 import javafx.scene.layout.StackPane;
@@ -23,16 +21,21 @@ import javafx.scene.shape.SVGPath;
 import javafx.scene.transform.Scale;
 import javafx.util.Duration;
 
-import java.util.Set;
-
 @NotThreadSafe
 public class FloatToolbox extends VBox {
+    private static volatile FloatToolbox instance;
+
     private boolean resourcePanelVisible = false;
     private final StackPane collectBtn;
     private final ResourceCounterPanel resourcePanel;
 
+    public static FloatToolbox getInstance() {
+        return instance;
+    }
+
     public FloatToolbox(ResourceCounterPanel resourcePanel, String unifiedBlueColor) {
         super(12);
+        instance = this;
         this.resourcePanel = resourcePanel;
         setPadding(new Insets(10));
         setAlignment(Pos.TOP_CENTER);
@@ -46,7 +49,7 @@ public class FloatToolbox extends VBox {
         collectBtn = createVectorIconButton(
                 "资源采集计数",
                 "M9 7V5h6v2h2V5a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2v2h2zm11 8V9a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2zm-11-4h4v2h-4v-2z",
-                false, resourcePanel, unifiedBlueColor
+                resourcePanel, unifiedBlueColor
         );
 
         getChildren().add(followBtn);
@@ -87,24 +90,17 @@ public class FloatToolbox extends VBox {
         Tooltip.install(btn, tooltip);
         btn.getChildren().add(wrapper);
 
-        CameraContext cameraCtx = CameraContext.getInstance();
-        btn.setOnMouseClicked(_ -> cameraCtx.setFollowMode(!cameraCtx.isFollowMode()));
-        HookRegistry.INSTANCE.register(new AbstractGenericHook<FollowModeEvent>() {
-            @Override
-            public void onEvent(HookEventType eventType, FollowModeEvent data) {
-                Platform.runLater(() -> icon.setFill(data.followMode() ? Color.web(unifiedBlueColor) : Color.WHITE));
-            }
-
-            @Override
-            public Set<HookEventType> supportedEvents() {
-                return Set.of(HookEventType.FOLLOW_MODE_CHANGED);
-            }
-        });
+        btn.setOnMouseClicked(_ ->
+                CommandBus.dispatch(new SetFollowModeCommand(!ViewportState.getInstance().isFollowMode())));
+        icon.fillProperty().bind(Bindings
+                .when(ViewportState.getInstance().followModeProperty())
+                .then(Color.web(unifiedBlueColor))
+                .otherwise(Color.WHITE));
 
         return btn;
     }
 
-    private StackPane createVectorIconButton(String hint, String svgPath, boolean isFollowLogic, ResourceCounterPanel panel, String unifiedBlueColor) {
+    private StackPane createVectorIconButton(String hint, String svgPath, ResourceCounterPanel panel, String unifiedBlueColor) {
         StackPane btn = new StackPane();
         btn.getStyleClass().add("float-toolbox-btn");
 
@@ -121,29 +117,15 @@ public class FloatToolbox extends VBox {
         Tooltip.install(btn, tooltip);
         btn.getChildren().add(icon);
 
-        if (isFollowLogic) {
-            CameraContext cameraCtx = CameraContext.getInstance();
-            btn.setOnMouseClicked(_ -> cameraCtx.setFollowMode(!cameraCtx.isFollowMode()));
-            HookRegistry.INSTANCE.register(new AbstractGenericHook<FollowModeEvent>() {
-                @Override
-                public void onEvent(HookEventType eventType, FollowModeEvent data) {
-                    Platform.runLater(() -> icon.setFill(data.followMode() ? Color.web(unifiedBlueColor) : Color.WHITE));
-                }
-
-                @Override
-                public Set<HookEventType> supportedEvents() {
-                    return Set.of(HookEventType.FOLLOW_MODE_CHANGED);
-                }
+        if (panel != null) {
+            // Property listener 驱动面板和图标（handler 只 dispatch command）
+            AppState.getInstance().materialCollectionProperty().addListener((_, _, now) -> {
+                resourcePanelVisible = now;
+                panel.toggle(now);
+                icon.setFill(now ? Color.web(unifiedBlueColor) : Color.WHITE);
             });
-        } else if (panel != null) {
-            // 切换面板显示的逻辑
-            btn.setOnMouseClicked(_ -> {
-                resourcePanelVisible = !resourcePanelVisible;
-                panel.toggle(resourcePanelVisible);
-                icon.setFill(resourcePanelVisible ? Color.web(unifiedBlueColor) : Color.WHITE);
-                //获取图标当前点击状态
-                ViewConfig.MATERIAL_COLLECTION = resourcePanelVisible;
-            });
+            btn.setOnMouseClicked(_ ->
+                    CommandBus.dispatch(new ToggleMaterialCollectionCommand()));
         }
         return btn;
     }
