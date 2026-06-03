@@ -89,9 +89,7 @@ public final class CommandHandlers {
             ConfigPersistence.save();
         });
 
-        CommandBus.subscribe(SetFollowModeCommand.class, cmd -> {
-            CameraContext.getInstance().setFollowMode(cmd.enabled());
-        });
+        CommandBus.subscribe(SetFollowModeCommand.class, cmd -> CameraContext.getInstance().setFollowMode(cmd.enabled()));
 
         CommandBus.subscribe(ToggleNavModeCommand.class, cmd -> {
             CameraContext cam = CameraContext.getInstance();

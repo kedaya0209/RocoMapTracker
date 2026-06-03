@@ -98,9 +98,7 @@ public class SettingFieldBuilder {
                     String url = currentValue != null ? currentValue.toString() : "";
                     Hyperlink link = new Hyperlink(url);
                     link.setStyle("-fx-font-size: 12px;");
-                    link.setOnAction(_ -> {
-                        ModernCanvasApp.hostServices().showDocument(url);
-                    });
+                    link.setOnAction(_ -> ModernCanvasApp.hostServices().showDocument(url));
                     return link;
                 }
                 Label label = new Label(currentValue != null ? currentValue.toString() : "");

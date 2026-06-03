@@ -4,7 +4,6 @@ import net.jcip.annotations.ThreadSafe;
 import atlantafx.base.theme.Styles;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
-import javafx.scene.control.Label;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;

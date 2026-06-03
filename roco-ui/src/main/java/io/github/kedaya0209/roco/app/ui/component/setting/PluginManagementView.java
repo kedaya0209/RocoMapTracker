@@ -1,6 +1,7 @@
 package io.github.kedaya0209.roco.app.ui.component.setting;
 
 import atlantafx.base.theme.Styles;
+import io.github.kedaya0209.roco.app.ui.component.dialog.PluginUpdateDialog;
 import io.github.kedaya0209.roco.app.ui.service.resource.SvgManager;
 import io.github.kedaya0209.roco.app.ui.component.dialog.ConfirmDialog;
 import io.github.kedaya0209.roco.app.ui.util.FxRippleUtil;
@@ -52,8 +53,6 @@ public class PluginManagementView {
     @Setter
     private StackPane dialogRoot;
 
-    private final Timeline progressPoller;
-
     public PluginManagementView() {
         this.root = new VBox(10);
         this.root.setPadding(new Insets(5, 10, 10, 10));
@@ -73,28 +72,17 @@ public class PluginManagementView {
         checkBtn.setStyle("-fx-cursor: hand;");
         checkBtn.setPrefWidth(100);
         FxRippleUtil.install(checkBtn);
-        checkBtn.setOnAction(e -> {
+        checkBtn.setOnAction(_ -> {
             checkBtn.setDisable(true);
             checkBtn.setText("检查中...");
-            new Thread(() -> {
-                try {
-                    PluginUpdateManager mgr = PluginUpdateManager.getInstance();
-                    mgr.scanPlugins();
-                    mgr.checkAllPlugins(true);
-                    while (mgr.isCheckingUpdates()) {
-                        try {
-                            Thread.sleep(100);
-                        } catch (InterruptedException ignored) {
-                        }
-                    }
-                } finally {
-                    Platform.runLater(() -> {
-                        refresh(false);
-                        checkBtn.setText("检查更新");
-                        checkBtn.setDisable(false);
-                    });
-                }
-            }).start();
+            PluginUpdateManager mgr = PluginUpdateManager.getInstance();
+            mgr.setOnCheckComplete(() -> Platform.runLater(() -> {
+                refresh(false);
+                checkBtn.setText("检查更新");
+                checkBtn.setDisable(false);
+            }));
+            mgr.scanPlugins();
+            mgr.checkAllPlugins(true);
         });
 
         toolbar.getChildren().addAll(statusLabel, spacer, checkBtn);
@@ -106,8 +94,8 @@ public class PluginManagementView {
         root.getChildren().addAll(toolbar, pluginList);
 
         // 进度轮询（每 100ms 刷新卡片背景）
-        progressPoller = new Timeline(
-                new KeyFrame(Duration.millis(100), e -> updateProgressDisplay()));
+        Timeline progressPoller = new Timeline(
+                new KeyFrame(Duration.millis(100), _ -> updateProgressDisplay()));
         progressPoller.setCycleCount(Animation.INDEFINITE);
         progressPoller.play();
     }
@@ -288,26 +276,7 @@ public class PluginManagementView {
 
         // 更新按钮（仅在 HAS_UPDATE 状态时显示）
         if (plugin.status() == PluginStatus.HAS_UPDATE) {
-            Button updateBtn = new Button("更新");
-            updateBtn.setPrefHeight(26);
-            updateBtn.setPadding(new Insets(0, 14, 0, 14));
-            updateBtn.setStyle("-fx-cursor: hand; -fx-font-size: 12px; -fx-background-radius: 13; " +
-                    "-fx-border-radius: 13; -fx-border-width: 0; -fx-background-color: #2a7de1; " +
-                    "-fx-text-fill: white; -fx-font-weight: bold;");
-            updateBtn.setOnAction(e -> {
-                updateBtn.setDisable(true);
-                updateBtn.setText("...");
-                PluginUpdateManager mgr = PluginUpdateManager.getInstance();
-                String pid = plugin.id();
-                mgr.setUpdateCompletionCallback(pid, message ->
-                        Platform.runLater(() -> {
-                            if (dialogRoot != null) {
-                                ConfirmDialog.showSimpleDialog(dialogRoot, "插件更新", message,
-                                        "确定", false, this::refresh);
-                            }
-                        }));
-                mgr.startUpdate(pid);
-            });
+            Button updateBtn = getButton(plugin);
             actions.getChildren().add(updateBtn);
         }
 
@@ -317,15 +286,15 @@ public class PluginManagementView {
         deleteBtn.setStyle("-fx-cursor: hand; -fx-background-radius: 6;");
         Node deleteIcon = SvgManager.createIcon("/icon/delete.svg", 20, "-fx-fill: #e05050;");
         deleteBtn.getChildren().add(deleteIcon);
-        deleteBtn.setOnMouseEntered(e -> {
+        deleteBtn.setOnMouseEntered(_ -> {
             deleteBtn.setStyle("-fx-background-color: #e05050; -fx-background-radius: 6; -fx-cursor: hand;");
             deleteBtn.getChildren().set(0, SvgManager.createIcon("/icon/delete.svg", 20, "-fx-fill: white;"));
         });
-        deleteBtn.setOnMouseExited(e -> {
+        deleteBtn.setOnMouseExited(_ -> {
             deleteBtn.setStyle("-fx-background-radius: 6; -fx-cursor: hand;");
             deleteBtn.getChildren().set(0, SvgManager.createIcon("/icon/delete.svg", 20, "-fx-fill: #e05050;"));
         });
-        deleteBtn.setOnMouseClicked(e -> {
+        deleteBtn.setOnMouseClicked(_ -> {
             if (dialogRoot != null) {
                 ConfirmDialog.showConfirmDialog(dialogRoot,
                         "卸载插件",
@@ -351,15 +320,7 @@ public class PluginManagementView {
         VBox detailPanel = new VBox(4);
         detailPanel.setPadding(new Insets(10, 14, 14, 14)); // 缩进与图标对齐
 
-        if (!plugin.description().isEmpty()) {
-            detailPanel.getChildren().add(createDetailRow("描述", plugin.description()));
-        }
-        if (!plugin.entry().isEmpty()) {
-            detailPanel.getChildren().add(createDetailRow("入口", plugin.entry()));
-        }
-        if (plugin.source() != null && !plugin.source().repo().isEmpty()) {
-            detailPanel.getChildren().add(createDetailRow("仓库", plugin.source().repo()));
-        }
+        PluginUpdateDialog.getItem(plugin, detailPanel, createDetailRow("描述", plugin.description()), createDetailRow("入口", plugin.entry()), createDetailRow("仓库", plugin.source().repo()));
         if (!plugin.assets().isEmpty()) {
             StringBuilder sb = new StringBuilder();
             for (var a : plugin.assets()) {
@@ -416,11 +377,33 @@ public class PluginManagementView {
         });
 
         // 自定义箭头跟随展开/折叠旋转
-        pane.expandedProperty().addListener((_, _, expanded) -> {
-            arrowWrapper.setRotate(expanded ? 90 : 0);
-        });
+        pane.expandedProperty().addListener((_, _, expanded) -> arrowWrapper.setRotate(expanded ? 90 : 0));
 
         return pane;
+    }
+
+    private Button getButton(PluginInfo plugin) {
+        Button updateBtn = new Button("更新");
+        updateBtn.setPrefHeight(26);
+        updateBtn.setPadding(new Insets(0, 14, 0, 14));
+        updateBtn.setStyle("-fx-cursor: hand; -fx-font-size: 12px; -fx-background-radius: 13; " +
+                "-fx-border-radius: 13; -fx-border-width: 0; -fx-background-color: #2a7de1; " +
+                "-fx-text-fill: white; -fx-font-weight: bold;");
+        updateBtn.setOnAction(_ -> {
+            updateBtn.setDisable(true);
+            updateBtn.setText("...");
+            PluginUpdateManager mgr = PluginUpdateManager.getInstance();
+            String pid = plugin.id();
+            mgr.setUpdateCompletionCallback(pid, message ->
+                    Platform.runLater(() -> {
+                        if (dialogRoot != null) {
+                            ConfirmDialog.showSimpleDialog(dialogRoot, "插件更新", message,
+                                    "确定", false, this::refresh);
+                        }
+                    }));
+            mgr.startUpdate(pid);
+        });
+        return updateBtn;
     }
 
     /** 创建首字母占位图标 */
@@ -436,16 +419,7 @@ public class PluginManagementView {
     }
 
     private HBox createDetailRow(String label, String value) {
-        Label lbl = new Label(label + ": ");
-        lbl.setStyle("-fx-text-fill: -color-fg-muted; -fx-font-size: 12px; -fx-font-weight: bold;");
-        Label val = new Label(value);
-        val.setStyle("-fx-text-fill: -color-fg-default; -fx-font-size: 12px;");
-        val.setWrapText(true);
-
-        HBox row = new HBox(6);
-        row.setAlignment(Pos.TOP_LEFT);
-        row.getChildren().addAll(lbl, val);
-        return row;
+        return PluginUpdateDialog.getRow(label, value);
     }
 
     private Label createStatusBadge(PluginStatus status) {

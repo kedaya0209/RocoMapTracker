@@ -380,12 +380,8 @@ public class TitleBar extends HBox {
         btn.setGraphic(minimizeGraphic);
         btn.getStyleClass().add("title-bar-btn");
 
-        btn.setOnMouseEntered(_ -> {
-            minimizeIcon.setStyle("-fx-stroke: -color-accent-emphasis; -fx-stroke-width: 2; -fx-stroke-line-cap: round;");
-        });
-        btn.setOnMouseExited(_ -> {
-            minimizeIcon.setStyle("-fx-stroke: -color-fg-muted; -fx-stroke-width: 2; -fx-stroke-line-cap: round;");
-        });
+        btn.setOnMouseEntered(_ -> minimizeIcon.setStyle("-fx-stroke: -color-accent-emphasis; -fx-stroke-width: 2; -fx-stroke-line-cap: round;"));
+        btn.setOnMouseExited(_ -> minimizeIcon.setStyle("-fx-stroke: -color-fg-muted; -fx-stroke-width: 2; -fx-stroke-line-cap: round;"));
         btn.setOnAction(_ -> {
             if (minimizeHandler != null) {
                 minimizeHandler.run();
@@ -409,26 +405,18 @@ public class TitleBar extends HBox {
         closeBtn.setGraphic(closeGraphic);
         closeBtn.getStyleClass().add("title-bar-btn");
 
-        closeBtn.setOnMouseEntered(_ -> {
-            closeIcon.setStyle("-fx-stroke: -color-danger-emphasis; -fx-stroke-width: 2; -fx-stroke-line-cap: round;");
-        });
-
-        closeBtn.setOnMouseExited(_ -> {
-            closeIcon.setStyle("-fx-stroke: -color-fg-muted; -fx-stroke-width: 2; -fx-stroke-line-cap: round;");
-        });
+        closeBtn.setOnMouseEntered(_ -> closeIcon.setStyle("-fx-stroke: -color-danger-emphasis; -fx-stroke-width: 2; -fx-stroke-line-cap: round;"));
+        closeBtn.setOnMouseExited(_ -> closeIcon.setStyle("-fx-stroke: -color-fg-muted; -fx-stroke-width: 2; -fx-stroke-line-cap: round;"));
 
         // ============ 【关闭确认弹窗 — 使用模态 Stage 确保置顶】 ============
-        closeBtn.setOnAction(_ -> {
-            ModalConfirmDialog.showModalConfirmDialog(
-                    stage,
-                    "确认退出",
-                    "确定要关闭程序吗？\n所有识别与渲染服务将会停止运行。",
-                    "立即退出",
-                    Platform::exit,
-                    () -> {
-                    }
-            );
-        });
+        closeBtn.setOnAction(_ -> ModalConfirmDialog.showModalConfirmDialog(
+                stage,
+                "确认退出",
+                "确定要关闭程序吗？\n所有识别与渲染服务将会停止运行。",
+                "立即退出",
+                Platform::exit,
+                () -> { }
+        ));
         // ====================================================================
 
         return closeBtn;

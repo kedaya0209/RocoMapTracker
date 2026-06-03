@@ -334,19 +334,19 @@ public class Sidebar extends VBox {
                               SidebarComponent wikiUpdater, boolean selected, String iconSvg,
                               Runnable onAction, double progress) {
 
-        public SidebarItem(Type type, String title, Category category, String currentValue,
-                           SidebarComponent wikiUpdater, boolean selected, String iconSvg,
-                           Runnable onAction) {
+        SidebarItem(Type type, String title, Category category, String currentValue,
+                    SidebarComponent wikiUpdater, boolean selected, String iconSvg,
+                    Runnable onAction) {
             this(type, title, category, currentValue, wikiUpdater, selected, iconSvg, onAction, -1);
         }
 
-        public SidebarItem(Type type, String title, Category category, String currentValue,
-                           SidebarComponent wikiUpdater) {
+        SidebarItem(Type type, String title, Category category, String currentValue,
+                    SidebarComponent wikiUpdater) {
             this(type, title, category, currentValue, wikiUpdater, false, null, null, -1);
         }
 
-        public SidebarItem(Type type, String title, Category category, String currentValue,
-                           SidebarComponent wikiUpdater, boolean selected) {
+        SidebarItem(Type type, String title, Category category, String currentValue,
+                    SidebarComponent wikiUpdater, boolean selected) {
             this(type, title, category, currentValue, wikiUpdater, selected, null, null, -1);
         }
 

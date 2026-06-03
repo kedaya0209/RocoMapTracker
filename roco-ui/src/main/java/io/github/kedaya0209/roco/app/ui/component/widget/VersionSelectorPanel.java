@@ -422,7 +422,9 @@ public class VersionSelectorPanel extends StackPane {
     /** 解压 zip 到外部 sniffer 目录 */
     private void extractZip(Path zipPath, String exeClasspath) throws IOException {
         File targetDir = new File(FilePathUtil.getExternalPath(exeClasspath, true)).getParentFile();
-        if (!targetDir.exists()) targetDir.mkdirs();
+        if (!targetDir.exists() && !targetDir.mkdirs()) {
+            log.warn("无法创建目录: {}", targetDir);
+        }
 
         try (ZipInputStream zis = new ZipInputStream(new FileInputStream(zipPath.toFile()))) {
             ZipEntry entry;

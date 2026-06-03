@@ -4,10 +4,8 @@ import net.jcip.annotations.NotThreadSafe;
 import atlantafx.base.theme.Styles;
 import javafx.animation.FadeTransition;
 import javafx.animation.RotateTransition;
-import javafx.event.Event;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
-import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
 import javafx.scene.layout.HBox;
@@ -72,12 +70,7 @@ public class PluginUpdateDialog {
             detailPanel.setVisible(false);
             detailPanel.setManaged(false);
 
-            if (!plugin.description().isEmpty())
-                detailPanel.getChildren().add(createDetailRow("描述", plugin.description()));
-            if (!plugin.entry().isEmpty())
-                detailPanel.getChildren().add(createDetailRow("入口", plugin.entry()));
-            if (plugin.source() != null && !plugin.source().repo().isEmpty())
-                detailPanel.getChildren().add(createDetailRow("仓库", plugin.source().repo()));
+            getItem(plugin, detailPanel, createDetailRow("描述", plugin.description()), createDetailRow("入口", plugin.entry()), createDetailRow("仓库", plugin.source().repo()));
             if (update.releaseNotes() != null && !update.releaseNotes().isBlank())
                 detailPanel.getChildren().add(createDetailRow("更新说明", update.releaseNotes().strip()));
             if (!update.remoteAssets().isEmpty()) {
@@ -90,7 +83,7 @@ public class PluginUpdateDialog {
             }
 
             boolean[] expanded = {false};
-            arrowWrapper.setOnMouseClicked(e -> {
+            arrowWrapper.setOnMouseClicked(_ -> {
                 expanded[0] = !expanded[0];
                 RotateTransition rt = new RotateTransition(Duration.millis(200), arrowWrapper);
                 rt.setToAngle(expanded[0] ? 90 : 0);
@@ -114,7 +107,7 @@ public class PluginUpdateDialog {
         var cancelBtn = AbstractDialog.createButton("取消", null, () -> {
             FadeTransition ft = new FadeTransition(Duration.millis(150), mask);
             ft.setToValue(0);
-            ft.setOnFinished(ev -> rootStack.getChildren().remove(mask));
+            ft.setOnFinished(_ -> rootStack.getChildren().remove(mask));
             ft.play();
         });
         var updateBtn = AbstractDialog.createButton("更新选中", Styles.SUCCESS, () -> {
@@ -131,7 +124,20 @@ public class PluginUpdateDialog {
         AbstractDialog.fadeIn(mask);
     }
 
+    public static void getItem(PluginInfo plugin, VBox detailPanel, HBox desc, HBox entry, HBox repository) {
+        if (!plugin.description().isEmpty())
+            detailPanel.getChildren().add(desc);
+        if (!plugin.entry().isEmpty())
+            detailPanel.getChildren().add(entry);
+        if (plugin.source() != null && !plugin.source().repo().isEmpty())
+            detailPanel.getChildren().add(repository);
+    }
+
     private static HBox createDetailRow(String label, String value) {
+        return getRow(label, value);
+    }
+
+    public static HBox getRow(String label, String value) {
         Label lbl = new Label(label + ": ");
         lbl.setStyle("-fx-text-fill: -color-fg-muted; -fx-font-size: 12px; -fx-font-weight: bold;");
         Label val = new Label(value);

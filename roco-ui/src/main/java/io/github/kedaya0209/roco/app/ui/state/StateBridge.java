@@ -34,23 +34,14 @@ public final class StateBridge {
         log.info("StateBridge initialized");
 
         // === 玩家状态 ===
-        AppEvents.subscribe(PlayerStateEvent.class, event -> {
-            Platform.runLater(() ->
-                    ViewportState.getInstance().updatePlayerPosition(event.x(), event.y(), event.angle())
-            );
-        });
+        AppEvents.subscribe(PlayerStateEvent.class, event -> Platform.runLater(() ->
+                ViewportState.getInstance().updatePlayerPosition(event.x(), event.y(), event.angle())));
 
         // === 相机模式 ===
-        AppEvents.subscribe(FollowModeEvent.class, event -> {
-            Platform.runLater(() ->
-                    ViewportState.getInstance().setFollowMode(event.followMode())
-            );
-        });
+        AppEvents.subscribe(FollowModeEvent.class, event -> Platform.runLater(() ->
+                ViewportState.getInstance().setFollowMode(event.followMode())));
 
-        AppEvents.subscribe(NavModeEvent.class, event -> {
-            Platform.runLater(() ->
-                    ViewportState.getInstance().setNavMode(event.enabled())
-            );
-        });
+        AppEvents.subscribe(NavModeEvent.class, event -> Platform.runLater(() ->
+                ViewportState.getInstance().setNavMode(event.enabled())));
     }
 }

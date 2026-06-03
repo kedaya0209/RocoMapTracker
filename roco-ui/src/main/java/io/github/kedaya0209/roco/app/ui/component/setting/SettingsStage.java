@@ -227,7 +227,10 @@ public class SettingsStage extends Stage {
         if (themeCss != null) {
             scene.getStylesheets().add(themeCss);
         }
-        scene.getStylesheets().add(getClass().getResource("/styles/ui.css").toExternalForm());
+        java.net.URL uiCss = getClass().getResource("/styles/ui.css");
+        if (uiCss != null) {
+            scene.getStylesheets().add(uiCss.toExternalForm());
+        }
 
         setScene(scene);
 

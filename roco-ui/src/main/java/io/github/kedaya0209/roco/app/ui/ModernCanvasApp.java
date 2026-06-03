@@ -90,9 +90,8 @@ public class ModernCanvasApp extends Application {
     private TrayManager trayManager;
     private StackPane rootStack;
     private Stage primaryStage;
-    private Sidebar sidebar;
 
-    public static void main(String[] args) {
+    static void main(String[] args) {
         launch(args);
     }
 
@@ -159,9 +158,7 @@ public class ModernCanvasApp extends Application {
             log.info("算法变体切换: {}", newVariant);
             siftClientManager.restartClient(newVariant);
         });
-        SwitchMapMatcher.getInstance().setAlgoKindCallback(_ -> {
-            log.info("算法类型固定为 SIFT");
-        });
+        SwitchMapMatcher.getInstance().setAlgoKindCallback(_ -> log.info("算法类型固定为 SIFT"));
 
         ResourceInitService initService = getResourceInitService();
         initService.start(this::buildMainUi);
@@ -237,7 +234,10 @@ public class ModernCanvasApp extends Application {
             scene.getStylesheets().add(css);
         }
         // 加载全局 UI 增强样式表
-        scene.getStylesheets().add(getClass().getResource("/styles/ui.css").toExternalForm());
+        java.net.URL uiCss = getClass().getResource("/styles/ui.css");
+        if (uiCss != null) {
+            scene.getStylesheets().add(uiCss.toExternalForm());
+        }
         primaryStage.initStyle(StageStyle.TRANSPARENT);
         primaryStage.setScene(scene);
 
@@ -298,7 +298,7 @@ public class ModernCanvasApp extends Application {
                 CommandBus.dispatch(new SwitchVersionCommand(mode)));
 
         result.renderer().start();
-        this.sidebar = result.sidebar();
+        Sidebar sidebar = result.sidebar();
 
         // 设置更新 UI 回调
         UpdateManager.getInstance().setUiDelegate(new AppUpdateUiHandler(rootStack, sidebar));

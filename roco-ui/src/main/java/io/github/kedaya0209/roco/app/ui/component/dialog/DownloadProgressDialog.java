@@ -48,7 +48,7 @@ public class DownloadProgressDialog {
                 javafx.animation.FadeTransition ft =
                         new javafx.animation.FadeTransition(Duration.millis(150), mask);
                 ft.setToValue(0);
-                ft.setOnFinished(e -> parent.getChildren().remove(mask));
+                ft.setOnFinished(_ -> parent.getChildren().remove(mask));
                 ft.play();
             });
         }

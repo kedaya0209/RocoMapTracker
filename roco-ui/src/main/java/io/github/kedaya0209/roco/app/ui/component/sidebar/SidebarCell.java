@@ -112,12 +112,8 @@ class SidebarCell extends ListCell<Sidebar.SidebarItem> {
 
     private void addHoverEvent(Node icon, HBox row) {
         row.getStyleClass().add("sidebar-header-row");
-        setOnMouseEntered(e -> {
-            SvgManager.animateHoverDrawIcon(icon, true, 400);
-        });
-        setOnMouseExited(e -> {
-            SvgManager.animateHoverDrawIcon(icon, false, 400);
-        });
+        setOnMouseEntered(e -> SvgManager.animateHoverDrawIcon(icon, true, 400));
+        setOnMouseExited(e -> SvgManager.animateHoverDrawIcon(icon, false, 400));
         setCursor(Cursor.HAND);
     }
 
@@ -146,12 +142,8 @@ class SidebarCell extends ListCell<Sidebar.SidebarItem> {
         row.setStyle(BG_STYLE);
         row.getStyleClass().add("sidebar-header-row");
 
-        setOnMouseEntered(e -> {
-            SvgManager.animateHoverDrawIcon(icon, true, 400);
-        });
-        setOnMouseExited(e -> {
-            SvgManager.animateHoverDrawIcon(icon, false, 400);
-        });
+        setOnMouseEntered(e -> SvgManager.animateHoverDrawIcon(icon, true, 400));
+        setOnMouseExited(e -> SvgManager.animateHoverDrawIcon(icon, false, 400));
 
         StackPane wrapper = new StackPane(row);
         wrapper.setPadding(new Insets(2, 0, 2, 0));

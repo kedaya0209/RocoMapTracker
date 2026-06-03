@@ -73,9 +73,6 @@ public class TrayManager {
     private long currentHIcon;
     private long pumpThreadId;
 
-    // WNDPROC upcall stub
-    private MemorySegment wndProcStub;
-
     // ============================================================
     // 构造
     // ============================================================
@@ -238,7 +235,7 @@ public class TrayManager {
                 .findVirtual(TrayManager.class, "onWndProc",
                         MethodType.methodType(long.class, long.class, int.class, long.class, long.class))
                 .bindTo(this);
-        wndProcStub = Win32TraySymbols.linker.upcallStub(
+        MemorySegment wndProcStub = Win32TraySymbols.linker.upcallStub(
                 wndProcHandle,
                 FunctionDescriptor.of(ValueLayout.JAVA_LONG,
                         ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT,
@@ -364,7 +361,7 @@ public class TrayManager {
      */
     private int getTrayIconSize() {
         double scale = Screen.getPrimary().getOutputScaleX();
-        return Math.max(16, Math.min(64, (int) Math.round(16 * scale)));
+        return Math.clamp((int) Math.round(16 * scale), 16, 64);
     }
 
     /**

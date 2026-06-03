@@ -40,18 +40,7 @@ public class UpdateDialog extends AbstractDialog {
             notesHeader.setStyle("-fx-text-fill: -color-fg-default; -fx-font-size: 13px; -fx-font-weight: bold;");
             notesHeader.setPadding(new Insets(6, 0, 0, 0));
 
-            TextArea notesArea = new TextArea(releaseNotes.strip());
-            notesArea.setEditable(false);
-            notesArea.setWrapText(true);
-            notesArea.setMaxHeight(280);
-            notesArea.setPrefHeight(220);
-            notesArea.setStyle(
-                    "-fx-background-color: -color-bg-subtle; " +
-                    "-fx-text-fill: -color-fg-muted; " +
-                    "-fx-font-size: 12px; " +
-                    "-fx-background-radius: 6; " +
-                    "-fx-border-color: -color-border-muted; " +
-                    "-fx-border-radius: 6;");
+            TextArea notesArea = getTextArea(releaseNotes);
 
             content.getChildren().add(notesArea);
         }
@@ -71,6 +60,22 @@ public class UpdateDialog extends AbstractDialog {
                                 fadeOutAndRemove(rootStack, mask, onCancel))));
         mask.getChildren().add(dialogBox);
         showOnStack(rootStack, mask);
+    }
+
+    private static TextArea getTextArea(String releaseNotes) {
+        TextArea notesArea = new TextArea(releaseNotes.strip());
+        notesArea.setEditable(false);
+        notesArea.setWrapText(true);
+        notesArea.setMaxHeight(280);
+        notesArea.setPrefHeight(220);
+        notesArea.setStyle(
+                "-fx-background-color: -color-bg-subtle; " +
+                "-fx-text-fill: -color-fg-muted; " +
+                "-fx-font-size: 12px; " +
+                "-fx-background-radius: 6; " +
+                "-fx-border-color: -color-border-muted; " +
+                "-fx-border-radius: 6;");
+        return notesArea;
     }
 
     public static void showUpdateReadyDialog(StackPane rootStack,

@@ -27,9 +27,7 @@ public class UiAnimator {
         modalPane.usePredefinedTransitionFactories(Side.LEFT);
 
         // 监听显示状态
-        modalPane.displayProperty().addListener((_, _, showing) -> {
-            sidebarVisible = showing;
-        });
+        modalPane.displayProperty().addListener((_, _, showing) -> sidebarVisible = showing);
 
         menuBtn.setOnAction(_ -> toggleSidebar());
     }

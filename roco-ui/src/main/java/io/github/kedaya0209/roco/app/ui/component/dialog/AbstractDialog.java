@@ -66,7 +66,7 @@ public class AbstractDialog {
     protected static void fadeOutAndRemove(StackPane root, Node node, Runnable callback) {
         FadeTransition ft = new FadeTransition(Duration.millis(150), node);
         ft.setToValue(0);
-        ft.setOnFinished(e -> {
+        ft.setOnFinished(_ -> {
             root.getChildren().remove(node);
             if (callback != null) callback.run();
         });
@@ -104,10 +104,6 @@ public class AbstractDialog {
         return msgLabel;
     }
 
-    protected static Button createButton(String text) {
-        return createButton(text, null, null);
-    }
-
     protected static Button createButton(String text, String styleClass, Runnable onAction) {
         Button btn = new Button(text);
         btn.setPrefWidth(120);
@@ -118,7 +114,7 @@ public class AbstractDialog {
         }
         FxRippleUtil.install(btn);
         if (onAction != null) {
-            btn.setOnAction(e -> onAction.run());
+            btn.setOnAction(_ -> onAction.run());
         }
         return btn;
     }

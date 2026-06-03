@@ -18,7 +18,6 @@ import javafx.util.Duration;
 import java.io.IOException;
 
 import io.github.kedaya0209.roco.app.ui.service.resource.SvgManager;
-import io.github.kedaya0209.roco.app.ui.util.FxRippleUtil;
 
 @NotThreadSafe
 public class AboutDialog {
@@ -38,8 +37,7 @@ public class AboutDialog {
         try {
             iconNode = SvgManager.createIcon("/icon/rmt.svg", 64, null);
         } catch (Exception e) {
-            SVGPath fallback = AbstractDialog.createDefaultIcon("-color-accent-emphasis");
-            iconNode = fallback;
+            iconNode = AbstractDialog.createDefaultIcon("-color-accent-emphasis");
         }
 
         VBox body = new VBox(10);

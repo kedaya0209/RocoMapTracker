@@ -16,13 +16,7 @@ import javafx.scene.layout.StackPane;
 @NotThreadSafe
 public class UiResponseHook {
 
-    private final StackPane rootStack;
-    private final LoadingOverlay globalLoading;
-
     public UiResponseHook(StackPane rootStack, LoadingOverlay globalLoading) {
-        this.rootStack = rootStack;
-        this.globalLoading = globalLoading;
-
         AppEvents.subscribe(StatusEvent.class, event -> {
             if (event.displayMode() == StatusEvent.DisplayMode.CAROUSEL) return;
             Platform.runLater(() -> ToastManager.show(rootStack, event.message(), event.type()));

@@ -55,13 +55,11 @@ public class CheckUpdateManager implements SidebarComponent {
                 return;
             }
             switchToProgress(0);
-            updateMgr.manualCheck(() -> {
-                Platform.runLater(() -> {
-                    if (!UpdateManager.getInstance().isDownloading()) {
-                        switchToNormal();
-                    }
-                });
-            });
+            updateMgr.manualCheck(() -> Platform.runLater(() -> {
+                if (!UpdateManager.getInstance().isDownloading()) {
+                    switchToNormal();
+                }
+            }));
         });
 
         progressBar = new ProgressBar(0);

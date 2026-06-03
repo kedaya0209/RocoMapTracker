@@ -11,8 +11,6 @@ import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 
-import io.github.kedaya0209.roco.app.ui.util.FxRippleUtil;
-
 @NotThreadSafe
 public class ModalConfirmDialog {
 
@@ -50,7 +48,7 @@ public class ModalConfirmDialog {
         if (onCancel != null) {
             var cancelBtn = AbstractDialog.createButton("取消", null, () -> {
                 dialog.close();
-                if (onCancel != null) onCancel.run();
+                onCancel.run();
             });
             btnBox.getChildren().add(cancelBtn);
         }
@@ -58,7 +56,7 @@ public class ModalConfirmDialog {
         dialogBox.getChildren().addAll(icon, titleLabel, msgLabel, btnBox);
         mask.getChildren().add(dialogBox);
 
-        mask.setOnMouseClicked(e -> {
+        mask.setOnMouseClicked(_ -> {
             dialog.close();
             if (onCancel != null) onCancel.run();
         });

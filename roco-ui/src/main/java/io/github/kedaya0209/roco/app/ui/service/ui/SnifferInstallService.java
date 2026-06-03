@@ -36,8 +36,7 @@ public class SnifferInstallService {
         } else {
             ProgressControl pc = DownloadProgressDialog.showDownloadProgressDialog(
                     rootStack, "需要下载高级版组件 (sniffer)...", null);
-            Thread.ofPlatform().daemon(true).name("sniffer-install").start(() -> {
-                pm.checkRemotePlugin("sniffer",
+            Thread.ofPlatform().daemon(true).name("sniffer-install").start(() -> pm.checkRemotePlugin("sniffer",
                         new PluginSource("github-release", SnifferConfig.SNIFFER_REPO))
                     .ifPresentOrElse(update ->
                             pm.downloadPlugin(update,
@@ -62,8 +61,7 @@ public class SnifferInstallService {
                                             "安装失败",
                                             "无法获取 sniffer 插件信息，请检查网络连接",
                                             "确定", true, () -> {}));
-                        });
-            });
+                        }));
         }
     }
 }
