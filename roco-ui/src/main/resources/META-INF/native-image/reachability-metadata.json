@@ -1667,6 +1667,19 @@
       ]
     },
     {
+      "type": "com.sun.scenario.effect.impl.prism.ps.PPSLinearConvolvePeer",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": [
+            "com.sun.scenario.effect.FilterContext",
+            "com.sun.scenario.effect.impl.Renderer",
+            "java.lang.String"
+          ]
+        }
+      ]
+    },
+    {
       "type": "com.sun.scenario.effect.impl.prism.ps.PPSLinearConvolveShadowPeer",
       "methods": [
         {
@@ -4497,19 +4510,7 @@
       "glob": "com/sun/prism/d3d/hlsl/Texture_Color.obj"
     },
     {
-      "glob": "com/sun/scenario/effect/impl/hw/d3d/hlsl/Blend_SRC_IN.obj"
-    },
-    {
-      "glob": "com/sun/scenario/effect/impl/hw/d3d/hlsl/LinearConvolveShadow_28.obj"
-    },
-    {
-      "glob": "com/sun/scenario/effect/impl/hw/d3d/hlsl/LinearConvolveShadow_32.obj"
-    },
-    {
-      "glob": "com/sun/scenario/effect/impl/hw/d3d/hlsl/LinearConvolveShadow_64.obj"
-    },
-    {
-      "glob": "com/sun/scenario/effect/impl/hw/d3d/hlsl/LinearConvolveShadow_8.obj"
+      "glob": "com/sun/scenario/effect/impl/hw/d3d/hlsl/*.obj"
     },
     {
       "glob": "dll/**"

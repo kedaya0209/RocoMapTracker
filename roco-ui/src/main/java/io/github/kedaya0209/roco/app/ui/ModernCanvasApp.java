@@ -24,6 +24,7 @@ import io.github.kedaya0209.roco.app.match.map.SwitchMapMatcher;
 import io.github.kedaya0209.roco.app.socket.SocketServer;
 import io.github.kedaya0209.roco.app.ui.component.FloatToolbox;
 import io.github.kedaya0209.roco.app.ui.component.LoadingOverlay;
+import io.github.kedaya0209.roco.app.ui.component.setting.SettingsStage;
 import io.github.kedaya0209.roco.app.ui.component.ResourceCounterPanel;
 import io.github.kedaya0209.roco.app.ui.component.Sidebar;
 import io.github.kedaya0209.roco.app.ui.component.TitleBar;
@@ -64,6 +65,7 @@ import javafx.application.Application;
 import javafx.application.HostServices;
 import javafx.application.Platform;
 import javafx.scene.Scene;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.Background;
 import javafx.scene.layout.StackPane;
 import javafx.scene.paint.Color;
@@ -123,6 +125,13 @@ public class ModernCanvasApp extends Application {
         initScene();
 
         primaryStage.setTitle(CaptureConfig.APP_MAIN_TITLE);
+
+        // Native Image 环境下 StageStyle.TRANSPARENT 窗口不会自动获得焦点，
+        // 首次点击只能激活窗口而按钮无法响应，配合场景事件过滤器确保焦点即时激活
+        primaryStage.setOnShown(_ -> {
+            primaryStage.requestFocus();
+            primaryStage.toFront();
+        });
         primaryStage.show();
 
         // 提取 .ico 图标文件并立即设置任务栏图标（尽早设置，避免窗口出现时无图标）
@@ -241,6 +250,13 @@ public class ModernCanvasApp extends Application {
         scene.getStylesheets().add(getClass().getResource("/styles/ui.css").toExternalForm());
         primaryStage.initStyle(StageStyle.TRANSPARENT);
         primaryStage.setScene(scene);
+
+        // 修复 StageStyle.TRANSPARENT 窗口需要双击才能响应按钮的问题
+        scene.addEventFilter(MouseEvent.MOUSE_PRESSED, _ -> {
+            if (!primaryStage.isFocused()) {
+                primaryStage.requestFocus();
+            }
+        });
     }
 
     /**
@@ -281,6 +297,9 @@ public class ModernCanvasApp extends Application {
 
         siftClientManager.init();
         captureServiceManager.init(siftClientManager.getClient());
+
+        // 预初始化设置面板，避免首次点击时 FX 线程阻塞导致卡顿
+        SettingsStage.getInstance();
 
         FloatToolbox floatToolbox = result.floatToolbox();
 

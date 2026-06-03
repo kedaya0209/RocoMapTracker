@@ -124,7 +124,14 @@
                                     <excludes>
                                         <exclude>ai/onnxruntime/native/linux-*/**</exclude>
                                         <exclude>ai/onnxruntime/native/osx-*/**</exclude>
-                                        <exclude>ai/onnxruntime/native/osx-*/**</exclude>
+                                    </excludes>
+                                </filter>
+                                <!-- 排除巨大的洞穴地图瓦片数据（避免嵌入原生镜像导致 1GB+） -->
+                                <filter>
+                                    <artifact>io.github.kedaya0209:roco-map</artifact>
+                                    <excludes>
+                                        <exclude>source/maps/**</exclude>
+                                        <exclude>source/maps.zip</exclude>
                                     </excludes>
                                 </filter>
                                 <!-- 排除不需要的元数据文件 -->
@@ -177,12 +184,10 @@
                                 </options>
                             </agent>
                             <buildArgs>
-                                <!-- =====调试时需要将这两项注释掉，有些错误不会被记录在日志中====== -->
                                 <!-- 指定链接器子系统为 WINDOWS -->
-                                <buildArg>-H:NativeLinkerOption=/SUBSYSTEM:WINDOWS</buildArg>
-                                <!-- 指定入口点，确保在无控制台模式下正确启动 -->
-                                <buildArg>-H:NativeLinkerOption=/ENTRY:mainCRTStartup</buildArg>
-                                <!-- ==================================================== -->
+<!--                                <buildArg>-H:NativeLinkerOption=/SUBSYSTEM:WINDOWS</buildArg>-->
+<!--                                &lt;!&ndash; 指定入口点，确保在无控制台模式下正确启动 &ndash;&gt;-->
+<!--                                <buildArg>-H:NativeLinkerOption=/ENTRY:mainCRTStartup</buildArg>-->
                                 <buildArg>-R:MaxHeapSize=512M</buildArg>
                                 <buildArg>-R:MinHeapSize=128M</buildArg>
                                 <buildArg>-R:MaxDirectMemorySize=512M</buildArg>
@@ -202,7 +207,7 @@
                                 <buildArg>--initialize-at-run-time=com.sun.glass.ui.**</buildArg>
                                 <buildArg>--initialize-at-run-time=javafx.**</buildArg>
                                 <buildArg>
-                                    -H:IncludeResources=^(com/sun/prism/.*|com/sun/javafx/.*|dll/.*|sift/.*|capture/.*|update/.*|icon/.*|logback\.xml|extract-list\.txt)$
+                                    -H:IncludeResources=^(com/sun/prism/.*|com/sun/javafx/.*|com/sun/scenario/effect/impl/hw/d3d/hlsl/.*\.obj|dll/.*|sift/.*|match/.*|capture/.*|update/.*|icon/.*|logback\.xml|extract-list\.txt|.*\.obj)$
                                 </buildArg>
                                 <buildArg>-H:IncludeResourceBundles=ch.qos.logback.*</buildArg>
                                 <buildArg>
@@ -296,7 +301,7 @@
                                 <buildArg>--initialize-at-run-time=com.sun.glass.ui.**</buildArg>
                                 <buildArg>--initialize-at-run-time=javafx.**</buildArg>
                                 <buildArg>
-                                    -H:IncludeResources=^(com/sun/prism/.*|com/sun/javafx/.*|dll/.*|sift/.*|capture/.*|update/.*|icon/.*|logback\.xml|extract-list\.txt)$
+                                    -H:IncludeResources=^(com/sun/prism/.*|com/sun/javafx/.*|com/sun/scenario/effect/impl/hw/d3d/hlsl/.*\.obj|dll/.*|sift/.*|match/.*|capture/.*|update/.*|icon/.*|logback\.xml|extract-list\.txt|.*\.obj)$
                                 </buildArg>
                                 <buildArg>-H:IncludeResourceBundles=ch.qos.logback.*</buildArg>
                                 <buildArg>
@@ -374,7 +379,7 @@
                                 <buildArg>--initialize-at-run-time=com.sun.glass.ui.**</buildArg>
                                 <buildArg>--initialize-at-run-time=javafx.**</buildArg>
                                 <buildArg>
-                                    -H:IncludeResources=^(com/sun/prism/.*|com/sun/javafx/.*|dll/.*|sift/.*|capture/.*|update/.*|icon/.*|logback\.xml|extract-list\.txt)$
+                                    -H:IncludeResources=^(com/sun/prism/.*|com/sun/javafx/.*|com/sun/scenario/effect/impl/hw/d3d/hlsl/.*\.obj|dll/.*|sift/.*|match/.*|capture/.*|update/.*|icon/.*|logback\.xml|extract-list\.txt|.*\.obj)$
                                 </buildArg>
                                 <buildArg>-H:IncludeResourceBundles=ch.qos.logback.*</buildArg>
                                 <buildArg>
