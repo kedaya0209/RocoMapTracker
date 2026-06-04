@@ -85,6 +85,7 @@ public class TitleBar extends HBox {
         super(12);
         this.stageRef = stage;
 
+        setMinHeight(TITLE_BAR_HEIGHT);
         setAlignment(Pos.CENTER_LEFT);
         setPadding(new Insets(5, 10, 5, 10));
         setStyle("-fx-background-color: -color-bg-default; -fx-border-color: -color-border-muted; -fx-border-width: 0 0 1 0;");

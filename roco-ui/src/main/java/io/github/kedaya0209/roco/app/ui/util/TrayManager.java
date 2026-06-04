@@ -3,6 +3,7 @@ package io.github.kedaya0209.roco.app.ui.util;
 import io.github.kedaya0209.roco.app.config.CaptureConfig;
 import io.github.kedaya0209.roco.app.config.PathConfig;
 import io.github.kedaya0209.roco.app.config.SiftConfig;
+import io.github.kedaya0209.roco.app.config.ViewConfig;
 import io.github.kedaya0209.roco.app.ui.service.resource.SvgManager;
 import io.github.kedaya0209.roco.app.ui.command.AppCommands.SetFollowModeCommand;
 import io.github.kedaya0209.roco.app.ui.command.AppCommands.ToggleGhostModeCommand;
@@ -671,6 +672,11 @@ public class TrayManager {
                         if (scene != null && scene.getRoot() instanceof StackPane rootPane) {
                             SettingsStage.getInstance().showDialog(rootPane, "插件管理");
                         }
+                        menuStage.hide();
+                    }),
+                    createItem("还原主面板初始大小", null, false, () -> {
+                        primaryStage.setWidth(ViewConfig.INITIAL_WINDOW_WIDTH);
+                        primaryStage.setHeight(ViewConfig.INITIAL_WINDOW_HEIGHT);
                         menuStage.hide();
                     }),
                     createItem("退出", null, false, () -> {
