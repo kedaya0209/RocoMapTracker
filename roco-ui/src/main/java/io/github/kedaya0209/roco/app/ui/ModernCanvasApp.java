@@ -46,6 +46,7 @@ import io.github.kedaya0209.roco.app.update.plugin.PluginUpdateManager;
 
 import java.io.File;
 import java.io.InputStream;
+import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import io.github.kedaya0209.roco.app.utils.ResourceExtractor;
@@ -234,7 +235,7 @@ public class ModernCanvasApp extends Application {
             scene.getStylesheets().add(css);
         }
         // 加载全局 UI 增强样式表
-        java.net.URL uiCss = getClass().getResource("/styles/ui.css");
+        URL uiCss = getClass().getResource("/styles/ui.css");
         if (uiCss != null) {
             scene.getStylesheets().add(uiCss.toExternalForm());
         }

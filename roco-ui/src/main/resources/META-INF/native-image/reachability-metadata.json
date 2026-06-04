@@ -4936,7 +4936,29 @@
           "jint",
           "void*"
         ]
-      }
+      },
+      {"returnType": "jint", "parameterTypes": ["jint"]},
+      {"returnType": "jint", "parameterTypes": ["jlong"]},
+      {"returnType": "jlong", "parameterTypes": ["jlong"]},
+      {"returnType": "jshort", "parameterTypes": ["jlong"]},
+      {"returnType": "jboolean", "parameterTypes": ["jlong"]},
+      {"returnType": "jboolean", "parameterTypes": ["jlong", "jlong"]},
+      {"returnType": "jint", "parameterTypes": ["jlong", "jlong"]},
+      {"returnType": "jlong", "parameterTypes": ["jlong", "jlong"]},
+      {"returnType": "jint", "parameterTypes": ["jint", "jlong"]},
+      {"returnType": "jlong", "parameterTypes": ["jlong", "jint", "jlong"]},
+      {"returnType": "jlong", "parameterTypes": ["jlong", "jint", "jlong", "jlong"]},
+      {"returnType": "jlong", "parameterTypes": ["jlong", "jlong", "jint", "jlong", "jlong"]},
+      {"returnType": "jint", "parameterTypes": ["jlong", "jlong", "jint", "jint"]},
+      {"returnType": "jint", "parameterTypes": ["jint", "jint", "jlong", "jlong"]},
+      {"returnType": "jlong", "parameterTypes": ["jlong", "jlong", "jint", "jint", "jint", "jint"]},
+      {"returnType": "jlong", "parameterTypes": ["jlong", "jlong", "jint", "jlong", "jlong", "jint"]},
+      {"returnType": "jlong", "parameterTypes": ["jint", "jint", "jint", "jint", "jlong"]},
+      {"returnType": "jlong", "parameterTypes": ["jint", "jlong", "jlong", "jint", "jint", "jint", "jint", "jint", "jlong", "jlong", "jlong", "jlong"]},
+      {"returnType": "jint", "parameterTypes": ["jlong", "jint", "jlong", "jint"]},
+      {"returnType": "jint", "parameterTypes": ["jlong", "jlong", "jlong"]},
+      {"returnType": "jlong", "parameterTypes": ["jint", "jint", "jint"]},
+      {"returnType": "jint", "parameterTypes": []}
     ],
     "upcalls": [
       {
@@ -4957,6 +4979,28 @@
         "parameterTypes": [
           "jlong",
           "void*"
+        ]
+      },
+      {
+        "class": "io.github.kedaya0209.roco.app.ui.util.WindowHitTestHelper",
+        "method": "wndProcImpl",
+        "returnType": "jlong",
+        "parameterTypes": [
+          "jlong",
+          "jint",
+          "jlong",
+          "jlong"
+        ]
+      },
+      {
+        "class": "io.github.kedaya0209.roco.app.ui.util.TrayManager",
+        "method": "onWndProc",
+        "returnType": "jlong",
+        "parameterTypes": [
+          "jlong",
+          "jint",
+          "jlong",
+          "jlong"
         ]
       }
     ]

@@ -16,6 +16,7 @@ import io.github.kedaya0209.roco.app.ui.command.AppCommands.ToggleMatchingComman
 import io.github.kedaya0209.roco.app.ui.command.AppCommands.ToggleNavModeCommand;
 import io.github.kedaya0209.roco.app.ui.command.CommandBus;
 import io.github.kedaya0209.roco.app.ui.state.AppState;
+import io.github.kedaya0209.roco.app.ui.util.WindowHitTestHelper;
 import io.github.kedaya0209.roco.app.ui.state.ViewportState;
 import io.github.kedaya0209.roco.app.ui.component.dialog.ModalConfirmDialog;
 import javafx.geometry.Insets;
@@ -32,8 +33,12 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.shape.Rectangle;
 import javafx.scene.shape.SVGPath;
 import javafx.stage.Stage;
+import javafx.animation.AnimationTimer;
 import javafx.animation.TranslateTransition;
 import javafx.application.Platform;
+import javafx.event.EventHandler;
+import javafx.scene.Scene;
+import javafx.scene.input.MouseEvent;
 import javafx.util.Duration;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
@@ -43,6 +48,9 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 
 public class TitleBar extends HBox {
+
+    /** 标题栏高度（像素），与 WindowHitTestHelper 穿透区域划分一致 */
+    private static final int TITLE_BAR_HEIGHT = 40;
 
     private double xOffset = 0;
     private double yOffset = 0;
@@ -54,6 +62,11 @@ public class TitleBar extends HBox {
     private final Button navBtn;
     /** 窗口引用，供 syncNavUi 设置透明度 */
     private final Stage stageRef;
+    /** 按位置显隐光标的过滤器 */
+    private EventHandler<MouseEvent> cursorFilter;
+    private boolean cursorShown = true;
+    /** 光标强制执行器：通过 Win32 GetCursorPos 轮询位置，不依赖 JavaFX 事件 */
+    private AnimationTimer cursorEnforcer;
     /** 幽灵模式图标 */
     private final Node ghostIcon;
     /** 幽灵模式透明度滑块 */
@@ -72,6 +85,7 @@ public class TitleBar extends HBox {
         super(12);
         this.stageRef = stage;
 
+        setMinHeight(TITLE_BAR_HEIGHT);
         setAlignment(Pos.CENTER_LEFT);
         setPadding(new Insets(5, 10, 5, 10));
         setStyle("-fx-background-color: -color-bg-default; -fx-border-color: -color-border-muted; -fx-border-width: 0 0 1 0;");
@@ -122,15 +136,54 @@ public class TitleBar extends HBox {
         ghostBtn.setOnAction(_ ->
                 CommandBus.dispatch(new ToggleGhostModeCommand()));
 
-        // 幽灵模式 Property → UI 副作用
+        // 幽灵模式 Property → UI 副作用 + HWND 穿透
         AppState.getInstance().ghostModeProperty().addListener((_, _, now) -> {
             ghostMode = now;
             setSvgFill(ghostIcon, now ? "-color-accent-emphasis" : "-color-fg-muted");
             updateSliderVisibility();
             opacitySlider.setDisable(!now && !navMode);
             stage.setAlwaysOnTop(now);
-            menuBtn.setMouseTransparent(now);
-            for (Node node : overlayNodes) node.setMouseTransparent(now);
+            Scene scene = stage.getScene();
+            if (now) {
+                // 鼠标事件过滤器：仅消费内容区事件阻止 UI 交互
+                if (cursorFilter == null) {
+                    cursorFilter = e -> {
+                        if (e.getSceneY() > TITLE_BAR_HEIGHT) e.consume();
+                    };
+                }
+                scene.addEventFilter(MouseEvent.ANY, cursorFilter);
+                WindowHitTestHelper.enablePartialPassthrough(stage, TITLE_BAR_HEIGHT);
+
+                // AnimationTimer 每帧轮询 Win32 GetCursorPos + GetWindowRect，
+                // 纯 Win32 判断光标是否在内容区，当在内容区时调用 ShowCursor(FALSE) 全局隐藏。
+                // 移出内容区后调用 ShowCursor(TRUE) 恢复，以保证标题栏和外部窗口光标正常。
+                cursorEnforcer = new AnimationTimer() {
+                    @Override
+                    public void handle(long now) {
+                        if (WindowHitTestHelper.isCursorOverContentArea(TITLE_BAR_HEIGHT)) {
+                            if (cursorShown) {
+                                WindowHitTestHelper.hideSystemCursor();
+                                cursorShown = false;
+                            }
+                        } else if (!cursorShown) {
+                            WindowHitTestHelper.showSystemCursor();
+                            cursorShown = true;
+                        }
+                    }
+                };
+                cursorEnforcer.start();
+            } else {
+                scene.removeEventFilter(MouseEvent.ANY, cursorFilter);
+                if (!cursorShown) {
+                    WindowHitTestHelper.showSystemCursor();
+                    cursorShown = true;
+                }
+                WindowHitTestHelper.disablePassthrough();
+                if (cursorEnforcer != null) {
+                    cursorEnforcer.stop();
+                    cursorEnforcer = null;
+                }
+            }
             if (!now) {
                 if (navMode) {
                     stage.setOpacity(NavigConfig.NAV_WINDOW_OPACITY);
@@ -181,18 +234,14 @@ public class TitleBar extends HBox {
         // --- 4. 调整子组件顺序：滑块在图标左侧，图标靠右锚定 ---
         getChildren().addAll(menuBtn, titleLabel, statusContainer, spacer, opacitySlider, ghostBtn, matchToggleBtn, navBtn, minimizeBtn, closeBtn);
 
-        // 窗口移动逻辑保持不变
+        // 窗口移动逻辑 — WM_NCHITTEST 拦截控制穿透，此处无需 ghostMode 守卫
         setOnMousePressed(e -> {
-            if (!ghostMode) {
-                xOffset = e.getSceneX();
-                yOffset = e.getSceneY();
-            }
+            xOffset = e.getSceneX();
+            yOffset = e.getSceneY();
         });
         setOnMouseDragged(e -> {
-            if (!ghostMode) {
-                stage.setX(e.getScreenX() - xOffset);
-                stage.setY(e.getScreenY() - yOffset);
-            }
+            stage.setX(e.getScreenX() - xOffset);
+            stage.setY(e.getScreenY() - yOffset);
         });
 
         // 注册状态轮播事件

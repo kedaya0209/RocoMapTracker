@@ -1,12 +1,23 @@
 package io.github.kedaya0209.roco.app.ui.util;
 
 import io.github.kedaya0209.roco.app.config.CaptureConfig;
+import io.github.kedaya0209.roco.app.config.PathConfig;
 import io.github.kedaya0209.roco.app.config.SiftConfig;
+import io.github.kedaya0209.roco.app.config.ViewConfig;
 import io.github.kedaya0209.roco.app.ui.service.resource.SvgManager;
+import io.github.kedaya0209.roco.app.ui.command.AppCommands.SetFollowModeCommand;
+import io.github.kedaya0209.roco.app.ui.command.AppCommands.ToggleGhostModeCommand;
+import io.github.kedaya0209.roco.app.ui.command.AppCommands.ToggleMatchingCommand;
+import io.github.kedaya0209.roco.app.ui.command.AppCommands.ToggleNavModeCommand;
+import io.github.kedaya0209.roco.app.ui.command.CommandBus;
+import io.github.kedaya0209.roco.app.ui.component.setting.SettingsStage;
+import io.github.kedaya0209.roco.app.ui.state.AppState;
+import io.github.kedaya0209.roco.app.ui.state.ViewportState;
 import io.github.kedaya0209.roco.app.utils.FilePathUtil;
 import io.github.kedaya0209.roco.app.utils.ResourceUtils;
 import javafx.application.Platform;
 import javafx.geometry.Rectangle2D;
+import javafx.scene.Group;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.SnapshotParameters;
@@ -15,6 +26,7 @@ import javafx.scene.image.PixelFormat;
 import javafx.scene.image.PixelReader;
 import javafx.scene.image.WritableImage;
 import javafx.scene.layout.Pane;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.stage.Screen;
@@ -371,7 +383,7 @@ public class TrayManager {
         try {
             // SVG → JavaFX WritableImage → ARGB 像素
             WritableImage fxImg = new WritableImage(size, size);
-            Node iconNode = SvgManager.createIcon(io.github.kedaya0209.roco.app.config.PathConfig.ICON, size);
+            Node iconNode = SvgManager.createIcon(PathConfig.ICON, size);
             SnapshotParameters sp = new SnapshotParameters();
             sp.setFill(Color.TRANSPARENT);
             iconNode.snapshot(sp, fxImg);
@@ -402,7 +414,7 @@ public class TrayManager {
             File appDir = FilePathUtil.getAppRootDir().toFile();
             iconFile = new File(appDir, "rmt.png");
             if (!iconFile.exists()) {
-                try (InputStream is = ResourceUtils.getResourceStream(io.github.kedaya0209.roco.app.config.PathConfig.ICON_PNG)) {
+                try (InputStream is = ResourceUtils.getResourceStream(PathConfig.ICON_PNG)) {
                     Files.copy(is, iconFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
                 }
             }
@@ -601,7 +613,7 @@ public class TrayManager {
             double scaleX = Screen.getPrimary().getOutputScaleX();
             double scaleY = Screen.getPrimary().getOutputScaleY();
             Rectangle2D vb = Screen.getPrimary().getVisualBounds();
-            int mw = 170, mh = 80;
+            int mw = 170, mh = 260;
 
             double sx = screenX / scaleX;
             double sy = screenY / scaleY;
@@ -630,11 +642,44 @@ public class TrayManager {
 
             VBox root = (VBox) menuStage.getScene().getRoot();
             root.getChildren().setAll(
-                    createItem("显示", () -> {
+                    createItem("打开主面板", null, false, () -> {
                         showWindow();
                         menuStage.hide();
                     }),
-                    createItem("退出", () -> {
+                    createItem("匹配开关", SvgManager.createIcon(PathConfig.MATCH_TOGGLE, 16),
+                            AppState.getInstance().isMatchingEnabled(), () -> {
+                        CommandBus.dispatch(new ToggleMatchingCommand());
+                        menuStage.hide();
+                    }),
+                    createItem("跟随模式", SvgManager.createIcon(PathConfig.FOLLOW, 16),
+                            ViewportState.getInstance().isFollowMode(), () -> {
+                        CommandBus.dispatch(new SetFollowModeCommand(
+                                !ViewportState.getInstance().isFollowMode()));
+                        menuStage.hide();
+                    }),
+                    createItem("视角跟随", SvgManager.createIcon(PathConfig.NAVIGATION, 16),
+                            ViewportState.getInstance().isNavMode(), () -> {
+                        CommandBus.dispatch(new ToggleNavModeCommand());
+                        menuStage.hide();
+                    }),
+                    createItem("幽灵模式", SvgManager.createIcon(PathConfig.GHOST, 16),
+                            AppState.getInstance().isGhostMode(), () -> {
+                        CommandBus.dispatch(new ToggleGhostModeCommand());
+                        menuStage.hide();
+                    }),
+                    createItem("插件管理", SvgManager.createIcon(PathConfig.PLUGINS, 16), false, () -> {
+                        Scene scene = primaryStage.getScene();
+                        if (scene != null && scene.getRoot() instanceof StackPane rootPane) {
+                            SettingsStage.getInstance().showDialog(rootPane, "插件管理");
+                        }
+                        menuStage.hide();
+                    }),
+                    createItem("还原主面板初始大小", null, false, () -> {
+                        primaryStage.setWidth(ViewConfig.INITIAL_WINDOW_WIDTH);
+                        primaryStage.setHeight(ViewConfig.INITIAL_WINDOW_HEIGHT);
+                        menuStage.hide();
+                    }),
+                    createItem("退出", null, false, () -> {
                         menuStage.hide();
                         Platform.runLater(Platform::exit);
                     })
@@ -649,15 +694,18 @@ public class TrayManager {
         }
     }
 
-    private Label createItem(String text, Runnable action) {
-        Label label = new Label(text);
+    private Label createItem(String text, Node icon, boolean active, Runnable action) {
+        Label label = new Label(text, icon);
+        if (icon != null) {
+            label.setGraphicTextGap(8);
+            setSvgFill(icon, active ? "-color-accent-emphasis" : "-color-fg-muted");
+        }
         label.setPrefSize(150, 32);
-        String normal = "-fx-padding: 4 12; -fx-font-size: 13;"
-                + " -fx-background-radius: 6; -fx-text-fill: -color-fg-default;"
-                + " -fx-background-color: transparent;";
-        String hover = "-fx-padding: 4 12; -fx-font-size: 13;"
-                + " -fx-background-radius: 6; -fx-text-fill: -color-fg-default;"
-                + " -fx-background-color: -color-accent-subtle;";
+        String base = "-fx-padding: 4 12; -fx-font-size: 13; -fx-background-radius: 6;";
+        String normal = base + " -fx-background-color: transparent;"
+                + " -fx-text-fill: " + (active ? "-color-accent-emphasis;" : "-color-fg-default;");
+        String hover = base + " -fx-background-color: -color-accent-subtle;"
+                + " -fx-text-fill: -color-fg-default;";
         label.setStyle(normal);
         label.setOnMouseEntered(_ -> label.setStyle(hover));
         label.setOnMouseExited(_ -> label.setStyle(normal));
@@ -665,4 +713,27 @@ public class TrayManager {
         return label;
     }
 
+    /**
+     * 为 SVG 图标节点设置 CSS fill 颜色（与 TitleBar.setSvgFill 一致）
+     */
+    private static void setSvgFill(Node iconNode, String cssColor) {
+        String style = "-fx-fill: " + cssColor + ";";
+        if (iconNode instanceof StackPane sp) {
+            for (Node child : sp.getChildren()) {
+                if (child instanceof Group g) {
+                    for (Node gc : g.getChildren()) {
+                        gc.setStyle(style);
+                    }
+                }
+            }
+        } else if (iconNode instanceof Group g) {
+            for (Node child : g.getChildren()) {
+                child.setStyle(style);
+            }
+        }
+    }
+
+    public boolean isPumpRunning() {
+        return pumpRunning;
+    }
 }

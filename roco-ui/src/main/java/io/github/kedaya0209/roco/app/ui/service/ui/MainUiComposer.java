@@ -157,6 +157,8 @@ public final class MainUiComposer {
         VBox uiOverlay = new VBox(titleBar);
         uiOverlay.setPickOnBounds(false);
         uiOverlay.setViewOrder(-15); // 永远在侧边栏 ModalPane 之上
+        uiOverlay.setMinHeight(40);
+        uiOverlay.setAlignment(Pos.TOP_CENTER);
 
         AnchorPane resizeLayer = new AnchorPane();
         resizeLayer.setPickOnBounds(false);

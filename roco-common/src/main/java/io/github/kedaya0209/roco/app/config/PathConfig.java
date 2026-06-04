@@ -65,5 +65,7 @@ public final class PathConfig {
     public static final String GHOST = "/icon/ghost.svg";
     public static final String NAVIGATION = "/icon/navigation.svg";
     public static final String MATCH_TOGGLE = "/icon/match_toggle.svg";
+    public static final String FOLLOW = "/icon/follow.svg";
+    public static final String PLUGINS = "/icon/plugins.svg";
     public static final String CONFIG_FILE_NAME = "app_config.properties";
 }
