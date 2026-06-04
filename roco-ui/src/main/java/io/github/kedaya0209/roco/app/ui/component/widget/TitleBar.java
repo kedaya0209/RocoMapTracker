@@ -154,7 +154,8 @@ public class TitleBar extends HBox {
                 WindowHitTestHelper.enablePartialPassthrough(stage, TITLE_BAR_HEIGHT);
 
                 // AnimationTimer 每帧轮询 Win32 GetCursorPos + GetWindowRect，
-                // 纯 Win32 判断光标是否在内容区，彻底不依赖 JavaFX 坐标/事件系统
+                // 纯 Win32 判断光标是否在内容区，当在内容区时调用 ShowCursor(FALSE) 全局隐藏。
+                // 移出内容区后调用 ShowCursor(TRUE) 恢复，以保证标题栏和外部窗口光标正常。
                 cursorEnforcer = new AnimationTimer() {
                     @Override
                     public void handle(long now) {

@@ -127,15 +127,14 @@ public class ResourceCounterPanel extends VBox {
             iconView.setFitHeight(ICON_SIZE);
 
             int bpTotal = backpackTotals.getOrDefault(name, 0);
-            Label countLabel = new Label("0 / " + bpTotal);
+            int prev = prevCounts.getOrDefault(name, 0);  // 默认 0，避免首次 diff=0
+            prevCounts.put(name, total);
+            Label countLabel = new Label(prev + " / " + bpTotal);
             countLabel.setStyle("-fx-text-fill: -color-accent-emphasis; -fx-font-weight: bold;");
 
             row.getChildren().addAll(iconView, countLabel);
             rowsContainer.getChildren().add(row);
 
-            // 计数动画：从旧值平滑过渡到新值
-            int prev = prevCounts.getOrDefault(name, total);
-            prevCounts.put(name, total);
             animateCountLabel(countLabel, prev, total, bpTotal);
         });
 
@@ -149,8 +148,8 @@ public class ResourceCounterPanel extends VBox {
      */
     private void animateCountLabel(Label label, int from, int to, int bpTotal) {
         int diff = Math.abs(to - from);
-        // 大跳变（差 >= 200 或首次设置）直接设值，不做动画
-        if (diff >= 200 || diff == to) {
+        // 大跳变（差 >= 200）或无变化时直接设值
+        if (diff >= 200 || from == to) {
             label.setText(to + " / " + bpTotal);
             return;
         }
