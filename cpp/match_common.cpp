@@ -138,7 +138,8 @@ MiniMapProcessor::DetectionResult MiniMapProcessor::detect(uint8_t* data, int w,
         }
     }
 
-    double dist_to_center = std::hypot(det_cx - SMALL_WIDTH / 2.0, det_cy - small_gray.rows / 2.0);
+    double dcx = det_cx - SMALL_WIDTH / 2.0, dcy = det_cy - small_gray.rows / 2.0;
+    double dist_to_center = std::sqrt(dcx * dcx + dcy * dcy);
     double max_dist = min_side * CENTER_OFFSET_RATIO;
     if ((double)black_count / 120 > BLACK_RATIO_THRESHOLD && dist_to_center < max_dist) {
         double scale = (double)SMALL_WIDTH / w;
@@ -504,6 +505,8 @@ int run_match_loop(SOCKET sock, AlgoParams& params, MatcherBase& matcher,
     int64_t frame_count = 0;
     int64_t success_count = 0;
     bool first_ready = true;
+    cv::Mat gray_mat;
+    cv::Mat roi_contiguous;
 
     while (g_running.load(std::memory_order_acquire)) {
         if (first_ready) {
@@ -553,9 +556,8 @@ int run_match_loop(SOCKET sock, AlgoParams& params, MatcherBase& matcher,
         try {
             MatchResult match_res;
 
-            // BGRA → GRAY
+            // BGRA → GRAY（复用 gray_mat 缓冲区）
             cv::Mat bgra_mat(fh, fw, CV_8UC4, bgra_data);
-            cv::Mat gray_mat;
             cv::cvtColor(bgra_mat, gray_mat, cv::COLOR_BGRA2GRAY);
             uint8_t* gray_data = gray_mat.data;
 
@@ -595,9 +597,7 @@ int run_match_loop(SOCKET sock, AlgoParams& params, MatcherBase& matcher,
                 continue;
             }
 
-            // 2. ROI crop around minimap (no circle mask — mask boundary creates false
-            //    features for AKAZE's nonlinear diffusion; SIFT's edgeThreshold also
-            //    doesn't need it since the crop itself isolates the minimap region)
+            // 2. ROI crop — 从已转换的 gray_mat 中裁剪 + copyTo 获得连续内存
             constexpr double CROP_MARGIN = 1.5;
             int crop_r = (int)(detection.radius * CROP_MARGIN);
             int crop_x = std::max(0, (int)(detection.center_x - crop_r));
@@ -607,7 +607,6 @@ int run_match_loop(SOCKET sock, AlgoParams& params, MatcherBase& matcher,
 
             uint8_t* sift_data = gray_data;
             int sift_w = fw, sift_h = fh;
-            cv::Mat roi_contiguous;
             if (crop_w > 64 && crop_h > 64 && crop_w * crop_h < fw * fh * 0.85) {
                 cv::Mat roi_full(gray_mat, cv::Rect(crop_x, crop_y, crop_w, crop_h));
                 roi_full.copyTo(roi_contiguous);

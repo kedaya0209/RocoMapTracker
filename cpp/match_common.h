@@ -91,7 +91,7 @@ struct AlgoParams {
     int32_t searchRadius = 500;
 
     // FLANN (SIFT only)
-    int32_t flannKDTreeCount = 1;
+    int32_t flannKDTreeCount = 4;
     int32_t flannSearchChecks = 24;
 
     // RANSAC (shared)

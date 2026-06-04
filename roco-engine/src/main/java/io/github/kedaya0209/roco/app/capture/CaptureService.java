@@ -227,6 +227,13 @@ public class CaptureService implements FullFrameControl {
         return handler.isRunning();
     }
 
+    /**
+     * @return 当前 capture.exe 子进程 PID，未启动时返回 -1
+     */
+    public int getProcessPid() {
+        return handler.getProcessPid();
+    }
+
     public void stop() {
         handler.stop();
         // 不反注册 handler — handler 注册于构造函数，生命周期与 CaptureService 相同。

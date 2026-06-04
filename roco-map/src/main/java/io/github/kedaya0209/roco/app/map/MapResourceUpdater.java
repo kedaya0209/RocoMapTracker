@@ -107,13 +107,22 @@ public final class MapResourceUpdater {
     public static boolean updateAllResources() {
         LoadInfo.invalidateCategoryCache();
 
-        if (!MapDownloader.updateMap()) return false;
+        if (!MapDownloader.updateMap()) {
+            System.gc();
+            return false;
+        }
         MapFileMover.moveMapsToResource();
 
-        if (!ResourceConfigBuilder.buildAndSaveConfig()) return false;
+        if (!ResourceConfigBuilder.buildAndSaveConfig()) {
+            System.gc();
+            return false;
+        }
 
         IconDownloader.downloadIcons();
         MapFileMover.moveAllResources();
+
+        // 全量下载完成，地图瓦片 byte[] + 图块拼接 BufferedImage + 图标下载临时内存全部回收
+        System.gc();
         return true;
     }
 

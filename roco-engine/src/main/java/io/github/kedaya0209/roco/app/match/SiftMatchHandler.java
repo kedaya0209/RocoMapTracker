@@ -383,6 +383,14 @@ public class SiftMatchHandler {
     }
 
     /**
+     * @return 当前 sift_match.exe 子进程 PID，未启动时返回 -1
+     */
+    public int getActiveProcessPid() {
+        NativeProcess p = processManager.getActiveProcess();
+        return p != null ? p.pid() : -1;
+    }
+
+    /**
      * 检查 active 进程和会话是否就绪。
      */
     public boolean isReady() {

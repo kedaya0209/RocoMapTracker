@@ -1,20 +1,7 @@
 package io.github.kedaya0209.roco.app.ui.component.setting;
 
+import io.github.kedaya0209.roco.app.config.*;
 import net.jcip.annotations.NotThreadSafe;
-import io.github.kedaya0209.roco.app.config.ConfigPersistence;
-import io.github.kedaya0209.roco.app.config.RenderConfig;
-import io.github.kedaya0209.roco.app.config.SocketConfig;
-import io.github.kedaya0209.roco.app.config.UiConfig;
-import io.github.kedaya0209.roco.app.config.CaptureConfig;
-import io.github.kedaya0209.roco.app.config.PlayerConfig;
-import io.github.kedaya0209.roco.app.config.StatsConfig;
-import io.github.kedaya0209.roco.app.config.MiniMapConfig;
-import io.github.kedaya0209.roco.app.config.ViewConfig;
-import io.github.kedaya0209.roco.app.config.DownloadConfig;
-import io.github.kedaya0209.roco.app.config.SiftConfig;
-import io.github.kedaya0209.roco.app.config.NavigConfig;
-import io.github.kedaya0209.roco.app.config.UpdateConfig;
-import io.github.kedaya0209.roco.app.config.BuildConfig;
 import io.github.kedaya0209.roco.app.context.CameraContext;
 import io.github.kedaya0209.roco.app.ui.state.AppState;
 import io.github.kedaya0209.roco.app.ui.state.ViewportState;
@@ -519,7 +506,7 @@ public final class SettingDefinitions {
                                 () -> DownloadConfig.DOWNLOAD_CHUNK_SIZE,
                                 v -> DownloadConfig.DOWNLOAD_CHUNK_SIZE = (Integer) v)
                 ),
-                cat("捕获", "/icon/capture.svg",
+                cat("捕获", PathConfig.CAPTURE_ICON_PATH,
                         integer("CAPTURE_BLACK_SAMPLE_SIZE", "黑帧采样字节", false,
                                 () -> CaptureConfig.CAPTURE_BLACK_SAMPLE_SIZE,
                                 v -> CaptureConfig.CAPTURE_BLACK_SAMPLE_SIZE = (Integer) v),

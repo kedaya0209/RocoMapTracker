@@ -156,8 +156,8 @@ public class PlayerRenderer implements RenderLayer {
             }
             double half = playerView.getFitWidth() / 2.0;
             ViewportState vps = ViewportState.getInstance();
-            double px = vps.getPlayerX();
-            double py = vps.getPlayerY();
+            double px = vps.getSmoothedPlayerX();
+            double py = vps.getSmoothedPlayerY();
             playerView.setLayoutX(px - half);
             playerView.setLayoutY(py - half);
             // 导航模式下 group 层 Rotate(-navAngle) 已提供逆旋转，
