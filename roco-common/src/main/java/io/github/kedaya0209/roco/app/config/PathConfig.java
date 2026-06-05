@@ -36,6 +36,11 @@ public final class PathConfig {
     // ============================================================
     public static final String ICON_DIR = "/source/icon/";
     public static final String PLAYER_ICON_PATH = "/source/icon/player.png";
+
+    public static final String CAPTURE_ICON_PATH = "/icon/capture.svg";
+
+    public static final String MATCH_ICON_PATH = "/icon/match.svg";
+
     public static final String RESOURCE_ICON_DIR = "/source/point/";
 
     // ============================================================
@@ -45,15 +50,6 @@ public final class PathConfig {
     public static final String RESOURCE_POINT_CONFIG_PATH = "/source/point/resource_config.json";
     public static final String INTERNAL_RESOURCE_POINT_CONFIG_PATH = "/source/point/internal_resource_point.json";
 
-    // ============================================================
-    // 插件数据
-    // ============================================================
-    public static final String RMT_DB = "/plugins/sniffer/rmt.db";
-
-    // ============================================================
-    // 模型文件
-    // ============================================================
-    public static final String MODEL_DIR = "/model/";
     // ============================================================
     // 配置文件
     // ============================================================
@@ -67,5 +63,4 @@ public final class PathConfig {
     public static final String MATCH_TOGGLE = "/icon/match_toggle.svg";
     public static final String FOLLOW = "/icon/follow.svg";
     public static final String PLUGINS = "/icon/plugins.svg";
-    public static final String CONFIG_FILE_NAME = "app_config.properties";
 }

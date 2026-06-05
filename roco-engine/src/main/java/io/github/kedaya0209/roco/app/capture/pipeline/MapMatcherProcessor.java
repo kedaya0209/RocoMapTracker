@@ -56,6 +56,8 @@ public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
     private long frameSeq = 0L;
     /** 上次匹配开关状态，用于侦测切换时发布事件 */
     private boolean wasMatchingEnabled;
+    /** 上次 GC 触发时间戳，每 15 秒回收一次匹配过程的内存 */
+    private long lastGcTime = System.currentTimeMillis();
 
     public MapMatcherProcessor(int targetRoiIndex, SiftMatchHandler matchClient,
                                 CaptureFrameBuffer frameBuffer,
@@ -96,6 +98,8 @@ public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
                 AppEvents.publish(StatusEvent.class,
                         new StatusEvent("匹配已暂停", NotificationType.INFO, StatusEvent.DisplayMode.CAROUSEL));
             }
+            // 匹配关闭时触发 GC 回收匹配过程分配的大块堆内存
+            System.gc();
         }
         if (!enabled) return;
 
@@ -163,6 +167,13 @@ public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
 
         } finally {
             watchdog.finish();
+            // 定期触发 GC：匹配活跃时每 15 秒回收一次临时分配的 byte[]，
+            // 避免 Serial GC 惰性收缩导致堆内存持续膨胀
+            long now = System.currentTimeMillis();
+            if (now - lastGcTime > 15_000L) {
+                lastGcTime = now;
+                System.gc();
+            }
         }
     }
 
@@ -179,6 +190,7 @@ public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
     @Override
     public void close() {
         executor.shutdownNow();
+        System.gc();
         log.info("MapMatcherProcessor 已关闭");
     }
 }

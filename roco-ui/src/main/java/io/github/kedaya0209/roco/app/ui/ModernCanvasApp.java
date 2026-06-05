@@ -27,6 +27,7 @@ import io.github.kedaya0209.roco.app.ui.component.sidebar.Sidebar;
 import io.github.kedaya0209.roco.app.ui.component.sidebar.UiAnimator;
 import io.github.kedaya0209.roco.app.ui.component.widget.TitleBar;
 import io.github.kedaya0209.roco.app.ui.service.VersionMode;
+import io.github.kedaya0209.roco.app.ui.service.lifecycle.PluginProcessRegistry;
 import io.github.kedaya0209.roco.app.ui.service.lifecycle.CaptureServiceManager;
 import io.github.kedaya0209.roco.app.ui.service.lifecycle.InfrastructureManager;
 import io.github.kedaya0209.roco.app.ui.service.lifecycle.PcapBridgeManager;
@@ -290,6 +291,10 @@ public class ModernCanvasApp extends Application {
 
         siftClientManager.init();
         captureServiceManager.init(siftClientManager.getClient());
+
+        // 注册内置插件 PID 以便 CPU/内存监控
+        PluginProcessRegistry.register("capture", captureServiceManager.getProcessPid());
+        PluginProcessRegistry.register("sift", siftClientManager.getClient().getActiveProcessPid());
 
         // 预初始化设置面板，避免首次点击时 FX 线程阻塞导致卡顿
         SettingsStage.getInstance();

@@ -4958,7 +4958,9 @@
       {"returnType": "jint", "parameterTypes": ["jlong", "jint", "jlong", "jint"]},
       {"returnType": "jint", "parameterTypes": ["jlong", "jlong", "jlong"]},
       {"returnType": "jlong", "parameterTypes": ["jint", "jint", "jint"]},
-      {"returnType": "jint", "parameterTypes": []}
+      {"returnType": "jint", "parameterTypes": []},
+      {"returnType": "jint", "parameterTypes": ["void*", "void*"]},
+      {"returnType": "jint", "parameterTypes": ["jlong", "void*", "void*", "void*", "void*"]}
     ],
     "upcalls": [
       {

@@ -44,7 +44,7 @@ public final class SiftConfig {
     /**
      * FLANN KD 树数量
      */
-    public static int FLANN_KD_TREES = 1;
+    public static int FLANN_KD_TREES = 4;
     /**
      * FLANN 搜索检查次数
      */

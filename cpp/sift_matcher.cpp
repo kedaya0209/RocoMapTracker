@@ -149,7 +149,7 @@ MatchResult SiftMatcher::match(uint8_t* data, int w, int h, double hint_x, doubl
     cv::Mat scene_img(h, w, CV_8UC1, data);
 
     auto t0 = std::chrono::steady_clock::now();
-    std::vector<cv::KeyPoint> scene_kps;
+    scene_kps.clear();
     cv::Mat scene_descriptors;
     sift->detectAndCompute(scene_img, cv::noArray(), scene_kps, scene_descriptors);
     auto t1 = std::chrono::steady_clock::now();
@@ -177,7 +177,6 @@ MatchResult SiftMatcher::match(uint8_t* data, int w, int h, double hint_x, doubl
         int* idx = indices.ptr<int>(qi);
         float* d = dists.ptr<float>(qi);
         if (idx[1] >= 0) {
-            // FLANN 返回平方 L2 距离，需要开根号（与 FlannBasedMatcher::knnMatchImpl 一致）
             float d0 = std::sqrt(d[0]);
             float d1 = std::sqrt(d[1]);
             if (d0 < match_ratio_threshold * d1) {
@@ -481,8 +480,12 @@ bool SiftMatcher::train_tiled(cv::Mat& map_gray, int map_w, int map_h) {
                     int nx = cx + dx, ny = cy + dy;
                     if (nx >= 0 && nx < grid_cols && ny >= 0 && ny < grid_rows) {
                         int existing = grid[ny * grid_cols + nx];
-                        if (existing >= 0 && std::hypot(kp.x - all_kps[existing].x, kp.y - all_kps[existing].y) < dedupDist)
-                            duplicate = true;
+                        if (existing >= 0) {
+                            float ddx = kp.x - all_kps[existing].x;
+                            float ddy = kp.y - all_kps[existing].y;
+                            if (ddx*ddx + ddy*ddy < dedupDist * dedupDist)
+                                duplicate = true;
+                        }
                     }
                 }
             if (!duplicate) { grid[cy * grid_cols + cx] = i; keep[i] = true; keep_count++; }

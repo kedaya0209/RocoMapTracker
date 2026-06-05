@@ -68,6 +68,7 @@ public:
     std::vector<cv::DMatch> filtered_matches;
     std::vector<cv::Point2f> src_pts;
     std::vector<cv::Point2f> dst_pts;
+    std::vector<cv::KeyPoint> scene_kps;
 
     float match_ratio_threshold = 0.6f;
     int match_min_count = 10;

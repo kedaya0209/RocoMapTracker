@@ -236,6 +236,17 @@ public class SettingsStage extends Stage {
 
         setScene(scene);
 
+        // 注册主题变更监听，使设置面板跟随全局主题切换
+        ThemeManager.addThemeChangeListener(() -> {
+            Scene sc = getScene();
+            if (sc == null) return;
+            String url = ThemeManager.getCurrentStylesheetUrl();
+            if (url == null) return;
+            sc.getStylesheets().removeIf(u -> u != null && u.contains("atlantafx"));
+            sc.getStylesheets().add(url);
+            sc.getRoot().applyCss();
+        });
+
         // Native Image 下 StageStyle.TRANSPARENT 窗口不会自动获得焦点
         setOnShown(_ -> { requestFocus(); toFront(); });
         scene.addEventFilter(javafx.scene.input.MouseEvent.MOUSE_PRESSED, _ -> {

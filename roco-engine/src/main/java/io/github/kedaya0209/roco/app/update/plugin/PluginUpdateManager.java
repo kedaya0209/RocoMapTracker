@@ -68,14 +68,17 @@ public class PluginUpdateManager {
     private volatile PluginUpdateUiDelegate uiDelegate;
 
     /** 插件禁用回调 — 在 .disabled 标记创建后调用，参数为 pluginId */
+    @Setter
     private volatile Consumer<String> onPluginDisabled;
     /** 插件启用回调 — 在 .disabled 标记删除后调用，参数为 pluginId */
+    @Setter
     private volatile Consumer<String> onPluginEnabled;
-    /** 更新检查完成回调 — checkAllPlugins 后台线程结束后调用 */
+    /** 更新检查完成回调 — checkAllPlugins 后台线程结束后调用
+     * -- SETTER --
+     *  设置更新检查完成回调（一次性，checkAllPlugins 完成后自动清除）。
+     */
+    @Setter
     private volatile Runnable onCheckComplete;
-
-    public void setOnPluginDisabled(Consumer<String> callback) { this.onPluginDisabled = callback; }
-    public void setOnPluginEnabled(Consumer<String> callback) { this.onPluginEnabled = callback; }
 
     private PluginUpdateManager() {
         this.scanner = new PluginScanner();
@@ -313,13 +316,6 @@ public class PluginUpdateManager {
     }
 
     /**
-     * 设置更新检查完成回调（一次性，checkAllPlugins 完成后自动清除）。
-     */
-    public void setOnCheckComplete(Runnable callback) {
-        this.onCheckComplete = callback;
-    }
-
-    /**
      * 是否正在检查更新.
      */
     public boolean isCheckingUpdates() {
@@ -402,6 +398,9 @@ public class PluginUpdateManager {
                             scanPlugins();
                             cacheVersion.incrementAndGet();
                             log.info("插件 {} 更新成功: {}", pluginId, update.version());
+                            // 下载涉及大量文件 I/O 和 JSON 解析，Serial GC 惰性收缩，
+                            // 显式触发 full GC 回收临时分配的堆内存
+                            System.gc();
                         },
                         error -> {
                             // 失败

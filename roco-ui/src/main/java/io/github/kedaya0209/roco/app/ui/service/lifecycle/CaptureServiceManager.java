@@ -66,6 +66,11 @@ public class CaptureServiceManager {
                             log.info("未找到游戏窗口，5秒后重试...");
                         }
                     }
+                    // 同步 PID 到插件进程注册中心（首次连接或重启后更新）
+                    int pid = getProcessPid();
+                    if (pid > 0) {
+                        PluginProcessRegistry.register("capture", pid);
+                    }
                     TimeUnit.SECONDS.sleep(5);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
@@ -75,6 +80,13 @@ public class CaptureServiceManager {
                 }
             }
         });
+    }
+
+    /**
+     * @return 当前 capture.exe 子进程 PID，未启动时返回 -1
+     */
+    public int getProcessPid() {
+        return captureService != null ? captureService.getProcessPid() : -1;
     }
 
     /**

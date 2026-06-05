@@ -8,6 +8,7 @@ import io.github.kedaya0209.roco.app.socket.ExternalBridgeHandler;
 import io.github.kedaya0209.roco.app.socket.ExternalBridgeProtocol;
 import io.github.kedaya0209.roco.app.socket.HandlerSubscriber;
 import io.github.kedaya0209.roco.app.socket.SocketServer;
+import io.github.kedaya0209.roco.app.ui.service.lifecycle.PluginProcessRegistry;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
@@ -61,6 +62,10 @@ public class PcapBridgeManager {
         boolean started = processManager.start(serverPort, iface);
         if (started) {
             initialized = true;
+            NativeProcess proc = processManager.getActiveProcess();
+            if (proc != null) {
+                PluginProcessRegistry.register("sniffer", proc.pid());
+            }
             log.info("PcapBridgeManager 初始化完成 (端口={})", serverPort);
         } else {
             log.error("PcapBridgeManager 初始化失败 — pcap.exe 未启动");
@@ -74,6 +79,7 @@ public class PcapBridgeManager {
         if (!initialized && processManager.getActiveProcess() == null) {
             return;
         }
+        PluginProcessRegistry.unregister("sniffer");
         processManager.stop();
         bridgeHandler = null;
         initialized = false;

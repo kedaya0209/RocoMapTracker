@@ -104,7 +104,7 @@ public class Sidebar extends VBox {
         // 分类菜单
         items.add(new SidebarItem(SidebarItem.Type.HEADER, "匹配算法选择",
                 SidebarItem.Category.ALGORITHM, SiftConfig.MAP_MATCHAER,
-                null, false, "/icon/match.svg", null));
+                null, false, PathConfig.MATCH_ICON_PATH, null));
         items.add(new SidebarItem(SidebarItem.Type.HEADER, "资源模式切换",
                 SidebarItem.Category.RESOURCE,
                 DownloadConfig.INTERNAL_RESOURCE ? "内置资源" : "WIKI资源",

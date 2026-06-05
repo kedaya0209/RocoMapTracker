@@ -382,6 +382,13 @@ public class NativeProcess {
         return pid;
     }
 
+    /**
+     * 返回 Windows 进程句柄 (HANDLE)，供 ProcessMonitor 等组件查询进程状态。
+     */
+    public long hProcess() {
+        return hProcess;
+    }
+
     public boolean isAlive() {
         if (destroyed) return false;
         return getExitCode() == STILL_ACTIVE;

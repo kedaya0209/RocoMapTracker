@@ -39,8 +39,12 @@ public class ViewportState {
 
     // ==== 玩家位置/朝向（来自 PlayerStateTracker → EventBus → StateBridge） ====
 
+    private static final double EMA_ALPHA = 0.3;
+
     private final SimpleDoubleProperty playerX = new SimpleDoubleProperty(-1);
     private final SimpleDoubleProperty playerY = new SimpleDoubleProperty(-1);
+    private final SimpleDoubleProperty smoothedPlayerX = new SimpleDoubleProperty(-1);
+    private final SimpleDoubleProperty smoothedPlayerY = new SimpleDoubleProperty(-1);
     private final SimpleDoubleProperty playerAngle = new SimpleDoubleProperty(0);
     private final SimpleBooleanProperty hasAngle = new SimpleBooleanProperty(false);
     private final SimpleBooleanProperty playerInitialized = new SimpleBooleanProperty(false);
@@ -205,10 +209,28 @@ public class ViewportState {
         return playerInitialized.get();
     }
 
+    // ==== 平滑玩家位置（EMA，供显示用） ====
+
+    public double getSmoothedPlayerX() {
+        return smoothedPlayerX.get();
+    }
+
+    public double getSmoothedPlayerY() {
+        return smoothedPlayerY.get();
+    }
+
     /** 玩家位置写入口（仅由 StateBridge 在 FX 线程调用）。 */
     public void updatePlayerPosition(double x, double y, Double angle) {
         playerX.set(x);
         playerY.set(y);
+        // EMA 平滑：首次使用原始值，后续递推
+        if (!playerInitialized.get()) {
+            smoothedPlayerX.set(x);
+            smoothedPlayerY.set(y);
+        } else {
+            smoothedPlayerX.set(EMA_ALPHA * x + (1.0 - EMA_ALPHA) * smoothedPlayerX.get());
+            smoothedPlayerY.set(EMA_ALPHA * y + (1.0 - EMA_ALPHA) * smoothedPlayerY.get());
+        }
         if (angle != null) {
             playerAngle.set(angle);
             hasAngle.set(true);
@@ -219,6 +241,8 @@ public class ViewportState {
     public void resetPlayer() {
         playerX.set(-1);
         playerY.set(-1);
+        smoothedPlayerX.set(-1);
+        smoothedPlayerY.set(-1);
         playerAngle.set(0);
         hasAngle.set(false);
         playerInitialized.set(false);
