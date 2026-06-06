@@ -269,9 +269,9 @@ bool SiftMatcher::train(const uint8_t* gray_pixels, int w, int h) {
         return false;
     }
 
-    // Plan A: 大图采用重叠分块训练（从 master 移植）
-    int64_t total_pixels = (int64_t)w * h;
+    int64_t total_pixels = (int64_t)w * (int64_t)h;
     if (total_pixels >= params.largeMapThreshold) {
+        LOG("Large map %dx%d (%lld pixels), using tiled training", w, h, (long long)total_pixels);
         return train_tiled(map_gray, w, h);
     }
 
@@ -311,7 +311,7 @@ MatchResult SiftMatcher::match(uint8_t* data, int w, int h, double hint_x, doubl
         query_desc = transform->process(scene_descriptors);
     }
 
-    // knnSearch(k=2) + 比率测试（统一处理单图和子图）
+    // knnSearch(k=2) + 手动 Lowe 比率测试（统一处理单图和子图）
     cv::Mat indices(query_desc.rows, 2, CV_32SC1);
     cv::Mat dists(query_desc.rows, 2, CV_32FC1);
     flann_index->knnSearch(query_desc, indices, dists, 2,
@@ -512,7 +512,7 @@ bool SiftMatcher::load_cache(const std::string& path) {
         LOG("Invalid cache version: %d", version);
         fclose(f); return false;
     }
-    // config hash validation
+    // v7: config hash validation
     uint32_t cached_hash = 0;
     if (fread(&cached_hash, 4, 1, f) != 1) {
         LOG("Truncated cache: missing config hash");
@@ -680,42 +680,43 @@ bool SiftMatcher::train_tiled(cv::Mat& map_gray, int map_w, int map_h) {
 
     // 重叠区域去重（空间网格索引 O(1)）
     int total_count = (int)all_kps.size();
-    int cell_size = (int)std::ceil(params.dedupDistance);
-    int grid_cols = map_w / cell_size + 1;
-    int grid_rows = map_h / cell_size + 1;
-    std::vector<int> grid(grid_cols * grid_rows, -1);
     std::vector<bool> keep(total_count, false);
     int keep_count = 0;
 
-    for (int i = 0; i < total_count; i++) {
-        auto& kp = all_kps[i];
-        int cx = (int)(kp.x / cell_size);
-        int cy = (int)(kp.y / cell_size);
-        bool duplicate = false;
-        for (int dx = -1; dx <= 1 && !duplicate; dx++) {
-            for (int dy = -1; dy <= 1 && !duplicate; dy++) {
-                int nx = cx + dx, ny = cy + dy;
-                if (nx >= 0 && nx < grid_cols && ny >= 0 && ny < grid_rows) {
-                    int existing = grid[ny * grid_cols + nx];
-                    if (existing >= 0) {
-                        auto& ekp = all_kps[existing];
-                        float dx = kp.x - ekp.x, dy = kp.y - ekp.y;
-                        if (dx * dx + dy * dy < params.dedupDistance * params.dedupDistance)
-                            duplicate = true;
+    if (cols * rows <= 1) {
+        // 单瓦片无需去重
+        for (int i = 0; i < total_count; i++) { keep[i] = true; }
+        keep_count = total_count;
+        LOG("Dedup: %d -> %d (single tile, skipped)", total_count, keep_count);
+    } else {
+        int cell_size = (int)std::ceil(params.dedupDistance);
+        int grid_cols = map_w / cell_size + 1;
+        int grid_rows = map_h / cell_size + 1;
+        std::vector<int> grid(grid_cols * grid_rows, -1);
+
+        for (int i = 0; i < total_count; i++) {
+            auto& kp = all_kps[i];
+            int cx = (int)(kp.x / cell_size);
+            int cy = (int)(kp.y / cell_size);
+            bool duplicate = false;
+            for (int dx = -1; dx <= 1 && !duplicate; dx++)
+                for (int dy = -1; dy <= 1 && !duplicate; dy++) {
+                    int nx = cx + dx, ny = cy + dy;
+                    if (nx >= 0 && nx < grid_cols && ny >= 0 && ny < grid_rows) {
+                        int existing = grid[ny * grid_cols + nx];
+                        if (existing >= 0) {
+                            float ddx = kp.x - all_kps[existing].x;
+                            float ddy = kp.y - all_kps[existing].y;
+                            if (ddx*ddx + ddy*ddy < params.dedupDistance * params.dedupDistance)
+                                duplicate = true;
+                        }
                     }
                 }
-            }
+            if (!duplicate) { grid[cy * grid_cols + cx] = i; keep[i] = true; keep_count++; }
         }
-        if (!duplicate) {
-            grid[cy * grid_cols + cx] = i;
-            keep[i] = true;
-            keep_count++;
-        }
+        LOG("Dedup: %d -> %d", total_count, keep_count);
     }
-    LOG("Dedup: %d -> %d (removed %d overlapping duplicates)",
-        total_count, keep_count, total_count - keep_count);
 
-    // 构建合并描述符矩阵
     cv::Mat all_descs(keep_count, desc_dim, CV_32F);
     int pos = 0;
     for (int i = 0; i < total_count; i++) {

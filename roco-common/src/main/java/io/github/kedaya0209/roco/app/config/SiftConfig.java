@@ -18,10 +18,6 @@ public final class SiftConfig {
      */
     public static String MAP_MATCHAER = "SIFT-ULTRA";
 
-    // --- 算法选择 ---
-    /** 算法类型: 0=SIFT */
-    public static int ALGO_KIND = 0;
-    public static final int ALGO_SIFT = 0;
     // --- SIFT 检测器 ---
     /**
      * SIFT 最大特征点数（0=无限制）
@@ -48,7 +44,7 @@ public final class SiftConfig {
     /**
      * FLANN KD 树数量
      */
-    public static int FLANN_KD_TREES = 1;
+    public static int FLANN_KD_TREES = 4;
     /**
      * FLANN 搜索检查次数
      */
@@ -134,14 +130,20 @@ public final class SiftConfig {
 
     public static void load(Properties prop) {
         MAP_MATCHAER = ConfigHelper.getStr(prop, "map.matcher", MAP_MATCHAER);
-        ALGO_KIND = 0; // 固定 SIFT，AKAZE 已移除
         SIFT_N_FEATURES = ConfigHelper.getInt(prop, "sift.n.features", SIFT_N_FEATURES);
+        SIFT_N_OCTAVE_LAYERS = ConfigHelper.getInt(prop, "sift.n.octave.layers", SIFT_N_OCTAVE_LAYERS);
+        SIFT_CONTRAST_THRESHOLD = ConfigHelper.getDouble(prop, "sift.contrast.threshold", SIFT_CONTRAST_THRESHOLD);
+        SIFT_EDGE_THRESHOLD = ConfigHelper.getDouble(prop, "sift.edge.threshold", SIFT_EDGE_THRESHOLD);
+        SIFT_SIGMA = ConfigHelper.getDouble(prop, "sift.sigma", SIFT_SIGMA);
         FLANN_KD_TREES = ConfigHelper.getInt(prop, "flann.kd.trees", FLANN_KD_TREES);
         FLANN_SEARCH_CHECKS = ConfigHelper.getInt(prop, "flann.search.checks", FLANN_SEARCH_CHECKS);
         MATCH_RATIO_THRESHOLD = (float) ConfigHelper.getDouble(prop, "match.ratio.threshold", MATCH_RATIO_THRESHOLD);
         MATCH_MIN_COUNT = ConfigHelper.getInt(prop, "match.min.count", MATCH_MIN_COUNT);
         SEARCH_RADIUS = ConfigHelper.getInt(prop, "search.radius", SEARCH_RADIUS);
+        RANSAC_REPROJ_THRESHOLD = ConfigHelper.getDouble(prop, "ransac.reproj.threshold", RANSAC_REPROJ_THRESHOLD);
         RANSAC_MAX_ITERS = ConfigHelper.getInt(prop, "ransac.max.iters", RANSAC_MAX_ITERS);
+        RANSAC_CONFIDENCE = ConfigHelper.getDouble(prop, "ransac.confidence", RANSAC_CONFIDENCE);
+        SIFT_LARGE_MAP_THRESHOLD = ConfigHelper.getLong(prop, "sift.large.map.threshold", SIFT_LARGE_MAP_THRESHOLD);
         MATCH_TIMEOUT_MS = ConfigHelper.getLong(prop, "match.timeout.ms", MATCH_TIMEOUT_MS);
         SIFT_MATCHING_ENABLED = ConfigHelper.getBool(prop, "sift.matching.enabled", true);
         SIFT_TILE_SIZE = ConfigHelper.getInt(prop, "sift.tile.size", SIFT_TILE_SIZE);
@@ -152,10 +154,16 @@ public final class SiftConfig {
     public static void save(StringBuilder sb) {
         sb.append("# 匹配器类型（SIFT / SIFT-PCA / SIFT-ULTRA / SIFT-PCA-ULTRA）\n");
         sb.append("map.matcher=").append(MAP_MATCHAER).append("\n");
-        sb.append("# 算法类型: 0=SIFT\n");
-        sb.append("algo.kind=").append(ALGO_KIND).append("\n");
         sb.append("# SIFT 最大特征点数（0=无限制）\n");
         sb.append("sift.n.features=").append(SIFT_N_FEATURES).append("\n");
+        sb.append("# SIFT 每层组数\n");
+        sb.append("sift.n.octave.layers=").append(SIFT_N_OCTAVE_LAYERS).append("\n");
+        sb.append("# SIFT 对比度阈值\n");
+        sb.append("sift.contrast.threshold=").append(SIFT_CONTRAST_THRESHOLD).append("\n");
+        sb.append("# SIFT 边缘阈值\n");
+        sb.append("sift.edge.threshold=").append(SIFT_EDGE_THRESHOLD).append("\n");
+        sb.append("# SIFT sigma\n");
+        sb.append("sift.sigma=").append(SIFT_SIGMA).append("\n");
         sb.append("# FLANN KD 树数量\n");
         sb.append("flann.kd.trees=").append(FLANN_KD_TREES).append("\n");
         sb.append("# FLANN 搜索检查次数\n");
@@ -166,8 +174,14 @@ public final class SiftConfig {
         sb.append("match.min.count=").append(MATCH_MIN_COUNT).append("\n");
         sb.append("# 空间过滤搜索半径（像素）\n");
         sb.append("search.radius=").append(SEARCH_RADIUS).append("\n");
+        sb.append("# RANSAC 重投影误差阈值\n");
+        sb.append("ransac.reproj.threshold=").append(RANSAC_REPROJ_THRESHOLD).append("\n");
         sb.append("# RANSAC 最大迭代次数\n");
         sb.append("ransac.max.iters=").append(RANSAC_MAX_ITERS).append("\n");
+        sb.append("# RANSAC 置信度\n");
+        sb.append("ransac.confidence=").append(RANSAC_CONFIDENCE).append("\n");
+        sb.append("# 启用分块的地图像素阈值\n");
+        sb.append("sift.large.map.threshold=").append(SIFT_LARGE_MAP_THRESHOLD).append("\n");
         sb.append("# SIFT 匹配等待超时（毫秒）\n");
         sb.append("match.timeout.ms=").append(MATCH_TIMEOUT_MS).append("\n");
         sb.append("# SIFT 匹配总开关\n");

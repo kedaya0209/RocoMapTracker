@@ -4,11 +4,12 @@ import net.jcip.annotations.NotThreadSafe;
 import io.github.kedaya0209.roco.app.config.SiftConfig;
 import io.github.kedaya0209.roco.app.config.SocketConfig;
 import io.github.kedaya0209.roco.app.context.ResourceConfigContext;
-import io.github.kedaya0209.roco.app.hook.HookEventType;
+import io.github.kedaya0209.roco.app.hook.AppEvents;
+import io.github.kedaya0209.roco.app.hook.event.NotificationType;
+import io.github.kedaya0209.roco.app.hook.event.StatusEvent;
 import io.github.kedaya0209.roco.app.map.model.CompositeMapMetadata;
 import io.github.kedaya0209.roco.app.map.model.CompositeMapMetadata.SubImageInfo;
 import io.github.kedaya0209.roco.app.utils.ResourceUtils;
-import io.github.kedaya0209.roco.app.hook.event.StatusCarouselEvent;
 import io.github.kedaya0209.roco.app.process.NativeProcess;
 import io.github.kedaya0209.roco.app.process.NativeProcessFactory;
 import io.github.kedaya0209.roco.app.process.ProcessRestartHelper;
@@ -21,7 +22,6 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.BiConsumer;
 
 import static io.github.kedaya0209.roco.app.match.SiftMatchProtocol.*;
 
@@ -66,7 +66,6 @@ public class SiftMatchHandler {
     private final SocketServer server;
     private final LaunchParams launchParams;
     private final FrameMatchSynchronizer synchronizer = new FrameMatchSynchronizer();
-    private final BiConsumer<HookEventType, Object> hookPublisher;
 
     // 外部回调
     private volatile StateCallback stateCallback;
@@ -87,15 +86,13 @@ public class SiftMatchHandler {
             MSG_MATCH_RESULT, this::handleMatchResult
     );
 
-    public SiftMatchHandler(SocketServer server, NativeProcessFactory processFactory,
-                             BiConsumer<HookEventType, Object> hookPublisher) {
+    public SiftMatchHandler(SocketServer server, NativeProcessFactory processFactory) {
         this.server = server;
         this.processManager = new SiftProcessManager(processFactory);
         this.sessionManager = new SiftSessionManager();
         this.restartHelper = new ProcessRestartHelper("sift_match",
                 SocketConfig.SIFT_RESTART_DELAY);
         this.launchParams = new LaunchParams(null);
-        this.hookPublisher = hookPublisher;
     }
 
     // ==================== HandlerSubscriber 适配 ====================
@@ -149,8 +146,8 @@ public class SiftMatchHandler {
     private void handleActiveDisconnect(SocketSession session, String reason) {
         log.warn("SiftMatchHandler 活跃会话 #{} 断开: {}", session.id(), reason);
         sessionManager.handleActiveDisconnect();
-        hookPublisher.accept(HookEventType.STATUS_CAROUSEL,
-                StatusCarouselEvent.siftDisconnected());
+        AppEvents.publish(StatusEvent.class,
+                new StatusEvent("sift引擎断开", NotificationType.ERROR, StatusEvent.DisplayMode.CAROUSEL));
 
         synchronizer.failAndWake();
 
@@ -224,7 +221,7 @@ public class SiftMatchHandler {
                     subImageHeights, subImageOverrides, matchingSift);
             session.send(MSG_CONFIG_DATA, body);
             log.info("CONFIG_DATA 已发送 ({} 字节, algoKind={}, cache={})",
-                    body.length, SiftConfig.ALGO_KIND, cacheSuffix);
+                    body.length, 0, cacheSuffix);
         } catch (RuntimeException e) {
             log.error("序列化 CONFIG_DATA 失败", e);
             byte[] errBody = ("Config error: " + e.getMessage())
@@ -288,8 +285,8 @@ public class SiftMatchHandler {
             return;
         }
         int featureCount = sessionManager.handleInitComplete(body);
-        hookPublisher.accept(HookEventType.STATUS_CAROUSEL,
-                StatusCarouselEvent.siftReady());
+        AppEvents.publish(StatusEvent.class,
+                new StatusEvent("sift引擎加载完成", NotificationType.SUCCESS, StatusEvent.DisplayMode.CAROUSEL));
         if (stateCallback != null) {
             stateCallback.onStateChange(true, "SIFT ready (" + featureCount + " features)");
         }
@@ -301,8 +298,8 @@ public class SiftMatchHandler {
             return;
         }
         String msg = sessionManager.handleInitFailed(body);
-        hookPublisher.accept(HookEventType.STATUS_CAROUSEL,
-                StatusCarouselEvent.siftFailed());
+        AppEvents.publish(StatusEvent.class,
+                new StatusEvent("sift引擎加载失败", NotificationType.ERROR, StatusEvent.DisplayMode.CAROUSEL));
         if (stateCallback != null) {
             stateCallback.onStateChange(false, msg);
         }
@@ -386,8 +383,8 @@ public class SiftMatchHandler {
         }
         processManager.setActiveProcess(proc);
 
-        hookPublisher.accept(HookEventType.STATUS_CAROUSEL,
-                StatusCarouselEvent.siftLoading());
+        AppEvents.publish(StatusEvent.class,
+                new StatusEvent("sift引擎加载中", NotificationType.LOADING, StatusEvent.DisplayMode.CAROUSEL));
         return true;
     }
 
@@ -465,6 +462,14 @@ public class SiftMatchHandler {
         sessionManager.reset();
 
         log.info("SiftMatchHandler 已停止");
+    }
+
+    /**
+     * @return 当前 sift_match.exe 子进程 PID，未启动时返回 -1
+     */
+    public int getActiveProcessPid() {
+        NativeProcess p = processManager.getActiveProcess();
+        return p != null ? p.pid() : -1;
     }
 
     /**

@@ -4,12 +4,11 @@ import net.jcip.annotations.NotThreadSafe;
 import io.github.kedaya0209.roco.app.config.PathConfig;
 import io.github.kedaya0209.roco.app.config.RenderConfig;
 import io.github.kedaya0209.roco.app.config.ViewConfig;
-import io.github.kedaya0209.roco.app.context.CameraContext;
-import io.github.kedaya0209.roco.app.context.MapContext;
 import io.github.kedaya0209.roco.app.context.ResourcePointContext;
 import io.github.kedaya0209.roco.app.map.model.Point;
 import io.github.kedaya0209.roco.app.map.model.ResourcePoint;
 import io.github.kedaya0209.roco.app.ui.service.resource.IconCache;
+import io.github.kedaya0209.roco.app.ui.state.ViewportState;
 import javafx.geometry.Rectangle2D;
 import javafx.scene.Group;
 import javafx.scene.Node;
@@ -53,8 +52,8 @@ public class IconLayerManager implements RenderLayer {
     @Override
     public void onFrame() {
         // 导航模式 counter-rotate：抵消 worldGroup 的旋转，保持图标朝上
-        CameraContext cam = CameraContext.getInstance();
-        double counterAngle = cam.isNavMode() ? cam.getNavAngle() : 0;
+        ViewportState vp = ViewportState.getInstance();
+        double counterAngle = vp.isNavMode() ? vp.getNavAngle() : 0;
         if (Math.abs(counterAngle - lastCounterRotate) > 0.01) {
             for (ImageView iv : iconViews.values()) {
                 iv.setRotate(counterAngle);
@@ -62,9 +61,9 @@ public class IconLayerManager implements RenderLayer {
             lastCounterRotate = counterAngle;
         }
 
-        MapContext mm = MapContext.getInstance();
-        if (mm.isPlayerInitialized()) {
-            updateGrayStates(mm.getPlayerX(), mm.getPlayerY());
+        ViewportState vps = ViewportState.getInstance();
+        if (vps.isPlayerInitialized()) {
+            updateGrayStates(vps.getPlayerX(), vps.getPlayerY());
         }
     }
 

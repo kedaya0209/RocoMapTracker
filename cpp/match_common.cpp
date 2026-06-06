@@ -597,6 +597,8 @@ int run_match_loop(SOCKET sock, AlgoParams& params,
     int64_t frame_count = 0;
     int64_t success_count = 0;
     bool first_ready = true;
+    cv::Mat gray_mat;
+    cv::Mat roi_contiguous;
 
     while (g_running.load(std::memory_order_acquire)) {
         if (first_ready) {
@@ -646,7 +648,7 @@ int run_match_loop(SOCKET sock, AlgoParams& params,
         try {
             MatchResult match_res;
 
-            // BGRA → GRAY（gray_mat 复用外部声明的缓冲区）
+            // BGRA → GRAY（复用 gray_mat 缓冲区）
             cv::Mat bgra_mat(fh, fw, CV_8UC4, bgra_data);
             cv::cvtColor(bgra_mat, gray_mat, cv::COLOR_BGRA2GRAY);
             uint8_t* gray_data = gray_mat.data;
@@ -687,9 +689,7 @@ int run_match_loop(SOCKET sock, AlgoParams& params,
                 continue;
             }
 
-            // 2. ROI crop around minimap (no circle mask — mask boundary creates false
-            //    features for AKAZE's nonlinear diffusion; SIFT's edgeThreshold also
-            //    doesn't need it since the crop itself isolates the minimap region)
+            // 2. ROI crop — 从已转换的 gray_mat 中裁剪 + copyTo 获得连续内存
             constexpr double CROP_MARGIN = 1.5;
             int crop_r = (int)(detection.radius * CROP_MARGIN);
             int crop_x = std::max(0, (int)(detection.center_x - crop_r));

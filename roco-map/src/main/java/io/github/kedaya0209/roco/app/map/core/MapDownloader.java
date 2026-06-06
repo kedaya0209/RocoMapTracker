@@ -134,6 +134,8 @@ public class MapDownloader {
             // 4. 清理
             cleanTempFiles();
             resetState(); // 释放下载过程中积累的集合内存
+            // validTiles 中所有 tile byte[] 和全图拼接 BufferedImage，全部回收
+            System.gc();
         } catch (IOException | InterruptedException e) {
             log.error("下载流程中断", e);
         }

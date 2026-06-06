@@ -12,6 +12,8 @@
 
 /* ── 按钮通用交互 ── */
 .title-bar-btn {
+    -fx-focus-color: transparent;
+    -fx-faint-focus-color: transparent;
     -fx-background-color: transparent;
     -fx-border-color: transparent;
     -fx-padding: 6;
@@ -26,6 +28,14 @@
 }
 .title-bar-btn:hover {
     -fx-background-color: -color-bg-subtle;
+}
+.title-bar-btn:focused, .title-bar-btn:armed {
+    -fx-focus-color: transparent;
+    -fx-faint-focus-color: transparent;
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-border-color: transparent;
+    -fx-effect: none;
 }
 
 /* ── 浮动工具箱按钮 ── */

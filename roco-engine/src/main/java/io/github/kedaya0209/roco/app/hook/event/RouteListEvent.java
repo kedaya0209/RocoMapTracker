@@ -1,15 +1,12 @@
 package io.github.kedaya0209.roco.app.hook.event;
 
-import io.github.kedaya0209.roco.app.map.model.RoutePath;
 import net.jcip.annotations.ThreadSafe;
 
-import java.util.List;
-
 /**
- * 路线列表变更事件
- *
- * @param routes 当前路线列表的不可变快照（防御性拷贝）
+ * 路线列表变更事件 — 仅作信号，无数据负载。
+ * UI 层收到后直接从 {@code PathContext.getInstance().getSavedRoutes()} 读取。
  */
 @ThreadSafe
-public record RouteListEvent(List<RoutePath> routes) {
+public record RouteListEvent() {
+    public static final RouteListEvent INSTANCE = new RouteListEvent();
 }

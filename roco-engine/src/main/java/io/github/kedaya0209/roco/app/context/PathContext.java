@@ -1,9 +1,8 @@
 package io.github.kedaya0209.roco.app.context;
 
 import net.jcip.annotations.ThreadSafe;
-import io.github.kedaya0209.roco.app.hook.HookEventType;
+import io.github.kedaya0209.roco.app.hook.AppEvents;
 import io.github.kedaya0209.roco.app.hook.event.RouteListEvent;
-import io.github.kedaya0209.roco.app.hook.multicast.HookRegistry;
 import io.github.kedaya0209.roco.app.map.model.RoutePath;
 import lombok.Getter;
 import lombok.Setter;
@@ -44,8 +43,7 @@ public class PathContext {
     }
 
     private void notifyChanged() {
-        HookRegistry.INSTANCE.publish(HookEventType.ROUTE_LIST_CHANGED,
-                new RouteListEvent(new ArrayList<>(savedRoutes)));
+        AppEvents.publish(RouteListEvent.class, RouteListEvent.INSTANCE);
     }
 
     public void startNewRoute() {

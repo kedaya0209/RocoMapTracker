@@ -49,6 +49,13 @@ public class SettingConfigManager {
     }
 
     /**
+     * 根据 key 获取已注册的控件，供外部事件同步使用。
+     */
+    public Control getControl(String key) {
+        return controlMap.get(key);
+    }
+
+    /**
      * 清空所有注册的控件（切换分类时调用）
      */
     public void clearControls() {

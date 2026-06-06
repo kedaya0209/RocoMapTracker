@@ -3,9 +3,9 @@ package io.github.kedaya0209.roco.app.context;
 import net.jcip.annotations.ThreadSafe;
 import io.github.kedaya0209.roco.app.config.UiConfig;
 import io.github.kedaya0209.roco.app.config.ViewConfig;
-import io.github.kedaya0209.roco.app.hook.HookEventType;
+import io.github.kedaya0209.roco.app.hook.AppEvents;
 import io.github.kedaya0209.roco.app.hook.event.FollowModeEvent;
-import io.github.kedaya0209.roco.app.hook.multicast.HookRegistry;
+import io.github.kedaya0209.roco.app.hook.event.NavModeEvent;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -26,6 +26,16 @@ public class CameraContext {
     @Setter
     private volatile double followScale = ViewConfig.DEFAULT_FOLLOW_SCALE;
 
+    /**
+     * 跟随模式死区阈值（逻辑坐标像素）。
+     * 玩家位移小于此值时跳过视口更新，避免小抖动导致地图晃动。
+     */
+    private static final double FOLLOW_DEAD_ZONE = 1.0;
+
+    /** 上次跟随模式更新时的玩家位置（用于死区判断） */
+    private volatile double lastFollowX = -1;
+    private volatile double lastFollowY = -1;
+
     /** 导航模式是否启用 */
     @Getter
     private volatile boolean navMode;
@@ -42,6 +52,7 @@ public class CameraContext {
         if (!navMode) {
             this.navAngle = 0;
         }
+        AppEvents.publish(NavModeEvent.class, new NavModeEvent(navMode));
     }
 
     public static CameraContext getInstance() {
@@ -57,8 +68,7 @@ public class CameraContext {
             if (followMode) {
                 applyFollowViewport();
             }
-            HookRegistry.INSTANCE.publish(HookEventType.FOLLOW_MODE_CHANGED,
-                    new FollowModeEvent(followMode));
+            AppEvents.publish(FollowModeEvent.class, new FollowModeEvent(followMode));
         }
     }
 
@@ -75,16 +85,26 @@ public class CameraContext {
                 UiConfig.MAP_VIEW_MAX_SCALE);
         mm.setScale(newScale);
 
+        double px = mm.getPlayerX();
+        double py = mm.getPlayerY();
         double cx = mm.getViewWidth() / 2;
         double cy = mm.getViewHeight() / 2;
-        mm.setOffsetX(cx - mm.getPlayerX() * newScale);
-        mm.setOffsetY(cy - mm.getPlayerY() * newScale);
+        mm.setOffsetX(cx - px * newScale);
+        mm.setOffsetY(cy - py * newScale);
         mm.ensureBounds();
+        lastFollowX = px;
+        lastFollowY = py;
     }
 
     /**
-     * 更新摄像机视口。offsetY 以拼接坐标存储，
-     * MapRenderer 中会转换为子图局部坐标。
+     * 更新摄像机视口
+     * 启用跟随模式时，自动计算视口偏移量使玩家位于中心。
+     * 不覆盖 scale，缩放由 {@link MapContext#zoom} 统一管理。
+     * <p>
+     * 包含死区过滤：玩家位移小于 {@link #FOLLOW_DEAD_ZONE} 时跳过更新，
+     * 避免小抖动导致地图晃动。
+     * </p>
+     * 注意：offsetY 以拼接坐标存储，MapRenderer 中会转换为子图局部坐标。
      */
     public void updateViewport() {
         MapContext mm = MapContext.getInstance();
@@ -93,13 +113,25 @@ public class CameraContext {
             return;
         }
 
+        double px = mm.getPlayerX();
+        double py = mm.getPlayerY();
+
+        // 死区过滤：位移太小则跳过
+        double dx = px - lastFollowX;
+        double dy = py - lastFollowY;
+        if (dx * dx + dy * dy < FOLLOW_DEAD_ZONE * FOLLOW_DEAD_ZONE) {
+            return;
+        }
+
         double cx = mm.getViewWidth() / 2;
         double cy = mm.getViewHeight() / 2;
 
-        mm.setOffsetX(cx - mm.getPlayerX() * mm.getScale());
-        mm.setOffsetY(cy - mm.getPlayerY() * mm.getScale());
+        mm.setOffsetX(cx - px * mm.getScale());
+        mm.setOffsetY(cy - py * mm.getScale());
 
         mm.ensureBounds();
+        lastFollowX = px;
+        lastFollowY = py;
     }
 
     /**

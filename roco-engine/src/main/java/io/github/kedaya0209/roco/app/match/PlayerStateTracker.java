@@ -1,8 +1,11 @@
 package io.github.kedaya0209.roco.app.match;
 
+import lombok.Getter;
 import net.jcip.annotations.NotThreadSafe;
 import io.github.kedaya0209.roco.app.config.PlayerConfig;
 import io.github.kedaya0209.roco.app.context.MapContext;
+import io.github.kedaya0209.roco.app.hook.AppEvents;
+import io.github.kedaya0209.roco.app.hook.event.PlayerStateEvent;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -29,10 +32,10 @@ public class PlayerStateTracker {
     private double velocityX, velocityY;
 
     /** 预测位置（用于 SIFT hint） */
-    private Double predictedX, predictedY;
-
-    public Double getPredictedX() { return predictedX; }
-    public Double getPredictedY() { return predictedY; }
+    @Getter
+    private Double predictedX;
+    @Getter
+    private Double predictedY;
 
     /**
      * 更新匹配成功时的位置
@@ -90,6 +93,7 @@ public class PlayerStateTracker {
         }
 
         MapContext.getInstance().updatePlayerState(smoothedX, smoothedY, angle);
+        AppEvents.publish(PlayerStateEvent.class, new PlayerStateEvent(smoothedX, smoothedY, angle));
 
         // 速度预测：为 SIFT 匹配提供 hint
         if (hasPreviousMatch) {

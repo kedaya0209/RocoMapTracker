@@ -63,7 +63,7 @@ public:
     std::vector<cv::KeyPoint> map_keypoints;
     std::vector<cv::Point2f> map_keypoint_pts;
 
-    // FLANN 索引（统一索引，关键点为完整图坐标）
+    // FLANN 索引（直接 cv::flann::Index，统一索引，关键点为完整图坐标）
     std::unique_ptr<cv::flann::Index> flann_index;
 
     // 子图归属（仅用于训练后记录每个特征属于哪个子图）

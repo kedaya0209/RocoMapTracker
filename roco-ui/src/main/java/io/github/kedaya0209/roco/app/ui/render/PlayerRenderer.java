@@ -3,8 +3,7 @@ package io.github.kedaya0209.roco.app.ui.render;
 import net.jcip.annotations.NotThreadSafe;
 import io.github.kedaya0209.roco.app.config.RenderConfig;
 import io.github.kedaya0209.roco.app.config.ViewConfig;
-import io.github.kedaya0209.roco.app.context.CameraContext;
-import io.github.kedaya0209.roco.app.context.MapContext;
+import io.github.kedaya0209.roco.app.ui.state.ViewportState;
 import javafx.scene.Group;
 import javafx.scene.Node;
 import javafx.scene.image.Image;
@@ -40,7 +39,6 @@ public class PlayerRenderer implements RenderLayer {
 
     /** 由 MapRenderer 在每帧开始时写入的快照，避免子渲染器独立读取 MapContext volatile 字段 */
     double snapshotScale, snapshotOx, snapshotOy;
-    double snapshotPlayerX, snapshotPlayerY;
     double snapshotPivotX, snapshotPivotY;
 
     public PlayerRenderer() {
@@ -124,8 +122,6 @@ public class PlayerRenderer implements RenderLayer {
     @Override
     public void onFrame() {
         frameCount++;
-        CameraContext cam = CameraContext.getInstance();
-        // 使用 MapRenderer 每帧写入的快照，避免独立读取 volatile 字段引入数据竞争
         double scale = snapshotScale;
         double ox = snapshotOx;
         double oy = snapshotOy;
@@ -135,17 +131,17 @@ public class PlayerRenderer implements RenderLayer {
         playerTranslate.setX(ox);
         playerTranslate.setY(oy);
 
-        // 导航模式旋转变换（与 worldGroup 的 [Rotate, Translate, Scale] 一致）
-        if (cam.isNavMode() && cam.getNavAngle() != 0) {
+        // 导航模式旋转变换 — 从 ViewportState 读取
+        ViewportState vp = ViewportState.getInstance();
+        if (vp.isNavMode() && vp.getNavAngle() != 0) {
             playerRotate.setPivotX(snapshotPivotX);
             playerRotate.setPivotY(snapshotPivotY);
-            playerRotate.setAngle(-cam.getNavAngle());
+            playerRotate.setAngle(-vp.getNavAngle());
         } else if (playerRotate.getAngle() != 0) {
             playerRotate.setAngle(0);
         }
 
-        // playerInitialized 由 snapshotPlayerX/Y < 0 推断（playerX/Y 初始为 -1）
-        boolean initialized = snapshotPlayerX >= 0 && snapshotPlayerY >= 0;
+        boolean initialized = ViewportState.getInstance().isPlayerInitialized();
         if (initialized && playerView.getImage() != null) {
             playerView.setVisible(true);
             if (lastPlayerSize != RenderConfig.PLAYER_VIEW_SIZE) {
@@ -159,17 +155,14 @@ public class PlayerRenderer implements RenderLayer {
                 rebuildRipples();
             }
             double half = playerView.getFitWidth() / 2.0;
-            double px = snapshotPlayerX;
-            double py = snapshotPlayerY;
+            ViewportState vps = ViewportState.getInstance();
+            double px = vps.getSmoothedPlayerX();
+            double py = vps.getSmoothedPlayerY();
             playerView.setLayoutX(px - half);
             playerView.setLayoutY(py - half);
             // 导航模式下 group 层 Rotate(-navAngle) 已提供逆旋转，
             // setRotate 只需设置玩家真实朝向，无需再减 navAngle
-            double playerAngle = 0;
-            MapContext mm = MapContext.getInstance();
-            if (mm.isPlayerInitialized()) {
-                playerAngle = mm.getPlayerAngle();
-            }
+            double playerAngle = vps.isHasAngle() ? vps.getPlayerAngle() : 0;
             playerView.setRotate(playerAngle);
 
             // 光环和波纹中心每帧追踪玩家位置

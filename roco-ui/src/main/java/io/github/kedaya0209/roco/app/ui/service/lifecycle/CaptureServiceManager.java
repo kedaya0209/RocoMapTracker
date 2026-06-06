@@ -7,7 +7,6 @@ import io.github.kedaya0209.roco.app.capture.frame.ROIData;
 import io.github.kedaya0209.roco.app.capture.pipeline.MapMatcherProcessor;
 import io.github.kedaya0209.roco.app.config.CaptureConfig;
 import io.github.kedaya0209.roco.app.context.StatsContext;
-import io.github.kedaya0209.roco.app.hook.multicast.HookRegistry;
 import io.github.kedaya0209.roco.app.match.SiftMatchHandler;
 import io.github.kedaya0209.roco.app.match.PlayerStateTracker;
 import io.github.kedaya0209.roco.app.ui.component.setting.SettingsStage;
@@ -45,7 +44,7 @@ public class CaptureServiceManager {
         if (captureService == null) return;
         MapMatcherProcessor siftProcessor = new MapMatcherProcessor(0, siftMatchClient,
                 CaptureFrameBuffer.getInstance(), StatsContext.getInstance(),
-                HookRegistry.INSTANCE::publish, new PlayerStateTracker());
+                new PlayerStateTracker());
         captureService.addProcessors(siftProcessor);
 
         List<ROIData> rois = new ArrayList<>();
@@ -67,6 +66,11 @@ public class CaptureServiceManager {
                             log.info("未找到游戏窗口，5秒后重试...");
                         }
                     }
+                    // 同步 PID 到插件进程注册中心（首次连接或重启后更新）
+                    int pid = getProcessPid();
+                    if (pid > 0) {
+                        PluginProcessRegistry.register("capture", pid);
+                    }
                     TimeUnit.SECONDS.sleep(5);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
@@ -76,6 +80,13 @@ public class CaptureServiceManager {
                 }
             }
         });
+    }
+
+    /**
+     * @return 当前 capture.exe 子进程 PID，未启动时返回 -1
+     */
+    public int getProcessPid() {
+        return captureService != null ? captureService.getProcessPid() : -1;
     }
 
     /**

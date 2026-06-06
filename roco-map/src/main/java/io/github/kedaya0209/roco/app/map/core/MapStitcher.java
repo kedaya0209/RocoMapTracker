@@ -75,6 +75,9 @@ public class MapStitcher {
             ImageIO.write(image, "png", outFile);
             image.flush();
 
+            // 全图 BufferedImage + tile 解码临时内存，写盘后立即回收
+            System.gc();
+
             log.info("✅ 地图 [{}] 拼接完成，文件路径：{}", tag, outFile.getAbsolutePath());
 
         } catch (IOException e) {

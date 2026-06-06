@@ -6,8 +6,9 @@ import io.github.kedaya0209.roco.app.capture.frame.ROIData;
 import io.github.kedaya0209.roco.app.config.CaptureConfig;
 import io.github.kedaya0209.roco.app.config.SiftConfig;
 import io.github.kedaya0209.roco.app.context.StatsContext;
-import io.github.kedaya0209.roco.app.hook.HookEventType;
-import io.github.kedaya0209.roco.app.hook.event.StatusCarouselEvent;
+import io.github.kedaya0209.roco.app.hook.AppEvents;
+import io.github.kedaya0209.roco.app.hook.event.NotificationType;
+import io.github.kedaya0209.roco.app.hook.event.StatusEvent;
 import io.github.kedaya0209.roco.app.hook.event.StatusStateMachine;
 import io.github.kedaya0209.roco.app.context.MapContext;
 import io.github.kedaya0209.roco.app.match.SiftMatchHandler;
@@ -20,7 +21,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.function.BiConsumer;
 
 /**
  * 地图匹配处理器 — 通过独立 C++ 进程 (sift_match.exe) 执行 SIFT 匹配。
@@ -43,7 +43,6 @@ public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
     private final PlayerStateTracker stateTracker;
     private final CaptureFrameBuffer frameBuffer;
     private final StatsContext stats;
-    private final BiConsumer<HookEventType, Object> hookPublisher;
     private final MatchingWatchdog watchdog;
 
     /** hint 过期时间（毫秒）：超过此时间无成功匹配则发 -1 禁用空间约束 */
@@ -67,17 +66,17 @@ public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
     private boolean wasMatchingEnabled;
     /** 上次洞穴模式状态，用于侦测变化时发布事件 */
     private boolean wasCaveMode;
+    /** 上次 GC 触发时间戳，每 15 秒回收一次匹配过程的内存 */
+    private long lastGcTime = System.currentTimeMillis();
 
     public MapMatcherProcessor(int targetRoiIndex, SiftMatchHandler matchClient,
                                 CaptureFrameBuffer frameBuffer,
                                 StatsContext stats,
-                                BiConsumer<HookEventType, Object> hookPublisher,
                                 PlayerStateTracker stateTracker) {
         this.targetRoiIndex = targetRoiIndex;
         this.matchClient = matchClient;
         this.frameBuffer = frameBuffer;
         this.stats = stats;
-        this.hookPublisher = hookPublisher;
         this.stateTracker = stateTracker;
         this.wasMatchingEnabled = SiftConfig.SIFT_MATCHING_ENABLED;
         this.wasCaveMode = false;
@@ -103,15 +102,16 @@ public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
         boolean enabled = SiftConfig.SIFT_MATCHING_ENABLED;
         if (enabled != wasMatchingEnabled) {
             wasMatchingEnabled = enabled;
-            StatusStateMachine.State matchState = StatusStateMachine.getInstance()
-                    .currentState(StatusStateMachine.StatusKey.MATCH);
-            StatusCarouselEvent event = enabled
-                    ? StatusCarouselEvent.matchingResumed()
-                    : (matchState == StatusStateMachine.State.ACTIVE
-                            ? StatusCarouselEvent.matchingPaused() : null);
-            if (event != null) {
-                hookPublisher.accept(HookEventType.STATUS_CAROUSEL, event);
+            if (enabled) {
+                AppEvents.publish(StatusEvent.class,
+                        new StatusEvent("匹配已开启", NotificationType.SUCCESS, StatusEvent.DisplayMode.CAROUSEL));
+            } else if (StatusStateMachine.getInstance()
+                    .currentState(StatusStateMachine.StatusKey.MATCH) == StatusStateMachine.State.ACTIVE) {
+                AppEvents.publish(StatusEvent.class,
+                        new StatusEvent("匹配已暂停", NotificationType.INFO, StatusEvent.DisplayMode.CAROUSEL));
             }
+            // 匹配关闭时触发 GC 回收匹配过程分配的大块堆内存
+            System.gc();
         }
         if (!enabled) return;
 
@@ -203,10 +203,9 @@ public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
                     // 洞穴模式变化时发布轮播事件
                     if (inCave != wasCaveMode) {
                         wasCaveMode = inCave;
-                        StatusCarouselEvent caveEvent = inCave
-                                ? StatusCarouselEvent.caveEntered(caveName)
-                                : StatusCarouselEvent.caveExited();
-                        hookPublisher.accept(HookEventType.STATUS_CAROUSEL, caveEvent);
+                        AppEvents.publish(StatusEvent.class, inCave
+                                ? new StatusEvent("洞穴: " + (caveName != null ? caveName : "?"), NotificationType.INFO, StatusEvent.DisplayMode.CAROUSEL)
+                                : new StatusEvent("大陆", NotificationType.SUCCESS, StatusEvent.DisplayMode.CAROUSEL));
                     }
 
                     if (log.isTraceEnabled()) {
@@ -235,6 +234,13 @@ public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
 
         } finally {
             watchdog.finish();
+            // 定期触发 GC：匹配活跃时每 15 秒回收一次临时分配的 byte[]，
+            // 避免 Serial GC 惰性收缩导致堆内存持续膨胀
+            long now = System.currentTimeMillis();
+            if (now - lastGcTime > 15_000L) {
+                lastGcTime = now;
+                System.gc();
+            }
         }
     }
 
@@ -251,6 +257,7 @@ public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
     @Override
     public void close() {
         executor.shutdownNow();
+        System.gc();
         log.info("MapMatcherProcessor 已关闭");
     }
 }

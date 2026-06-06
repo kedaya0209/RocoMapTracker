@@ -1,14 +1,19 @@
-package io.github.kedaya0209.roco.app.ui.component;
+package io.github.kedaya0209.roco.app.ui.component.canvas;
 
 import net.jcip.annotations.NotThreadSafe;
 import io.github.kedaya0209.roco.app.config.UiConfig;
-import io.github.kedaya0209.roco.app.config.ViewConfig;
-import io.github.kedaya0209.roco.app.context.CameraContext;
 import io.github.kedaya0209.roco.app.context.MapContext;
 import io.github.kedaya0209.roco.app.context.PathContext;
-import io.github.kedaya0209.roco.app.ui.util.CoordinateUtil;
+import io.github.kedaya0209.roco.app.ui.command.CommandBus;
+import io.github.kedaya0209.roco.app.ui.command.ViewportCommands.DragViewportCommand;
+import io.github.kedaya0209.roco.app.ui.command.ViewportCommands.SetViewportSizeCommand;
+import io.github.kedaya0209.roco.app.ui.command.ViewportCommands.ZoomViewportCommand;
 import io.github.kedaya0209.roco.app.map.model.ResourcePoint;
+import io.github.kedaya0209.roco.app.ui.component.sidebar.UiAnimator;
+import io.github.kedaya0209.roco.app.ui.component.widget.RouteManagerStage;
 import io.github.kedaya0209.roco.app.ui.render.MapRenderer;
+import io.github.kedaya0209.roco.app.ui.state.ViewportState;
+import io.github.kedaya0209.roco.app.ui.util.CoordinateUtil;
 import javafx.application.Platform;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.input.*;
@@ -29,7 +34,6 @@ import lombok.extern.slf4j.Slf4j;
 public class InteractiveCanvas extends Canvas {
 
     private final MapContext mapManager = MapContext.getInstance();
-    private final CameraContext cameraManager = CameraContext.getInstance();
     private final PathContext pathContext = PathContext.getInstance();
 
     private final PathEditor pathEditor = new PathEditor();
@@ -49,7 +53,7 @@ public class InteractiveCanvas extends Canvas {
         this.hoverManager = new HoverManager(this);
         this.contextMenuManager = new ContextMenuManager(this,
                 () -> { if (mapRenderer != null) mapRenderer.resetViewport(); },
-                () -> { if (mapRenderer != null) mapRenderer.markDirty(); });
+                null);
 
         setFocusTraversable(true);
         bindViewport();
@@ -64,8 +68,10 @@ public class InteractiveCanvas extends Canvas {
     // ================================================================
 
     private void bindViewport() {
-        widthProperty().addListener(_ -> mapManager.setViewWidth(getWidth()));
-        heightProperty().addListener(_ -> mapManager.setViewHeight(getHeight()));
+        widthProperty().addListener(_ ->
+                CommandBus.dispatch(new SetViewportSizeCommand(getWidth(), getHeight())));
+        heightProperty().addListener(_ ->
+                CommandBus.dispatch(new SetViewportSizeCommand(getWidth(), getHeight())));
     }
 
     private void initListeners() {
@@ -94,10 +100,6 @@ public class InteractiveCanvas extends Canvas {
                 mapRenderer.setHoveredPoint(hoverManager.getHoveredPoint());
             }
         }
-        // 绘制模式下鼠标移动需重绘路线层，使橡皮筋跟随光标
-        if (pathContext.getCurrentMode() == PathContext.Mode.DRAWING && mapRenderer != null) {
-            mapRenderer.markDirty();
-        }
     }
 
     private void onMouseExited(MouseEvent _e) {
@@ -124,13 +126,13 @@ public class InteractiveCanvas extends Canvas {
         if (e.getButton() == MouseButton.PRIMARY) {
             boolean handled = pathEditor.onMouseClicked(e.getX(), e.getY(),
                     hoverManager.getHoveredPoint(),
-                    () -> { if (mapRenderer != null) mapRenderer.markDirty(); });
+                    null);
             if (handled) return;
         }
 
         if (e.getButton() == MouseButton.SECONDARY) {
             boolean deleted = pathEditor.onSecondaryClicked(e.getX(), e.getY(),
-                    () -> { if (mapRenderer != null) mapRenderer.markDirty(); });
+                    null);
             if (deleted) return;
 
             ResourcePoint hovered = hoverManager.getHoveredPoint();
@@ -148,29 +150,16 @@ public class InteractiveCanvas extends Canvas {
         if (pathEditor.isDragging()) {
             pathEditor.onMouseDragged(e.getX(), e.getY(),
                     hoverManager.getHoveredPoint(),
-                    () -> { if (mapRenderer != null) mapRenderer.markDirty(); });
+                    null);
             return;
         }
 
-        if (cameraManager.isFollowMode()) cameraManager.setFollowMode(false);
         // 拖拽地图时清除 hover，避免残留
         hoverManager.clearHover();
 
         double dx = e.getX() - lastMouseX;
         double dy = e.getY() - lastMouseY;
-        // 导航模式下将屏幕拖拽向量旋转到地图坐标空间，保持拖拽手感与视觉一致
-        if (cameraManager.isNavMode() && cameraManager.getNavAngle() != 0) {
-            double rad = Math.toRadians(cameraManager.getNavAngle());
-            double cos = Math.cos(rad);
-            double sin = Math.sin(rad);
-            double rdx = dx * cos - dy * sin;
-            double rdy = dx * sin + dy * cos;
-            dx = rdx;
-            dy = rdy;
-        }
-        mapManager.setOffsetX(mapManager.getOffsetX() + dx);
-        mapManager.setOffsetY(mapManager.getOffsetY() + dy);
-        mapManager.ensureBounds();
+        CommandBus.dispatch(new DragViewportCommand(dx, dy));
         lastMouseX = e.getX();
         lastMouseY = e.getY();
 
@@ -179,7 +168,6 @@ public class InteractiveCanvas extends Canvas {
             double[] logic = toLogic(e.getX(), e.getY());
             pathContext.setMouseLogicX(logic[0]);
             pathContext.setMouseLogicY(logic[1]);
-            if (mapRenderer != null) mapRenderer.markDirty();
         }
     }
 
@@ -187,27 +175,7 @@ public class InteractiveCanvas extends Canvas {
         double factor = e.getDeltaY() > 0
                 ? UiConfig.INTERACTIVE_ZOOM_FACTOR
                 : (2 - UiConfig.INTERACTIVE_ZOOM_FACTOR);
-
-        if (cameraManager.isFollowMode()) {
-            if (!cameraManager.hasValidPlayerPosition()) {
-                mapManager.zoom(factor, e.getX(), e.getY());
-                return;
-            }
-            // follow 模式：绕玩家缩放，偏移立即居中
-            double oldScale = mapManager.getScale();
-            double newScale = Math.clamp(oldScale * factor,
-                    ViewConfig.INTERACTIVE_FOLLOW_MIN_SCALE,
-                    ViewConfig.INTERACTIVE_FOLLOW_MAX_SCALE);
-            mapManager.setScale(newScale);
-            double cx = mapManager.getViewWidth() / 2;
-            double cy = mapManager.getViewHeight() / 2;
-            mapManager.setOffsetX(cx - mapManager.getPlayerX() * newScale);
-            mapManager.setOffsetY(cy - mapManager.getPlayerY() * newScale);
-            mapManager.ensureBounds();
-            cameraManager.setFollowScale(newScale);
-        } else {
-            mapManager.zoom(factor, e.getX(), e.getY());
-        }
+        CommandBus.dispatch(new ZoomViewportCommand(factor, e.getX(), e.getY()));
     }
 
     // ================================================================
@@ -219,13 +187,11 @@ public class InteractiveCanvas extends Canvas {
             RouteManagerStage.getInstance().handleSave();
             event.consume();
         } else if (undoCombo.match(event)) {
-            boolean undone = pathEditor.undoLastNode(
-                    () -> { if (mapRenderer != null) mapRenderer.markDirty(); });
+            boolean undone = pathEditor.undoLastNode(null);
             if (undone) event.consume();
         } else if (event.getCode() == KeyCode.ESCAPE) {
             contextMenuManager.hideAll();
-            pathEditor.exitEditingMode(
-                    () -> { if (mapRenderer != null) mapRenderer.markDirty(); });
+            pathEditor.exitEditingMode(null);
             event.consume();
         }
     }
@@ -238,15 +204,16 @@ public class InteractiveCanvas extends Canvas {
      * 屏幕 Canvas 坐标 → 地图逻辑坐标（同时处理 X/Y，导航旋转时需要两个值）。
      */
     public double[] toLogic(double canvasX, double canvasY) {
-        double ox = mapManager.getOffsetX();
-        double oy = mapManager.getOffsetY();
-        double scale = mapManager.getScale();
+        ViewportState vp = ViewportState.getInstance();
+        double ox = vp.getOffsetX();
+        double oy = vp.getOffsetY();
+        double scale = vp.getScale();
         double[] out = new double[2];
-        if (cameraManager.isNavMode() && cameraManager.getNavAngle() != 0) {
+        if (vp.isNavMode() && vp.getNavAngle() != 0) {
             double pivotX = getWidth() / 2;
             double pivotY = getHeight() / 2;
             CoordinateUtil.screenToWorldInto(out, canvasX, canvasY, ox, oy, scale,
-                    cameraManager.getNavAngle(), pivotX, pivotY);
+                    vp.getNavAngle(), pivotX, pivotY);
         } else {
             out[0] = (canvasX - ox) / scale;
             out[1] = (canvasY - oy) / scale;

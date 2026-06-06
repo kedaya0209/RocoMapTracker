@@ -20,8 +20,18 @@ public final class ConfigPersistence {
 
     private static final String CONFIG_FILE_NAME = "app_config.properties";
 
+    /** 配置加载完成后回调（由 UI 层注册，用于同步 AppState 等） */
+    private static volatile Runnable onConfigLoaded;
+
     private ConfigPersistence() {
         throw new AssertionError("禁止实例化配置类");
+    }
+
+    /**
+     * 注册配置加载完成回调。
+     */
+    public static void setOnConfigLoaded(Runnable callback) {
+        onConfigLoaded = callback;
     }
 
     /**
@@ -84,6 +94,9 @@ public final class ConfigPersistence {
             }
         } catch (IOException e) {
             log.error("加载配置异常，使用默认值", e);
+        }
+        if (onConfigLoaded != null) {
+            onConfigLoaded.run();
         }
     }
 

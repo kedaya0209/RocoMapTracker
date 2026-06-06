@@ -1,6 +1,5 @@
 package io.github.kedaya0209.roco.app.ui.service.resource;
 
-import net.jcip.annotations.ThreadSafe;
 import javafx.animation.Interpolator;
 import javafx.animation.KeyFrame;
 import javafx.animation.KeyValue;
@@ -20,8 +19,9 @@ import javafx.scene.shape.StrokeLineCap;
 import javafx.scene.shape.StrokeLineJoin;
 import javafx.scene.transform.Scale;
 import javafx.scene.transform.Transform;
-import javafx.geometry.Bounds;
 import javafx.util.Duration;
+import net.jcip.annotations.ThreadSafe;
+
 import java.util.List;
 
 /**
@@ -139,7 +139,7 @@ final class SvgAnimator {
         if (box.getScene() != null) {
             Platform.runLater(task);
         } else {
-            box.sceneProperty().addListener(new ChangeListener<Scene>() {
+            box.sceneProperty().addListener(new ChangeListener<>() {
                 @Override
                 public void changed(ObservableValue<? extends Scene> obs,
                                     Scene oldScene, Scene newScene) {

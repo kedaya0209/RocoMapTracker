@@ -90,7 +90,9 @@ public class TileGeneratorService {
 
                 File levelDir = ResourceUtils.getExternalFile(
                         ResourceConfigContext.getTilesDir() + "/" + li.level);
-                levelDir.mkdirs();
+                if (!levelDir.mkdirs() && !levelDir.isDirectory()) {
+                    log.warn("无法创建瓦片目录: {}", levelDir);
+                }
 
                 // 3. 从缩放图裁剪子图，多线程保存
                 int tileWorldSize = tileSize * (1 << li.level);
@@ -141,7 +143,9 @@ public class TileGeneratorService {
             File levelDir = ResourceUtils.getExternalFile(
                     Path.of(ResourceConfigContext.getTilesDir(), String.valueOf(li.level)).toString());
             if (!levelDir.isDirectory()) return false;
-            int actual = levelDir.list((_, n) -> n.endsWith(".png")).length;
+            String[] files = levelDir.list((_, n) -> n.endsWith(".png"));
+            if (files == null) return false;
+            int actual = files.length;
             if (actual < li.total) {
                 log.warn("瓦片 Level {} 不完整: {}/{}", li.level, actual, li.total);
                 return false;

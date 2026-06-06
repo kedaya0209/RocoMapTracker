@@ -1,10 +1,9 @@
 package io.github.kedaya0209.roco.app.capture;
 
-import io.github.kedaya0209.roco.app.capture.frame.CaptureFrameBuffer;
 import io.github.kedaya0209.roco.app.capture.frame.FrameDeserializer;
 import io.github.kedaya0209.roco.app.capture.frame.ROIData;
-import io.github.kedaya0209.roco.app.capture.pipeline.RoiProcessor;
 import io.github.kedaya0209.roco.app.capture.pipeline.ThroughputStats;
+import io.github.kedaya0209.roco.app.process.NativeProcess;
 import io.github.kedaya0209.roco.app.process.NativeProcessFactory;
 import io.github.kedaya0209.roco.app.process.ProcessRestartHelper;
 import io.github.kedaya0209.roco.app.config.SocketConfig;
@@ -287,6 +286,14 @@ public class CaptureHandler {
      */
     public void releaseFullFrameBuffer() {
         frameDeserializer.clearPool();
+    }
+
+    /**
+     * @return 当前 capture.exe 子进程 PID，未启动时返回 -1
+     */
+    public int getProcessPid() {
+        NativeProcess p = processManager.getProcess();
+        return p != null ? p.pid() : -1;
     }
 
     // ==================== 内嵌类型（向后兼容） ====================

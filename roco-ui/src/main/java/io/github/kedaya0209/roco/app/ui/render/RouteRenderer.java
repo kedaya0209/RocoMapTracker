@@ -2,8 +2,7 @@ package io.github.kedaya0209.roco.app.ui.render;
 
 import net.jcip.annotations.NotThreadSafe;
 import io.github.kedaya0209.roco.app.config.RenderConfig;
-import io.github.kedaya0209.roco.app.context.CameraContext;
-import io.github.kedaya0209.roco.app.context.MapContext;
+import io.github.kedaya0209.roco.app.ui.state.ViewportState;
 import io.github.kedaya0209.roco.app.ui.util.CoordinateUtil;
 import io.github.kedaya0209.roco.app.context.PathContext;
 import io.github.kedaya0209.roco.app.map.model.Point;
@@ -43,12 +42,11 @@ public class RouteRenderer implements RenderLayer {
 
     @Override
     public void onFrame() {
-        MapContext mm = MapContext.getInstance();
-        CameraContext cam = CameraContext.getInstance();
-        double ox = mm.getOffsetX();
-        double oy = mm.getOffsetY();
-        double scale = mm.getScale();
-        double navAngle = cam.isNavMode() ? cam.getNavAngle() : 0;
+        ViewportState vp = ViewportState.getInstance();
+        double ox = vp.getOffsetX();
+        double oy = vp.getOffsetY();
+        double scale = vp.getScale();
+        double navAngle = vp.isNavMode() ? vp.getNavAngle() : 0;
         double pivotX = routeCanvas.getWidth() / 2;
         double pivotY = routeCanvas.getHeight() / 2;
 

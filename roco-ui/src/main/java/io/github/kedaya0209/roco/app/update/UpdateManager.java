@@ -561,6 +561,7 @@ public class UpdateManager {
         Future<?>[] futures = new Future[3];
 
         ExecutorService pool = Executors.newFixedThreadPool(3);
+        try {
         for (int i = 0; i < 3; i++) {
             final int idx = i;
             futures[i] = pool.submit(() -> {
@@ -595,7 +596,9 @@ public class UpdateManager {
         for (Future<?> f : futures) {
             f.cancel(true);
         }
-        pool.shutdownNow();
+        } finally {
+            pool.shutdownNow();
+        }
 
         // 按已下载字节数降序排列
         List<String> sorted = new ArrayList<>();
