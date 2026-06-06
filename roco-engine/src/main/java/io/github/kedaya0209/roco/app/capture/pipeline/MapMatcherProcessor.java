@@ -157,8 +157,6 @@ public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
                 stats.recordDirection(Math.round(result.tArrowMs()));
 
                 if (result.success()) {
-                    log.info("resultL{}", result);
-
                     // Plan B: 用 C++ 返回的 map_id 确定子图
                     CompositeMapMetadata meta = MapContext.getInstance().getMultiMapMetadata();
                     int mapId = result.mapId();

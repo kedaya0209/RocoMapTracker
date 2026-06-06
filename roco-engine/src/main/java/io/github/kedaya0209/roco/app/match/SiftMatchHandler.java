@@ -208,7 +208,7 @@ public class SiftMatchHandler {
                                 ms.nfeatures(), ms.nOctaveLayers(), ms.sigma());
                     }
 
-                    cacheSuffix = cacheSuffix + ".multi2";
+                    cacheSuffix = cacheSuffix + ".multi";
                     log.info("MultiMap 模式: {} 子图, {} 个参数覆盖, 匹配参数={}, 缓存后缀={}",
                             subImageHeights.length, subImageOverrides.length,
                             matchingSift != null ? "自定义" : "SiftConfig默认",

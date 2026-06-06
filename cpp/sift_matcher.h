@@ -51,7 +51,7 @@ private:
 // Cache file magic (SIFT-specific)
 // ============================================================================
 static constexpr uint32_t SIFT_CACHE_MAGIC = 0x53494654; // "SIFT"
-static constexpr int32_t SIFT_CACHE_VERSION = 6; // v6: full-coord keypoints for multimap
+static constexpr int32_t SIFT_CACHE_VERSION = 7; // v7: full-coord keypoints + config CRC32
 
 // ============================================================================
 // SiftMatcher
@@ -69,6 +69,7 @@ public:
     // 子图归属（仅用于训练后记录每个特征属于哪个子图）
     std::vector<int> map_id_for_feature;
 
+    std::vector<cv::KeyPoint> scene_kps;
     std::vector<cv::DMatch> good_matches;
     std::vector<cv::DMatch> filtered_matches;
     std::vector<cv::Point2f> src_pts;
@@ -105,6 +106,7 @@ private:
     bool train_multimap(const uint8_t* gray_pixels, int w, int h);
     void build_flann_index();
     bool load_from_cache();
+    uint32_t compute_config_hash() const;
 
     /** 根据完整图坐标 y 值确定子图 ID */
     int resolve_map_id(float y) const;

@@ -138,9 +138,10 @@ MiniMapProcessor::DetectionResult MiniMapProcessor::detect(uint8_t* data, int w,
         }
     }
 
-    double dist_to_center = std::hypot(det_cx - SMALL_WIDTH / 2.0, det_cy - small_gray.rows / 2.0);
+    double dcx = det_cx - SMALL_WIDTH / 2.0, dcy = det_cy - small_gray.rows / 2.0;
+    double dist_to_center_sq = dcx * dcx + dcy * dcy;
     double max_dist = min_side * CENTER_OFFSET_RATIO;
-    if ((double)black_count / 120 > BLACK_RATIO_THRESHOLD && dist_to_center < max_dist) {
+    if ((double)black_count / 120 > BLACK_RATIO_THRESHOLD && dist_to_center_sq < max_dist * max_dist) {
         double scale = (double)SMALL_WIDTH / w;
         return DetectionResult{
             true,
@@ -591,6 +592,8 @@ int run_match_loop(SOCKET sock, AlgoParams& params,
                    MatcherBase& matcher_overworld, MatcherBase& matcher_cave,
                    std::atomic<bool>& g_running) {
     MiniMapProcessor minimap;
+    cv::Mat gray_mat;
+    cv::Mat roi_contiguous;
     int64_t frame_count = 0;
     int64_t success_count = 0;
     bool first_ready = true;
@@ -643,9 +646,8 @@ int run_match_loop(SOCKET sock, AlgoParams& params,
         try {
             MatchResult match_res;
 
-            // BGRA → GRAY
+            // BGRA → GRAY（gray_mat 复用外部声明的缓冲区）
             cv::Mat bgra_mat(fh, fw, CV_8UC4, bgra_data);
-            cv::Mat gray_mat;
             cv::cvtColor(bgra_mat, gray_mat, cv::COLOR_BGRA2GRAY);
             uint8_t* gray_data = gray_mat.data;
 
@@ -668,6 +670,23 @@ int run_match_loop(SOCKET sock, AlgoParams& params,
                 continue;
             }
 
+            // 检查裁剪出来的小地图是否是完整圆形（排除过渡动画中未完全显示的情况）
+            if (detection.center_x - detection.radius < 0 ||
+                detection.center_y - detection.radius < 0 ||
+                detection.center_x + detection.radius >= fw ||
+                detection.center_y + detection.radius >= fh) {
+                auto result_buf = serialize_result(false, 0, 0,
+                    std::numeric_limits<double>::quiet_NaN(), t_minimap, 0, 0);
+                if (!send_message(sock, MATCH_RESULT, result_buf.data(), (uint32_t)result_buf.size())) {
+                    LOG("Socket send failed (RESULT)");
+                    break;
+                }
+                if (frame_count % 100 == 0) {
+                    LOG("frames=%lld (incomplete circle)", (long long)frame_count);
+                }
+                continue;
+            }
+
             // 2. ROI crop around minimap (no circle mask — mask boundary creates false
             //    features for AKAZE's nonlinear diffusion; SIFT's edgeThreshold also
             //    doesn't need it since the crop itself isolates the minimap region)
@@ -682,7 +701,6 @@ int run_match_loop(SOCKET sock, AlgoParams& params,
             int sift_w = fw, sift_h = fh;
             double local_cx = detection.center_x;
             double local_cy = detection.center_y;
-            cv::Mat roi_contiguous;
             if (crop_w > 64 && crop_h > 64 && crop_w * crop_h < fw * fh * 0.85) {
                 cv::Mat roi_full(gray_mat, cv::Rect(crop_x, crop_y, crop_w, crop_h));
                 roi_full.copyTo(roi_contiguous);
@@ -704,8 +722,6 @@ int run_match_loop(SOCKET sock, AlgoParams& params,
                 // Switch to cave only if clearly cave
                 if (dark_ratio >= 0.50f) cave_mode = true;
             }
-            LOG("  brightness: ratio=%.3f cave=%d -> %s", dark_ratio, (int)cave_mode,
-                cave_mode ? "CAVE" : "OVERWORLD");
             MatcherBase& matcher = cave_mode ? matcher_cave : matcher_overworld;
 
             // 4. Match
@@ -714,17 +730,6 @@ int run_match_loop(SOCKET sock, AlgoParams& params,
 
             if (match_res.success) {
                 success_count++;
-
-                // Plan B: map_id comes from the unified index voting in match()
-                if (match_res.map_id >= 0) {
-                    if (match_res.map_id == 0) {
-                        LOG("匹配到大陆 (map_id=%d, x=%.1f, y=%.1f)",
-                            match_res.map_id, match_res.x, match_res.y);
-                    } else {
-                        LOG("匹配到洞穴%d (map_id=%d, x=%.1f, y=%.1f)",
-                            match_res.map_id, match_res.map_id, match_res.x, match_res.y);
-                    }
-                }
             }
 
             // 5. Arrow direction detection
