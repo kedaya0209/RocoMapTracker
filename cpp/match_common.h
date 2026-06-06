@@ -120,6 +120,7 @@ struct AlgoParams {
 
     // Paths
     std::string cacheFilePath;
+    std::string caveCacheFilePath;
 
     // Multi-subimage: sub-image boundary heights, in pixels, top-to-bottom order.
     // Used for Plan B unified index — each sub-image gets its own map_id during training,
@@ -181,6 +182,14 @@ void apply_circle_mask(uint8_t* data, int w, int h,
                        double center_x, double center_y, int radius);
 
 // ============================================================================
+// Brightness classification: is the cropped minimap "dark" (cave-like)?
+// Returns dark pixel ratio (0..1). If ratio > dark_ratio_threshold → cave.
+// ============================================================================
+float is_dark_minimap(const uint8_t* gray_data, int w, int h,
+                      double cx, double cy, int radius,
+                      float dark_ratio_threshold = 0.5f);
+
+// ============================================================================
 // Arrow direction detection: HSV color-based + PCA
 // ============================================================================
 double detect_arrow_angle_hsv(const uint8_t* bgra_data, int w, int h,
@@ -225,6 +234,12 @@ public:
     virtual bool save_cache(const std::string& path) = 0;
     virtual bool load_cache(const std::string& path) = 0;
     virtual size_t feature_count() const = 0;
+
+    /**
+     * 设置训练分组（仅用于多子图模式）。
+     * 0=大陆(子图0), 1=洞穴(子图1+), -1=全部(默认)。
+     */
+    virtual void setSubImageGroup(int group) {}
 };
 
 // ============================================================================
@@ -240,7 +255,8 @@ std::unique_ptr<MatcherBase> create_matcher(const AlgoParams& params);
 // ============================================================================
 // Main loop driver
 // ============================================================================
-int run_match_loop(SOCKET sock, AlgoParams& params, MatcherBase& matcher,
+int run_match_loop(SOCKET sock, AlgoParams& params,
+                   MatcherBase& matcher_overworld, MatcherBase& matcher_cave,
                    std::atomic<bool>& g_running);
 
 #endif // MATCH_COMMON_H

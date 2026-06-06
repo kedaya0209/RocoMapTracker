@@ -216,6 +216,50 @@ void apply_circle_mask(uint8_t* data, int w, int h,
 }
 
 // ============================================================================
+// Brightness classification: is the cropped minimap dark (cave-like)?
+// Applies sigmoid LUT (midpoint=100, steepness=0.05) to amplify brightness
+// separation, then counts pixels < 100 at stride 4.
+// ============================================================================
+float is_dark_minimap(const uint8_t* gray_data, int w, int h,
+                     double cx, double cy, int radius,
+                     float dark_ratio_threshold) {
+    // Precomputed sigmoid LUT: lut[i] = 255 / (1 + exp(-0.05 * (i - 100)))
+    static const uint8_t SIGMOID_LUT[256] = {
+        1,  1,  1,  1,  2,  2,  2,  2,  2,  2,  2,  2,  3,  3,  3,  3,  3,  3,  4,  4,  4,  4,  5,  5,  5,  5,  6,  6,  6,  7,  7,  7,
+        8,  8,  9,  9,  9, 10, 10, 11, 12, 12, 13, 13, 14, 15, 16, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 29, 30, 31, 33, 34,
+       36, 37, 39, 41, 42, 44, 46, 48, 50, 52, 54, 56, 59, 61, 63, 66, 68, 71, 73, 76, 79, 81, 84, 87, 90, 93, 96, 99,102,105,108,111,
+      114,117,121,124,127,130,133,137,140,143,146,149,152,155,158,161,164,167,170,173,175,178,181,183,186,188,191,193,195,198,200,202,
+      204,206,208,210,212,213,215,217,218,220,221,223,224,225,227,228,229,230,231,232,233,234,235,236,237,238,238,239,240,241,241,242,
+      242,243,244,244,245,245,245,246,246,247,247,247,248,248,248,249,249,249,249,250,250,250,250,251,251,251,251,251,251,252,252,252,
+      252,252,252,252,252,253,253,253,253,253,253,253,253,253,253,253,253,253,253,254,254,254,254,254,254,254,254,254,254,254,254,254,
+      254,254,254,254,254,254,254,254,254,254,254,254,254,254,254,254,254,254,254,254,254,254,254,254,254,254,254,254,254,254,254,254
+    };
+    constexpr int STRIDE = 4;
+    double r2 = (double)radius * radius;
+    double inner_r2 = (double)(radius / 4) * (double)(radius / 4);  // skip flashlight at center
+    int dark_count = 0;
+    int total = 0;
+
+    for (int y = 0; y < h; y += STRIDE) {
+        double dy = y - cy;
+        const uint8_t* row = gray_data + (size_t)y * w;
+        for (int x = 0; x < w; x += STRIDE) {
+            double dx = x - cx;
+            if (dx * dx + dy * dy > r2) continue;        // outside minimap circle
+            if (dx * dx + dy * dy < inner_r2) continue;   // skip player flashlight center
+            uint8_t gray_val = row[x];
+            if (gray_val < 5 || gray_val > 250) continue;  // trim extremes: borders & UI
+            if (SIGMOID_LUT[gray_val] < 100) {
+                dark_count++;
+            }
+            total++;
+        }
+    }
+
+    return (float)dark_count / (float)std::max(total, 1);
+}
+
+// ============================================================================
 // Debug PNG helpers
 // ============================================================================
 static void write_be32(FILE* f, uint32_t v) {
@@ -486,12 +530,13 @@ bool parse_config_data(const std::vector<uint8_t>& body, AlgoParams& p) {
     p.cacheFilePath = std::string((const char*)body.data() + off, cachePathLen);
     off += cachePathLen;
 
-    // Second cache path (cave-only, unused in Plan B unified index mode)
-    // Kept for backward compatibility with Java CONFIG_DATA that may send it.
+    // Second cache path (cave)
     if (off + 4 <= body.size()) {
         int32_t extraPathLen = (int32_t)read_be32(body.data() + off); off += 4;
         if (extraPathLen > 0 && off + extraPathLen <= body.size()) {
+            p.caveCacheFilePath = std::string((const char*)body.data() + off, extraPathLen);
             off += extraPathLen;
+            LOG("  cave cache: %s", p.caveCacheFilePath.c_str());
         }
     }
 
@@ -542,7 +587,8 @@ bool parse_config_data(const std::vector<uint8_t>& body, AlgoParams& p) {
 // ============================================================================
 // Main loop driver
 // ============================================================================
-int run_match_loop(SOCKET sock, AlgoParams& params, MatcherBase& matcher,
+int run_match_loop(SOCKET sock, AlgoParams& params,
+                   MatcherBase& matcher_overworld, MatcherBase& matcher_cave,
                    std::atomic<bool>& g_running) {
     MiniMapProcessor minimap;
     int64_t frame_count = 0;
@@ -634,6 +680,8 @@ int run_match_loop(SOCKET sock, AlgoParams& params, MatcherBase& matcher,
 
             uint8_t* sift_data = gray_data;
             int sift_w = fw, sift_h = fh;
+            double local_cx = detection.center_x;
+            double local_cy = detection.center_y;
             cv::Mat roi_contiguous;
             if (crop_w > 64 && crop_h > 64 && crop_w * crop_h < fw * fh * 0.85) {
                 cv::Mat roi_full(gray_mat, cv::Rect(crop_x, crop_y, crop_w, crop_h));
@@ -641,9 +689,26 @@ int run_match_loop(SOCKET sock, AlgoParams& params, MatcherBase& matcher,
                 sift_data = roi_contiguous.data;
                 sift_w = crop_w;
                 sift_h = crop_h;
+                local_cx = detection.center_x - crop_x;
+                local_cy = detection.center_y - crop_y;
             }
 
-            // 3. Match
+            // 3. Brightness classification → select cache (with hysteresis)
+            float dark_ratio = is_dark_minimap(sift_data, sift_w, sift_h,
+                                               local_cx, local_cy, detection.radius);
+            static bool cave_mode = true;
+            if (cave_mode) {
+                // Stay in cave unless clearly overworld
+                if (dark_ratio < 0.30f) cave_mode = false;
+            } else {
+                // Switch to cave only if clearly cave
+                if (dark_ratio >= 0.50f) cave_mode = true;
+            }
+            LOG("  brightness: ratio=%.3f cave=%d -> %s", dark_ratio, (int)cave_mode,
+                cave_mode ? "CAVE" : "OVERWORLD");
+            MatcherBase& matcher = cave_mode ? matcher_cave : matcher_overworld;
+
+            // 4. Match
             match_res = matcher.match(sift_data, sift_w, sift_h, hint_x, hint_y);
             match_res.t_minimap_ms = t_minimap;
 
@@ -662,14 +727,14 @@ int run_match_loop(SOCKET sock, AlgoParams& params, MatcherBase& matcher,
                 }
             }
 
-            // 4. Arrow direction detection
+            // 5. Arrow direction detection
             auto t_arrow_start = std::chrono::steady_clock::now();
             double arrow_angle = detect_arrow_angle_hsv(bgra_data, fw, fh,
                 detection.center_x, detection.center_y, detection.radius);
             float t_arrow_ms = std::chrono::duration<float, std::milli>(
                 std::chrono::steady_clock::now() - t_arrow_start).count();
 
-            // 5. Send result
+            // 6. Send result
             auto result_buf = serialize_result(match_res.success, match_res.x, match_res.y,
                 arrow_angle,
                 match_res.t_minimap_ms, match_res.t_extract_ms, match_res.t_matching_ms, t_arrow_ms,

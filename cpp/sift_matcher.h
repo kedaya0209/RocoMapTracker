@@ -4,6 +4,7 @@
 
 #include "match_common.h"
 #include <opencv2/flann.hpp>
+#include <opencv2/imgproc.hpp>
 #include <cfloat>
 #include <memory>
 #include <unordered_map>
@@ -50,7 +51,7 @@ private:
 // Cache file magic (SIFT-specific)
 // ============================================================================
 static constexpr uint32_t SIFT_CACHE_MAGIC = 0x53494654; // "SIFT"
-static constexpr int32_t SIFT_CACHE_VERSION = 5; // v5: per-sub-image SIFT params
+static constexpr int32_t SIFT_CACHE_VERSION = 6; // v6: full-coord keypoints for multimap
 
 // ============================================================================
 // SiftMatcher
@@ -62,10 +63,10 @@ public:
     std::vector<cv::KeyPoint> map_keypoints;
     std::vector<cv::Point2f> map_keypoint_pts;
 
-    // FLANN 索引（直接 cv::flann::Index，避免 FlannBasedMatcher 的 3 份内部拷贝）
+    // FLANN 索引（统一索引，关键点为完整图坐标）
     std::unique_ptr<cv::flann::Index> flann_index;
 
-    // Plan B unified index: tracks which sub-image each feature belongs to
+    // 子图归属（仅用于训练后记录每个特征属于哪个子图）
     std::vector<int> map_id_for_feature;
 
     std::vector<cv::DMatch> good_matches;
@@ -83,7 +84,13 @@ public:
 
     AlgoParams params;
 
+    /** 子图训练分组: 0=大陆(子图0), 1=洞穴(子图1+), -1=全部(默认). */
+    int sub_image_group = -1;
+
     explicit SiftMatcher(const AlgoParams& p);
+
+    /** 设置训练分组: 0=大陆(子图0), 1=洞穴(子图1+), -1=全部(默认)。 */
+    void setSubImageGroup(int group) override;
 
     // MatcherBase interface
     bool train(const uint8_t* gray_pixels, int w, int h) override;
@@ -94,9 +101,16 @@ public:
 
 private:
     bool train_direct(cv::Mat& map_gray);
+    bool train_tiled(cv::Mat& map_gray, int map_w, int map_h);
     bool train_multimap(const uint8_t* gray_pixels, int w, int h);
     void build_flann_index();
     bool load_from_cache();
+
+    /** 根据完整图坐标 y 值确定子图 ID */
+    int resolve_map_id(float y) const;
+
+    /** 洞穴 CLAHE 增强器（匹配侧复用实例） */
+    cv::Ptr<cv::CLAHE> clahe;
 };
 
 #endif // SIFT_MATCHER_H

@@ -218,8 +218,8 @@ public class SiftMatchHandler {
                 }
             }
 
-            // Plan B: 不再使用独立的 cave 缓存路径（统一索引只有一个缓存文件）
-            String caveCacheSuffix = ""; // 0 length = no cave cache
+            // 亮度分流：使用独立的 cave 缓存路径
+            String caveCacheSuffix = variant.cacheSuffix() + ".cave";
             byte[] body = encodeConfig(variant.variantOrdinal(), cacheSuffix, caveCacheSuffix, 0,
                     subImageHeights, subImageOverrides, matchingSift);
             session.send(MSG_CONFIG_DATA, body);

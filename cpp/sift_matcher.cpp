@@ -3,6 +3,94 @@
 #include "sift_matcher.h"
 
 // ============================================================================
+// 分块 SIFT 检测 + 去重（用于大子图）
+// ============================================================================
+static void detect_tiled(
+    cv::Ptr<cv::SIFT>& sift_instance,
+    const cv::Mat& img, int img_w, int img_h,
+    int tile_size, int tile_overlap, float dedup_dist,
+    std::vector<cv::KeyPoint>& out_kps, cv::Mat& out_descs) {
+    int stride = tile_size - tile_overlap;
+    int cols = (int)std::ceil((double)(img_w - tile_overlap) / stride);
+    int rows = (int)std::ceil((double)(img_h - tile_overlap) / stride);
+
+    struct KpEntry {
+        float x, y;
+        std::vector<float> desc;
+    };
+    std::vector<KpEntry> all_kps;
+    int desc_dim = 128;
+
+    for (int r = 0; r < rows; r++) {
+        for (int c = 0; c < cols; c++) {
+            int tile_x = c * stride;
+            int tile_y = r * stride;
+            int tile_w = std::min(tile_size, img_w - tile_x);
+            int tile_h = std::min(tile_size, img_h - tile_y);
+            cv::Rect roi(tile_x, tile_y, tile_w, tile_h);
+            cv::Mat tile_gray = img(roi);
+            std::vector<cv::KeyPoint> tile_kps;
+            cv::Mat tile_descs;
+            sift_instance->detectAndCompute(tile_gray, cv::noArray(), tile_kps, tile_descs);
+            if (tile_descs.empty()) continue;
+            cv::Mat desc_float;
+            if (tile_descs.type() != CV_32F)
+                tile_descs.convertTo(desc_float, CV_32F);
+            else
+                desc_float = tile_descs;
+            desc_dim = desc_float.cols;
+            for (size_t i = 0; i < tile_kps.size(); i++) {
+                KpEntry e;
+                e.x = tile_kps[i].pt.x + (float)tile_x;
+                e.y = tile_kps[i].pt.y + (float)tile_y;
+                e.desc.resize(desc_dim);
+                memcpy(e.desc.data(), desc_float.ptr<float>((int)i), desc_dim * sizeof(float));
+                all_kps.push_back(std::move(e));
+            }
+        }
+    }
+
+    if (all_kps.empty()) return;
+
+    // 去重
+    int total = (int)all_kps.size();
+    int cell = (int)std::ceil(dedup_dist);
+    int gc = img_w / cell + 1;
+    int gr = img_h / cell + 1;
+    std::vector<int> grid(gc * gr, -1);
+    std::vector<bool> keep(total, false);
+    int kept = 0;
+
+    for (int i = 0; i < total; i++) {
+        auto& kp = all_kps[i];
+        int cx = (int)(kp.x / cell), cy = (int)(kp.y / cell);
+        bool dup = false;
+        for (int dx = -1; dx <= 1 && !dup; dx++)
+            for (int dy = -1; dy <= 1 && !dup; dy++) {
+                int nx = cx + dx, ny = cy + dy;
+                if (nx >= 0 && nx < gc && ny >= 0 && ny < gr) {
+                    int ex = grid[ny * gc + nx];
+                    if (ex >= 0 && std::hypot(kp.x - all_kps[ex].x, kp.y - all_kps[ex].y) < dedup_dist)
+                        dup = true;
+                }
+            }
+        if (!dup) { grid[cy * gc + cx] = i; keep[i] = true; kept++; }
+    }
+
+    out_kps.clear();
+    out_kps.reserve(kept);
+    out_descs = cv::Mat(kept, desc_dim, CV_32F);
+    int pos = 0;
+    for (int i = 0; i < total; i++) {
+        if (keep[i]) {
+            out_kps.push_back(cv::KeyPoint(all_kps[i].x, all_kps[i].y, 1.0f));
+            memcpy(out_descs.ptr<float>(pos), all_kps[i].desc.data(), desc_dim * sizeof(float));
+            pos++;
+        }
+    }
+}
+
+// ============================================================================
 // DescriptorTransform
 // ============================================================================
 DescriptorTransform::DescriptorTransform(SiftVariant v) : variant(v) {}
@@ -140,6 +228,12 @@ bool SiftMatcher::train(const uint8_t* gray_pixels, int w, int h) {
         return false;
     }
 
+    // Plan A: 大图采用重叠分块训练（从 master 移植）
+    int64_t total_pixels = (int64_t)w * h;
+    if (total_pixels >= params.largeMapThreshold) {
+        return train_tiled(map_gray, w, h);
+    }
+
     return train_direct(map_gray);
 }
 
@@ -149,10 +243,19 @@ MatchResult SiftMatcher::match(uint8_t* data, int w, int h, double hint_x, doubl
 
     cv::Mat scene_img(h, w, CV_8UC1, data);
 
+    // 洞穴匹配：CLAHE 增强暗区纹理
+    cv::Mat match_img = scene_img;
+    if (sub_image_group == 1) {
+        if (!clahe) clahe = cv::createCLAHE(3.0, cv::Size(8, 8));
+        cv::Mat enhanced;
+        clahe->apply(scene_img, enhanced);
+        match_img = enhanced;
+    }
+
     auto t0 = std::chrono::steady_clock::now();
     std::vector<cv::KeyPoint> scene_kps;
     cv::Mat scene_descriptors;
-    sift->detectAndCompute(scene_img, cv::noArray(), scene_kps, scene_descriptors);
+    sift->detectAndCompute(match_img, cv::noArray(), scene_kps, scene_descriptors);
     auto t1 = std::chrono::steady_clock::now();
     res.t_extract_ms = std::chrono::duration<float, std::milli>(t1 - t0).count();
 
@@ -167,88 +270,18 @@ MatchResult SiftMatcher::match(uint8_t* data, int w, int h, double hint_x, doubl
         query_desc = transform->process(scene_descriptors);
     }
 
-    // knnSearch(2)
+    // knnSearch(k=2) + 比率测试（统一处理单图和子图）
     cv::Mat indices(query_desc.rows, 2, CV_32SC1);
     cv::Mat dists(query_desc.rows, 2, CV_32FC1);
     flann_index->knnSearch(query_desc, indices, dists, 2,
         cv::flann::SearchParams(flann_search_checks, 0.0f, true));
 
     good_matches.clear();
-
-    // 统一 Lowe 比率测试（跨所有子图）
     for (int qi = 0; qi < query_desc.rows; qi++) {
         int* idx = indices.ptr<int>(qi);
         float* d = dists.ptr<float>(qi);
-        if (idx[1] >= 0) {
-            float d0 = std::sqrt(d[0]);
-            float d1 = std::sqrt(d[1]);
-            if (d0 < match_ratio_threshold * d1) {
-                good_matches.push_back(cv::DMatch(qi, idx[0], d0));
-            }
-        }
-    }
-
-    if (!map_id_for_feature.empty() && !good_matches.empty()) {
-        // 按距离排序，取最近的前 N 个最佳匹配
-        int vote_top_n = 10;
-        int vote_count = std::min(vote_top_n, (int)good_matches.size());
-        std::partial_sort(good_matches.begin(), good_matches.begin() + vote_count,
-            good_matches.end(),
-            [](auto& a, auto& b) { return a.distance < b.distance; });
-
-        // 统计各子图总特征数
-        std::unordered_map<int, int> sub_total;
-        for (int m : map_id_for_feature) sub_total[m]++;
-
-        // 归一化投票：匹配数 ÷ 子图总特征数（消除特征量差异带来的偏置）
-        std::unordered_map<int, int> raw_votes;
-        for (int i = 0; i < vote_count; i++) {
-            int ti = good_matches[i].trainIdx;
-            if (ti >= 0 && ti < (int)map_id_for_feature.size()) {
-                raw_votes[map_id_for_feature[ti]]++;
-            }
-        }
-        if (!raw_votes.empty()) {
-            int best_id = -1;
-            float best_score = -1.0f;
-            for (auto& [sid, cnt] : raw_votes) {
-                float score = (float)cnt / (float)std::max(sub_total[sid], 1);
-                LOG("  sub %d: %d/%d = %.4f", sid, cnt, sub_total[sid], score);
-                if (score > best_score) { best_score = score; best_id = sid; }
-            }
-            LOG("Sub vote (norm): best=%d score=%.4f", best_id, best_score);
-            res.map_id = best_id;
-
-            // 从 good_matches 中收集 winner 的匹配
-            std::vector<cv::DMatch> voted;
-            for (auto& dm : good_matches) {
-                if (dm.trainIdx >= 0 && dm.trainIdx < (int)map_id_for_feature.size()
-                    && map_id_for_feature[dm.trainIdx] == best_id) {
-                    voted.push_back(dm);
-                }
-            }
-
-            // 若不够，从 winner 子图补充
-            if ((int)voted.size() < match_min_count) {
-                for (int qi = 0; qi < query_desc.rows; qi++) {
-                    int* idx = indices.ptr<int>(qi);
-                    float* d = dists.ptr<float>(qi);
-                    if (idx[0] >= 0 && idx[0] < (int)map_id_for_feature.size()
-                        && map_id_for_feature[idx[0]] == best_id) {
-                        float d0 = std::sqrt(d[0]);
-                        if (idx[1] >= 0) {
-                            float d1 = std::sqrt(d[1]);
-                            if (d0 < match_ratio_threshold * d1) continue;
-                        }
-                        if (d0 < match_ratio_threshold * 512.0f) {
-                            voted.push_back(cv::DMatch(qi, idx[0], d0));
-                        }
-                    }
-                }
-                LOG("  expanded to %zu matches from sub %d", voted.size(), best_id);
-            }
-
-            good_matches.swap(voted);
+        if (idx[1] >= 0 && d[0] < match_ratio_threshold * d[1]) {
+            good_matches.push_back(cv::DMatch(qi, idx[0], d[0]));
         }
     }
 
@@ -260,7 +293,8 @@ MatchResult SiftMatcher::match(uint8_t* data, int w, int h, double hint_x, doubl
 
     // Spatial filter: 利用 hint 位置过滤远处误匹配
     bool has_hint = !std::isnan(hint_x) && !std::isnan(hint_y)
-                 && hint_x >= -1e9 && hint_y >= -1e9;
+                 && hint_x >= -1e9 && hint_y >= -1e9
+                 && hint_x != -1.0 && hint_y != -1.0; // -1 = Java 无效 sentinel
     filtered_matches.clear();
     if (has_hint) {
         for (auto& dm : good_matches) {
@@ -312,11 +346,51 @@ MatchResult SiftMatcher::match(uint8_t* data, int w, int h, double hint_x, doubl
         res.success = true;
         res.x = dst_center[0].x;
         res.y = dst_center[0].y;
+
+        // 空间一致性校验：匹配结果与 hint 距离远超搜索半径则拒绝。
+        if (has_hint) {
+            double dist = std::hypot(res.x - hint_x, res.y - hint_y);
+            int inlier_cnt = inlier_mask.empty() ? 0 : cv::countNonZero(inlier_mask);
+            if (dist > search_radius * 2 && inlier_cnt < 8) {
+                LOG("  spatial reject: (%.1f,%.1f) too far from hint (%.1f,%.1f), dist=%.1f inliers=%d/%zu",
+                    res.x, res.y, hint_x, hint_y, dist, inlier_cnt, src_pts.size());
+                res.success = false;
+            }
+        }
+
+        // 从完整图坐标 y 值确定子图 ID（多子图模式）
+        if (res.success && !params.subImageHeights.empty()) {
+            res.map_id = resolve_map_id((float)res.y);
+            // 将完整图坐标转回局部坐标（Java 端会加 offsetY）
+            int y_accum = 0;
+            for (int i = 0; i < res.map_id && i < (int)params.subImageHeights.size(); i++) {
+                y_accum += std::max(0, params.subImageHeights[i]);
+            }
+            res.y -= y_accum;
+            LOG("  map_id=%d (from y=%.1f, local_y=%.1f)", res.map_id, dst_center[0].y + y_accum, res.y);
+        }
     }
 
     res.t_matching_ms = std::chrono::duration<float, std::milli>(
         std::chrono::steady_clock::now() - t1).count();
     return res;
+}
+
+int SiftMatcher::resolve_map_id(float y) const {
+    if (params.subImageHeights.empty()) return 0;
+    int y_accum = 0;
+    for (int i = 0; i < (int)params.subImageHeights.size(); i++) {
+        y_accum += std::max(0, params.subImageHeights[i]);
+        if (y < y_accum) return i;
+    }
+    return (int)params.subImageHeights.size() - 1;
+}
+
+void SiftMatcher::setSubImageGroup(int group) {
+    sub_image_group = group;
+    // Matching 侧始终使用 AlgoParams 全局参数（ct=0.001, sigma=1.6），
+    // 训练侧 per-sub-image 覆盖只在 train_multimap 中生效。
+    // 不在此处覆盖 sift 参数，否则低 ct 导致过多弱特征（慢 + 抖动）。
 }
 
 size_t SiftMatcher::feature_count() const {
@@ -461,6 +535,130 @@ bool SiftMatcher::train_direct(cv::Mat& map_gray) {
     return true;
 }
 
+// ----- 大图重叠分块训练 (>9Mpx) — 从 master 移植 -----
+bool SiftMatcher::train_tiled(cv::Mat& map_gray, int map_w, int map_h) {
+    int stride = params.tileSize - params.tileOverlap;
+    int cols = (int)std::ceil((double)(map_w - params.tileOverlap) / stride);
+    int rows = (int)std::ceil((double)(map_h - params.tileOverlap) / stride);
+    LOG("Tiled training: %dx%d map, %dx%d tiles (%d total)",
+        map_w, map_h, cols, rows, cols * rows);
+
+    struct KpEntry {
+        float x, y;
+        std::vector<float> desc;
+    };
+    std::vector<KpEntry> all_kps;
+    int desc_dim = 128;
+
+    for (int r = 0; r < rows; r++) {
+        for (int c = 0; c < cols; c++) {
+            int tile_x = c * stride;
+            int tile_y = r * stride;
+            int tile_w = std::min(params.tileSize, map_w - tile_x);
+            int tile_h = std::min(params.tileSize, map_h - tile_y);
+
+            cv::Rect roi(tile_x, tile_y, tile_w, tile_h);
+            cv::Mat tile_gray = map_gray(roi);
+
+            std::vector<cv::KeyPoint> tile_kps;
+            cv::Mat tile_descs;
+            sift->detectAndCompute(tile_gray, cv::noArray(), tile_kps, tile_descs);
+            if (tile_descs.empty()) continue;
+
+            cv::Mat desc_float;
+            if (tile_descs.type() != CV_32F)
+                tile_descs.convertTo(desc_float, CV_32F);
+            else
+                desc_float = tile_descs;
+
+            desc_dim = desc_float.cols;
+            for (size_t i = 0; i < tile_kps.size(); i++) {
+                KpEntry entry;
+                entry.x = tile_kps[i].pt.x + (float)tile_x;
+                entry.y = tile_kps[i].pt.y + (float)tile_y;
+                entry.desc.resize(desc_dim);
+                memcpy(entry.desc.data(), desc_float.ptr<float>((int)i),
+                       desc_dim * sizeof(float));
+                all_kps.push_back(std::move(entry));
+            }
+        }
+    }
+
+    if (all_kps.empty()) {
+        LOGERR("No keypoints detected in any tile");
+        return false;
+    }
+
+    // 重叠区域去重（空间网格索引 O(1)）
+    int total_count = (int)all_kps.size();
+    int cell_size = (int)std::ceil(params.dedupDistance);
+    int grid_cols = map_w / cell_size + 1;
+    int grid_rows = map_h / cell_size + 1;
+    std::vector<int> grid(grid_cols * grid_rows, -1);
+    std::vector<bool> keep(total_count, false);
+    int keep_count = 0;
+
+    for (int i = 0; i < total_count; i++) {
+        auto& kp = all_kps[i];
+        int cx = (int)(kp.x / cell_size);
+        int cy = (int)(kp.y / cell_size);
+        bool duplicate = false;
+        for (int dx = -1; dx <= 1 && !duplicate; dx++) {
+            for (int dy = -1; dy <= 1 && !duplicate; dy++) {
+                int nx = cx + dx, ny = cy + dy;
+                if (nx >= 0 && nx < grid_cols && ny >= 0 && ny < grid_rows) {
+                    int existing = grid[ny * grid_cols + nx];
+                    if (existing >= 0) {
+                        auto& ekp = all_kps[existing];
+                        if (std::hypot(kp.x - ekp.x, kp.y - ekp.y) < params.dedupDistance)
+                            duplicate = true;
+                    }
+                }
+            }
+        }
+        if (!duplicate) {
+            grid[cy * grid_cols + cx] = i;
+            keep[i] = true;
+            keep_count++;
+        }
+    }
+    LOG("Dedup: %d -> %d (removed %d overlapping duplicates)",
+        total_count, keep_count, total_count - keep_count);
+
+    // 构建合并描述符矩阵
+    cv::Mat all_descs(keep_count, desc_dim, CV_32F);
+    int pos = 0;
+    for (int i = 0; i < total_count; i++) {
+        if (keep[i]) {
+            memcpy(all_descs.ptr<float>(pos), all_kps[i].desc.data(),
+                   desc_dim * sizeof(float));
+            pos++;
+        }
+    }
+
+    // 描述符变换 (PCA + 量化)
+    if (!transform->train(all_descs)) {
+        LOGERR("Descriptor transform failed");
+        return false;
+    }
+
+    // 构建关键点列表
+    map_keypoints.clear();
+    map_keypoints.reserve(keep_count);
+    map_keypoint_pts.clear();
+    map_keypoint_pts.reserve(keep_count);
+    for (int i = 0; i < total_count; i++) {
+        if (keep[i]) {
+            auto& kp = all_kps[i];
+            map_keypoints.push_back(cv::KeyPoint(kp.x, kp.y, 1.0f));
+            map_keypoint_pts.emplace_back(kp.x, kp.y);
+        }
+    }
+
+    build_flann_index();
+    LOG("SIFT trained (tiled): %zu features", map_keypoints.size());
+    return true;
+}
 
 bool SiftMatcher::train_multimap(const uint8_t* gray_pixels, int w, int h) {
     auto& sub_h = params.subImageHeights;
@@ -489,11 +687,18 @@ bool SiftMatcher::train_multimap(const uint8_t* gray_pixels, int w, int h) {
         override_map[sp.subImageIndex] = &sp;
     }
 
+    LOG("  group_filter=%d (0=overworld, 1=caves, -1=all)", sub_image_group);
+
     for (int si = 0; si < sub_count; si++) {
         int sh = sub_h[si];
         if (sh <= 0) { LOG("Sub-image %d: zero height, skipping", si); continue; }
 
+        // Group filter: 0=overworld(only sub 0), 1=caves(sub 1+), -1=all
+        if (sub_image_group == 0 && si > 0) continue;
+        if (sub_image_group == 1 && si == 0) continue;
+
         // Resolve SIFT params for this sub-image (override or default)
+        cv::Ptr<cv::SIFT> sub_sift;
         auto it = override_map.find(si);
         if (it != override_map.end()) {
             auto* sp = it->second;
@@ -502,20 +707,33 @@ bool SiftMatcher::train_multimap(const uint8_t* gray_pixels, int w, int h) {
             double ct = (sp->contrastThreshold > 0.0) ? sp->contrastThreshold : params.contrastThreshold;
             double et = (sp->edgeThreshold > 0.0) ? sp->edgeThreshold : params.edgeThreshold;
             double sg = (sp->sigma > 0.0) ? sp->sigma : params.sigma;
-            cv::Ptr<cv::SIFT> sub_sift = cv::SIFT::create(nf, nol, ct, et, sg, false);
-            cv::Mat sub_gray(sh, w, CV_8UC1, (void*)(gray_pixels + y_offsets[si] * w));
-            sub_sift->detectAndCompute(sub_gray, cv::noArray(),
-                sub_results[si].kps, sub_results[si].descs);
-            LOG("  sub[%d] → %zu kp (override: ct=%.4f et=%.1f)", si,
-                sub_results[si].kps.size(), ct, et);
+            sub_sift = cv::SIFT::create(nf, nol, ct, et, sg, false);
         } else {
-            cv::Ptr<cv::SIFT> default_sift = cv::SIFT::create(
+            sub_sift = cv::SIFT::create(
                 params.nfeatures, params.nOctaveLayers,
                 params.contrastThreshold, params.edgeThreshold, params.sigma, false);
-            cv::Mat sub_gray(sh, w, CV_8UC1, (void*)(gray_pixels + y_offsets[si] * w));
-            default_sift->detectAndCompute(sub_gray, cv::noArray(),
+        }
+
+        cv::Mat sub_gray(sh, w, CV_8UC1, (void*)(gray_pixels + y_offsets[si] * w));
+
+        // 洞穴子图：CLAHE 增强对比度，提升暗区纹理可见度
+        bool is_cave = (sub_image_group == 1) || (sub_image_group == -1 && si > 0);
+        if (is_cave) {
+            cv::Ptr<cv::CLAHE> clahe_train = cv::createCLAHE(3.0, cv::Size(8, 8));
+            cv::Mat enhanced;
+            clahe_train->apply(sub_gray, enhanced);
+            sub_gray = enhanced;
+        }
+
+        // 大子图使用分块检测（同步 master 行为）
+        if ((int64_t)w * sh >= params.largeMapThreshold) {
+            detect_tiled(sub_sift, sub_gray, w, sh,
+                params.tileSize, params.tileOverlap, params.dedupDistance,
                 sub_results[si].kps, sub_results[si].descs);
-            LOG("  sub[%d] → %zu kp (default params)", si, sub_results[si].kps.size());
+            LOG("  sub[%d] -> %zu kp (tiled)", si, sub_results[si].kps.size());
+        } else {
+            sub_sift->detectAndCompute(sub_gray, cv::noArray(),
+                sub_results[si].kps, sub_results[si].descs);
         }
         sub_results[si].map_id = si;
         total_kp += (int)sub_results[si].kps.size();
@@ -539,7 +757,9 @@ bool SiftMatcher::train_multimap(const uint8_t* gray_pixels, int w, int h) {
         desc_dim = desc_float.cols;
         all_raw_descs.push_back(desc_float);
         for (auto& kp : r.kps) {
-            all_kps.push_back(kp);  // 子图局部坐标
+            cv::KeyPoint kp_full = kp;
+            kp_full.pt.y += y_offsets[si];  // 子图局部坐标 → 完整图坐标
+            all_kps.push_back(kp_full);
             map_id_for_feature.push_back(r.map_id);
         }
     }
@@ -559,13 +779,13 @@ bool SiftMatcher::train_multimap(const uint8_t* gray_pixels, int w, int h) {
     }
     LOG("Merged descriptors: %d x %d", merged_descs.rows, merged_descs.cols);
 
-    // Unified PCA + quantization
+    // Unified PCA + quantization (shared across all sub-images in this group)
     if (!transform->train(merged_descs)) {
         LOGERR("Descriptor transform failed");
         return false;
     }
 
-    // Unified index
+    // ---- Unified index (all sub-images in full coordinates) ----
     map_keypoints = std::move(all_kps);
     map_keypoint_pts.clear();
     map_keypoint_pts.reserve(map_keypoints.size());
@@ -573,7 +793,7 @@ bool SiftMatcher::train_multimap(const uint8_t* gray_pixels, int w, int h) {
         map_keypoint_pts.push_back(kp.pt);
 
     build_flann_index();
-    LOG("Multi-map trained: %zu features across %d sub-images",
+    LOG("Multi-map trained: %zu features across %d sub-images (full coordinates)",
         map_keypoints.size(), sub_count);
     return true;
 }
@@ -612,3 +832,5 @@ bool SiftMatcher::load_from_cache() {
     }
     return true;
 }
+
+

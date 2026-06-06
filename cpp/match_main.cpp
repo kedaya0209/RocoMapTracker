@@ -103,26 +103,34 @@ int main(int argc, char* argv[]) {
 
     LOG("Algorithm: SIFT (kind=%d)", (int)params.kind);
 
-    // Create matcher
-    auto matcher = create_matcher(params);
-    if (!matcher) {
-        LOGERR("Failed to create matcher");
+    // Create dual matchers: overworld (sub-image 0) + caves (sub-images 1+)
+    auto overworld = create_matcher(params);
+    auto matcher_cave = create_matcher(params);
+    if (!overworld || !matcher_cave) {
+        LOGERR("Failed to create matchers");
         closesocket(sock); WSACleanup(); return 1;
     }
+    overworld->setSubImageGroup(0);
+    matcher_cave->setSubImageGroup(1);
 
-    bool init_ok = false;
+    // Try loading caches
+    bool ow_ok = false, cv_ok = false;
     if (!params.cacheFilePath.empty()) {
-        init_ok = matcher->load_cache(params.cacheFilePath);
+        ow_ok = overworld->load_cache(params.cacheFilePath);
+    }
+    if (!params.caveCacheFilePath.empty()) {
+        cv_ok = matcher_cave->load_cache(params.caveCacheFilePath);
     }
 
-    if (!init_ok) {
-        LOG("Cache miss, requesting map data...");
+    // Request MAP_DATA if any cache needs training
+    if (!ow_ok || !cv_ok) {
+        LOG("Cache miss (ow=%d cave=%d), requesting map data...", ow_ok, cv_ok);
         if (!send_message(sock, REQUEST_MAP, nullptr, 0)) {
             LOGERR("Failed to send REQUEST_MAP");
             closesocket(sock); WSACleanup(); return 1;
         }
 
-        type = recv_message(sock, recv_body);
+        int32_t type = recv_message(sock, recv_body);
         if (type != MAP_DATA) {
             LOGERR("Expected MAP_DATA, got type=%d", type);
             closesocket(sock); WSACleanup(); return 1;
@@ -168,45 +176,77 @@ int main(int argc, char* argv[]) {
         LOG("Received map data: %dx%d (%u gray pixels, subImageCount=%d)",
             map_w, map_h, pixels_len, sub_count);
 
-        if (!matcher->train(map_pixels, map_w, map_h)) {
-            LOGERR("Training failed");
-            // Simple inline send_init_failed
-            {
-                const char* msg = "Training failed";
-                uint32_t msg_len = (uint32_t)strlen(msg);
-                std::vector<uint8_t> body(8 + msg_len);
-                write_be32(body.data(), 1);
-                write_be32(body.data() + 4, msg_len);
-                memcpy(body.data() + 8, msg, msg_len);
-                send_message(sock, INIT_FAILED, body.data(), (uint32_t)body.size());
+        // Train overworld if needed
+        if (!ow_ok) {
+            LOG("Training overworld matcher...");
+            if (!overworld->train(map_pixels, map_w, map_h)) {
+                LOGERR("Overworld training failed");
+                {
+                    const char* msg = "Overworld training failed";
+                    uint32_t msg_len = (uint32_t)strlen(msg);
+                    std::vector<uint8_t> body(8 + msg_len);
+                    write_be32(body.data(), 1);
+                    write_be32(body.data() + 4, msg_len);
+                    memcpy(body.data() + 8, msg, msg_len);
+                    send_message(sock, INIT_FAILED, body.data(), (uint32_t)body.size());
+                }
+                closesocket(sock); WSACleanup(); return 1;
             }
-            closesocket(sock); WSACleanup(); return 1;
+            if (!params.cacheFilePath.empty()) {
+                size_t lastSep = params.cacheFilePath.find_last_of("\\/");
+                if (lastSep != std::string::npos) {
+                    std::string dir = params.cacheFilePath.substr(0, lastSep);
+                    CreateDirectoryA(dir.c_str(), nullptr);
+                }
+                overworld->save_cache(params.cacheFilePath);
+            }
         }
 
-        if (!params.cacheFilePath.empty()) {
-            size_t lastSep = params.cacheFilePath.find_last_of("\\/");
-            if (lastSep != std::string::npos) {
-                std::string dir = params.cacheFilePath.substr(0, lastSep);
-                CreateDirectoryA(dir.c_str(), nullptr);
+        // Train caves if needed
+        if (!cv_ok) {
+            LOG("Training cave matcher...");
+            if (!matcher_cave->train(map_pixels, map_w, map_h)) {
+                LOGERR("Cave training failed");
+                {
+                    const char* msg = "Cave training failed";
+                    uint32_t msg_len = (uint32_t)strlen(msg);
+                    std::vector<uint8_t> body(8 + msg_len);
+                    write_be32(body.data(), 1);
+                    write_be32(body.data() + 4, msg_len);
+                    memcpy(body.data() + 8, msg, msg_len);
+                    send_message(sock, INIT_FAILED, body.data(), (uint32_t)body.size());
+                }
+                closesocket(sock); WSACleanup(); return 1;
             }
-            matcher->save_cache(params.cacheFilePath);
+            if (!params.caveCacheFilePath.empty()) {
+                size_t lastSep = params.caveCacheFilePath.find_last_of("\\/");
+                if (lastSep != std::string::npos) {
+                    std::string dir = params.caveCacheFilePath.substr(0, lastSep);
+                    CreateDirectoryA(dir.c_str(), nullptr);
+                }
+                matcher_cave->save_cache(params.caveCacheFilePath);
+            }
         }
     }
 
-    // INIT_COMPLETE
+    // INIT_COMPLETE — report total features from both matchers
     {
         uint8_t feat_buf[4];
-        write_be32(feat_buf, (uint32_t)matcher->feature_count());
+        size_t total_kp = overworld->feature_count() + matcher_cave->feature_count();
+        write_be32(feat_buf, (uint32_t)total_kp);
         if (!send_message(sock, INIT_COMPLETE, feat_buf, 4)) {
             LOGERR("Failed to send INIT_COMPLETE");
             closesocket(sock); WSACleanup(); return 1;
         }
+        LOG("INIT_COMPLETE: overworld=%zu cave=%zu total=%zu features",
+            overworld->feature_count(), matcher_cave->feature_count(), total_kp);
     }
-    LOG("INIT_COMPLETE sent, entering matching loop...");
 
-    // Matching loop
+    // Matching loop with dual matchers
     std::atomic<bool> g_running{true};
-    int ret = run_match_loop(sock, params, *matcher, g_running);
+    MatcherBase& ref_overworld = *overworld;
+    MatcherBase& ref_cave = *matcher_cave;
+    int ret = run_match_loop(sock, params, ref_overworld, ref_cave, g_running);
 
     closesocket(sock);
     WSACleanup();
