@@ -174,6 +174,7 @@ public class SiftMatchHandler {
 
             // Plan B unified index: load sub-image heights + per-sub-image SIFT params from metadata
             int[] subImageHeights = null;
+            boolean[] subImageIsCave = null;
             SubImageSiftOverride[] subImageOverrides = null;
             SubImageSiftOverride matchingSift = null;
             if (ResourceConfigContext.isMultiMapActive()) {
@@ -184,6 +185,10 @@ public class SiftMatchHandler {
                     subImageHeights = subs.stream()
                             .mapToInt(SubImageInfo::height)
                             .toArray();
+                    subImageIsCave = new boolean[subs.size()];
+                    for (int i = 0; i < subs.size(); i++) {
+                        subImageIsCave[i] = subs.get(i).isCave();
+                    }
 
                     // 收集有 SIFT 参数覆盖的子图
                     subImageOverrides = subs.stream()
@@ -218,7 +223,7 @@ public class SiftMatchHandler {
             // 亮度分流：使用独立的 cave 缓存路径
             String caveCacheSuffix = variant.cacheSuffix() + ".cave";
             byte[] body = encodeConfig(variant.variantOrdinal(), cacheSuffix, caveCacheSuffix, 0,
-                    subImageHeights, subImageOverrides, matchingSift);
+                    subImageHeights, subImageIsCave, subImageOverrides, matchingSift);
             session.send(MSG_CONFIG_DATA, body);
             log.info("CONFIG_DATA 已发送 ({} 字节, algoKind={}, cache={})",
                     body.length, 0, cacheSuffix);

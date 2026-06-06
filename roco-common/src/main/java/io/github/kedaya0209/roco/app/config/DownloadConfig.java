@@ -31,6 +31,10 @@ public final class DownloadConfig {
      */
     public static int[] MAP_REMOTE_URL_SORT = new int[0];
     /**
+     * 远程瓦片 URL 对应的显示名称（中文名，如"卡洛西亚大陆"）
+     */
+    public static String[] MAP_REMOTE_URL_DISPLAY_NAME = new String[0];
+    /**
      * 地图资源信息页 URL
      */
     public static String MAP_RESOURCE_INFO_URL = "https://wiki.biligame.com/rocom/大地图";
@@ -84,6 +88,7 @@ public final class DownloadConfig {
         MAP_REMOTE_URLS = ConfigHelper.getStrArray(prop, "map.remote.urls");
         MAP_REMOTE_URL_NAME = ConfigHelper.getStrArray(prop, "map.remote.url.name");
         MAP_REMOTE_URL_SORT = ConfigHelper.getIntArray(prop, "map.remote.url.sort");
+        MAP_REMOTE_URL_DISPLAY_NAME = ConfigHelper.getStrArray(prop, "map.remote.url.display.name");
     }
 
     public static void save(StringBuilder sb) {
@@ -108,5 +113,7 @@ public final class DownloadConfig {
         String sortArr = Arrays.stream(MAP_REMOTE_URL_SORT).mapToObj(String::valueOf).collect(Collectors.joining(","));
         sb.append("# 远程瓦片 URL 排序权重\n");
         sb.append("map.remote.url.sort=").append(sortArr).append("\n\n");
+        sb.append("# 远程瓦片 URL 对应的显示名称（中文名，如\"卡洛西亚大陆\"）\n");
+        sb.append("map.remote.url.display.name=").append(String.join(",", MAP_REMOTE_URL_DISPLAY_NAME)).append("\n\n");
     }
 }

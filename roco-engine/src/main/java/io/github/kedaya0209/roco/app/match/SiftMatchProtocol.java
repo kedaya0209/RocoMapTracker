@@ -48,6 +48,7 @@ public class SiftMatchProtocol {
      *   [4B]caveCachePathLen [NB]caveCachePath(UTF-8)  // 0 length = no cave cache
      *   [4B]subImageCount                                  // 0 = not multi-map
      *   [subImageCount * 4B] subImageHeights[]              // per-sub-image pixel heights
+     *   [subImageCount * 1B] subImageIsCave[]               // per-sub-image cave flag (0=overworld, 1=cave)
      *   [4B]overrideCount                                   // per-sub-image SIFT params
      *   overrideCount * {
      *     [4B]subImageIndex
@@ -61,6 +62,7 @@ public class SiftMatchProtocol {
      */
     public static byte[] encodeConfig(int variant, String cacheSuffix, String caveCacheSuffix, int algoKind,
                                        int[] subImageHeights,
+                                       boolean[] subImageIsCave,
                                        SubImageSiftOverride[] subImageOverrides,
                                        SubImageSiftOverride matchingSift) {
         String siftMapPath = ResourceConfigContext.getSiftMap();
@@ -82,7 +84,7 @@ public class SiftMatchProtocol {
                 + 4 + 4 + 8 + 4                      // TILE
                 + 4 + cachePathBytes.length          // cache path
                 + 4 + (cavePathBytes != null ? cavePathBytes.length : 0) // cave cache path
-                + 4 + subCount * 4                   // subImageCount + subImageHeights
+                + 4 + subCount * 4 + subCount           // subImageCount + subImageHeights + subImageIsCave
                 + 4 + overrideCount * (4 + 8 + 8 + 4 + 4 + 8); // per-sub-image SIFT overrides
 
         ByteBuffer buf = ByteBuffer.allocate(bodyLen).order(ByteOrder.BIG_ENDIAN);
@@ -133,6 +135,13 @@ public class SiftMatchProtocol {
         if (subImageHeights != null) {
             for (int h : subImageHeights) {
                 buf.putInt(h);
+            }
+        }
+
+        // Per-sub-image cave flags (1 byte each, 0=overworld, 1=cave)
+        if (subImageIsCave != null) {
+            for (boolean b : subImageIsCave) {
+                buf.put((byte) (b ? 1 : 0));
             }
         }
 

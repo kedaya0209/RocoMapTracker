@@ -286,8 +286,13 @@ public class ResourceInitService {
             try (InputStream is = ResourceUtils.getResourceStream(
                     ResourceConfigContext.getMultiMapMetadata())) {
                 CompositeMapMetadata metadata = CompositeMapMetadata.load(is);
-                int imgW = metadata.width();
-                int imgH = metadata.totalHeight();
+                // 渲染使用子图局部坐标空间（大陆图尺寸），
+                // 完整合成图高度仅用于 SIFT 匹配
+                var mainland = metadata.subImages().stream()
+                        .filter(s -> !s.isCave())
+                        .findFirst().orElse(null);
+                int imgW = mainland != null ? mainland.width() : 8192;
+                int imgH = mainland != null ? mainland.height() : 8192;
                 log.info("内置地图元数据从 MultiMap_metadata.json 读取: {}x{} ({} 子图)",
                         imgW, imgH, metadata.subImages().size());
                 MapContext.getInstance().init("G", imgW, imgH);
@@ -328,8 +333,13 @@ public class ResourceInitService {
             try (InputStream is = ResourceUtils.getResourceStream(
                     ResourceConfigContext.getMultiMapMetadata())) {
                 CompositeMapMetadata metadata = CompositeMapMetadata.load(is);
-                int imgW = metadata.width();
-                int imgH = metadata.totalHeight();
+                // 渲染使用子图局部坐标空间（大陆图尺寸），
+                // 完整合成图高度仅用于 SIFT 匹配
+                var mainland = metadata.subImages().stream()
+                        .filter(s -> !s.isCave())
+                        .findFirst().orElse(null);
+                int imgW = mainland != null ? mainland.width() : 8192;
+                int imgH = mainland != null ? mainland.height() : 8192;
                 log.info("地图元数据从 MultiMap_metadata.json 读取: {}x{} ({} 子图)",
                         imgW, imgH, metadata.subImages().size());
                 MapContext.getInstance().init("G", imgW, imgH);

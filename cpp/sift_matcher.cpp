@@ -280,7 +280,10 @@ bool SiftMatcher::train(const uint8_t* gray_pixels, int w, int h) {
 
 MatchResult SiftMatcher::match(uint8_t* data, int w, int h, double hint_x, double hint_y) {
     MatchResult res{};
-    if (!flann_index) return res;
+    if (!flann_index) {
+        LOG("match: FAIL no flann_index (g=%d)", sub_image_group);
+        return res;
+    }
 
     cv::Mat scene_img(h, w, CV_8UC1, data);
 
@@ -300,7 +303,10 @@ MatchResult SiftMatcher::match(uint8_t* data, int w, int h, double hint_x, doubl
     auto t1 = std::chrono::steady_clock::now();
     res.t_extract_ms = std::chrono::duration<float, std::milli>(t1 - t0).count();
 
-    if (scene_descriptors.empty()) return res;
+    if (scene_descriptors.empty()) {
+        LOG("match: FAIL zero features (g=%d, kps=%zu)", sub_image_group, scene_kps.size());
+        return res;
+    }
 
     // PCA 投影 + 量化（必须与训练时的变换一致）
     cv::Mat query_desc;
@@ -310,6 +316,7 @@ MatchResult SiftMatcher::match(uint8_t* data, int w, int h, double hint_x, doubl
     } else {
         query_desc = transform->process(scene_descriptors);
     }
+    auto t_pca = std::chrono::steady_clock::now();
 
     // knnSearch(k=2) + 手动 Lowe 比率测试（统一处理单图和子图）
     cv::Mat indices(query_desc.rows, 2, CV_32SC1);
@@ -329,10 +336,12 @@ MatchResult SiftMatcher::match(uint8_t* data, int w, int h, double hint_x, doubl
             }
         }
     }
+    auto t_knn = std::chrono::steady_clock::now();
 
     if (good_matches.size() < (size_t)match_min_count) {
-        res.t_matching_ms = std::chrono::duration<float, std::milli>(
-            std::chrono::steady_clock::now() - t1).count();
+        LOG("match: FAIL good_matches %zu < min %d (g=%d, query_desc=%d)",
+            good_matches.size(), match_min_count, sub_image_group, query_desc.rows);
+        res.t_matching_ms = std::chrono::duration<float, std::milli>(t_knn - t1).count();
         return res;
     }
 
@@ -359,6 +368,8 @@ MatchResult SiftMatcher::match(uint8_t* data, int w, int h, double hint_x, doubl
     }
 
     if (filtered_matches.size() < (size_t)match_min_count) {
+        LOG("match: FAIL filtered_matches %zu < min %d (g=%d, has_hint=%d)",
+            filtered_matches.size(), match_min_count, sub_image_group, (int)has_hint);
         res.t_matching_ms = std::chrono::duration<float, std::milli>(
             std::chrono::steady_clock::now() - t1).count();
         return res;
@@ -375,12 +386,14 @@ MatchResult SiftMatcher::match(uint8_t* data, int w, int h, double hint_x, doubl
     }
 
     if (src_pts.size() < (size_t)match_min_count) {
+        LOG("match: FAIL src_pts %zu < min %d (g=%d)", src_pts.size(), match_min_count, sub_image_group);
         res.t_matching_ms = std::chrono::duration<float, std::milli>(
             std::chrono::steady_clock::now() - t1).count();
         return res;
     }
 
     cv::Mat inlier_mask;
+    auto t_ransac0 = std::chrono::steady_clock::now();
     cv::Mat H = cv::findHomography(src_pts, dst_pts, cv::RANSAC,
             ransac_reproj_threshold, inlier_mask, ransac_max_iters, ransac_confidence);
 
@@ -413,10 +426,21 @@ MatchResult SiftMatcher::match(uint8_t* data, int w, int h, double hint_x, doubl
             }
             res.y -= y_accum;
         }
+    } else {
+        LOG("match: FAIL RANSAC H.empty (g=%d, src_pts=%zu)", sub_image_group, src_pts.size());
     }
 
-    res.t_matching_ms = std::chrono::duration<float, std::milli>(
-        std::chrono::steady_clock::now() - t1).count();
+    auto t_end = std::chrono::steady_clock::now();
+    res.t_matching_ms = std::chrono::duration<float, std::milli>(t_end - t1).count();
+
+    float t_pca_ms = std::chrono::duration<float, std::milli>(t_pca - t1).count();
+    float t_knn_ms = std::chrono::duration<float, std::milli>(t_knn - t_pca).count();
+    float t_ransac_ms = std::chrono::duration<float, std::milli>(t_end - t_ransac0).count();
+    float t_other_ms = res.t_matching_ms - t_pca_ms - t_knn_ms - t_ransac_ms;
+    LOG("  match timing[g=%d]: pca=%.2f knn=%.2f ransac=%.2f other=%.2f (total=%.2f, kps=%d/%d, index=%zu)",
+        sub_image_group, t_pca_ms, t_knn_ms, t_ransac_ms, t_other_ms,
+        res.t_matching_ms, (int)scene_kps.size(), query_desc.rows,
+        map_keypoint_pts.size());
     return res;
 }
 
@@ -786,9 +810,13 @@ bool SiftMatcher::train_multimap(const uint8_t* gray_pixels, int w, int h) {
         int sh = sub_h[si];
         if (sh <= 0) { LOG("Sub-image %d: zero height, skipping", si); continue; }
 
-        // Group filter: 0=overworld(only sub 0), 1=caves(sub 1+), -1=all
-        if (sub_image_group == 0 && si > 0) continue;
-        if (sub_image_group == 1 && si == 0) continue;
+        // Group filter using subImageIsCave flags from Java metadata (fallback to
+        // index-based convention: si==0 = overworld, si>0 = cave)
+        bool is_cave = (si < (int)params.subImageIsCave.size())
+            ? (params.subImageIsCave[si] != 0)
+            : (si > 0);
+        if (sub_image_group == 0 && is_cave) continue;  // overworld: skip caves
+        if (sub_image_group == 1 && !is_cave) continue; // caves: skip overworld
 
         // Resolve SIFT params for this sub-image (override or default)
         cv::Ptr<cv::SIFT> sub_sift;
@@ -816,8 +844,7 @@ bool SiftMatcher::train_multimap(const uint8_t* gray_pixels, int w, int h) {
             sub_gray = sub_gray(crop);
         }
 
-        // 洞穴子图：CLAHE 增强对比度，提升暗区纹理可见度
-        bool is_cave = (sub_image_group == 1) || (sub_image_group == -1 && si > 0);
+        // 洞穴子图：CLAHE 增强对比度，提升暗区纹理可见度（is_cave 已从 subImageIsCave 标志确定）
         if (is_cave) {
             cv::Ptr<cv::CLAHE> clahe_train = cv::createCLAHE(3.0, cv::Size(8, 8));
             cv::Mat enhanced;

@@ -3,11 +3,18 @@ package io.github.kedaya0209.roco.app.map;
 import io.github.kedaya0209.roco.app.config.DownloadConfig;
 import io.github.kedaya0209.roco.app.map.core.IconDownloader;
 import io.github.kedaya0209.roco.app.map.loader.LoadInfo;
+import io.github.kedaya0209.roco.app.map.util.BrightnessExtractor;
+import io.github.kedaya0209.roco.app.map.util.MapPostProcessor;
+import io.github.kedaya0209.roco.app.utils.FilePathUtil;
 import net.jcip.annotations.NotThreadSafe;
 import io.github.kedaya0209.roco.app.map.core.MapDownloader;
 import io.github.kedaya0209.roco.app.map.core.ResourceConfigBuilder;
 import io.github.kedaya0209.roco.app.map.util.MapFileMover;
 import lombok.extern.slf4j.Slf4j;
+
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Path;
 
 /**
  * 地图资源更新触发器
@@ -99,7 +106,7 @@ public final class MapResourceUpdater {
     // ========== 公共API方法 ==========
 
     /**
-     * 全量更新：地图瓦片 → 资源点配置 → 图标 → 移动到最终目录。
+     * 全量更新：地图瓦片 → 亮度提取 → 资源点配置 → 图标 → 移动到最终目录。
      * 每次更新开始前清空分类缓存，确保从远程获取最新数据。
      *
      * @return true 全部成功，false 中途失败（地图下载或配置构建出错）
@@ -110,6 +117,12 @@ public final class MapResourceUpdater {
         if (!MapDownloader.updateMap()) {
             System.gc();
             return false;
+        }
+        processAllMapBrightness();
+        try {
+            MapPostProcessor.processMaps();
+        } catch (IOException e) {
+            log.error("多地图后处理失败", e);
         }
         MapFileMover.moveMapsToResource();
 
@@ -137,6 +150,30 @@ public final class MapResourceUpdater {
         if (!MapDownloader.updateMap()) return false;
         MapFileMover.moveMapsToResource();
         return true;
+    }
+
+    /**
+     * 对下载拼接后的所有地图 PNG 做亮度提取处理，覆盖原文件。
+     * 处理完的图片只保留亮度超过阈值的区域（其余透明），
+     * 用于 WIKI 洞穴图这种暗色地图的特征增强。
+     */
+    static void processAllMapBrightness() {
+        File dir = FilePathUtil.getRelativeFile(DOWNLOAD_MAP_DIR);
+        File[] files = dir.listFiles((d, name) -> name.startsWith("map_") && name.endsWith(".png"));
+        if (files == null || files.length == 0) {
+            log.info("无地图文件需要亮度处理");
+            return;
+        }
+        log.info("开始亮度提取处理，共 {} 个地图文件", files.length);
+        for (File f : files) {
+            Path p = f.toPath();
+            try {
+                BrightnessExtractor.extractAndSave(p, p);
+                log.info("  亮度处理完成: {}", f.getName());
+            } catch (IOException e) {
+                log.warn("亮度处理失败，跳过: {}", f.getName(), e);
+            }
+        }
     }
 
     /**

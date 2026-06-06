@@ -108,9 +108,19 @@ public class TileGeneratorService {
                         if (w <= 0 || h <= 0) continue;
 
                         BufferedImage tile = levelImage.getSubimage(x, y, w, h);
+                        // 边缘瓦片补透明像素到 tileSize × tileSize，避免渲染时被拉伸
+                        BufferedImage tileToWrite = tile;
+                        if (w < tileSize || h < tileSize) {
+                            BufferedImage padded = new BufferedImage(tileSize, tileSize, BufferedImage.TYPE_INT_ARGB);
+                            Graphics2D g2 = padded.createGraphics();
+                            g2.drawImage(tile, 0, 0, null);
+                            g2.dispose();
+                            tileToWrite = padded;
+                        }
+                        final BufferedImage finalTile = tileToWrite;
                         futures.add(executor.submit(() -> {
                             try {
-                                ImageIO.write(tile, "png", tileFile);
+                                ImageIO.write(finalTile, "png", tileFile);
                             } catch (IOException e) {
                                 log.warn("瓦片保存失败: {}", tileFile, e);
                             }

@@ -16,13 +16,10 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class PlayerStateTracker {
 
-    /** 速度模平方阈值 — 低于此值时不进行反方向修正 */
-    private static final double SPEED_THRESHOLD_SQ = 9.0;  // 3 px/frame
-    /** 反方向修正角度阈值 — 速度方向与箭头朝向相差超过此值时翻转 180° */
-    private static final double DIRECTION_ANGLE_THRESHOLD = 120.0;
-
     private boolean hasSmoothedPosition = false;
     private double smoothedX, smoothedY;
+
+    // 角度 EMA 平滑
     private boolean hasSmoothedAngle = false;
     private double smoothedAngle;
 
@@ -36,6 +33,24 @@ public class PlayerStateTracker {
     private Double predictedX;
     @Getter
     private Double predictedY;
+
+    /**
+     * 将角度差归一化到 [-180, 180] 范围
+     */
+    private static double normalizeAngleDiff(double diff) {
+        while (diff > 180) diff -= 360;
+        while (diff < -180) diff += 360;
+        return diff;
+    }
+
+    /**
+     * 将角度归一化到 [0, 360) 范围
+     */
+    private static double normalizeAngle(double angle) {
+        double a = angle % 360;
+        if (a < 0) a += 360;
+        return a;
+    }
 
     /**
      * 更新匹配成功时的位置
@@ -57,45 +72,24 @@ public class PlayerStateTracker {
             smoothedY = alpha * y + (1 - alpha) * smoothedY;
         }
 
-        // 反方向修正（后备）：速度方向与箭头朝向明显相反（>120°）时翻转 180°
-        if (angle != null && hasPreviousMatch) {
-            double speedSq = velocityX * velocityX + velocityY * velocityY;
-            if (speedSq > SPEED_THRESHOLD_SQ) {
-                double moveAngle = Math.toDegrees(Math.atan2(velocityY, velocityX));
-                if (moveAngle < 0) moveAngle += 360;
-                moveAngle = (moveAngle + 90) % 360; // 统一到游戏坐标系 (0°=上)
-                double diff = Math.abs(angle - moveAngle);
-                diff = Math.min(diff, 360 - diff);
-                if (diff > DIRECTION_ANGLE_THRESHOLD) {
-                    angle = (angle + 180) % 360;
-                }
-            }
-        }
-
-        // 角度 EMA 平滑（圆周差值，处理 360° 边界）
+        // 角度 EMA 平滑（处理 0/360 环绕）
+        Double finalAngle = angle;
         if (angle != null) {
             if (!hasSmoothedAngle) {
                 smoothedAngle = angle;
                 hasSmoothedAngle = true;
             } else {
-                double aDiff = normalizeAngleDiff(angle - smoothedAngle);
-                if (Math.abs(aDiff) > 90.0) {
-                    // 大角度跳变（含 C++ 方向修正）：直接快照，消除平滑延迟
-                    smoothedAngle = angle;
-                } else {
-                    double angleAlpha = Math.abs(aDiff) > PlayerConfig.PLAYER_ANGLE_OUTLIER_THRESHOLD
-                        ? PlayerConfig.PLAYER_ANGLE_EMA_ALPHA * 0.5
-                        : PlayerConfig.PLAYER_ANGLE_EMA_ALPHA;
-                    smoothedAngle = (smoothedAngle + angleAlpha * aDiff + 360) % 360;
-                }
+                double diff = normalizeAngleDiff(angle - smoothedAngle);
+                double aAlpha = PlayerConfig.PLAYER_ANGLE_EMA_ALPHA;
+                smoothedAngle = normalizeAngle(smoothedAngle + aAlpha * diff);
             }
-            angle = smoothedAngle;
+            finalAngle = smoothedAngle;
         }
 
-        MapContext.getInstance().updatePlayerState(smoothedX, smoothedY, angle);
-        AppEvents.publish(PlayerStateEvent.class, new PlayerStateEvent(smoothedX, smoothedY, angle));
+        MapContext.getInstance().updatePlayerState(smoothedX, smoothedY, finalAngle);
+        AppEvents.publish(PlayerStateEvent.class, new PlayerStateEvent(smoothedX, smoothedY, finalAngle));
 
-        // 速度预测：为 SIFT 匹配提供 hint
+        // 速度预测：为 SIFT 匹配提供 hint（EMA 平滑稳定 hint）
         if (hasPreviousMatch) {
             double frameDx = x - prevRawX;
             double frameDy = y - prevRawY;
@@ -126,13 +120,5 @@ public class PlayerStateTracker {
         predictedX = null;
         predictedY = null;
         velocityX = velocityY = 0;
-    }
-
-    /** 将角度差归一化到 [-180, 180]，处理 360° 环绕 */
-    private static double normalizeAngleDiff(double diff) {
-        diff = diff % 360;
-        if (diff > 180) diff -= 360;
-        if (diff < -180) diff += 360;
-        return diff;
     }
 }

@@ -30,7 +30,7 @@ public final class SiftConfig {
     /**
      * SIFT 对比度阈值
      */
-    public static double SIFT_CONTRAST_THRESHOLD = 0.0005;
+    public static double SIFT_CONTRAST_THRESHOLD = 0.001;
     /**
      * SIFT 边缘阈值
      */
@@ -38,7 +38,7 @@ public final class SiftConfig {
     /**
      * SIFT sigma
      */
-    public static double SIFT_SIGMA = 2.4;
+    public static double SIFT_SIGMA = 1.6;
 
     // --- FLANN 索引 ---
     /**
@@ -76,7 +76,7 @@ public final class SiftConfig {
     /**
      * 匹配点最小数量
      */
-    public static int MATCH_MIN_COUNT = 30;
+    public static int MATCH_MIN_COUNT = 10;
     /**
      * 空间过滤搜索半径（像素）
      */

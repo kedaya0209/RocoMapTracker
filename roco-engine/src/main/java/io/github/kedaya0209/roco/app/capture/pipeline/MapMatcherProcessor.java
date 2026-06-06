@@ -165,9 +165,10 @@ public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
                         sub = meta.subImages().get(mapId);
                     }
 
-                    // Plan B: C++ 返回子图局部坐标，所有子图 offsetY=0，full == local
+                    // Plan B: C++ 返回子图局部坐标（所有子图 offsetY=0），
+                    // 瓦片和渲染都在大陆局部空间，无需加 offsetY
                     double fullX = result.x();
-                    double fullY = result.y() + ((sub != null) ? sub.offsetY() : 0);
+                    double fullY = result.y();
 
                     // 安全检测：map_id 失效时坐标可能在完整图空间（>8192），记警告
                     if (mapId < 0 && (result.y() > 8192 || result.x() > 8192)) {

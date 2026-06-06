@@ -551,6 +551,16 @@ bool parse_config_data(const std::vector<uint8_t>& body, AlgoParams& p) {
             }
             LOG("  subImageHeights: %d sub-images", subCount);
 
+            // Per-sub-image cave flags (1 byte each, 0=overworld, 1=cave)
+            if (off + subCount <= body.size()) {
+                p.subImageIsCave.resize(subCount);
+                for (int i = 0; i < subCount; i++) {
+                    p.subImageIsCave[i] = body[off];
+                    off += 1;
+                }
+                LOG("  subImageIsCave: %d flags", subCount);
+            }
+
             // Per-sub-image SIFT param overrides (optional)
             if (off + 4 <= body.size()) {
                 int32_t overrideCount = (int32_t)read_be32(body.data() + off); off += 4;
@@ -597,8 +607,6 @@ int run_match_loop(SOCKET sock, AlgoParams& params,
     int64_t frame_count = 0;
     int64_t success_count = 0;
     bool first_ready = true;
-    cv::Mat gray_mat;
-    cv::Mat roi_contiguous;
 
     while (g_running.load(std::memory_order_acquire)) {
         if (first_ready) {
@@ -723,6 +731,11 @@ int run_match_loop(SOCKET sock, AlgoParams& params,
                 if (dark_ratio >= 0.50f) cave_mode = true;
             }
             MatcherBase& matcher = cave_mode ? matcher_cave : matcher_overworld;
+
+            if (frame_count <= 3) {
+                LOG("routing: frame=%lld cave=%d dark_ratio=%.3f sift=%dx%d",
+                    (long long)frame_count, (int)cave_mode, dark_ratio, sift_w, sift_h);
+            }
 
             // 4. Match
             match_res = matcher.match(sift_data, sift_w, sift_h, hint_x, hint_y);

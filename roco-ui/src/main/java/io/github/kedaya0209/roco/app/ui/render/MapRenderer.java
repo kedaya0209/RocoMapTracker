@@ -92,7 +92,7 @@ public class MapRenderer {
      * 初始化地图尺寸并构建图标。
      */
     public void init(int mapW, int mapH, CompositeMapMetadata metadata) {
-        this.tileManager = new TileManager(worldGroup, 8192, 8192);
+        this.tileManager = new TileManager(worldGroup, mapW, mapH);
         if (metadata != null) {
             tileManager.initFromMetadata(metadata);
         }
@@ -215,6 +215,8 @@ public class MapRenderer {
         playerRenderer.snapshotOy = localOy;
         playerRenderer.snapshotPivotX = parent.getWidth() / 2;
         playerRenderer.snapshotPivotY = parent.getHeight() / 2;
+        playerRenderer.snapshotPlayerX = mm.getPlayerX();
+        playerRenderer.snapshotPlayerY = mm.getPlayerY();
         for (RenderLayer layer : renderLayers) {
             layer.onFrame();
         }
@@ -235,6 +237,9 @@ public class MapRenderer {
             tileManager.updateTiles(ox, localOy, scale, level,
                     parent.getWidth(), parent.getHeight());
         }
+
+        // 确保图标层始终在最上层（覆盖所有瓦片包括洞穴叠加）
+        iconLayerManager.getNode().toFront();
 
         lastScale = scale;
         lastOx = ox;

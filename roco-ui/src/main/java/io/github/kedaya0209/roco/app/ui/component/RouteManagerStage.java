@@ -178,7 +178,7 @@ public class RouteManagerStage extends Stage {
         HookRegistry.INSTANCE.register(new AbstractGenericHook<RouteListEvent>() {
             @Override
             public void onEvent(HookEventType eventType, RouteListEvent data) {
-                Platform.runLater(() -> routeItems.setAll(data.routes()));
+                Platform.runLater(() -> routeItems.setAll(PathContext.getInstance().getSavedRoutes()));
             }
 
             @Override

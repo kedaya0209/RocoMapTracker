@@ -3,6 +3,7 @@ package io.github.kedaya0209.roco.app.ui.render;
 import net.jcip.annotations.NotThreadSafe;
 import io.github.kedaya0209.roco.app.config.RenderConfig;
 import io.github.kedaya0209.roco.app.config.ViewConfig;
+import io.github.kedaya0209.roco.app.context.MapContext;
 import io.github.kedaya0209.roco.app.ui.state.ViewportState;
 import javafx.scene.Group;
 import javafx.scene.Node;
@@ -40,6 +41,7 @@ public class PlayerRenderer implements RenderLayer {
     /** 由 MapRenderer 在每帧开始时写入的快照，避免子渲染器独立读取 MapContext volatile 字段 */
     double snapshotScale, snapshotOx, snapshotOy;
     double snapshotPivotX, snapshotPivotY;
+    double snapshotPlayerX, snapshotPlayerY;
 
     public PlayerRenderer() {
         playerGroup = new Group();
@@ -142,6 +144,7 @@ public class PlayerRenderer implements RenderLayer {
         }
 
         boolean initialized = ViewportState.getInstance().isPlayerInitialized();
+        MapContext mm = MapContext.getInstance();
         if (initialized && playerView.getImage() != null) {
             playerView.setVisible(true);
             if (lastPlayerSize != RenderConfig.PLAYER_VIEW_SIZE) {
@@ -155,14 +158,14 @@ public class PlayerRenderer implements RenderLayer {
                 rebuildRipples();
             }
             double half = playerView.getFitWidth() / 2.0;
-            ViewportState vps = ViewportState.getInstance();
-            double px = vps.getSmoothedPlayerX();
-            double py = vps.getSmoothedPlayerY();
+            // 使用 MapRenderer 的快照值，与 CameraContext 在同一帧内基于相同坐标计算视口偏移
+            double px = snapshotPlayerX;
+            double py = snapshotPlayerY;
             playerView.setLayoutX(px - half);
             playerView.setLayoutY(py - half);
             // 导航模式下 group 层 Rotate(-navAngle) 已提供逆旋转，
             // setRotate 只需设置玩家真实朝向，无需再减 navAngle
-            double playerAngle = vps.isHasAngle() ? vps.getPlayerAngle() : 0;
+            double playerAngle = mm.isHasAngle() ? mm.getPlayerAngle() : 0;
             playerView.setRotate(playerAngle);
 
             // 光环和波纹中心每帧追踪玩家位置

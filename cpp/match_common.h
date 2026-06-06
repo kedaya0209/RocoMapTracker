@@ -127,6 +127,10 @@ struct AlgoParams {
     // and match() votes on which sub-image the query belongs to.
     std::vector<int> subImageHeights;
 
+    // Per-sub-image cave flags (1 byte each from protocol, 0=overworld, 1=cave).
+    // Used by train_multimap for group filtering instead of hardcoded si==0/si>0.
+    std::vector<uint8_t> subImageIsCave;
+
     // Per-sub-image SIFT parameter overrides for training.
     // If empty, all sub-images use the defaults above.
     std::vector<SubImageSiftParams> subImageSiftParams;
