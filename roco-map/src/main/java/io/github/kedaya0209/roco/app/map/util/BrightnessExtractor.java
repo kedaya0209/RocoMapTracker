@@ -1,41 +1,31 @@
 package io.github.kedaya0209.roco.app.map.util;
 
+import ar.com.hjg.pngj.ImageInfo;
+import ar.com.hjg.pngj.ImageLineByte;
+import ar.com.hjg.pngj.ImageLineInt;
+import ar.com.hjg.pngj.PngReader;
+import ar.com.hjg.pngj.PngWriter;
 import lombok.extern.slf4j.Slf4j;
 import net.jcip.annotations.ThreadSafe;
 
-import javax.imageio.ImageIO;
-import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.BitSet;
 
 /**
  * 亮度提取工具 — 将图像中亮度超过阈值的区域抠出并保存为透明背景 PNG。
- * 用于 WIKI 资源洞穴图下载后的后处理，提取高亮区域作为 SIFT 可匹配特征。
+ * 使用 PNGJ 逐行读写，不将全图加载到内存。
  */
 @Slf4j
 @ThreadSafe
 public final class BrightnessExtractor {
 
-    /**
-     * 默认亮度阈值（0~255）：像素亮度大于此值视为"有内容"
-     */
     private static final int DEFAULT_THRESHOLD = 50;
-
-    /**
-     * 膨胀核大小
-     */
     private static final int KERNEL_SIZE = 3;
 
     private BrightnessExtractor() {
     }
 
-    /**
-     * 读取图片 → 亮度阈值提取高亮区域 → 保存为透明背景 PNG。
-     *
-     * @param inputPath  输入图片路径
-     * @param outputPath 输出 PNG 路径（含透明度）
-     * @throws IOException 读写失败时抛出
-     */
     public static void extractAndSave(Path inputPath, Path outputPath) throws IOException {
         extractAndSave(inputPath, outputPath, DEFAULT_THRESHOLD);
     }
@@ -43,87 +33,121 @@ public final class BrightnessExtractor {
     /**
      * 读取图片 → 亮度阈值提取高亮区域 → 保存为透明背景 PNG。
      *
-     * @param inputPath  输入图片路径
-     * @param outputPath 输出 PNG 路径（含透明度）
-     * @param threshold  亮度阈值（0~255）
-     * @throws IOException 读写失败时抛出
+     * <p>内存优化：
+     * <ol>
+     *   <li>逐行读取源图，二值掩码存储在 BitSet（~8MB vs boolean[] 的 67MB）</li>
+     *   <li>BitSet 上实现膨胀</li>
+     *   <li>逐行写出结果</li>
+     * </ol>
      */
     public static void extractAndSave(Path inputPath, Path outputPath, int threshold) throws IOException {
-        BufferedImage src = ImageIO.read(inputPath.toFile());
-        if (src == null) {
-            throw new IOException("无法读取图片: " + inputPath);
-        }
+        int w, h;
+        BitSet mask;
 
-        int w = src.getWidth();
-        int h = src.getHeight();
+        // ===== Pass 1: 逐行读取，构建 BitSet 掩码 =====
+        PngReader reader1 = null;
+        try {
+            reader1 = new PngReader(inputPath.toFile());
+            w = reader1.imgInfo.cols;
+            h = reader1.imgInfo.rows;
+            int n = w * h;
+            mask = new BitSet(n);
 
-        // 1. 读取所有像素 ARGB
-        int[] argb = new int[w * h];
-        src.getRGB(0, 0, w, h, argb, 0, w);
-
-        // 2. 计算灰度 + 二值化掩码
-        boolean[] mask = new boolean[w * h];
-        int[] gray = new int[w * h];
-        for (int i = 0; i < argb.length; i++) {
-            int r = (argb[i] >> 16) & 0xFF;
-            int g = (argb[i] >> 8) & 0xFF;
-            int b = argb[i] & 0xFF;
-            // 亮度公式：0.299R + 0.587G + 0.114B
-            int lum = (r * 299 + g * 587 + b * 114) / 1000;
-            gray[i] = lum;
-            mask[i] = lum > threshold;
-        }
-
-        // 3. 膨胀掩码（3×3 核）
-        mask = dilate(mask, w, h, KERNEL_SIZE);
-
-        // 4. 输出 ARGB：掩码为 True 的区域保留原色，其余透明
-        BufferedImage out = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
-        int[] outPixels = new int[w * h];
-        for (int i = 0; i < argb.length; i++) {
-            if (mask[i]) {
-                outPixels[i] = argb[i]; // 保留原 ARGB（含原始 alpha）
-            } else {
-                outPixels[i] = 0; // 完全透明
+            for (int y = 0; y < h; y++) {
+                int[] rgba = readRowRgba(reader1.readRow(), w);
+                for (int x = 0; x < w; x++) {
+                    int off = x * 4;
+                    int a = rgba[off + 3];
+                    if (a == 0) continue;
+                    int r = rgba[off];
+                    int g = rgba[off + 1];
+                    int b = rgba[off + 2];
+                    int lum = (r * 299 + g * 587 + b * 114) / 1000;
+                    if (lum > threshold) {
+                        mask.set(y * w + x);
+                    }
+                }
             }
+        } finally {
+            if (reader1 != null) reader1.end();
         }
-        out.setRGB(0, 0, w, h, outPixels, 0, w);
 
-        // 5. 保存
-        ImageIO.write(out, "png", outputPath.toFile());
+        // ===== Pass 2: BitSet 膨胀 =====
+        mask = dilateBitSet(mask, w, h, KERNEL_SIZE);
+
+        // ===== Pass 3: 逐行写出 =====
+        PngReader reader2 = null;
+        PngWriter writer = null;
+        try {
+            reader2 = new PngReader(inputPath.toFile());
+            writer = new PngWriter(outputPath.toFile(),
+                    new ImageInfo(w, h, 8, true, false, false));
+
+            ImageLineInt outLine = new ImageLineInt(writer.imgInfo);
+            for (int y = 0; y < h; y++) {
+                int[] rgba = readRowRgba(reader2.readRow(), w);
+                int[] outScan = outLine.getScanline();
+                for (int x = 0; x < w; x++) {
+                    int idx = y * w + x;
+                    int off = x * 4;
+                    if (mask.get(idx)) {
+                        outScan[off] = rgba[off];
+                        outScan[off + 1] = rgba[off + 1];
+                        outScan[off + 2] = rgba[off + 2];
+                        outScan[off + 3] = rgba[off + 3];
+                    } else {
+                        outScan[off] = 0;
+                        outScan[off + 1] = 0;
+                        outScan[off + 2] = 0;
+                        outScan[off + 3] = 0;
+                    }
+                }
+                writer.writeRow(outLine, y);
+            }
+        } finally {
+            if (reader2 != null) reader2.end();
+            if (writer != null) writer.end();
+        }
+
         log.info("亮度提取完成: {} → {} ({}x{})", inputPath.getFileName(), outputPath.getFileName(), w, h);
     }
 
-    /**
-     * 对二值掩码做形态学膨胀。
-     *
-     * @param mask   输入掩码
-     * @param w      宽度
-     * @param h      高度
-     * @param ksize  核大小（奇数）
-     * @return 膨胀后的掩码
-     */
-    private static boolean[] dilate(boolean[] mask, int w, int h, int ksize) {
+    private static BitSet dilateBitSet(BitSet mask, int w, int h, int ksize) {
         int half = ksize / 2;
-        boolean[] result = new boolean[mask.length];
-        for (int y = 0; y < h; y++) {
-            for (int x = 0; x < w; x++) {
-                int pi = y * w + x;
-                if (mask[pi]) {
-                    // 将核范围内的所有像素置为 true
-                    int y0 = Math.max(0, y - half);
-                    int y1 = Math.min(h - 1, y + half);
-                    int x0 = Math.max(0, x - half);
-                    int x1 = Math.min(w - 1, x + half);
-                    for (int dy = y0; dy <= y1; dy++) {
-                        int rowOffset = dy * w;
-                        for (int dx = x0; dx <= x1; dx++) {
-                            result[rowOffset + dx] = true;
-                        }
-                    }
+        BitSet result = new BitSet(mask.size());
+        for (int idx = mask.nextSetBit(0); idx >= 0; idx = mask.nextSetBit(idx + 1)) {
+            int y = idx / w, x = idx % w;
+            int y0 = Math.max(0, y - half);
+            int y1 = Math.min(h - 1, y + half);
+            int x0 = Math.max(0, x - half);
+            int x1 = Math.min(w - 1, x + half);
+            for (int dy = y0; dy <= y1; dy++) {
+                int rowOffset = dy * w;
+                for (int dx = x0; dx <= x1; dx++) {
+                    result.set(rowOffset + dx);
                 }
             }
         }
         return result;
+    }
+
+    /**
+     * 将 PNGJ 行数据统一转为 RGBA int 数组，兼容 ImageLineByte / ImageLineInt。
+     */
+    private static int[] readRowRgba(ar.com.hjg.pngj.IImageLine line, int w) {
+        int[] rgba = new int[w * 4];
+        if (line instanceof ImageLineByte byteLine) {
+            byte[] src = byteLine.getScanlineByte();
+            for (int i = 0; i < w * 4; i++) {
+                rgba[i] = src[i] & 0xFF;
+            }
+        } else if (line instanceof ImageLineInt intLine) {
+            int[] src = intLine.getScanline();
+            System.arraycopy(src, 0, rgba, 0, w * 4);
+        } else {
+            // 未知行类型，全透明
+            java.util.Arrays.fill(rgba, 0);
+        }
+        return rgba;
     }
 }

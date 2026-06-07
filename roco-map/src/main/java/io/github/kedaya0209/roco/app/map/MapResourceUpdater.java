@@ -10,16 +10,14 @@ import net.jcip.annotations.NotThreadSafe;
 import io.github.kedaya0209.roco.app.map.core.MapDownloader;
 import io.github.kedaya0209.roco.app.map.core.ResourceConfigBuilder;
 import io.github.kedaya0209.roco.app.map.util.MapFileMover;
+import ar.com.hjg.pngj.ImageLineByte;
+import ar.com.hjg.pngj.PngReader;
 import lombok.extern.slf4j.Slf4j;
 
-import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.Comparator;
 import java.util.List;
-import java.util.stream.IntStream;
-import javax.imageio.ImageIO;
 
 /**
  * 地图资源更新触发器
@@ -82,11 +80,6 @@ public final class MapResourceUpdater {
      * 网络读取超时时间（毫秒）
      */
     public static int READ = DownloadConfig.DOWNLOAD_READ_TIMEOUT;
-
-    /**
-     * 最大重试次数
-     */
-    public static int MAX_RETRY = DownloadConfig.DOWNLOAD_MAX_RETRY;
 
     /**
      * 并发下载线程数
@@ -180,9 +173,7 @@ public final class MapResourceUpdater {
         // 策略：先按亮度提取阈值(50)模拟提取，透明比例最低的是大陆图（地面图亮区多），
         // 透明比例高的是洞穴图（暗色缝隙多）。
         // 优先使用已有的 IS_CAVE 配置（持久化），否则自动检测。
-        BufferedImage mainlandImage = null;
-        int mainlandIdx = -1;
-        String mainlandTag = null;
+        File mainlandMapFile = null;
         List<Integer> caveIndices = new java.util.ArrayList<>();
         boolean[] isCave = new boolean[tags.length];
 
@@ -194,19 +185,9 @@ public final class MapResourceUpdater {
                 File mapFile = FilePathUtil.getRelativeFile(DOWNLOAD_MAP_DIR, "map_" + tag + ".png");
                 if (!mapFile.exists()) continue;
 
-                if (!isCave[i] && mainlandImage == null) {
-                    BufferedImage img;
-                    try {
-                        img = ImageIO.read(mapFile);
-                    } catch (IOException e) {
-                        log.warn("无法读取地图文件: {}，跳过", mapFile, e);
-                        continue;
-                    }
-                    if (img == null) continue;
-                    mainlandImage = img;
-                    mainlandIdx = i;
-                    mainlandTag = tag;
-                    log.info("配置指定为大陆图: {} ({}x{})", mapFile.getName(), img.getWidth(), img.getHeight());
+                if (!isCave[i] && mainlandMapFile == null) {
+                    mainlandMapFile = mapFile;
+                    log.info("配置指定为大陆图: {}", mapFile.getName());
                 } else if (isCave[i]) {
                     caveIndices.add(i);
                 }
@@ -214,7 +195,7 @@ public final class MapResourceUpdater {
         }
 
         // 无已有配置或配置未找到大陆图 → 模拟亮度提取后按透明比例自动检测
-        if (mainlandImage == null) {
+        if (mainlandMapFile == null) {
             caveIndices.clear();
             isCave = new boolean[tags.length];
 
@@ -228,34 +209,24 @@ public final class MapResourceUpdater {
                         DOWNLOAD_MAP_DIR, "map_" + tags[i] + ".png");
                 if (!mapFile.exists()) continue;
 
-                BufferedImage img;
+                int w, h, total, darkCount;
+                PngReader reader = null;
                 try {
-                    img = ImageIO.read(mapFile);
-                } catch (IOException e) {
+                    reader = new PngReader(mapFile);
+                    w = reader.imgInfo.cols;
+                    h = reader.imgInfo.rows;
+                    int channels = reader.imgInfo.channels;
+                    total = w * h;
+                    darkCount = 0;
+
+                    for (int y = 0; y < h; y++) {
+                        darkCount += countDarkPixels(reader.readRow(), channels, w, 50);
+                    }
+                } catch (Exception e) {
                     log.warn("无法读取地图文件: {}，跳过", mapFile, e);
                     continue;
-                }
-                if (img == null) continue;
-
-                int w = img.getWidth();
-                int h = img.getHeight();
-                int total = w * h;
-                int[] argb = new int[total];
-                img.getRGB(0, 0, w, h, argb, 0, w);
-                img.flush();
-
-                int darkCount = 0;
-                for (int v : argb) {
-                    int a = (v >> 24) & 0xFF;
-                    if (a == 0) {
-                        darkCount++;
-                    } else {
-                        int r = (v >> 16) & 0xFF;
-                        int g = (v >> 8) & 0xFF;
-                        int b = v & 0xFF;
-                        int lum = (r * 299 + g * 587 + b * 114) / 1000;
-                        if (lum <= 50) darkCount++;
-                    }
+                } finally {
+                    if (reader != null) reader.end();
                 }
 
                 estimatedTransparent[i] = darkCount;
@@ -280,19 +251,12 @@ public final class MapResourceUpdater {
                 }
 
                 if (mainlandIdxLocal >= 0) {
-                    File mapFile = FilePathUtil.getRelativeFile(
+                    mainlandMapFile = FilePathUtil.getRelativeFile(
                             DOWNLOAD_MAP_DIR, "map_" + tags[mainlandIdxLocal] + ".png");
-                    try {
-                        mainlandImage = ImageIO.read(mapFile);
-                        mainlandIdx = mainlandIdxLocal;
-                        mainlandTag = tags[mainlandIdxLocal];
-                        isCave[mainlandIdxLocal] = false;
-                        log.info("自动检测大陆图: {} (透明比例 {}%)",
-                                mapFile.getName(),
-                                String.format("%.1f", minRatio * 100));
-                    } catch (IOException e) {
-                        log.warn("读取大陆图失败: {}", mapFile, e);
-                    }
+                    isCave[mainlandIdxLocal] = false;
+                    log.info("自动检测大陆图: {} (透明比例 {}%)",
+                            mainlandMapFile.getName(),
+                            String.format("%.1f", minRatio * 100));
 
                     for (int i = 0; i < tags.length; i++) {
                         if (i == mainlandIdxLocal || totalPixels[i] == 0) continue;
@@ -311,11 +275,10 @@ public final class MapResourceUpdater {
         // 写入 IS_CAVE 配置，供下游 MapPostProcessor 使用
         DownloadConfig.MAP_REMOTE_URL_IS_CAVE = isCave;
 
-        if (mainlandImage == null) {
+        if (mainlandMapFile == null) {
             log.warn("未找到大陆图（所有地图均含透明像素），跳过洞穴增强处理");
             return;
         }
-        log.info("大陆图: {}x{}", mainlandImage.getWidth(), mainlandImage.getHeight());
 
         if (caveIndices.isEmpty()) {
             log.info("没有洞穴图，跳过增强处理");
@@ -326,7 +289,8 @@ public final class MapResourceUpdater {
         DownloadProgressContext progress = DownloadProgressContext.getInstance();
         progress.reset("图片处理：生成SIFT图片");
 
-        // 处理洞穴图
+        // 处理洞穴图（传递大陆图路径，不加载 BufferedImage — 内部按需条带读取）
+        Path mainlandPath = mainlandMapFile.toPath();
         int processed = 0;
         for (int idx : caveIndices) {
             progress.addTask();
@@ -345,7 +309,7 @@ public final class MapResourceUpdater {
             try {
                 // 融合大陆特征（内部自动完成亮度提取、CLAHE、膨胀、填充）
                 log.info("融合大陆特征: {} ({})", displayName, caveFile.getName());
-                CaveImageFuser.fuse(cavePath, mainlandImage, 120, 0.3);
+                CaveImageFuser.fuse(cavePath, mainlandPath, 120, 0.3);
 
                 processed++;
             } catch (IOException e) {
@@ -370,5 +334,49 @@ public final class MapResourceUpdater {
         IconDownloader.downloadIcons();
         MapFileMover.moveAllResources();
         return true;
+    }
+
+    /**
+     * 统计一行像素中"暗色"像素数量（alpha=0 或 luminance ≤ threshold），
+     * 兼容 ImageLineByte / ImageLineInt。
+     */
+    private static int countDarkPixels(ar.com.hjg.pngj.IImageLine line, int channels, int w, int lumThreshold) {
+        int darkCount = 0;
+        int[] bufInt = null;
+        byte[] bufByte = null;
+
+        if (line instanceof ImageLineByte byteLine) {
+            bufByte = byteLine.getScanlineByte();
+        } else if (line instanceof ar.com.hjg.pngj.ImageLineInt intLine) {
+            bufInt = intLine.getScanline();
+        } else {
+            // 未知行类型，全部计为暗色
+            return w;
+        }
+
+        boolean useByte = (bufByte != null);
+        for (int x = 0; x < w; x++) {
+            int off = x * channels;
+            int a;
+            int r, g, b;
+            if (useByte) {
+                a = bufByte[off + 3] & 0xFF;
+                r = bufByte[off] & 0xFF;
+                g = bufByte[off + 1] & 0xFF;
+                b = bufByte[off + 2] & 0xFF;
+            } else {
+                a = bufInt[off + 3];
+                r = bufInt[off];
+                g = bufInt[off + 1];
+                b = bufInt[off + 2];
+            }
+            if (a == 0) {
+                darkCount++;
+            } else {
+                int lum = (r * 299 + g * 587 + b * 114) / 1000;
+                if (lum <= lumThreshold) darkCount++;
+            }
+        }
+        return darkCount;
     }
 }

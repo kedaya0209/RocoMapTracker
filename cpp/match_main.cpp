@@ -230,17 +230,29 @@ int main(int argc, char* argv[]) {
     }
 
     // INIT_COMPLETE — report total features from both matchers
+    size_t ow_feat = 0, cv_feat = 0;
     {
+        ow_feat = overworld->feature_count();
+        cv_feat = matcher_cave->feature_count();
+        size_t total_kp = ow_feat + cv_feat;
         uint8_t feat_buf[4];
-        size_t total_kp = overworld->feature_count() + matcher_cave->feature_count();
         write_be32(feat_buf, (uint32_t)total_kp);
         if (!send_message(sock, INIT_COMPLETE, feat_buf, 4)) {
             LOGERR("Failed to send INIT_COMPLETE");
             closesocket(sock); WSACleanup(); return 1;
         }
         LOG("INIT_COMPLETE: overworld=%zu cave=%zu total=%zu features",
-            overworld->feature_count(), matcher_cave->feature_count(), total_kp);
+            ow_feat, cv_feat, total_kp);
     }
+
+    // 释放训练内存（persistent_mat 等），FLANN 索引已持有内部拷贝
+    overworld->release_training_memory();
+    matcher_cave->release_training_memory();
+    LOG("Training memory released for both matchers (%zu ow + %zu cave features)",
+        ow_feat, cv_feat);
+
+    // Windows 堆压缩，将空闲内存归还给 OS
+    _heapmin();
 
     // Matching loop with dual matchers
     std::atomic<bool> g_running{true};

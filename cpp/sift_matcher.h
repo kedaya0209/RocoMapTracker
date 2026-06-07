@@ -97,6 +97,7 @@ public:
     size_t feature_count() const override;
     bool save_cache(const std::string& path) override;
     bool load_cache(const std::string& path) override;
+    void release_training_memory() override;
 
 private:
     bool train_direct(cv::Mat& map_gray);
@@ -109,8 +110,6 @@ private:
     /** 根据完整图坐标 y 值确定子图 ID */
     int resolve_map_id(float y) const;
 
-    /** 洞穴 CLAHE 增强器（匹配侧复用实例） */
-    cv::Ptr<cv::CLAHE> clahe;
 };
 
 #endif // SIFT_MATCHER_H

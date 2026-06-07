@@ -246,7 +246,7 @@ public class SiftMatchHandler {
             int subImageCount = MapImageLoader.getSubImageCount(info.height());
             int bodyLength = 16 + subImageCount * 4 + info.width() * info.height();
             session.sendStreaming(MSG_MAP_DATA, bodyLength, out -> {
-                MapImageLoader.writeStreamingMulti(info, subImageCount, out);
+                MapImageLoader.writeStreamingMulti(out);
             });
             log.info("地图数据已发送: {}x{} ({} 子图, {} 灰度像素)",
                     info.width(), info.height(), subImageCount, info.width() * info.height());
@@ -272,10 +272,14 @@ public class SiftMatchHandler {
             int subCount = subs.size();
             int bodyLength = 16 + subCount * 4 + w * totalH;
 
-            session.sendStreaming(MSG_MAP_DATA, bodyLength, out -> {
+            boolean sent = session.sendStreaming(MSG_MAP_DATA, bodyLength, out -> {
                 MapImageLoader.writeStreamingMultiFromMetadata(metadata, out);
             });
-            log.info("MultiMap 数据已发送: {}x{} ({} 子图)", w, totalH, subCount);
+            if (sent) {
+                log.info("MultiMap 数据已发送: {}x{} ({} 子图)", w, totalH, subCount);
+            } else {
+                log.error("MultiMap 数据发送失败，Socket 已关闭");
+            }
         } catch (Exception e) {
             log.error("加载 MultiMap 地图数据失败", e);
             byte[] errBody = ("MultiMap map load error: " + e.getMessage())

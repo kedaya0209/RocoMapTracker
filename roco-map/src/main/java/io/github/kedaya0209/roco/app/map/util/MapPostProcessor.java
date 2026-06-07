@@ -11,15 +11,17 @@ import io.github.kedaya0209.roco.app.utils.ResourceUtils;
 import lombok.extern.slf4j.Slf4j;
 import net.jcip.annotations.ThreadSafe;
 
-import javax.imageio.ImageIO;
-import java.awt.Color;
-import java.awt.Graphics2D;
-import java.awt.image.BufferedImage;
+import ar.com.hjg.pngj.ImageInfo;
+import ar.com.hjg.pngj.ImageLineByte;
+import ar.com.hjg.pngj.ImageLineInt;
+import ar.com.hjg.pngj.PngReader;
+import ar.com.hjg.pngj.PngWriter;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.IntStream;
@@ -100,6 +102,7 @@ public final class MapPostProcessor {
                 // ============================================================
                 // 洞穴图：使用 _亮度提取.png + 半透明黑底合成
                 // srcFile（map_{tag}.png）不动，保留为 CaveImageFuser 输出供 SIFT 使用
+                // 内存优化：直接原位修改 brightImg 像素，避免创建第二个 256MB 合成图
                 // ============================================================
                 File brightFile = FilePathUtil.getRelativeFile(
                         MapResourceUpdater.DOWNLOAD_MAP_DIR,
@@ -109,34 +112,51 @@ public final class MapPostProcessor {
                     progress.finishTask();
                     continue;
                 }
-                BufferedImage brightImg;
+                // 逐行读取亮度提取 PNG，与半透明黑底合成后写入 destPng
+                PngReader dimReader = null;
                 try {
-                    brightImg = ImageIO.read(brightFile);
-                } catch (IOException e) {
+                    dimReader = new PngReader(brightFile);
+                    w = dimReader.imgInfo.cols;
+                    h = dimReader.imgInfo.rows;
+                } catch (Exception e) {
                     log.warn("无法读取亮度提取文件: {}", brightFile, e);
                     progress.finishTask();
                     continue;
+                } finally {
+                    if (dimReader != null) dimReader.end();
                 }
-                if (brightImg == null) {
-                    log.warn("无法读取亮度提取文件: {}", brightFile);
-                    progress.finishTask();
-                    continue;
+
+                PngReader reader = null;
+                PngWriter writer = null;
+                try {
+                    reader = new PngReader(brightFile);
+                    writer = new PngWriter(destPng,
+                            new ImageInfo(w, h, 8, true, false, false));
+                    ImageLineInt outLine = new ImageLineInt(writer.imgInfo);
+                    for (int y = 0; y < h; y++) {
+                        int[] srcRgba = readRowRgba(reader.readRow(), w);
+                        int[] outScan = outLine.getScanline();
+                        for (int x = 0; x < w; x++) {
+                            int srcAlpha = srcRgba[x * 4 + 3];
+                            int r = srcRgba[x * 4];
+                            int g = srcRgba[x * 4 + 1];
+                            int b = srcRgba[x * 4 + 2];
+                            // bg=黑色(0,0,0) alpha=178, src over bg
+                            int resultAlpha = 178 + srcAlpha * (255 - 178) / 255;
+                            int outR = r * srcAlpha / Math.max(1, resultAlpha);
+                            int outG = g * srcAlpha / Math.max(1, resultAlpha);
+                            int outB = b * srcAlpha / Math.max(1, resultAlpha);
+                            outScan[x * 4] = Math.min(255, outR);
+                            outScan[x * 4 + 1] = Math.min(255, outG);
+                            outScan[x * 4 + 2] = Math.min(255, outB);
+                            outScan[x * 4 + 3] = Math.min(255, resultAlpha);
+                        }
+                        writer.writeRow(outLine, y);
+                    }
+                } finally {
+                    if (reader != null) reader.end();
+                    if (writer != null) writer.end();
                 }
-                w = brightImg.getWidth();
-                h = brightImg.getHeight();
-
-                // 半透明黑底 + 亮度提取结果覆盖
-                BufferedImage composited = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
-                Graphics2D g = composited.createGraphics();
-                g.setColor(new Color(0, 0, 0, 178));
-                g.fillRect(0, 0, w, h);
-                g.drawImage(brightImg, 0, 0, null);
-                g.dispose();
-                brightImg.flush();
-
-                // 写 destPng → 从 destPng 生成瓦片
-                ImageIO.write(composited, "png", destPng);
-                composited.flush();
                 try {
                     new LayerMapTileGenerator().generateTiles(destPng.getAbsolutePath(), tileDir.getAbsolutePath());
                 } catch (Exception e) {
@@ -149,22 +169,19 @@ public final class MapPostProcessor {
                 // ============================================================
                 // 大陆图：直接读取 srcFile，生成瓦片 + 拷贝 PNG
                 // ============================================================
-                BufferedImage img;
+                // 仅读取尺寸，无需解码像素数据
+                PngReader dimReader2 = null;
                 try {
-                    img = ImageIO.read(srcFile);
-                } catch (IOException e) {
+                    dimReader2 = new PngReader(srcFile);
+                    w = dimReader2.imgInfo.cols;
+                    h = dimReader2.imgInfo.rows;
+                } catch (Exception e) {
                     log.warn("无法读取地图文件: {}", srcFile, e);
                     progress.finishTask();
                     continue;
+                } finally {
+                    if (dimReader2 != null) dimReader2.end();
                 }
-                if (img == null) {
-                    log.warn("无法读取地图文件: {}", srcFile);
-                    progress.finishTask();
-                    continue;
-                }
-                w = img.getWidth();
-                h = img.getHeight();
-                img.flush();
 
                 // 生成瓦片
                 try {
@@ -178,7 +195,7 @@ public final class MapPostProcessor {
                 // 拷贝 PNG 到目标目录
                 try {
                     Files.copy(srcFile.toPath(), destPng.toPath(), StandardCopyOption.REPLACE_EXISTING);
-                } catch (IOException e) {
+                } catch (Exception e) {
                     log.warn("拷贝 PNG 失败: {}", srcFile, e);
                     progress.finishTask();
                     continue;
@@ -256,5 +273,19 @@ public final class MapPostProcessor {
 
     private record SubImageEntry(int index, String name, boolean isCave, int offsetY,
                                  int width, int height, String sourcePath, String tileDir) {
+    }
+
+    private static int[] readRowRgba(ar.com.hjg.pngj.IImageLine line, int w) {
+        int[] rgba = new int[w * 4];
+        if (line instanceof ImageLineByte byteLine) {
+            byte[] src = byteLine.getScanlineByte();
+            for (int i = 0; i < w * 4; i++) rgba[i] = src[i] & 0xFF;
+        } else if (line instanceof ImageLineInt intLine) {
+            int[] src = intLine.getScanline();
+            System.arraycopy(src, 0, rgba, 0, w * 4);
+        } else {
+            Arrays.fill(rgba, 0);
+        }
+        return rgba;
     }
 }

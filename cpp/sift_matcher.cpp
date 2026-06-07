@@ -286,19 +286,10 @@ MatchResult SiftMatcher::match(uint8_t* data, int w, int h) {
 
     cv::Mat scene_img(h, w, CV_8UC1, data);
 
-    // 洞穴匹配：CLAHE 增强暗区纹理
-    cv::Mat match_img = scene_img;
-    if (sub_image_group == 1) {
-        if (!clahe) clahe = cv::createCLAHE(3.0, cv::Size(8, 8));
-        cv::Mat enhanced;
-        clahe->apply(scene_img, enhanced);
-        match_img = enhanced;
-    }
-
     auto t0 = std::chrono::steady_clock::now();
     scene_kps.clear();
     cv::Mat scene_descriptors;
-    sift->detectAndCompute(match_img, cv::noArray(), scene_kps, scene_descriptors);
+    sift->detectAndCompute(scene_img, cv::noArray(), scene_kps, scene_descriptors);
     auto t1 = std::chrono::steady_clock::now();
     res.t_extract_ms = std::chrono::duration<float, std::milli>(t1 - t0).count();
 
@@ -406,9 +397,6 @@ int SiftMatcher::resolve_map_id(float y) const {
 
 void SiftMatcher::setSubImageGroup(int group) {
     sub_image_group = group;
-    // Matching 侧始终使用 AlgoParams 全局参数（ct=0.001, sigma=1.6），
-    // 训练侧 per-sub-image 覆盖只在 train_multimap 中生效。
-    // 不在此处覆盖 sift 参数，否则低 ct 导致过多弱特征（慢 + 抖动）。
 }
 
 size_t SiftMatcher::feature_count() const {
@@ -794,24 +782,21 @@ bool SiftMatcher::train_multimap(const uint8_t* gray_pixels, int w, int h) {
             sub_gray = sub_gray(crop);
         }
 
-        // 洞穴子图：CLAHE 增强对比度，提升暗区纹理可见度（is_cave 已从 subImageIsCave 标志确定）
-        if (is_cave) {
-            cv::Ptr<cv::CLAHE> clahe_train = cv::createCLAHE(3.0, cv::Size(8, 8));
-            cv::Mat enhanced;
-            clahe_train->apply(sub_gray, enhanced);
-            sub_gray = enhanced;
-        }
-
         // 大子图使用分块检测（同步 master 行为）
+        bool is_tiled = false;
         if ((int64_t)sub_gray.cols * sub_gray.rows >= params.largeMapThreshold) {
             detect_tiled(sub_sift, sub_gray, sub_gray.cols, sub_gray.rows,
                 params.tileSize, params.tileOverlap, params.dedupDistance,
                 sub_results[si].kps, sub_results[si].descs);
-            LOG("  sub[%d] -> %zu kp (tiled)", si, sub_results[si].kps.size());
+            is_tiled = true;
         } else {
             sub_sift->detectAndCompute(sub_gray, cv::noArray(),
                 sub_results[si].kps, sub_results[si].descs);
         }
+        LOG("  sub[%d] is_cave=%d crop=(%d,%d,%d,%d) -> %zu kp%s",
+            si, is_cave, crop.x, crop.y, crop.width, crop.height,
+            sub_results[si].kps.size(), is_tiled ? " (tiled)" : "");
+
         sub_results[si].map_id = si;
         total_kp += (int)sub_results[si].kps.size();
     }
@@ -910,6 +895,23 @@ bool SiftMatcher::load_from_cache() {
         LOG("  multi-map mode: %d sub-images", max_id + 1);
     }
     return true;
+}
+
+void SiftMatcher::release_training_memory() {
+    // persistent_mat 是训练后保留的 CV_8U 描述符矩阵。
+    // FLANN 索引已在 build_flann_index() 时拷贝了数据，
+    // persistent_mat 仅用于 save_cache()，缓存写完后即可释放。
+    transform->persistent_mat = cv::Mat();
+
+    // map_id_for_feature 仅用于 save_cache() 写缓存文件，匹配时不需要
+    map_id_for_feature.clear();
+    map_id_for_feature.shrink_to_fit();
+
+    // map_keypoints 不被匹配循环使用（匹配用 map_keypoint_pts），可释放以省内存
+    map_keypoints.clear();
+    map_keypoints.shrink_to_fit();
+
+    LOG("Training memory released");
 }
 
 

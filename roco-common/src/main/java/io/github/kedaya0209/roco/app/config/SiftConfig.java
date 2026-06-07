@@ -30,7 +30,7 @@ public final class SiftConfig {
     /**
      * SIFT 对比度阈值
      */
-    public static double SIFT_CONTRAST_THRESHOLD = 0.001;
+    public static double SIFT_CONTRAST_THRESHOLD = 0.0005;
     /**
      * SIFT 边缘阈值
      */
