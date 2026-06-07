@@ -143,7 +143,7 @@ bool DescriptorTransform::train(cv::Mat& raw_descriptors) {
     cv::Mat result = raw_descriptors;
 
     if (variant == PCA || variant == PCA_ULTRA) {
-        int pcadim = std::min(64, std::min(raw_descriptors.rows, 128));
+        int pcadim = std::min(pca_target_dim, std::min(raw_descriptors.rows, 128));
         cv::Mat mean;
         cv::Mat full_eigenvectors;
         cv::PCACompute(raw_descriptors, mean, full_eigenvectors, cv::PCA::DATA_AS_ROW);
@@ -241,19 +241,14 @@ cv::Mat DescriptorTransform::pca_project(cv::Mat& src) {
 // SiftMatcher
 // ============================================================================
 SiftMatcher::SiftMatcher(const AlgoParams& p)
-    : match_ratio_threshold((float)p.matchRatioThreshold)
-    , match_min_count(p.matchMinCount)
-    , ransac_reproj_threshold(p.ransacReprojThreshold)
-    , ransac_max_iters(p.ransacMaxIters)
-    , ransac_confidence(p.ransacConfidence)
-    , flann_search_checks(p.flannSearchChecks)
-    , params(p)
+    : params(p)
 {
     sift = cv::SIFT::create(
         p.nfeatures, p.nOctaveLayers,
         p.contrastThreshold, p.edgeThreshold, p.sigma, false);
     auto v = static_cast<SiftVariant>(p.siftVariant);
     transform = std::make_unique<DescriptorTransform>(v);
+    transform->pca_target_dim = p.ext.pcaTargetDim;
 }
 
 bool SiftMatcher::train(const uint8_t* gray_pixels, int w, int h) {
@@ -312,7 +307,7 @@ MatchResult SiftMatcher::match(uint8_t* data, int w, int h) {
     cv::Mat indices(query_desc.rows, 2, CV_32SC1);
     cv::Mat dists(query_desc.rows, 2, CV_32FC1);
     flann_index->knnSearch(query_desc, indices, dists, 2,
-        cv::flann::SearchParams(flann_search_checks, 0.0f, true));
+        cv::flann::SearchParams(params.flannSearchChecks, 0.0f, true));
 
     good_matches.clear();
     for (int qi = 0; qi < query_desc.rows; qi++) {
@@ -321,16 +316,16 @@ MatchResult SiftMatcher::match(uint8_t* data, int w, int h) {
         if (idx[1] >= 0) {
             float d0 = std::sqrt(d[0]);
             float d1 = std::sqrt(d[1]);
-            if (d0 < match_ratio_threshold * d1) {
+            if (d0 < params.matchRatioThreshold * d1) {
                 good_matches.push_back(cv::DMatch(qi, idx[0], d0));
             }
         }
     }
     auto t_knn = std::chrono::steady_clock::now();
 
-    if (good_matches.size() < (size_t)match_min_count) {
+    if (good_matches.size() < (size_t)params.matchMinCount) {
         LOG("match: FAIL good_matches %zu < min %d (g=%d, query_desc=%d)",
-            good_matches.size(), match_min_count, sub_image_group, query_desc.rows);
+            good_matches.size(), params.matchMinCount, sub_image_group, query_desc.rows);
         res.t_matching_ms = std::chrono::duration<float, std::milli>(t_knn - t1).count();
         return res;
     }
@@ -345,8 +340,8 @@ MatchResult SiftMatcher::match(uint8_t* data, int w, int h) {
         }
     }
 
-    if (src_pts.size() < (size_t)match_min_count) {
-        LOG("match: FAIL src_pts %zu < min %d (g=%d)", src_pts.size(), match_min_count, sub_image_group);
+    if (src_pts.size() < (size_t)params.matchMinCount) {
+        LOG("match: FAIL src_pts %zu < min %d (g=%d)", src_pts.size(), params.matchMinCount, sub_image_group);
         res.t_matching_ms = std::chrono::duration<float, std::milli>(
             std::chrono::steady_clock::now() - t1).count();
         return res;
@@ -355,9 +350,11 @@ MatchResult SiftMatcher::match(uint8_t* data, int w, int h) {
     cv::Mat inlier_mask;
     auto t_ransac0 = std::chrono::steady_clock::now();
     cv::Mat H = cv::findHomography(src_pts, dst_pts, cv::RANSAC,
-            ransac_reproj_threshold, inlier_mask, ransac_max_iters, ransac_confidence);
+            params.ransacReprojThreshold, inlier_mask, params.ransacMaxIters, params.ransacConfidence);
 
     if (!H.empty() && H.rows == 3) {
+        res.inliers = inlier_mask.empty() ? 0 : cv::countNonZero(inlier_mask);
+
         std::vector<cv::Point2f> src_center = { cv::Point2f((float)w / 2.0f, (float)h / 2.0f) };
         std::vector<cv::Point2f> dst_center;
         cv::perspectiveTransform(src_center, dst_center, H);
@@ -536,7 +533,7 @@ bool SiftMatcher::load_cache(const std::string& path) {
 }
 
 uint32_t SiftMatcher::compute_config_hash() const {
-    uint8_t buf[128];
+    uint8_t buf[256];
     size_t off = 0;
 
     auto w4 = [&](int32_t v) { memcpy(buf + off, &v, 4); off += 4; };
@@ -561,6 +558,11 @@ uint32_t SiftMatcher::compute_config_hash() const {
     w4(params.tileOverlap);
     w8((double)params.largeMapThreshold);
     wf(params.dedupDistance);
+
+    // Extended training fields that affect cached features
+    w4(params.ext.pcaTargetDim);
+    w4(params.ext.contentRectThreshold);
+    w4(params.ext.contentRectStride);
 
     return crc32(0, buf, (uInt)off);
 }
@@ -776,7 +778,9 @@ bool SiftMatcher::train_multimap(const uint8_t* gray_pixels, int w, int h) {
         cv::Mat sub_gray(sh, w, CV_8UC1, (void*)(gray_pixels + y_offsets[si] * w));
 
         // 自动裁剪空白边缘，只对有效内容区域做 SIFT 检测
-        cv::Rect crop = find_content_rect(sub_gray, 16, 4);
+        cv::Rect crop = find_content_rect(sub_gray,
+            (uint8_t)params.ext.contentRectThreshold,
+            params.ext.contentRectStride);
         if (crop.width > 0 && crop.height > 0 && crop.area() < (int64_t)w * sh) {
             crop_offsets[si] = cv::Point(crop.x, crop.y);
             sub_gray = sub_gray(crop);

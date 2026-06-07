@@ -8,7 +8,6 @@ import io.github.kedaya0209.roco.app.config.UiConfig;
 import io.github.kedaya0209.roco.app.config.CaptureConfig;
 import io.github.kedaya0209.roco.app.config.PlayerConfig;
 import io.github.kedaya0209.roco.app.config.StatsConfig;
-import io.github.kedaya0209.roco.app.config.MiniMapConfig;
 import io.github.kedaya0209.roco.app.config.ViewConfig;
 import io.github.kedaya0209.roco.app.config.DownloadConfig;
 import io.github.kedaya0209.roco.app.config.SiftConfig;
@@ -70,82 +69,82 @@ public final class SettingDefinitions {
 
     private static SettingDef bool(String key, String label,
                                    Supplier<Object> getter, Consumer<Object> setter) {
-        return new SettingDef(key, label, SettingType.BOOLEAN, null, null, false, getter, setter);
+        return new SettingDef(key, label, SettingType.BOOLEAN, null, null, false, getter, setter, null);
     }
 
     private static SettingDef bool(String key, String label, Runnable onApply,
                                    Supplier<Object> getter, Consumer<Object> setter) {
-        return new SettingDef(key, label, SettingType.BOOLEAN, null, onApply, false, getter, setter);
+        return new SettingDef(key, label, SettingType.BOOLEAN, null, onApply, false, getter, setter, null);
     }
 
     private static SettingDef bool(String key, String label, boolean restart,
                                    Supplier<Object> getter, Consumer<Object> setter) {
-        return new SettingDef(key, label, SettingType.BOOLEAN, null, null, restart, getter, setter);
+        return new SettingDef(key, label, SettingType.BOOLEAN, null, null, restart, getter, setter, null);
     }
 
     private static SettingDef integer(String key, String label,
                                       Supplier<Object> getter, Consumer<Object> setter) {
-        return new SettingDef(key, label, SettingType.INTEGER, null, null, false, getter, setter);
+        return new SettingDef(key, label, SettingType.INTEGER, null, null, false, getter, setter, null);
     }
 
     private static SettingDef integer(String key, String label, boolean restart,
                                       Supplier<Object> getter, Consumer<Object> setter) {
-        return new SettingDef(key, label, SettingType.INTEGER, null, null, restart, getter, setter);
+        return new SettingDef(key, label, SettingType.INTEGER, null, null, restart, getter, setter, null);
     }
 
     private static SettingDef integer(String key, String label, Runnable onApply,
                                       Supplier<Object> getter, Consumer<Object> setter) {
-        return new SettingDef(key, label, SettingType.INTEGER, null, onApply, false, getter, setter);
+        return new SettingDef(key, label, SettingType.INTEGER, null, onApply, false, getter, setter, null);
     }
 
     private static SettingDef long_(String key, String label,
                                     Supplier<Object> getter, Consumer<Object> setter) {
-        return new SettingDef(key, label, SettingType.LONG, null, null, false, getter, setter);
+        return new SettingDef(key, label, SettingType.LONG, null, null, false, getter, setter, null);
     }
 
     private static SettingDef long_(String key, String label, boolean restart,
                                     Supplier<Object> getter, Consumer<Object> setter) {
-        return new SettingDef(key, label, SettingType.LONG, null, null, restart, getter, setter);
+        return new SettingDef(key, label, SettingType.LONG, null, null, restart, getter, setter, null);
     }
 
     private static SettingDef long_(String key, String label, Runnable onApply,
                                     Supplier<Object> getter, Consumer<Object> setter) {
-        return new SettingDef(key, label, SettingType.LONG, null, onApply, false, getter, setter);
+        return new SettingDef(key, label, SettingType.LONG, null, onApply, false, getter, setter, null);
     }
 
     private static SettingDef doub(String key, String label,
                                    Supplier<Object> getter, Consumer<Object> setter) {
-        return new SettingDef(key, label, SettingType.DOUBLE, null, null, false, getter, setter);
+        return new SettingDef(key, label, SettingType.DOUBLE, null, null, false, getter, setter, null);
     }
 
     private static SettingDef doub(String key, String label, boolean restart,
                                    Supplier<Object> getter, Consumer<Object> setter) {
-        return new SettingDef(key, label, SettingType.DOUBLE, null, null, restart, getter, setter);
+        return new SettingDef(key, label, SettingType.DOUBLE, null, null, restart, getter, setter, null);
     }
 
     private static SettingDef doub(String key, String label, Runnable onApply,
                                    Supplier<Object> getter, Consumer<Object> setter) {
-        return new SettingDef(key, label, SettingType.DOUBLE, null, onApply, false, getter, setter);
+        return new SettingDef(key, label, SettingType.DOUBLE, null, onApply, false, getter, setter, null);
     }
 
     private static SettingDef str(String key, String label,
                                   Supplier<Object> getter, Consumer<Object> setter) {
-        return new SettingDef(key, label, SettingType.STRING, null, null, false, getter, setter);
+        return new SettingDef(key, label, SettingType.STRING, null, null, false, getter, setter, null);
     }
 
     private static SettingDef str(String key, String label, boolean restart,
                                   Supplier<Object> getter, Consumer<Object> setter) {
-        return new SettingDef(key, label, SettingType.STRING, null, null, restart, getter, setter);
+        return new SettingDef(key, label, SettingType.STRING, null, null, restart, getter, setter, null);
     }
 
     private static SettingDef str(String key, String label, Runnable onApply,
                                   Supplier<Object> getter, Consumer<Object> setter) {
-        return new SettingDef(key, label, SettingType.STRING, null, onApply, false, getter, setter);
+        return new SettingDef(key, label, SettingType.STRING, null, onApply, false, getter, setter, null);
     }
 
     private static SettingDef combo(String key, String label, Supplier<String[]> options, Runnable onApply,
                                     Supplier<Object> getter, Consumer<Object> setter) {
-        return new SettingDef(key, label, SettingType.COMBO, options, onApply, false, getter, setter);
+        return new SettingDef(key, label, SettingType.COMBO, options, onApply, false, getter, setter, null);
     }
 
     // ================================================================
@@ -250,7 +249,7 @@ public final class SettingDefinitions {
                 cat("路线管理", "/icon/route.svg",
                         new SettingDef("OPEN_ROUTE_MANAGER", "打开路线管理面板", SettingType.BUTTON,
                                 null, () -> RouteManagerStage.getInstance().show(),
-                                false, null, null),
+                                false, null, null, null),
                         doub("NODE_CLICK_THRESHOLD", "节点点击半径",
                                 () -> ViewConfig.NODE_CLICK_THRESHOLD,
                                 v -> ViewConfig.NODE_CLICK_THRESHOLD = (Double) v),
@@ -384,50 +383,65 @@ public final class SettingDefinitions {
                                     }
                                 },
                                 () -> SiftConfig.MAP_MATCHAER,
-                                v -> SiftConfig.MAP_MATCHAER = (String) v),
+                                v -> SiftConfig.MAP_MATCHAER = (String) v)
+                                .withSubcategory("SIFT 参数"),
                         bool("SIFT_MATCHING_ENABLED", "启用SIFT匹配",
                                 () -> {},
                                 () -> AppState.getInstance().isMatchingEnabled(),
-                                v -> AppState.getInstance().setMatchingEnabled((Boolean) v)),
+                                v -> AppState.getInstance().setMatchingEnabled((Boolean) v))
+                                .withSubcategory("SIFT 参数"),
                         integer("SIFT_N_FEATURES", "SIFT最大特征数", true,
                                 () -> SiftConfig.SIFT_N_FEATURES,
-                                v -> SiftConfig.SIFT_N_FEATURES = (Integer) v),
+                                v -> SiftConfig.SIFT_N_FEATURES = (Integer) v)
+                                .withSubcategory("SIFT 参数"),
                         integer("SIFT_N_OCTAVE_LAYERS", "SIFT每层组数", true,
                                 () -> SiftConfig.SIFT_N_OCTAVE_LAYERS,
-                                v -> SiftConfig.SIFT_N_OCTAVE_LAYERS = (Integer) v),
+                                v -> SiftConfig.SIFT_N_OCTAVE_LAYERS = (Integer) v)
+                                .withSubcategory("SIFT 参数"),
                         doub("SIFT_CONTRAST_THRESHOLD", "SIFT对比度阈值", true,
                                 () -> SiftConfig.SIFT_CONTRAST_THRESHOLD,
-                                v -> SiftConfig.SIFT_CONTRAST_THRESHOLD = (Double) v),
+                                v -> SiftConfig.SIFT_CONTRAST_THRESHOLD = (Double) v)
+                                .withSubcategory("SIFT 参数"),
                         doub("SIFT_EDGE_THRESHOLD", "SIFT边缘阈值", true,
                                 () -> SiftConfig.SIFT_EDGE_THRESHOLD,
-                                v -> SiftConfig.SIFT_EDGE_THRESHOLD = (Double) v),
+                                v -> SiftConfig.SIFT_EDGE_THRESHOLD = (Double) v)
+                                .withSubcategory("SIFT 参数"),
                         doub("SIFT_SIGMA", "SIFT sigma", true,
                                 () -> SiftConfig.SIFT_SIGMA,
-                                v -> SiftConfig.SIFT_SIGMA = (Double) v),
+                                v -> SiftConfig.SIFT_SIGMA = (Double) v)
+                                .withSubcategory("SIFT 参数"),
                         integer("FLANN_KD_TREES", "FLANN KD树数", true,
                                 () -> SiftConfig.FLANN_KD_TREES,
-                                v -> SiftConfig.FLANN_KD_TREES = (Integer) v),
+                                v -> SiftConfig.FLANN_KD_TREES = (Integer) v)
+                                .withSubcategory("SIFT 参数"),
                         integer("FLANN_SEARCH_CHECKS", "FLANN搜索检查数", true,
                                 () -> SiftConfig.FLANN_SEARCH_CHECKS,
-                                v -> SiftConfig.FLANN_SEARCH_CHECKS = (Integer) v),
+                                v -> SiftConfig.FLANN_SEARCH_CHECKS = (Integer) v)
+                                .withSubcategory("SIFT 参数"),
                         doub("MATCH_RATIO_THRESHOLD", "比率测试阈值", true,
                                 () -> SiftConfig.MATCH_RATIO_THRESHOLD,
-                                v -> SiftConfig.MATCH_RATIO_THRESHOLD = ((Number) v).floatValue()),
+                                v -> SiftConfig.MATCH_RATIO_THRESHOLD = ((Number) v).floatValue())
+                                .withSubcategory("SIFT 参数"),
                         integer("MATCH_MIN_COUNT", "最小匹配点数", true,
                                 () -> SiftConfig.MATCH_MIN_COUNT,
-                                v -> SiftConfig.MATCH_MIN_COUNT = (Integer) v),
+                                v -> SiftConfig.MATCH_MIN_COUNT = (Integer) v)
+                                .withSubcategory("SIFT 参数"),
                         integer("SEARCH_RADIUS", "搜索半径(px)",
                                 () -> SiftConfig.SEARCH_RADIUS,
-                                v -> SiftConfig.SEARCH_RADIUS = (Integer) v),
+                                v -> SiftConfig.SEARCH_RADIUS = (Integer) v)
+                                .withSubcategory("SIFT 参数"),
                         doub("RANSAC_REPROJ_THRESHOLD", "RANSAC误差阈值", true,
                                 () -> SiftConfig.RANSAC_REPROJ_THRESHOLD,
-                                v -> SiftConfig.RANSAC_REPROJ_THRESHOLD = (Double) v),
+                                v -> SiftConfig.RANSAC_REPROJ_THRESHOLD = (Double) v)
+                                .withSubcategory("SIFT 参数"),
                         integer("RANSAC_MAX_ITERS", "RANSAC迭代次数", true,
                                 () -> SiftConfig.RANSAC_MAX_ITERS,
-                                v -> SiftConfig.RANSAC_MAX_ITERS = (Integer) v),
+                                v -> SiftConfig.RANSAC_MAX_ITERS = (Integer) v)
+                                .withSubcategory("SIFT 参数"),
                         doub("RANSAC_CONFIDENCE", "RANSAC置信度", true,
                                 () -> SiftConfig.RANSAC_CONFIDENCE,
-                                v -> SiftConfig.RANSAC_CONFIDENCE = (Double) v),
+                                v -> SiftConfig.RANSAC_CONFIDENCE = (Double) v)
+                                .withSubcategory("SIFT 参数"),
                         integer("ROI_MAP_X", "小地图ROI X(万分比)", true,
                                 () -> SiftConfig.ROI_MAP_X,
                                 v -> SiftConfig.ROI_MAP_X = (Integer) v),
@@ -439,39 +453,157 @@ public final class SettingDefinitions {
                                 v -> SiftConfig.ROI_MAP_W = (Integer) v),
                         integer("ROI_MAP_H", "小地图ROI高度(万分比)", true,
                                 () -> SiftConfig.ROI_MAP_H,
-                                v -> SiftConfig.ROI_MAP_H = (Integer) v)
-                ),
-                cat("小地图", "/icon/minimap.svg",
-                        integer("MM_SMALL_WIDTH", "缩小检测宽度(px)",
-                                () -> MiniMapConfig.MM_SMALL_WIDTH,
-                                v -> MiniMapConfig.MM_SMALL_WIDTH = (Integer) v),
-                        doub("MM_BLACK_RATIO_THRESHOLD", "黑边比例阈值",
-                                () -> MiniMapConfig.MM_BLACK_RATIO_THRESHOLD,
-                                v -> MiniMapConfig.MM_BLACK_RATIO_THRESHOLD = (Double) v),
-                        doub("MM_CENTER_OFFSET_RATIO", "圆心偏移阈值",
-                                () -> MiniMapConfig.MM_CENTER_OFFSET_RATIO,
-                                v -> MiniMapConfig.MM_CENTER_OFFSET_RATIO = (Double) v),
-                        integer("MM_MEDIAN_BLUR_KERNEL", "中值滤波核",
-                                () -> MiniMapConfig.MM_MEDIAN_BLUR_KERNEL,
-                                v -> MiniMapConfig.MM_MEDIAN_BLUR_KERNEL = (Integer) v),
-                        doub("MM_HOUGH_DP", "Hough dp",
-                                () -> MiniMapConfig.MM_HOUGH_DP,
-                                v -> MiniMapConfig.MM_HOUGH_DP = (Double) v),
-                        doub("MM_HOUGH_PARAM1", "Hough param1",
-                                () -> MiniMapConfig.MM_HOUGH_PARAM1,
-                                v -> MiniMapConfig.MM_HOUGH_PARAM1 = (Double) v),
-                        doub("MM_HOUGH_PARAM2", "Hough param2",
-                                () -> MiniMapConfig.MM_HOUGH_PARAM2,
-                                v -> MiniMapConfig.MM_HOUGH_PARAM2 = (Double) v),
-                        integer("MM_BLACK_PIXEL_THRESHOLD", "黑边灰度阈值",
-                                () -> MiniMapConfig.MM_BLACK_PIXEL_THRESHOLD,
-                                v -> MiniMapConfig.MM_BLACK_PIXEL_THRESHOLD = (Integer) v),
-                        integer("MM_EDGE_SAMPLE_COUNT", "边缘采样点数",
-                                () -> MiniMapConfig.MM_EDGE_SAMPLE_COUNT,
-                                v -> MiniMapConfig.MM_EDGE_SAMPLE_COUNT = (Integer) v),
-                        doub("MM_EDGE_SAMPLE_STEP", "边缘采样步长(°)",
-                                () -> MiniMapConfig.MM_EDGE_SAMPLE_STEP,
-                                v -> MiniMapConfig.MM_EDGE_SAMPLE_STEP = (Double) v)
+                                v -> SiftConfig.ROI_MAP_H = (Integer) v),
+
+                        // === 亮度路由 ===
+                        doub("ROUTING_CAVE_TO_OW", "洞穴→大陆切换阈值", true,
+                                () -> (double) SiftConfig.ROUTING_CAVE_TO_OW,
+                                v -> SiftConfig.ROUTING_CAVE_TO_OW = ((Number) v).floatValue())
+                                .withSubcategory("亮度路由"),
+                        doub("ROUTING_OW_TO_CAVE", "大陆→洞穴切换阈值", true,
+                                () -> (double) SiftConfig.ROUTING_OW_TO_CAVE,
+                                v -> SiftConfig.ROUTING_OW_TO_CAVE = ((Number) v).floatValue())
+                                .withSubcategory("亮度路由"),
+                        integer("DARK_SIGMOID_MIDPOINT", "Sigmoid LUT 中点", true,
+                                () -> SiftConfig.DARK_SIGMOID_MIDPOINT,
+                                v -> SiftConfig.DARK_SIGMOID_MIDPOINT = (Integer) v)
+                                .withSubcategory("亮度路由"),
+                        doub("DARK_SIGMOID_STEEPNESS", "Sigmoid LUT 陡峭度", true,
+                                () -> (double) SiftConfig.DARK_SIGMOID_STEEPNESS,
+                                v -> SiftConfig.DARK_SIGMOID_STEEPNESS = ((Number) v).floatValue())
+                                .withSubcategory("亮度路由"),
+                        integer("DARK_STRIDE", "暗像素采样步长", true,
+                                () -> SiftConfig.DARK_STRIDE,
+                                v -> SiftConfig.DARK_STRIDE = (Integer) v)
+                                .withSubcategory("亮度路由"),
+                        integer("DARK_SIGMOID_THRESHOLD", "Sigmoid 暗阈值", true,
+                                () -> SiftConfig.DARK_SIGMOID_THRESHOLD,
+                                v -> SiftConfig.DARK_SIGMOID_THRESHOLD = (Integer) v)
+                                .withSubcategory("亮度路由"),
+                        integer("DARK_TRIM_LOW", "灰度下限裁剪", true,
+                                () -> SiftConfig.DARK_TRIM_LOW,
+                                v -> SiftConfig.DARK_TRIM_LOW = (Integer) v)
+                                .withSubcategory("亮度路由"),
+                        integer("DARK_TRIM_HIGH", "灰度上限裁剪", true,
+                                () -> SiftConfig.DARK_TRIM_HIGH,
+                                v -> SiftConfig.DARK_TRIM_HIGH = (Integer) v)
+                                .withSubcategory("亮度路由"),
+                        doub("DARK_RATIO_THRESHOLD", "暗像素比例阈值", true,
+                                () -> (double) SiftConfig.DARK_RATIO_THRESHOLD,
+                                v -> SiftConfig.DARK_RATIO_THRESHOLD = ((Number) v).floatValue())
+                                .withSubcategory("亮度路由"),
+
+                        // === MiniMap 检测 ===
+                        integer("MM_SMALL_WIDTH", "缩小检测宽度(px)", true,
+                                () -> SiftConfig.MM_SMALL_WIDTH,
+                                v -> SiftConfig.MM_SMALL_WIDTH = (Integer) v)
+                                .withSubcategory("MiniMap 检测"),
+                        doub("MM_BLACK_RATIO_THRESHOLD", "黑边比例阈值", true,
+                                () -> (double) SiftConfig.MM_BLACK_RATIO_THRESHOLD,
+                                v -> SiftConfig.MM_BLACK_RATIO_THRESHOLD = ((Number) v).floatValue())
+                                .withSubcategory("MiniMap 检测"),
+                        doub("MM_CENTER_OFFSET_RATIO", "圆心偏移阈值", true,
+                                () -> (double) SiftConfig.MM_CENTER_OFFSET_RATIO,
+                                v -> SiftConfig.MM_CENTER_OFFSET_RATIO = ((Number) v).floatValue())
+                                .withSubcategory("MiniMap 检测"),
+                        doub("MM_HOUGH_DP", "Hough dp", true,
+                                () -> (double) SiftConfig.MM_HOUGH_DP,
+                                v -> SiftConfig.MM_HOUGH_DP = ((Number) v).floatValue())
+                                .withSubcategory("MiniMap 检测"),
+                        integer("MM_HOUGH_PARAM1", "Hough param1", true,
+                                () -> SiftConfig.MM_HOUGH_PARAM1,
+                                v -> SiftConfig.MM_HOUGH_PARAM1 = (Integer) v)
+                                .withSubcategory("MiniMap 检测"),
+                        integer("MM_HOUGH_PARAM2", "Hough param2", true,
+                                () -> SiftConfig.MM_HOUGH_PARAM2,
+                                v -> SiftConfig.MM_HOUGH_PARAM2 = (Integer) v)
+                                .withSubcategory("MiniMap 检测"),
+                        doub("MM_HOUGH_MIN_RADIUS_RATIO", "最小半径比例", true,
+                                () -> (double) SiftConfig.MM_HOUGH_MIN_RADIUS_RATIO,
+                                v -> SiftConfig.MM_HOUGH_MIN_RADIUS_RATIO = ((Number) v).floatValue())
+                                .withSubcategory("MiniMap 检测"),
+                        doub("MM_HOUGH_MAX_RADIUS_RATIO", "最大半径比例", true,
+                                () -> (double) SiftConfig.MM_HOUGH_MAX_RADIUS_RATIO,
+                                v -> SiftConfig.MM_HOUGH_MAX_RADIUS_RATIO = ((Number) v).floatValue())
+                                .withSubcategory("MiniMap 检测"),
+                        integer("MM_CIRCLE_SAMPLE_COUNT", "边界采样点数", true,
+                                () -> SiftConfig.MM_CIRCLE_SAMPLE_COUNT,
+                                v -> SiftConfig.MM_CIRCLE_SAMPLE_COUNT = (Integer) v)
+                                .withSubcategory("MiniMap 检测"),
+                        doub("MM_CIRCLE_STEP_DEG", "边界采样步长(°)", true,
+                                () -> (double) SiftConfig.MM_CIRCLE_STEP_DEG,
+                                v -> SiftConfig.MM_CIRCLE_STEP_DEG = ((Number) v).floatValue())
+                                .withSubcategory("MiniMap 检测"),
+                        integer("MM_CIRCLE_BLACK_THRESHOLD", "边界黑色阈值", true,
+                                () -> SiftConfig.MM_CIRCLE_BLACK_THRESHOLD,
+                                v -> SiftConfig.MM_CIRCLE_BLACK_THRESHOLD = (Integer) v)
+                                .withSubcategory("MiniMap 检测"),
+
+                        // === 箭头检测 ===
+                        integer("ARROW_HUE_LOW", "色相下限", true,
+                                () -> SiftConfig.ARROW_HUE_LOW,
+                                v -> SiftConfig.ARROW_HUE_LOW = (Integer) v)
+                                .withSubcategory("箭头检测"),
+                        integer("ARROW_HUE_HIGH", "色相上限", true,
+                                () -> SiftConfig.ARROW_HUE_HIGH,
+                                v -> SiftConfig.ARROW_HUE_HIGH = (Integer) v)
+                                .withSubcategory("箭头检测"),
+                        integer("ARROW_SAT_LOW", "饱和度下限", true,
+                                () -> SiftConfig.ARROW_SAT_LOW,
+                                v -> SiftConfig.ARROW_SAT_LOW = (Integer) v)
+                                .withSubcategory("箭头检测"),
+                        integer("ARROW_SAT_HIGH", "饱和度上限", true,
+                                () -> SiftConfig.ARROW_SAT_HIGH,
+                                v -> SiftConfig.ARROW_SAT_HIGH = (Integer) v)
+                                .withSubcategory("箭头检测"),
+                        integer("ARROW_VAL_LOW", "明度下限", true,
+                                () -> SiftConfig.ARROW_VAL_LOW,
+                                v -> SiftConfig.ARROW_VAL_LOW = (Integer) v)
+                                .withSubcategory("箭头检测"),
+                        integer("ARROW_VAL_HIGH", "明度上限", true,
+                                () -> SiftConfig.ARROW_VAL_HIGH,
+                                v -> SiftConfig.ARROW_VAL_HIGH = (Integer) v)
+                                .withSubcategory("箭头检测"),
+                        integer("ARROW_MIN_CONTOUR_AREA", "最小轮廓面积", true,
+                                () -> SiftConfig.ARROW_MIN_CONTOUR_AREA,
+                                v -> SiftConfig.ARROW_MIN_CONTOUR_AREA = (Integer) v)
+                                .withSubcategory("箭头检测"),
+                        integer("ARROW_MIN_RADIUS", "最小检测半径", true,
+                                () -> SiftConfig.ARROW_MIN_RADIUS,
+                                v -> SiftConfig.ARROW_MIN_RADIUS = (Integer) v)
+                                .withSubcategory("箭头检测"),
+                        integer("ARROW_CROP_SIZE", "裁剪尺寸", true,
+                                () -> SiftConfig.ARROW_CROP_SIZE,
+                                v -> SiftConfig.ARROW_CROP_SIZE = (Integer) v)
+                                .withSubcategory("箭头检测"),
+
+                        // === ROI 裁剪 ===
+                        doub("CROP_MARGIN", "裁剪半径倍数", true,
+                                () -> (double) SiftConfig.CROP_MARGIN,
+                                v -> SiftConfig.CROP_MARGIN = ((Number) v).floatValue())
+                                .withSubcategory("ROI 裁剪"),
+                        integer("CROP_MIN_DIM", "裁剪最小尺寸", true,
+                                () -> SiftConfig.CROP_MIN_DIM,
+                                v -> SiftConfig.CROP_MIN_DIM = (Integer) v)
+                                .withSubcategory("ROI 裁剪"),
+                        doub("CROP_MAX_AREA_RATIO", "裁剪最大面积比", true,
+                                () -> (double) SiftConfig.CROP_MAX_AREA_RATIO,
+                                v -> SiftConfig.CROP_MAX_AREA_RATIO = ((Number) v).floatValue())
+                                .withSubcategory("ROI 裁剪"),
+
+                        // === 训练/特征 ===
+                        integer("PCA_TARGET_DIM", "PCA 目标维度", true,
+                                () -> SiftConfig.PCA_TARGET_DIM,
+                                v -> SiftConfig.PCA_TARGET_DIM = (Integer) v)
+                                .withSubcategory("训练/特征"),
+                        integer("CONTENT_RECT_THRESHOLD", "内容裁剪亮度阈值", true,
+                                () -> SiftConfig.CONTENT_RECT_THRESHOLD,
+                                v -> SiftConfig.CONTENT_RECT_THRESHOLD = (Integer) v)
+                                .withSubcategory("训练/特征"),
+                        integer("CONTENT_RECT_STRIDE", "内容裁剪采样步长", true,
+                                () -> SiftConfig.CONTENT_RECT_STRIDE,
+                                v -> SiftConfig.CONTENT_RECT_STRIDE = (Integer) v)
+                                .withSubcategory("训练/特征")
                 ),
                 cat("统计面板", "/icon/statistics.svg",
                         bool("SHOW_STATS_MATCH_TIME", "显示匹配耗时（算法匹配总耗时）",
@@ -576,19 +708,19 @@ public final class SettingDefinitions {
                                 v -> UpdateConfig.PROXY_URL = (String) v),
                         new SettingDef("CHECK_NOW", "检查更新", SettingType.BUTTON,
                                 null, () -> UpdateManager.getInstance().manualCheck(null),
-                                false, null, null)
+                                false, null, null, null)
                 ),
                 cat("插件管理", "/icon/plugins.svg"),
                 cat("关于", "/icon/about.svg",
                         new SettingDef("ABOUT_VERSION", "当前版本", SettingType.STRING,
                                 null, null, false,
-                                () -> BuildConfig.APP_VERSION, null),
+                                () -> BuildConfig.APP_VERSION, null, null),
                         new SettingDef("ABOUT_BUILD_TIME", "构建时间", SettingType.STRING,
                                 null, null, false,
-                                () -> BuildConfig.BUILD_TIMESTAMP, null),
+                                () -> BuildConfig.BUILD_TIMESTAMP, null, null),
                         new SettingDef("ABOUT_REPO", "GitHub仓库", SettingType.STRING,
                                 null, null, false,
-                                () -> "https://github.com/kedaya0209/RocoMapTracker", null)
+                                () -> "https://github.com/kedaya0209/RocoMapTracker", null, null)
                 )
         );
     }

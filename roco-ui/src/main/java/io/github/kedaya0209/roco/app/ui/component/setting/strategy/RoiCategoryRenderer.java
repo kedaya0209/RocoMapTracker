@@ -11,12 +11,13 @@ import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Spinner;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.stage.Stage;
 
-/** 「匹配」/「OCR」分类：ROI 截帧预览 + 坐标参数 + 下方字段列表。 */
+/** 「匹配」/「OCR」分类：ROI 截帧预览 + 坐标参数，嵌入滚动面板内作为子分类。 */
 public class RoiCategoryRenderer implements CategoryRenderer {
 
     private RoiPreview roiPreview;
@@ -39,17 +40,27 @@ public class RoiCategoryRenderer implements CategoryRenderer {
             captureService.setFullFrameMode(true);
         }
 
-        // 右侧 ROI 坐标参数面板
+        // ====== 将 ROI 预览 + 坐标参数嵌入滚动面板顶部作为子分类 ======
+
+        VBox content = (VBox) fieldScrollPane.getContent();
+
+        // 子分类标题
+        Label sectionTitle = new Label("ROI 区域");
+        sectionTitle.setStyle("-fx-text-fill: -color-fg-default; -fx-font-weight: bold; -fx-font-size: 14px; -fx-padding: 8 0 4 0;");
+
+        // ROI 坐标参数面板（右侧）
         VBox roiParamPanel = buildRoiParamPanel(category, prefix, fieldBuilder, configManager);
 
+        // ROI 预览 + 坐标左右两栏
         HBox topRow = new HBox(12);
         HBox.setHgrow(roiPreview.getNode(), Priority.ALWAYS);
         topRow.getChildren().addAll(roiPreview.getNode(), roiParamPanel);
 
-        VBox container = new VBox();
-        container.getChildren().addAll(topRow, fieldScrollPane);
-        VBox.setVgrow(fieldScrollPane, Priority.ALWAYS);
-        return container;
+        VBox roiSection = new VBox(6);
+        roiSection.getChildren().addAll(sectionTitle, topRow);
+
+        content.getChildren().addFirst(roiSection);
+        return fieldScrollPane;
     }
 
     private static VBox buildRoiParamPanel(SettingCategory category, String prefix,
@@ -68,8 +79,6 @@ public class RoiCategoryRenderer implements CategoryRenderer {
 
         for (SettingDef def : category.fields()) {
             if (!def.key().startsWith(prefix)) continue;
-            Label l = new Label(def.label());
-            l.setStyle("-fx-text-fill: -color-fg-default; -fx-font-size: 12px;");
             Node ctrl = fieldBuilder.buildControl(def);
             if (ctrl instanceof Control c) {
                 configManager.registerControl(def.key(), c);
@@ -88,7 +97,11 @@ public class RoiCategoryRenderer implements CategoryRenderer {
             }
             HBox row = new HBox(8);
             row.setAlignment(Pos.CENTER_LEFT);
-            row.getChildren().addAll(l, ctrl);
+            Label l = new Label(def.label());
+            l.setStyle("-fx-text-fill: -color-fg-default; -fx-font-size: 12px;");
+            Region spacer = new Region();
+            HBox.setHgrow(spacer, Priority.ALWAYS);
+            row.getChildren().addAll(l, spacer, ctrl);
             panel.getChildren().add(row);
         }
         return panel;

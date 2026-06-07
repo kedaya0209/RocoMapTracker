@@ -33,6 +33,7 @@ import net.jcip.annotations.NotThreadSafe;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -422,41 +423,55 @@ public class SettingsStage extends Stage {
                 ? category.fields().stream().filter(d -> !d.key().startsWith(roiPrefix)).toList()
                 : category.fields();
 
-        if ("匹配".equals(category.name()) && fields.size() > 6) {
-            // 两栏布局：匹配分类配置项较多，使用 GridPane 两列排列
-            GridPane grid = new GridPane();
-            grid.setHgap(20);
-            grid.setVgap(6);
-            grid.setPadding(new Insets(5, 10, 10, 10));
-            ColumnConstraints cc = new ColumnConstraints();
-            cc.setPercentWidth(50);
-            grid.getColumnConstraints().addAll(cc, cc);
-
-            for (int i = 0; i < fields.size(); i++) {
-                SettingDef def = fields.get(i);
-                int col = i % 2;
-                int row = i / 2;
-                HBox container = buildFieldRow(def, fieldBuilder);
-                grid.add(container, col, row);
-            }
-            scroll.setContent(grid);
-        } else {
-            VBox content = new VBox(6);
-            content.setPadding(new Insets(5, 10, 10, 10));
-
-            for (int i = 0; i < fields.size(); i++) {
-                SettingDef def = fields.get(i);
-                content.getChildren().add(buildFieldRow(def, fieldBuilder));
-
-                if (i < fields.size() - 1) {
-                    Region sep = new Region();
-                    sep.setStyle("-fx-border-color: -color-border-muted; -fx-border-width: 0 0 0.5 0;");
-                    sep.setPrefHeight(1);
-                    content.getChildren().add(sep);
-                }
-            }
-            scroll.setContent(content);
+        // 按子分类分组：subcategory → List<SettingDef>，空子分类的字段放在 "general" 组
+        Map<String, List<SettingDef>> groups = new LinkedHashMap<>();
+        groups.put("", new ArrayList<>()); // 无子分类的字段
+        for (SettingDef def : fields) {
+            String sub = def.subcategory();
+            String groupKey = (sub == null || sub.isEmpty()) ? "" : sub;
+            groups.computeIfAbsent(groupKey, _ -> new ArrayList<>()).add(def);
         }
+
+        VBox outerContent = new VBox(10);
+        outerContent.setPadding(new Insets(5, 10, 10, 10));
+
+        for (var entry : groups.entrySet()) {
+            String sub = entry.getKey();
+            List<SettingDef> groupFields = entry.getValue();
+            if (groupFields.isEmpty()) continue;
+
+            // 如果只有一个子分类（或无子分类），用原有布局方式，不显示分组标题
+            boolean singleGroup = groups.size() == 1;
+
+            if (!singleGroup && !sub.isEmpty()) {
+                // 子分类标题
+                Label sectionTitle = new Label(sub);
+                sectionTitle.setStyle("-fx-text-fill: -color-fg-default; -fx-font-weight: bold; -fx-font-size: 14px; -fx-padding: 8 0 4 0;");
+                outerContent.getChildren().add(sectionTitle);
+            }
+
+            if (!singleGroup && sub.isEmpty()) {
+                // 未归类的字段放在首位但不显示标题
+            }
+
+            { // 统一单栏布局
+                VBox content = new VBox(6);
+                for (int i = 0; i < groupFields.size(); i++) {
+                    SettingDef def = groupFields.get(i);
+                    content.getChildren().add(buildFieldRow(def, fieldBuilder));
+
+                    if (i < groupFields.size() - 1) {
+                        Region sep = new Region();
+                        sep.setStyle("-fx-border-color: -color-border-muted; -fx-border-width: 0 0 0.5 0;");
+                        sep.setPrefHeight(1);
+                        content.getChildren().add(sep);
+                    }
+                }
+                outerContent.getChildren().add(content);
+            }
+        }
+
+        scroll.setContent(outerContent);
         return scroll;
     }
 

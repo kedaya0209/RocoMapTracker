@@ -34,6 +34,8 @@ public:
 
     cv::Mat persistent_mat;
 
+    int pca_target_dim = 64;
+
     explicit DescriptorTransform(SiftVariant v);
 
     bool train(cv::Mat& raw_descriptors);
@@ -73,13 +75,6 @@ public:
     std::vector<cv::DMatch> good_matches;
     std::vector<cv::Point2f> src_pts;
     std::vector<cv::Point2f> dst_pts;
-
-    float match_ratio_threshold = 0.6f;
-    int match_min_count = 10;
-    double ransac_reproj_threshold = 10.0;
-    int ransac_max_iters = 200;
-    double ransac_confidence = 0.95;
-    int flann_search_checks = 24;
 
     AlgoParams params;
 

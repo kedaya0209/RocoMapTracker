@@ -15,12 +15,22 @@ import java.util.function.Supplier;
  * @param restartRequired 修改后是否需要重启生效
  * @param getter          读取当前值（替代反射）
  * @param setter          写入新值（替代反射）
+ * @param subcategory     子分类名称（空字符串表示无子分类）
  */
 @ThreadSafe
 public record SettingDef(String key, String label, SettingType type,
                          Supplier<String[]> optionsSupplier, Runnable onApply, boolean restartRequired,
-                         Supplier<Object> getter, Consumer<Object> setter) {
+                         Supplier<Object> getter, Consumer<Object> setter,
+                         String subcategory) {
     public SettingDef {
         optionsSupplier = optionsSupplier != null ? optionsSupplier : () -> new String[0];
+        if (subcategory == null) subcategory = "";
+    }
+
+    /**
+     * 返回设置了子分类名称的新实例。
+     */
+    public SettingDef withSubcategory(String sub) {
+        return new SettingDef(key, label, type, optionsSupplier, onApply, restartRequired, getter, setter, sub);
     }
 }
