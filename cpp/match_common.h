@@ -74,10 +74,23 @@ enum class AlgoKind : int32_t {
     SIFT  = 0,
 };
 
+/**
+ * Per-sub-image SIFT parameter overrides (for training).
+ * 0.0 for double fields or -1 for int32_t fields means "use the AlgoParams default".
+ */
+struct SubImageSiftParams {
+    int32_t subImageIndex = -1;
+    double contrastThreshold = 0.0;   // 0.0 = 不覆盖
+    double edgeThreshold = 0.0;       // 0.0 = 不覆盖
+    int32_t nfeatures = -1;           // -1 = 不覆盖
+    int32_t nOctaveLayers = -1;       // -1 = 不覆盖
+    double sigma = 0.0;               // 0.0 = 不覆盖
+};
+
 struct AlgoParams {
     AlgoKind kind = AlgoKind::SIFT;
 
-    // SIFT
+    // SIFT (用于匹配侧，训练侧可由 per-sub-image overrides 覆盖)
     int32_t siftVariant = 3;      // PCA_ULTRA
     int32_t nfeatures = 0;
     int32_t nOctaveLayers = 3;
@@ -107,6 +120,21 @@ struct AlgoParams {
 
     // Paths
     std::string cacheFilePath;
+    std::string caveCacheFilePath;
+
+    // Multi-subimage: sub-image boundary heights, in pixels, top-to-bottom order.
+    // Used for Plan B unified index — each sub-image gets its own map_id during training,
+    // and match() votes on which sub-image the query belongs to.
+    std::vector<int> subImageHeights;
+
+    // Per-sub-image cave flags (1 byte each from protocol, 0=overworld, 1=cave).
+    // Used by train_multimap for group filtering instead of hardcoded si==0/si>0.
+    std::vector<uint8_t> subImageIsCave;
+
+    // Per-sub-image SIFT parameter overrides for training.
+    // If empty, all sub-images use the defaults above.
+    std::vector<SubImageSiftParams> subImageSiftParams;
+
 };
 
 // ============================================================================
@@ -158,6 +186,14 @@ void apply_circle_mask(uint8_t* data, int w, int h,
                        double center_x, double center_y, int radius);
 
 // ============================================================================
+// Brightness classification: is the cropped minimap "dark" (cave-like)?
+// Returns dark pixel ratio (0..1). If ratio > dark_ratio_threshold → cave.
+// ============================================================================
+float is_dark_minimap(const uint8_t* gray_data, int w, int h,
+                      double cx, double cy, int radius,
+                      float dark_ratio_threshold = 0.5f);
+
+// ============================================================================
 // Arrow direction detection: HSV color-based + PCA
 // ============================================================================
 double detect_arrow_angle_hsv(const uint8_t* bgra_data, int w, int h,
@@ -179,6 +215,7 @@ struct MatchResult {
     float t_minimap_ms = 0;
     float t_extract_ms = 0;
     float t_matching_ms = 0;
+    int map_id = -1;  // -1=unknown, 0+=sub-image index for multimap
 };
 
 // ============================================================================
@@ -187,7 +224,8 @@ struct MatchResult {
 // ============================================================================
 std::vector<uint8_t> serialize_result(bool success, double x, double y, double angle,
                                       float t_minimap_ms = 0, float t_extract_ms = 0,
-                                      float t_matching_ms = 0, float t_arrow_ms = 0);
+                                      float t_matching_ms = 0, float t_arrow_ms = 0,
+                                      int map_id = -1);
 
 // ============================================================================
 // Abstract matcher interface
@@ -196,10 +234,23 @@ class MatcherBase {
 public:
     virtual ~MatcherBase() = default;
     virtual bool train(const uint8_t* gray_pixels, int w, int h) = 0;
-    virtual MatchResult match(uint8_t* data, int w, int h, double hint_x, double hint_y) = 0;
+    virtual MatchResult match(uint8_t* data, int w, int h) = 0;
     virtual bool save_cache(const std::string& path) = 0;
     virtual bool load_cache(const std::string& path) = 0;
     virtual size_t feature_count() const = 0;
+
+    /**
+     * 设置训练分组（仅用于多子图模式）。
+     * 0=大陆(子图0), 1=洞穴(子图1+), -1=全部(默认)。
+     */
+    virtual void setSubImageGroup(int group) {}
+
+    /**
+     * 释放训练阶段分配的临时内存（描述符矩阵等）。
+     * FLANN 索引已持有内部拷贝，匹配功能不受影响。
+     * 在 save_cache() 之后、进入匹配循环之前调用。
+     */
+    virtual void release_training_memory() {}
 };
 
 // ============================================================================
@@ -215,7 +266,8 @@ std::unique_ptr<MatcherBase> create_matcher(const AlgoParams& params);
 // ============================================================================
 // Main loop driver
 // ============================================================================
-int run_match_loop(SOCKET sock, AlgoParams& params, MatcherBase& matcher,
+int run_match_loop(SOCKET sock, AlgoParams& params,
+                   MatcherBase& matcher_overworld, MatcherBase& matcher_cave,
                    std::atomic<bool>& g_running);
 
 #endif // MATCH_COMMON_H

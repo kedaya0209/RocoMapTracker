@@ -3,9 +3,13 @@ package io.github.kedaya0209.roco.app.match;
 import net.jcip.annotations.NotThreadSafe;
 import io.github.kedaya0209.roco.app.config.SiftConfig;
 import io.github.kedaya0209.roco.app.config.SocketConfig;
+import io.github.kedaya0209.roco.app.context.ResourceConfigContext;
 import io.github.kedaya0209.roco.app.hook.AppEvents;
 import io.github.kedaya0209.roco.app.hook.event.NotificationType;
 import io.github.kedaya0209.roco.app.hook.event.StatusEvent;
+import io.github.kedaya0209.roco.app.map.model.CompositeMapMetadata;
+import io.github.kedaya0209.roco.app.map.model.CompositeMapMetadata.SubImageInfo;
+import io.github.kedaya0209.roco.app.utils.ResourceUtils;
 import io.github.kedaya0209.roco.app.process.NativeProcess;
 import io.github.kedaya0209.roco.app.process.NativeProcessFactory;
 import io.github.kedaya0209.roco.app.process.ProcessRestartHelper;
@@ -14,6 +18,7 @@ import io.github.kedaya0209.roco.app.socket.SocketServer;
 import io.github.kedaya0209.roco.app.socket.SocketSession;
 import lombok.extern.slf4j.Slf4j;
 
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Set;
@@ -165,9 +170,60 @@ public class SiftMatchHandler {
         log.info("收到 REQUEST_CONFIG，发送参数...");
         try {
             SiftVariant variant = launchParams.get() != null ? launchParams.get() : SiftVariant.PCA_ULTRA;
-            // 选择缓存后缀
             String cacheSuffix = variant.cacheSuffix();
-            byte[] body = encodeConfig(variant.variantOrdinal(), cacheSuffix, 0);
+
+            // Plan B unified index: load sub-image heights + per-sub-image SIFT params from metadata
+            int[] subImageHeights = null;
+            boolean[] subImageIsCave = null;
+            SubImageSiftOverride[] subImageOverrides = null;
+            SubImageSiftOverride matchingSift = null;
+            if (ResourceConfigContext.isMultiMapActive()) {
+                try (InputStream is = ResourceUtils.getResourceStream(
+                        ResourceConfigContext.getMultiMapMetadata())) {
+                    CompositeMapMetadata metadata = CompositeMapMetadata.load(is);
+                    var subs = metadata.subImages();
+                    subImageHeights = subs.stream()
+                            .mapToInt(SubImageInfo::height)
+                            .toArray();
+                    subImageIsCave = new boolean[subs.size()];
+                    for (int i = 0; i < subs.size(); i++) {
+                        subImageIsCave[i] = subs.get(i).isCave();
+                    }
+
+                    // 收集有 SIFT 参数覆盖的子图
+                    subImageOverrides = subs.stream()
+                            .filter(sub -> sub.siftOverride() != null && sub.siftOverride().hasAny())
+                            .map(sub -> {
+                                var o = sub.siftOverride();
+                                return new SubImageSiftOverride(
+                                        sub.index(), o.contrastThreshold(),
+                                        o.edgeThreshold(), o.nfeatures(),
+                                        o.nOctaveLayers(), o.sigma());
+                            })
+                            .toArray(SubImageSiftOverride[]::new);
+
+                    // 匹配侧 SIFT 参数（元数据覆盖）
+                    CompositeMapMetadata.SiftParams ms = metadata.matchingSift();
+                    if (ms != null && ms.hasAny()) {
+                        matchingSift = new SubImageSiftOverride(
+                                -1, ms.contrastThreshold(), ms.edgeThreshold(),
+                                ms.nfeatures(), ms.nOctaveLayers(), ms.sigma());
+                    }
+
+                    cacheSuffix = cacheSuffix + ".multi";
+                    log.info("MultiMap 模式: {} 子图, {} 个参数覆盖, 匹配参数={}, 缓存后缀={}",
+                            subImageHeights.length, subImageOverrides.length,
+                            matchingSift != null ? "自定义" : "SiftConfig默认",
+                            cacheSuffix);
+                } catch (Exception e) {
+                    log.warn("加载 MultiMap 元数据失败，回退到普通模式", e);
+                }
+            }
+
+            // 亮度分流：使用独立的 cave 缓存路径
+            String caveCacheSuffix = variant.cacheSuffix() + ".cave";
+            byte[] body = encodeConfig(variant.variantOrdinal(), cacheSuffix, caveCacheSuffix, 0,
+                    subImageHeights, subImageIsCave, subImageOverrides, matchingSift);
             session.send(MSG_CONFIG_DATA, body);
             log.info("CONFIG_DATA 已发送 ({} 字节, algoKind={}, cache={})",
                     body.length, 0, cacheSuffix);
@@ -180,18 +236,53 @@ public class SiftMatchHandler {
     }
 
     private void handleRequestMap(SocketSession session) {
+        if (ResourceConfigContext.isMultiMapActive()) {
+            handleRequestMultiMap(session);
+            return;
+        }
         log.info("收到 REQUEST_MAP，加载地图...");
         try {
             MapImageLoader.ImageInfo info = MapImageLoader.loadImage();
-            int bodyLength = 12 + info.width() * info.height();
+            int subImageCount = MapImageLoader.getSubImageCount(info.height());
+            int bodyLength = 16 + subImageCount * 4 + info.width() * info.height();
             session.sendStreaming(MSG_MAP_DATA, bodyLength, out -> {
-                MapImageLoader.writeStreaming(info, out);
+                MapImageLoader.writeStreamingMulti(out);
             });
-            log.info("地图数据已发送: {}x{} ({} 灰度像素)",
-                    info.width(), info.height(), info.width() * info.height());
+            log.info("地图数据已发送: {}x{} ({} 子图, {} 灰度像素)",
+                    info.width(), info.height(), subImageCount, info.width() * info.height());
         } catch (Exception e) {
             log.error("加载地图数据失败", e);
             byte[] errBody = ("Map load error: " + e.getMessage())
+                    .getBytes(StandardCharsets.UTF_8);
+            session.send(MSG_INIT_FAILED, errBody);
+        }
+    }
+
+    private void handleRequestMultiMap(SocketSession session) {
+        log.info("收到 REQUEST_MAP (MultiMap)，加载子图...");
+        try {
+            CompositeMapMetadata metadata;
+            try (InputStream is = ResourceUtils.getResourceStream(
+                    ResourceConfigContext.getMultiMapMetadata())) {
+                metadata = CompositeMapMetadata.load(is);
+            }
+            int w = metadata.width();
+            int totalH = metadata.totalHeight();
+            var subs = metadata.subImages();
+            int subCount = subs.size();
+            int bodyLength = 16 + subCount * 4 + w * totalH;
+
+            boolean sent = session.sendStreaming(MSG_MAP_DATA, bodyLength, out -> {
+                MapImageLoader.writeStreamingMultiFromMetadata(metadata, out);
+            });
+            if (sent) {
+                log.info("MultiMap 数据已发送: {}x{} ({} 子图)", w, totalH, subCount);
+            } else {
+                log.error("MultiMap 数据发送失败，Socket 已关闭");
+            }
+        } catch (Exception e) {
+            log.error("加载 MultiMap 地图数据失败", e);
+            byte[] errBody = ("MultiMap map load error: " + e.getMessage())
                     .getBytes(StandardCharsets.UTF_8);
             session.send(MSG_INIT_FAILED, errBody);
         }
@@ -269,14 +360,13 @@ public class SiftMatchHandler {
      * @return 匹配结果（成功/失败 + 坐标），超时返回 MatchResult.FAIL
      */
     public MatchResult sendFrameAndWait(byte[] grayData, int width, int height,
-                                        double hintX, double hintY,
                                         long timeoutMs) throws InterruptedException {
         SocketSession s = sessionManager.getActiveSession();
         if (s == null || !sessionManager.isReady()) {
             return MatchResult.FAIL;
         }
 
-        byte[] frameData = encodeFrameData(grayData, width, height, hintX, hintY);
+        byte[] frameData = encodeFrameData(grayData, width, height);
         if (!s.send(MSG_FRAME_DATA, frameData)) {
             return MatchResult.FAIL;
         }

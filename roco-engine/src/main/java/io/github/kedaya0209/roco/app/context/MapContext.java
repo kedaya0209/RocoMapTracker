@@ -3,6 +3,7 @@ package io.github.kedaya0209.roco.app.context;
 import net.jcip.annotations.ThreadSafe;
 import io.github.kedaya0209.roco.app.config.UiConfig;
 import io.github.kedaya0209.roco.app.config.ViewConfig;
+import io.github.kedaya0209.roco.app.map.model.CompositeMapMetadata;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -31,6 +32,16 @@ public class MapContext {
     private volatile double playerAngle = 0;             // 玩家朝向
     private volatile boolean hasAngle = false;           // 是否有有效朝向数据
     private volatile boolean playerInitialized = false;  // 是否已定位
+
+    private volatile boolean caveMode = false;           // 是否在洞穴区域
+    private volatile int caveIndex = -1;                 // 洞穴子图索引（-1=不在洞穴）
+    private volatile String caveName = null;             // 洞穴名称
+
+    // 渲染用活跃子图（0=大陆，1-5=洞穴）
+    private volatile int activeSubImageIndex = 0;
+    private volatile double activeSubImageOffsetY = 0;
+
+    private volatile CompositeMapMetadata multiMapMetadata = null;
 
     private String currentMapKey; // 当前地图唯一标识
 
@@ -65,6 +76,46 @@ public class MapContext {
             this.hasAngle = true;
         }
         this.playerInitialized = true;
+    }
+
+    /**
+     * 更新洞穴模式状态。
+     * @param inCave  是否在洞穴中
+     * @param idx     洞穴子图索引（-1=不在洞穴）
+     * @param name    洞穴名称（null=不在洞穴）
+     */
+    public void updateCaveMode(boolean inCave, int idx, String name) {
+        this.caveMode = inCave;
+        this.caveIndex = idx;
+        this.caveName = name;
+    }
+
+    public boolean isCaveMode() { return caveMode; }
+    public int getCaveIndex() { return caveIndex; }
+    public String getCaveName() { return caveName; }
+
+    public CompositeMapMetadata getMultiMapMetadata() { return multiMapMetadata; }
+    public void setMultiMapMetadata(CompositeMapMetadata meta) { this.multiMapMetadata = meta; }
+
+    // ==================== 渲染子图切换 ====================
+
+    public int getActiveSubImageIndex() { return activeSubImageIndex; }
+    public double getActiveSubImageOffsetY() { return activeSubImageOffsetY; }
+
+    /**
+     * 设置活跃渲染子图。渲染系统只显示此子图区域（8192x8192），
+     * 其它子图的瓦片不参与主渲染。
+     */
+    public void setActiveSubImage(int index, double offsetY) {
+        this.activeSubImageIndex = index;
+        this.activeSubImageOffsetY = offsetY;
+    }
+
+    /**
+     * 获取渲染用玩家 Y 坐标（相对于活跃子图原点）。
+     */
+    public double getRenderPlayerY() {
+        return playerY - activeSubImageOffsetY;
     }
 
     /**

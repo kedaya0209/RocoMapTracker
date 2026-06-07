@@ -4,8 +4,10 @@
 
 #include "match_common.h"
 #include <opencv2/flann.hpp>
+#include <opencv2/imgproc.hpp>
 #include <cfloat>
 #include <memory>
+#include <unordered_map>
 
 // ============================================================================
 // SIFT variant enum (matches Java DescriptorTransform.Variant)
@@ -49,7 +51,7 @@ private:
 // Cache file magic (SIFT-specific)
 // ============================================================================
 static constexpr uint32_t SIFT_CACHE_MAGIC = 0x53494654; // "SIFT"
-static constexpr int32_t SIFT_CACHE_VERSION = 7; // v7: config CRC32 validation
+static constexpr int32_t SIFT_CACHE_VERSION = 7; // v7: full-coord keypoints + config CRC32
 
 // ============================================================================
 // SiftMatcher
@@ -61,40 +63,53 @@ public:
     std::vector<cv::KeyPoint> map_keypoints;
     std::vector<cv::Point2f> map_keypoint_pts;
 
-    // FLANN 索引（直接 cv::flann::Index，避免 FlannBasedMatcher 的 3 份内部拷贝）
+    // FLANN 索引（直接 cv::flann::Index，统一索引，关键点为完整图坐标）
     std::unique_ptr<cv::flann::Index> flann_index;
 
+    // 子图归属（仅用于训练后记录每个特征属于哪个子图）
+    std::vector<int> map_id_for_feature;
+
+    std::vector<cv::KeyPoint> scene_kps;
     std::vector<cv::DMatch> good_matches;
-    std::vector<cv::DMatch> filtered_matches;
     std::vector<cv::Point2f> src_pts;
     std::vector<cv::Point2f> dst_pts;
-    std::vector<cv::KeyPoint> scene_kps;
 
     float match_ratio_threshold = 0.6f;
     int match_min_count = 10;
     double ransac_reproj_threshold = 10.0;
     int ransac_max_iters = 200;
     double ransac_confidence = 0.95;
-    int search_radius = 500;
     int flann_search_checks = 24;
 
     AlgoParams params;
 
+    /** 子图训练分组: 0=大陆(子图0), 1=洞穴(子图1+), -1=全部(默认). */
+    int sub_image_group = -1;
+
     explicit SiftMatcher(const AlgoParams& p);
+
+    /** 设置训练分组: 0=大陆(子图0), 1=洞穴(子图1+), -1=全部(默认)。 */
+    void setSubImageGroup(int group) override;
 
     // MatcherBase interface
     bool train(const uint8_t* gray_pixels, int w, int h) override;
-    MatchResult match(uint8_t* data, int w, int h, double hint_x, double hint_y) override;
+    MatchResult match(uint8_t* data, int w, int h) override;
     size_t feature_count() const override;
     bool save_cache(const std::string& path) override;
     bool load_cache(const std::string& path) override;
+    void release_training_memory() override;
 
 private:
     bool train_direct(cv::Mat& map_gray);
     bool train_tiled(cv::Mat& map_gray, int map_w, int map_h);
+    bool train_multimap(const uint8_t* gray_pixels, int w, int h);
     void build_flann_index();
     bool load_from_cache();
     uint32_t compute_config_hash() const;
+
+    /** 根据完整图坐标 y 值确定子图 ID */
+    int resolve_map_id(float y) const;
+
 };
 
 #endif // SIFT_MATCHER_H

@@ -10,9 +10,11 @@ import io.github.kedaya0209.roco.app.hook.AppEvents;
 import io.github.kedaya0209.roco.app.hook.event.NotificationType;
 import io.github.kedaya0209.roco.app.hook.event.StatusEvent;
 import io.github.kedaya0209.roco.app.hook.event.StatusStateMachine;
+import io.github.kedaya0209.roco.app.context.MapContext;
 import io.github.kedaya0209.roco.app.match.SiftMatchHandler;
 import io.github.kedaya0209.roco.app.match.SiftMatchProtocol;
 import io.github.kedaya0209.roco.app.match.PlayerStateTracker;
+import io.github.kedaya0209.roco.app.map.model.CompositeMapMetadata;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.concurrent.ExecutorService;
@@ -43,6 +45,7 @@ public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
     private final StatsContext stats;
     private final MatchingWatchdog watchdog;
 
+
     // 专用单线程池：SynchronousQueue 无缓冲，忙时新任务直接丢弃（只保留最新帧）
     private final ExecutorService executor = new ThreadPoolExecutor(
             1, 1, 0L, TimeUnit.MILLISECONDS,
@@ -56,6 +59,8 @@ public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
     private long frameSeq = 0L;
     /** 上次匹配开关状态，用于侦测切换时发布事件 */
     private boolean wasMatchingEnabled;
+    /** 上次洞穴模式状态，用于侦测变化时发布事件 */
+    private boolean wasCaveMode;
     /** 上次 GC 触发时间戳，每 15 秒回收一次匹配过程的内存 */
     private long lastGcTime = System.currentTimeMillis();
 
@@ -69,8 +74,10 @@ public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
         this.stats = stats;
         this.stateTracker = stateTracker;
         this.wasMatchingEnabled = SiftConfig.SIFT_MATCHING_ENABLED;
+        this.wasCaveMode = false;
         long watchdogTimeout = Math.max(3000L, SiftConfig.MATCH_TIMEOUT_MS * 3);
         this.watchdog = new MatchingWatchdog(watchdogTimeout);
+
     }
 
     @Override
@@ -122,15 +129,9 @@ public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
             long tStart = System.currentTimeMillis();
             stats.onFrameProcessed();
 
-            // 获取预测位置 (首帧/重置后为 null)
-            Double hintX = stateTracker.getPredictedX();
-            Double hintY = stateTracker.getPredictedY();
-
             try {
                 SiftMatchProtocol.MatchResult result = matchClient.sendFrameAndWait(
                         data, width, height,
-                        hintX != null ? hintX : Double.NaN,
-                        hintY != null ? hintY : Double.NaN,
                         SiftConfig.MATCH_TIMEOUT_MS);
 
                 long elapsed = System.currentTimeMillis() - tStart;
@@ -140,17 +141,67 @@ public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
                 stats.recordDirection(Math.round(result.tArrowMs()));
 
                 if (result.success()) {
+                    // Plan B: 用 C++ 返回的 map_id 确定子图
+                    CompositeMapMetadata meta = MapContext.getInstance().getMultiMapMetadata();
+                    int mapId = result.mapId();
+                    CompositeMapMetadata.SubImageInfo sub = null;
+                    if (meta != null && mapId >= 0 && mapId < meta.subImages().size()) {
+                        sub = meta.subImages().get(mapId);
+                    }
+
+                    // Plan B: C++ 返回子图局部坐标（所有子图 offsetY=0），
+                    // 瓦片和渲染都在大陆局部空间，无需加 offsetY
+                    double fullX = result.x();
+                    double fullY = result.y();
+
+                    // 安全检测：map_id 失效时坐标可能在完整图空间（>8192），记警告
+                    if (mapId < 0 && (result.y() > 8192 || result.x() > 8192)) {
+                        log.warn("map_id={} 且坐标异常 ({}), 可能投票未生效，结果不可靠",
+                                mapId, String.format("%.1f,%.1f", result.x(), result.y()));
+                    }
+
+                    // 大陆/洞穴切换时重置 EMA（渲染始终在大陆空间）
+                    boolean newCave = sub != null && sub.isCave();
+                    if (newCave != wasCaveMode) {
+                        log.info("洞穴切换: caveMode={} (map_id={}), 重置位置平滑", newCave, mapId);
+                        stateTracker.reset();
+                    }
+
                     double angle = AngleConverter.toJavaFX(result.angle());
-                    stateTracker.onMatchSuccess(result.x(), result.y(),
+                    stateTracker.onMatchSuccess(fullX, fullY,
                         Double.isNaN(angle) ? null : angle);
+
+                    // 用 map_id + 元数据判断大陆/洞穴，更新洞穴状态
+                    // 渲染始终使用大陆坐标空间（offsetY=0），不切换活跃子图
+                    boolean inCave = false;
+                    String caveName = null;
+                    int caveIdx = -1;
+
+                    if (sub != null && sub.isCave()) {
+                        inCave = true;
+                        caveIdx = sub.index();
+                        caveName = sub.name();
+                    }
+                    MapContext.getInstance().updateCaveMode(inCave, caveIdx, caveName);
+
+                    // 洞穴模式变化时发布轮播事件
+                    if (inCave != wasCaveMode) {
+                        wasCaveMode = inCave;
+                        AppEvents.publish(StatusEvent.class, inCave
+                                ? new StatusEvent("洞穴: " + (caveName != null ? caveName : "?"), NotificationType.INFO, StatusEvent.DisplayMode.CAROUSEL)
+                                : new StatusEvent("大陆", NotificationType.SUCCESS, StatusEvent.DisplayMode.CAROUSEL));
+                    }
+
                     if (log.isTraceEnabled()) {
-                        log.trace("[seq={}] match OK: ({},{}), angle={}, elapsed={}ms",
+                        log.trace("[seq={}] match OK: ({},{}), angle={}, sub={}, elapsed={}ms",
                                 seq, String.format("%.1f", result.x()),
                                 String.format("%.1f", result.y()),
-                                String.format("%.1f", result.angle()), elapsed);
+                                String.format("%.1f", result.angle()),
+                                caveName, elapsed);
                     }
                 } else {
                     stateTracker.onMatchFailure("C++ match failed");
+                    // 匹配失败时不改变洞穴状态（保留上一帧的有效值）
                     if (log.isTraceEnabled()) {
                         log.trace("[seq={}] match FAILED, elapsed={}ms", seq, elapsed);
                     }

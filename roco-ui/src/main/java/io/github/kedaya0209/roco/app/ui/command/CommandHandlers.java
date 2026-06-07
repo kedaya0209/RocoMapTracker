@@ -144,8 +144,8 @@ public final class CommandHandlers {
                 mc.setScale(newScale);
                 double cx = mc.getViewWidth() / 2;
                 double cy = mc.getViewHeight() / 2;
-                mc.setOffsetX(cx - vp.getSmoothedPlayerX() * newScale);
-                mc.setOffsetY(cy - vp.getSmoothedPlayerY() * newScale);
+                mc.setOffsetX(cx - vp.getPlayerX() * newScale);
+                mc.setOffsetY(cy - vp.getPlayerY() * newScale);
                 mc.ensureBounds();
                 CameraContext.getInstance().setFollowScale(newScale);
             } else {

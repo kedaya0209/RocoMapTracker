@@ -30,7 +30,7 @@
         <lombok.version>1.18.46</lombok.version>
         <junit.version>6.0.3</junit.version>
         <graalvm.version>25.0.3</graalvm.version>
-        <djl.version>0.36.0</djl.version>
+        <pngj.version>2.1.0</pngj.version>
         <atlantafx.version>2.1.0</atlantafx.version>
         <app.version>${project.version}</app.version>
     </properties>
@@ -71,19 +71,6 @@
                 <scope>provided</scope>
             </dependency>
 
-            <!-- JavaFX / DJL -->
-            <dependency>
-                <groupId>ai.djl</groupId>
-                <artifactId>api</artifactId>
-                <version>${djl.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>ai.djl.onnxruntime</groupId>
-                <artifactId>onnxruntime-engine</artifactId>
-                <version>${djl.version}</version>
-                <scope>runtime</scope>
-            </dependency>
-
             <!-- JavaFX -->
             <dependency>
                 <groupId>org.openjfx</groupId>
@@ -106,6 +93,13 @@
                 <groupId>io.github.mkpaz</groupId>
                 <artifactId>atlantafx-base</artifactId>
                 <version>${atlantafx.version}</version>
+            </dependency>
+
+            <!-- PNGJ streaming PNG library -->
+            <dependency>
+                <groupId>ar.com.hjg</groupId>
+                <artifactId>pngj</artifactId>
+                <version>${pngj.version}</version>
             </dependency>
 
             <!-- Test -->

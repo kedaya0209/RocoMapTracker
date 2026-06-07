@@ -197,28 +197,26 @@ public class MapDownloader {
     }
 
     private static DownloadResult download(int x, int y, String tpl) {
-        for (int i = 0; i < MapResourceUpdater.MAX_RETRY; i++) {
-            HttpURLConnection conn = null;
-            try {
-                String u = tpl.replace("{x}", String.valueOf(x)).replace("{y}", String.valueOf(y));
-                conn = (HttpURLConnection) new URL(u).openConnection();
-                conn.setRequestMethod("GET");
-                conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
-                conn.setConnectTimeout(MapResourceUpdater.CONNECT_TIMEOUT);
-                conn.setReadTimeout(MapResourceUpdater.READ);
+        HttpURLConnection conn = null;
+        try {
+            String u = tpl.replace("{x}", String.valueOf(x)).replace("{y}", String.valueOf(y));
+            conn = (HttpURLConnection) new URL(u).openConnection();
+            conn.setRequestMethod("GET");
+            conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
+            conn.setConnectTimeout(MapResourceUpdater.CONNECT_TIMEOUT);
+            conn.setReadTimeout(MapResourceUpdater.READ);
 
-                int code = conn.getResponseCode();
-                if (code == 404) return DownloadResult.notFound();
-                if (code != 200) continue;
-
+            int code = conn.getResponseCode();
+            if (code == 404) return DownloadResult.notFound();
+            if (code == 200) {
                 try (InputStream in = conn.getInputStream()) {
                     return DownloadResult.success(in.readAllBytes());
                 }
-            } catch (IOException e) {
-                sleep(MapResourceUpdater.TILE_DELAY_MS * 2);
-            } finally {
-                if (conn != null) conn.disconnect();
             }
+        } catch (IOException e) {
+            // 单次失败不重试
+        } finally {
+            if (conn != null) conn.disconnect();
         }
         return DownloadResult.failed();
     }
@@ -273,7 +271,7 @@ public class MapDownloader {
         dir.delete();
     }
 
-    private static synchronized void add(int x, int y) {
+    private static void add(int x, int y) {
         taskQueue.offer(new int[]{x, y});
     }
 

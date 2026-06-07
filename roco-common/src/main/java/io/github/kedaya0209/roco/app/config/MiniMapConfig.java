@@ -4,7 +4,8 @@ import net.jcip.annotations.NotThreadSafe;
 import java.util.Properties;
 
 /**
- * 小地图检测配置持久化 
+ * 小地图检测配置持久化
+ * 未与cpp做联动，需修改
  */
 @NotThreadSafe
 public final class MiniMapConfig {

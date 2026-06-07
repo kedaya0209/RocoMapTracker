@@ -1,5 +1,135 @@
 // sift_matcher.cpp — SIFT Matcher implementation.
+#include <algorithm>
 #include "sift_matcher.h"
+
+// ============================================================================
+// 分块 SIFT 检测 + 去重（用于大子图）
+// ============================================================================
+static void detect_tiled(
+    cv::Ptr<cv::SIFT>& sift_instance,
+    const cv::Mat& img, int img_w, int img_h,
+    int tile_size, int tile_overlap, float dedup_dist,
+    std::vector<cv::KeyPoint>& out_kps, cv::Mat& out_descs) {
+    int stride = tile_size - tile_overlap;
+    int cols = (int)std::ceil((double)(img_w - tile_overlap) / stride);
+    int rows = (int)std::ceil((double)(img_h - tile_overlap) / stride);
+
+    struct KpEntry {
+        float x, y;
+        std::vector<float> desc;
+    };
+    std::vector<KpEntry> all_kps;
+    int desc_dim = 128;
+
+    for (int r = 0; r < rows; r++) {
+        for (int c = 0; c < cols; c++) {
+            int tile_x = c * stride;
+            int tile_y = r * stride;
+            int tile_w = std::min(tile_size, img_w - tile_x);
+            int tile_h = std::min(tile_size, img_h - tile_y);
+            cv::Rect roi(tile_x, tile_y, tile_w, tile_h);
+            cv::Mat tile_gray = img(roi);
+            std::vector<cv::KeyPoint> tile_kps;
+            cv::Mat tile_descs;
+            sift_instance->detectAndCompute(tile_gray, cv::noArray(), tile_kps, tile_descs);
+            if (tile_descs.empty()) continue;
+            cv::Mat desc_float;
+            if (tile_descs.type() != CV_32F)
+                tile_descs.convertTo(desc_float, CV_32F);
+            else
+                desc_float = tile_descs;
+            desc_dim = desc_float.cols;
+            for (size_t i = 0; i < tile_kps.size(); i++) {
+                KpEntry e;
+                e.x = tile_kps[i].pt.x + (float)tile_x;
+                e.y = tile_kps[i].pt.y + (float)tile_y;
+                e.desc.resize(desc_dim);
+                memcpy(e.desc.data(), desc_float.ptr<float>((int)i), desc_dim * sizeof(float));
+                all_kps.push_back(std::move(e));
+            }
+        }
+    }
+
+    if (all_kps.empty()) return;
+
+    // 去重
+    int total = (int)all_kps.size();
+    int cell = (int)std::ceil(dedup_dist);
+    int gc = img_w / cell + 1;
+    int gr = img_h / cell + 1;
+    std::vector<int> grid(gc * gr, -1);
+    std::vector<bool> keep(total, false);
+    int kept = 0;
+
+    for (int i = 0; i < total; i++) {
+        auto& kp = all_kps[i];
+        int cx = (int)(kp.x / cell), cy = (int)(kp.y / cell);
+        bool dup = false;
+        for (int dx = -1; dx <= 1 && !dup; dx++)
+            for (int dy = -1; dy <= 1 && !dup; dy++) {
+                int nx = cx + dx, ny = cy + dy;
+                if (nx >= 0 && nx < gc && ny >= 0 && ny < gr) {
+                    int ex = grid[ny * gc + nx];
+                    if (ex >= 0) {
+                        float dx = kp.x - all_kps[ex].x, dy = kp.y - all_kps[ex].y;
+                        if (dx * dx + dy * dy < dedup_dist * dedup_dist)
+                            dup = true;
+                    }
+                }
+            }
+        if (!dup) { grid[cy * gc + cx] = i; keep[i] = true; kept++; }
+    }
+
+    out_kps.clear();
+    out_kps.reserve(kept);
+    out_descs = cv::Mat(kept, desc_dim, CV_32F);
+    int pos = 0;
+    for (int i = 0; i < total; i++) {
+        if (keep[i]) {
+            out_kps.push_back(cv::KeyPoint(all_kps[i].x, all_kps[i].y, 1.0f));
+            memcpy(out_descs.ptr<float>(pos), all_kps[i].desc.data(), desc_dim * sizeof(float));
+            pos++;
+        }
+    }
+}
+
+// ============================================================================
+// Auto-crop grayscale image to non-void content bounding box.
+// Scans rows/columns at stride 4, counts pixels > threshold.
+// Returns the content rect in image coordinates. If no content found,
+// returns the full image rect.
+// ============================================================================
+static cv::Rect find_content_rect(const cv::Mat& gray, uint8_t threshold = 16, int stride = 4) {
+    int w = gray.cols, h = gray.rows;
+    if (w <= 0 || h <= 0) return cv::Rect(0, 0, w, h);
+
+    auto row_has_content = [&](int y) -> bool {
+        const uint8_t* r = gray.ptr<uint8_t>(y);
+        for (int x = 0; x < w; x += stride)
+            if (r[x] > threshold) return true;
+        return false;
+    };
+    auto col_has_content = [&](int x) -> bool {
+        for (int y = 0; y < h; y += stride)
+            if (gray.at<uint8_t>(y, x) > threshold) return true;
+        return false;
+    };
+
+    int top = 0;
+    while (top < h && !row_has_content(top)) top++;
+    if (top >= h) return cv::Rect(0, 0, w, h); // fully void
+
+    int bottom = h - 1;
+    while (bottom > top && !row_has_content(bottom)) bottom--;
+
+    int left = 0;
+    while (left < w && !col_has_content(left)) left++;
+
+    int right = w - 1;
+    while (right > left && !col_has_content(right)) right--;
+
+    return cv::Rect(left, top, right - left + 1, bottom - top + 1);
+}
 
 // ============================================================================
 // DescriptorTransform
@@ -113,7 +243,6 @@ cv::Mat DescriptorTransform::pca_project(cv::Mat& src) {
 SiftMatcher::SiftMatcher(const AlgoParams& p)
     : match_ratio_threshold((float)p.matchRatioThreshold)
     , match_min_count(p.matchMinCount)
-    , search_radius(p.searchRadius)
     , ransac_reproj_threshold(p.ransacReprojThreshold)
     , ransac_max_iters(p.ransacMaxIters)
     , ransac_confidence(p.ransacConfidence)
@@ -128,6 +257,11 @@ SiftMatcher::SiftMatcher(const AlgoParams& p)
 }
 
 bool SiftMatcher::train(const uint8_t* gray_pixels, int w, int h) {
+    // Plan B: multi-subimage unified index
+    if (!params.subImageHeights.empty()) {
+        return train_multimap(gray_pixels, w, h);
+    }
+
     cv::Mat map_gray(h, w, CV_8UC1, (void*)gray_pixels);
     if (map_gray.empty()) {
         LOGERR("Invalid map image: %dx%d", w, h);
@@ -139,12 +273,16 @@ bool SiftMatcher::train(const uint8_t* gray_pixels, int w, int h) {
         LOG("Large map %dx%d (%lld pixels), using tiled training", w, h, (long long)total_pixels);
         return train_tiled(map_gray, w, h);
     }
+
     return train_direct(map_gray);
 }
 
-MatchResult SiftMatcher::match(uint8_t* data, int w, int h, double hint_x, double hint_y) {
+MatchResult SiftMatcher::match(uint8_t* data, int w, int h) {
     MatchResult res{};
-    if (!flann_index) return res;
+    if (!flann_index) {
+        LOG("match: FAIL no flann_index (g=%d)", sub_image_group);
+        return res;
+    }
 
     cv::Mat scene_img(h, w, CV_8UC1, data);
 
@@ -155,7 +293,10 @@ MatchResult SiftMatcher::match(uint8_t* data, int w, int h, double hint_x, doubl
     auto t1 = std::chrono::steady_clock::now();
     res.t_extract_ms = std::chrono::duration<float, std::milli>(t1 - t0).count();
 
-    if (scene_descriptors.empty()) return res;
+    if (scene_descriptors.empty()) {
+        LOG("match: FAIL zero features (g=%d, kps=%zu)", sub_image_group, scene_kps.size());
+        return res;
+    }
 
     // PCA 投影 + 量化（必须与训练时的变换一致）
     cv::Mat query_desc;
@@ -165,8 +306,9 @@ MatchResult SiftMatcher::match(uint8_t* data, int w, int h, double hint_x, doubl
     } else {
         query_desc = transform->process(scene_descriptors);
     }
+    auto t_pca = std::chrono::steady_clock::now();
 
-    // knnSearch(2) + 手动 Lowe 比率测试
+    // knnSearch(k=2) + 手动 Lowe 比率测试（统一处理单图和子图）
     cv::Mat indices(query_desc.rows, 2, CV_32SC1);
     cv::Mat dists(query_desc.rows, 2, CV_32FC1);
     flann_index->knnSearch(query_desc, indices, dists, 2,
@@ -184,43 +326,18 @@ MatchResult SiftMatcher::match(uint8_t* data, int w, int h, double hint_x, doubl
             }
         }
     }
+    auto t_knn = std::chrono::steady_clock::now();
 
     if (good_matches.size() < (size_t)match_min_count) {
-        res.t_matching_ms = std::chrono::duration<float, std::milli>(
-            std::chrono::steady_clock::now() - t1).count();
-        return res;
-    }
-
-    // Spatial filter: 利用 hint 位置过滤远处误匹配
-    bool has_hint = !std::isnan(hint_x) && !std::isnan(hint_y)
-                 && hint_x >= -1e9 && hint_y >= -1e9;
-    filtered_matches.clear();
-    if (has_hint) {
-        for (auto& dm : good_matches) {
-            if (dm.trainIdx >= 0 && dm.trainIdx < (int)map_keypoint_pts.size()) {
-                auto& pt = map_keypoint_pts[dm.trainIdx];
-                double dist = std::hypot(pt.x - hint_x, pt.y - hint_y);
-                if (dist <= search_radius) {
-                    filtered_matches.push_back(dm);
-                }
-            }
-        }
-        if (filtered_matches.size() < 4) {
-            filtered_matches = good_matches; // fallback
-        }
-    } else {
-        filtered_matches = good_matches;
-    }
-
-    if (filtered_matches.size() < (size_t)match_min_count) {
-        res.t_matching_ms = std::chrono::duration<float, std::milli>(
-            std::chrono::steady_clock::now() - t1).count();
+        LOG("match: FAIL good_matches %zu < min %d (g=%d, query_desc=%d)",
+            good_matches.size(), match_min_count, sub_image_group, query_desc.rows);
+        res.t_matching_ms = std::chrono::duration<float, std::milli>(t_knn - t1).count();
         return res;
     }
 
     src_pts.clear();
     dst_pts.clear();
-    for (auto& dm : filtered_matches) {
+    for (auto& dm : good_matches) {
         if (dm.queryIdx >= 0 && dm.queryIdx < (int)scene_kps.size()
             && dm.trainIdx >= 0 && dm.trainIdx < (int)map_keypoint_pts.size()) {
             src_pts.push_back(scene_kps[dm.queryIdx].pt);
@@ -229,12 +346,14 @@ MatchResult SiftMatcher::match(uint8_t* data, int w, int h, double hint_x, doubl
     }
 
     if (src_pts.size() < (size_t)match_min_count) {
+        LOG("match: FAIL src_pts %zu < min %d (g=%d)", src_pts.size(), match_min_count, sub_image_group);
         res.t_matching_ms = std::chrono::duration<float, std::milli>(
             std::chrono::steady_clock::now() - t1).count();
         return res;
     }
 
     cv::Mat inlier_mask;
+    auto t_ransac0 = std::chrono::steady_clock::now();
     cv::Mat H = cv::findHomography(src_pts, dst_pts, cv::RANSAC,
             ransac_reproj_threshold, inlier_mask, ransac_max_iters, ransac_confidence);
 
@@ -245,11 +364,39 @@ MatchResult SiftMatcher::match(uint8_t* data, int w, int h, double hint_x, doubl
         res.success = true;
         res.x = dst_center[0].x;
         res.y = dst_center[0].y;
+
+        // 从完整图坐标 y 值确定子图 ID（多子图模式）
+        if (res.success && !params.subImageHeights.empty()) {
+            res.map_id = resolve_map_id((float)res.y);
+            // 将完整图坐标转回局部坐标（Java 端会加 offsetY）
+            int y_accum = 0;
+            for (int i = 0; i < res.map_id && i < (int)params.subImageHeights.size(); i++) {
+                y_accum += std::max(0, params.subImageHeights[i]);
+            }
+            res.y -= y_accum;
+        }
+    } else {
+        LOG("match: FAIL RANSAC H.empty (g=%d, src_pts=%zu)", sub_image_group, src_pts.size());
     }
 
-    res.t_matching_ms = std::chrono::duration<float, std::milli>(
-        std::chrono::steady_clock::now() - t1).count();
+    auto t_end = std::chrono::steady_clock::now();
+    res.t_matching_ms = std::chrono::duration<float, std::milli>(t_end - t1).count();
+
     return res;
+}
+
+int SiftMatcher::resolve_map_id(float y) const {
+    if (params.subImageHeights.empty()) return 0;
+    int y_accum = 0;
+    for (int i = 0; i < (int)params.subImageHeights.size(); i++) {
+        y_accum += std::max(0, params.subImageHeights[i]);
+        if (y < y_accum) return i;
+    }
+    return (int)params.subImageHeights.size() - 1;
+}
+
+void SiftMatcher::setSubImageGroup(int group) {
+    sub_image_group = group;
 }
 
 size_t SiftMatcher::feature_count() const {
@@ -284,6 +431,13 @@ bool SiftMatcher::save_cache(const std::string& path) {
         float x = kp.pt.x, y = kp.pt.y;
         fwrite(&x, 4, 1, f);
         fwrite(&y, 4, 1, f);
+    }
+
+    // v3: map_id_per_feature array
+    int32_t mapIdCount = (int32_t)map_id_for_feature.size();
+    fwrite(&mapIdCount, 4, 1, f);
+    if (mapIdCount > 0) {
+        fwrite(map_id_for_feature.data(), 4, mapIdCount, f);
     }
 
     if (fclose(f) != 0) {
@@ -356,6 +510,27 @@ bool SiftMatcher::load_cache(const std::string& path) {
         }
         map_keypoints.push_back(cv::KeyPoint(x, y, 1.0f));
     }
+
+    // v3: read map_id_per_feature array (absent in v2 caches, which get version-bumped and retrained)
+    map_id_for_feature.clear();
+    if (version >= 3) {
+        int32_t mapIdCount;
+        if (fread(&mapIdCount, 4, 1, f) != 1) {
+            LOG("Truncated map_id count");
+            fclose(f); return false;
+        }
+        if (mapIdCount > 0) {
+            if (mapIdCount != kpCount) {
+                LOG("map_id count mismatch: %d vs %d", mapIdCount, kpCount);
+                fclose(f); return false;
+            }
+            map_id_for_feature.resize(mapIdCount);
+            if (fread(map_id_for_feature.data(), 4, mapIdCount, f) != (size_t)mapIdCount) {
+                LOG("Truncated map_id data");
+                fclose(f); return false;
+            }
+        }
+    }
     fclose(f);
     return load_from_cache();
 }
@@ -411,24 +586,28 @@ bool SiftMatcher::train_direct(cv::Mat& map_gray) {
     return true;
 }
 
+// ----- 大图重叠分块训练 (>9Mpx) — 从 master 移植 -----
 bool SiftMatcher::train_tiled(cv::Mat& map_gray, int map_w, int map_h) {
-    int tileSize = params.tileSize > 0 ? params.tileSize : 2000;
-    int tileOverlap = params.tileOverlap;
-    float dedupDist = params.dedupDistance > 0 ? params.dedupDistance : 4.0f;
-    int stride = tileSize - tileOverlap;
-    int cols = (int)std::ceil((double)(map_w - tileOverlap) / stride);
-    int rows = (int)std::ceil((double)(map_h - tileOverlap) / stride);
-    LOG("Tile layout: %dx%d (%d tiles)", cols, rows, cols * rows);
+    int stride = params.tileSize - params.tileOverlap;
+    int cols = (int)std::ceil((double)(map_w - params.tileOverlap) / stride);
+    int rows = (int)std::ceil((double)(map_h - params.tileOverlap) / stride);
+    LOG("Tiled training: %dx%d map, %dx%d tiles (%d total)",
+        map_w, map_h, cols, rows, cols * rows);
 
-    struct KpEntry { float x, y; std::vector<float> desc; };
+    struct KpEntry {
+        float x, y;
+        std::vector<float> desc;
+    };
     std::vector<KpEntry> all_kps;
     int desc_dim = 128;
 
     for (int r = 0; r < rows; r++) {
         for (int c = 0; c < cols; c++) {
-            int tile_x = c * stride, tile_y = r * stride;
-            int tile_w = std::min(tileSize, map_w - tile_x);
-            int tile_h = std::min(tileSize, map_h - tile_y);
+            int tile_x = c * stride;
+            int tile_y = r * stride;
+            int tile_w = std::min(params.tileSize, map_w - tile_x);
+            int tile_h = std::min(params.tileSize, map_h - tile_y);
+
             cv::Rect roi(tile_x, tile_y, tile_w, tile_h);
             cv::Mat tile_gray = map_gray(roi);
 
@@ -449,14 +628,19 @@ bool SiftMatcher::train_tiled(cv::Mat& map_gray, int map_w, int map_h) {
                 entry.x = tile_kps[i].pt.x + (float)tile_x;
                 entry.y = tile_kps[i].pt.y + (float)tile_y;
                 entry.desc.resize(desc_dim);
-                memcpy(entry.desc.data(), desc_float.ptr<float>((int)i), desc_dim * sizeof(float));
+                memcpy(entry.desc.data(), desc_float.ptr<float>((int)i),
+                       desc_dim * sizeof(float));
                 all_kps.push_back(std::move(entry));
             }
         }
     }
 
-    if (all_kps.empty()) { LOGERR("No keypoints detected in any tile"); return false; }
+    if (all_kps.empty()) {
+        LOGERR("No keypoints detected in any tile");
+        return false;
+    }
 
+    // 重叠区域去重（空间网格索引 O(1)）
     int total_count = (int)all_kps.size();
     std::vector<bool> keep(total_count, false);
     int keep_count = 0;
@@ -465,15 +649,17 @@ bool SiftMatcher::train_tiled(cv::Mat& map_gray, int map_w, int map_h) {
         // 单瓦片无需去重
         for (int i = 0; i < total_count; i++) { keep[i] = true; }
         keep_count = total_count;
-        LOG("Dedup: %d → %d (single tile, skipped)", total_count, keep_count);
+        LOG("Dedup: %d -> %d (single tile, skipped)", total_count, keep_count);
     } else {
-        int cell_size = (int)std::ceil(dedupDist);
-        int grid_cols = map_w / cell_size + 1, grid_rows = map_h / cell_size + 1;
+        int cell_size = (int)std::ceil(params.dedupDistance);
+        int grid_cols = map_w / cell_size + 1;
+        int grid_rows = map_h / cell_size + 1;
         std::vector<int> grid(grid_cols * grid_rows, -1);
 
         for (int i = 0; i < total_count; i++) {
             auto& kp = all_kps[i];
-            int cx = (int)(kp.x / cell_size), cy = (int)(kp.y / cell_size);
+            int cx = (int)(kp.x / cell_size);
+            int cy = (int)(kp.y / cell_size);
             bool duplicate = false;
             for (int dx = -1; dx <= 1 && !duplicate; dx++)
                 for (int dy = -1; dy <= 1 && !duplicate; dy++) {
@@ -483,25 +669,37 @@ bool SiftMatcher::train_tiled(cv::Mat& map_gray, int map_w, int map_h) {
                         if (existing >= 0) {
                             float ddx = kp.x - all_kps[existing].x;
                             float ddy = kp.y - all_kps[existing].y;
-                            if (ddx*ddx + ddy*ddy < dedupDist * dedupDist)
+                            if (ddx*ddx + ddy*ddy < params.dedupDistance * params.dedupDistance)
                                 duplicate = true;
                         }
                     }
                 }
             if (!duplicate) { grid[cy * grid_cols + cx] = i; keep[i] = true; keep_count++; }
         }
-        LOG("Dedup: %d → %d", total_count, keep_count);
+        LOG("Dedup: %d -> %d", total_count, keep_count);
     }
 
     cv::Mat all_descs(keep_count, desc_dim, CV_32F);
     int pos = 0;
-    for (int i = 0; i < total_count; i++)
-        if (keep[i]) memcpy(all_descs.ptr<float>(pos++), all_kps[i].desc.data(), desc_dim * sizeof(float));
+    for (int i = 0; i < total_count; i++) {
+        if (keep[i]) {
+            memcpy(all_descs.ptr<float>(pos), all_kps[i].desc.data(),
+                   desc_dim * sizeof(float));
+            pos++;
+        }
+    }
 
-    if (!transform->train(all_descs)) { LOGERR("Descriptor transform failed"); return false; }
+    // 描述符变换 (PCA + 量化)
+    if (!transform->train(all_descs)) {
+        LOGERR("Descriptor transform failed");
+        return false;
+    }
 
-    map_keypoints.clear(); map_keypoints.reserve(keep_count);
-    map_keypoint_pts.clear(); map_keypoint_pts.reserve(keep_count);
+    // 构建关键点列表
+    map_keypoints.clear();
+    map_keypoints.reserve(keep_count);
+    map_keypoint_pts.clear();
+    map_keypoint_pts.reserve(keep_count);
     for (int i = 0; i < total_count; i++) {
         if (keep[i]) {
             auto& kp = all_kps[i];
@@ -512,6 +710,155 @@ bool SiftMatcher::train_tiled(cv::Mat& map_gray, int map_w, int map_h) {
 
     build_flann_index();
     LOG("SIFT trained (tiled): %zu features", map_keypoints.size());
+    return true;
+}
+
+bool SiftMatcher::train_multimap(const uint8_t* gray_pixels, int w, int h) {
+    auto& sub_h = params.subImageHeights;
+    int sub_count = (int)sub_h.size();
+    LOG("Multi-map training: %d sub-images, total %dx%d", sub_count, w, h);
+
+    // Pre-compute y offsets for each sub-image
+    std::vector<int> y_offsets(sub_count, 0);
+    for (int si = 1; si < sub_count; si++) {
+        y_offsets[si] = y_offsets[si - 1] + std::max(0, sub_h[si - 1]);
+    }
+
+    // Per-sub-image results
+    struct SubResult {
+        std::vector<cv::KeyPoint> kps;
+        cv::Mat descs;
+        int map_id = 0;
+    };
+    std::vector<SubResult> sub_results(sub_count);
+    int total_kp = 0;
+    // 裁剪偏移（每个子图不同），用于后续坐标修正
+    std::vector<cv::Point> crop_offsets(sub_count, cv::Point(0, 0));
+
+    // Serial training — each sub-image with its own SIFT params (if overridden)
+    // Build a lookup map: subImageIndex → SubImageSiftParams
+    std::unordered_map<int, const SubImageSiftParams*> override_map;
+    for (auto& sp : params.subImageSiftParams) {
+        override_map[sp.subImageIndex] = &sp;
+    }
+
+    LOG("  group_filter=%d (0=overworld, 1=caves, -1=all)", sub_image_group);
+
+    for (int si = 0; si < sub_count; si++) {
+        int sh = sub_h[si];
+        if (sh <= 0) { LOG("Sub-image %d: zero height, skipping", si); continue; }
+
+        // Group filter using subImageIsCave flags from Java metadata (fallback to
+        // index-based convention: si==0 = overworld, si>0 = cave)
+        bool is_cave = (si < (int)params.subImageIsCave.size())
+            ? (params.subImageIsCave[si] != 0)
+            : (si > 0);
+        if (sub_image_group == 0 && is_cave) continue;  // overworld: skip caves
+        if (sub_image_group == 1 && !is_cave) continue; // caves: skip overworld
+
+        // Resolve SIFT params for this sub-image (override or default)
+        cv::Ptr<cv::SIFT> sub_sift;
+        auto it = override_map.find(si);
+        if (it != override_map.end()) {
+            auto* sp = it->second;
+            int nf = (sp->nfeatures >= 0) ? sp->nfeatures : params.nfeatures;
+            int nol = (sp->nOctaveLayers >= 0) ? sp->nOctaveLayers : params.nOctaveLayers;
+            double ct = (sp->contrastThreshold > 0.0) ? sp->contrastThreshold : params.contrastThreshold;
+            double et = (sp->edgeThreshold > 0.0) ? sp->edgeThreshold : params.edgeThreshold;
+            double sg = (sp->sigma > 0.0) ? sp->sigma : params.sigma;
+            sub_sift = cv::SIFT::create(nf, nol, ct, et, sg, false);
+        } else {
+            sub_sift = cv::SIFT::create(
+                params.nfeatures, params.nOctaveLayers,
+                params.contrastThreshold, params.edgeThreshold, params.sigma, false);
+        }
+
+        cv::Mat sub_gray(sh, w, CV_8UC1, (void*)(gray_pixels + y_offsets[si] * w));
+
+        // 自动裁剪空白边缘，只对有效内容区域做 SIFT 检测
+        cv::Rect crop = find_content_rect(sub_gray, 16, 4);
+        if (crop.width > 0 && crop.height > 0 && crop.area() < (int64_t)w * sh) {
+            crop_offsets[si] = cv::Point(crop.x, crop.y);
+            sub_gray = sub_gray(crop);
+        }
+
+        // 大子图使用分块检测（同步 master 行为）
+        bool is_tiled = false;
+        if ((int64_t)sub_gray.cols * sub_gray.rows >= params.largeMapThreshold) {
+            detect_tiled(sub_sift, sub_gray, sub_gray.cols, sub_gray.rows,
+                params.tileSize, params.tileOverlap, params.dedupDistance,
+                sub_results[si].kps, sub_results[si].descs);
+            is_tiled = true;
+        } else {
+            sub_sift->detectAndCompute(sub_gray, cv::noArray(),
+                sub_results[si].kps, sub_results[si].descs);
+        }
+        LOG("  sub[%d] is_cave=%d crop=(%d,%d,%d,%d) -> %zu kp%s",
+            si, is_cave, crop.x, crop.y, crop.width, crop.height,
+            sub_results[si].kps.size(), is_tiled ? " (tiled)" : "");
+
+        sub_results[si].map_id = si;
+        total_kp += (int)sub_results[si].kps.size();
+    }
+
+    // Collect results from all sub-images
+    std::vector<cv::Mat> all_raw_descs;
+    std::vector<cv::KeyPoint> all_kps;
+    map_id_for_feature.clear();
+    int desc_dim = 128;
+
+    for (int si = 0; si < sub_count; si++) {
+        auto& r = sub_results[si];
+        if (r.descs.empty()) continue;
+        cv::Mat desc_float;
+        if (r.descs.type() != CV_32F) {
+            r.descs.convertTo(desc_float, CV_32F);
+        } else {
+            desc_float = r.descs;
+        }
+        desc_dim = desc_float.cols;
+        all_raw_descs.push_back(desc_float);
+        for (auto& kp : r.kps) {
+            cv::KeyPoint kp_full = kp;
+            kp_full.pt.x += crop_offsets[si].x;  // 裁剪偏移 → 子图坐标
+            kp_full.pt.y += crop_offsets[si].y;
+            kp_full.pt.y += y_offsets[si];        // 子图坐标 → 完整图坐标
+            all_kps.push_back(kp_full);
+            map_id_for_feature.push_back(r.map_id);
+        }
+    }
+
+    if (all_kps.empty()) {
+        LOGERR("No keypoints detected in any sub-image");
+        return false;
+    }
+    LOG("Total keypoints across all sub-images: %zu", all_kps.size());
+
+    // Merge descriptors
+    cv::Mat merged_descs;
+    if (all_raw_descs.size() == 1) {
+        merged_descs = all_raw_descs[0];
+    } else {
+        cv::vconcat(all_raw_descs, merged_descs);
+    }
+    LOG("Merged descriptors: %d x %d", merged_descs.rows, merged_descs.cols);
+
+    // Unified PCA + quantization (shared across all sub-images in this group)
+    if (!transform->train(merged_descs)) {
+        LOGERR("Descriptor transform failed");
+        return false;
+    }
+
+    // ---- Unified index (all sub-images in full coordinates) ----
+    map_keypoints = std::move(all_kps);
+    map_keypoint_pts.clear();
+    map_keypoint_pts.reserve(map_keypoints.size());
+    for (auto& kp : map_keypoints)
+        map_keypoint_pts.push_back(kp.pt);
+
+    build_flann_index();
+    LOG("Multi-map trained: %zu features across %d sub-images (full coordinates)",
+        map_keypoints.size(), sub_count);
     return true;
 }
 
@@ -543,5 +890,28 @@ bool SiftMatcher::load_from_cache() {
     for (auto& kp : map_keypoints)
         map_keypoint_pts.push_back(kp.pt);
     LOG("SIFT loaded from cache: %zu features", map_keypoints.size());
+    if (!map_id_for_feature.empty()) {
+        int max_id = *std::max_element(map_id_for_feature.begin(), map_id_for_feature.end());
+        LOG("  multi-map mode: %d sub-images", max_id + 1);
+    }
     return true;
 }
+
+void SiftMatcher::release_training_memory() {
+    // persistent_mat 是训练后保留的 CV_8U 描述符矩阵。
+    // FLANN 索引已在 build_flann_index() 时拷贝了数据，
+    // persistent_mat 仅用于 save_cache()，缓存写完后即可释放。
+    transform->persistent_mat = cv::Mat();
+
+    // map_id_for_feature 仅用于 save_cache() 写缓存文件，匹配时不需要
+    map_id_for_feature.clear();
+    map_id_for_feature.shrink_to_fit();
+
+    // map_keypoints 不被匹配循环使用（匹配用 map_keypoint_pts），可释放以省内存
+    map_keypoints.clear();
+    map_keypoints.shrink_to_fit();
+
+    LOG("Training memory released");
+}
+
+

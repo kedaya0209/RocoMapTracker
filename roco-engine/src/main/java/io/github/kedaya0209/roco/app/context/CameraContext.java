@@ -74,6 +74,7 @@ public class CameraContext {
 
     /**
      * 启用跟随模式时，立即缩放至 followScale 并居中玩家。
+     * offsetY 以拼接坐标存储，MapRenderer 中转换为子图局部坐标。
      */
     private void applyFollowViewport() {
         MapContext mm = MapContext.getInstance();
@@ -103,6 +104,7 @@ public class CameraContext {
      * 包含死区过滤：玩家位移小于 {@link #FOLLOW_DEAD_ZONE} 时跳过更新，
      * 避免小抖动导致地图晃动。
      * </p>
+     * 注意：offsetY 以拼接坐标存储，MapRenderer 中会转换为子图局部坐标。
      */
     public void updateViewport() {
         MapContext mm = MapContext.getInstance();

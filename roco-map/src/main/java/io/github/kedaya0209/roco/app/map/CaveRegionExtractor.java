@@ -1,13 +1,13 @@
 package io.github.kedaya0209.roco.app.map;
 
+import lombok.extern.slf4j.Slf4j;
+
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -17,41 +17,33 @@ import java.util.List;
  * <p>输出：在 maps 目录下生成 {洞穴名}_大陆区域.png，膨胀区域显示大陆图，
  * 其余透明。不修改原洞穴图。
  */
+@Slf4j
 public class CaveRegionExtractor {
 
-    private static final String MAIN_MAP = "卡洛西亚大陆.png";
     private static final int[][] DIRS = {{-1,0}, {1,0}, {0,-1}, {0,1}};
 
     public static void main(String[] args) throws Exception {
         int extendPx = args.length > 0 ? Integer.parseInt(args[0]) : 200;
 
         String baseDir = System.getProperty("cave-fuser.resources",
-                "roco-map/src/main/resources");
+                "RocoMapTracker/roco-map/src/main/resources");
         Path mapsDir = Paths.get(baseDir, "source", "maps");
         if (!Files.isDirectory(mapsDir)) {
-            System.err.println("目录不存在: " + mapsDir.toAbsolutePath());
+            log.error("目录不存在: {}", mapsDir.toAbsolutePath());
             System.exit(1);
         }
 
-        // 收集洞穴 PNG
-        List<Path> cavePngs = new ArrayList<>();
-        try (var stream = Files.list(mapsDir)) {
-            stream.filter(p -> p.toString().endsWith(".png")
-                            && !p.getFileName().toString().equals(MAIN_MAP)
-                            && !p.getFileName().toString().contains("_大陆区域"))
-                  .sorted().forEach(cavePngs::add);
-        }
-
+        List<Path> cavePngs = CaveUtils.findCavePngs(mapsDir);
         if (cavePngs.isEmpty()) {
-            System.out.println("未找到洞穴 PNG");
+            log.info("未找到洞穴 PNG");
             return;
         }
 
-        Path mainPath = mapsDir.resolve(MAIN_MAP);
-        System.out.println("加载大陆图: " + MAIN_MAP);
+        Path mainPath = mapsDir.resolve(CaveUtils.MAIN_MAP);
+        log.info("加载大陆图: {}", CaveUtils.MAIN_MAP);
         BufferedImage mainMap = ImageIO.read(mainPath.toFile());
         if (mainMap == null) {
-            System.err.println("大陆图加载失败");
+            log.error("大陆图加载失败");
             System.exit(1);
         }
 
@@ -59,17 +51,17 @@ public class CaveRegionExtractor {
             extract(cavePng, mainMap, extendPx, mapsDir);
         }
 
-        System.out.println("全部提取完成，共 " + cavePngs.size() + " 个洞穴");
+        log.info("全部提取完成，共 {} 个洞穴", cavePngs.size());
     }
 
     private static void extract(Path cavePng, BufferedImage mainMap,
                                 int extendPx, Path mapsDir) throws IOException {
         String name = cavePng.getFileName().toString();
-        System.out.println("处理: " + name);
+        log.info("处理: {}", name);
 
         BufferedImage caveImg = ImageIO.read(cavePng.toFile());
         if (caveImg == null) {
-            System.out.println("  跳过: 读取失败");
+            log.warn("  跳过: 读取失败");
             return;
         }
 
@@ -147,6 +139,6 @@ public class CaveRegionExtractor {
         }
 
         ImageIO.write(outImg, "png", outPath.toFile());
-        System.out.println("  输出: " + outName + " (" + pixels + " 像素, 暗化0.3)");
+        log.info("  输出: {} ({} 像素, 暗化0.3)", outName, pixels);
     }
 }

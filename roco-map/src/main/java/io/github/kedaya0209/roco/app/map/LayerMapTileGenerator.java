@@ -117,9 +117,10 @@ public class LayerMapTileGenerator {
                         if (w <= 0 || h <= 0) continue;
 
                         BufferedImage tile = levelImage.getSubimage(x, y, w, h);
+                        final BufferedImage finalTile = tile;
                         futures.add(executor.submit(() -> {
                             try {
-                                ImageIO.write(tile, "png", tileFile);
+                                ImageIO.write(finalTile, "png", tileFile);
                             } catch (IOException e) {
                                 log.warn("瓦片保存失败: {}", tileFile, e);
                             }

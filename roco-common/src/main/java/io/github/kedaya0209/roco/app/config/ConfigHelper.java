@@ -64,4 +64,16 @@ public final class ConfigHelper {
             return new int[0];
         }
     }
+
+    public static boolean[] getBoolArray(Properties prop, String key) {
+        String s = prop.getProperty(key);
+        if (s == null || s.isBlank()) return new boolean[0];
+        String[] parts = s.split(",");
+        boolean[] result = new boolean[parts.length];
+        for (int i = 0; i < parts.length; i++) {
+            result[i] = Boolean.parseBoolean(parts[i].trim());
+        }
+        return result;
+    }
+
 }

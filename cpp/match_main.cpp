@@ -103,78 +103,162 @@ int main(int argc, char* argv[]) {
 
     LOG("Algorithm: SIFT (kind=%d)", (int)params.kind);
 
-    // Create matcher
-    auto matcher = create_matcher(params);
-    if (!matcher) {
-        LOGERR("Failed to create matcher");
+    // Create dual matchers: overworld (sub-image 0) + caves (sub-images 1+)
+    auto overworld = create_matcher(params);
+    auto matcher_cave = create_matcher(params);
+    if (!overworld || !matcher_cave) {
+        LOGERR("Failed to create matchers");
         closesocket(sock); WSACleanup(); return 1;
     }
+    overworld->setSubImageGroup(0);
+    matcher_cave->setSubImageGroup(1);
 
-    bool init_ok = false;
+    // Try loading caches
+    bool ow_ok = false, cv_ok = false;
     if (!params.cacheFilePath.empty()) {
-        init_ok = matcher->load_cache(params.cacheFilePath);
+        ow_ok = overworld->load_cache(params.cacheFilePath);
+    }
+    if (!params.caveCacheFilePath.empty()) {
+        cv_ok = matcher_cave->load_cache(params.caveCacheFilePath);
     }
 
-    if (!init_ok) {
-        LOG("Cache miss, requesting map data...");
+    // Request MAP_DATA if any cache needs training
+    if (!ow_ok || !cv_ok) {
+        LOG("Cache miss (ow=%d cave=%d), requesting map data...", ow_ok, cv_ok);
         if (!send_message(sock, REQUEST_MAP, nullptr, 0)) {
             LOGERR("Failed to send REQUEST_MAP");
             closesocket(sock); WSACleanup(); return 1;
         }
 
-        type = recv_message(sock, recv_body);
-        if (type != MAP_DATA || recv_body.size() < 12) {
-            LOGERR("Expected MAP_DATA, got type=%d size=%zu", type, recv_body.size());
+        int32_t type = recv_message(sock, recv_body);
+        if (type != MAP_DATA) {
+            LOGERR("Expected MAP_DATA, got type=%d", type);
             closesocket(sock); WSACleanup(); return 1;
         }
 
-        int map_w = (int)read_be32(recv_body.data());
-        int map_h = (int)read_be32(recv_body.data() + 4);
-        uint32_t pixels_len = read_be32(recv_body.data() + 8);
-        if (pixels_len != (uint32_t)(map_w * map_h)) {
-            LOGERR("Map pixel size mismatch");
-            closesocket(sock); WSACleanup(); return 1;
-        }
-        LOG("Received map data: %dx%d (%u gray pixels)", map_w, map_h, pixels_len);
+        // --- Parse MAP_DATA (supports multi-subimage format) ---
+        int sub_count = 1;
+        int map_w, map_h;
+        uint32_t pixels_len;
+        uint8_t* map_pixels;
 
-        uint8_t* map_pixels = recv_body.data() + 12;
-        if (!matcher->train(map_pixels, map_w, map_h)) {
-            LOGERR("Training failed");
-            const char* err_msg = "Training failed";
-            uint8_t err_buf[8];
-            write_be32(err_buf, 1);
-            write_be32(err_buf + 4, (uint32_t)strlen(err_msg));
-            std::vector<uint8_t> body;
-            body.insert(body.end(), err_buf, err_buf + 8);
-            body.insert(body.end(), err_msg, err_msg + strlen(err_msg));
-            send_message(sock, INIT_FAILED, body.data(), (uint32_t)body.size());
-            closesocket(sock); WSACleanup(); return 1;
-        }
+        int first_val = (int)read_be32(recv_body.data());
+        if (first_val > 0 && first_val <= 20) {
+            // Multi-subimage format: [subImageCount][w][totalH][subH_0..subH_{N-1}][pixelsLen][gray8...]
+            sub_count = first_val;
+            map_w = (int)read_be32(recv_body.data() + 4);
+            map_h = (int)read_be32(recv_body.data() + 8);
+            int pixels_off = 12 + sub_count * 4;
+            pixels_len = read_be32(recv_body.data() + pixels_off);
+            map_pixels = recv_body.data() + pixels_off + 4;
 
-        if (!params.cacheFilePath.empty()) {
-            size_t lastSep = params.cacheFilePath.find_last_of("\\/");
-            if (lastSep != std::string::npos) {
-                std::string dir = params.cacheFilePath.substr(0, lastSep);
-                CreateDirectoryA(dir.c_str(), nullptr);
+            params.subImageHeights.resize(sub_count);
+            for (int i = 0; i < sub_count; i++) {
+                params.subImageHeights[i] = (int)read_be32(recv_body.data() + 12 + i * 4);
             }
-            matcher->save_cache(params.cacheFilePath);
+        } else {
+            // Single-map format: [w][h][pixelsLen][gray8...]
+            if (recv_body.size() < 12) {
+                LOGERR("MAP_DATA too short: %zu bytes", recv_body.size());
+                closesocket(sock); WSACleanup(); return 1;
+            }
+            map_w = first_val;
+            map_h = (int)read_be32(recv_body.data() + 4);
+            pixels_len = read_be32(recv_body.data() + 8);
+            map_pixels = recv_body.data() + 12;
+        }
+
+        if (pixels_len != (uint32_t)(map_w * map_h)) {
+            LOGERR("Map pixel size mismatch: %u vs %dx%d=%d",
+                    pixels_len, map_w, map_h, map_w * map_h);
+            closesocket(sock); WSACleanup(); return 1;
+        }
+        LOG("Received map data: %dx%d (%u gray pixels, subImageCount=%d)",
+            map_w, map_h, pixels_len, sub_count);
+
+        // Train overworld if needed
+        if (!ow_ok) {
+            LOG("Training overworld matcher...");
+            if (!overworld->train(map_pixels, map_w, map_h)) {
+                LOGERR("Overworld training failed");
+                {
+                    const char* msg = "Overworld training failed";
+                    uint32_t msg_len = (uint32_t)strlen(msg);
+                    std::vector<uint8_t> body(8 + msg_len);
+                    write_be32(body.data(), 1);
+                    write_be32(body.data() + 4, msg_len);
+                    memcpy(body.data() + 8, msg, msg_len);
+                    send_message(sock, INIT_FAILED, body.data(), (uint32_t)body.size());
+                }
+                closesocket(sock); WSACleanup(); return 1;
+            }
+            if (!params.cacheFilePath.empty()) {
+                size_t lastSep = params.cacheFilePath.find_last_of("\\/");
+                if (lastSep != std::string::npos) {
+                    std::string dir = params.cacheFilePath.substr(0, lastSep);
+                    CreateDirectoryA(dir.c_str(), nullptr);
+                }
+                overworld->save_cache(params.cacheFilePath);
+            }
+        }
+
+        // Train caves if needed
+        if (!cv_ok) {
+            LOG("Training cave matcher...");
+            if (!matcher_cave->train(map_pixels, map_w, map_h)) {
+                LOGERR("Cave training failed");
+                {
+                    const char* msg = "Cave training failed";
+                    uint32_t msg_len = (uint32_t)strlen(msg);
+                    std::vector<uint8_t> body(8 + msg_len);
+                    write_be32(body.data(), 1);
+                    write_be32(body.data() + 4, msg_len);
+                    memcpy(body.data() + 8, msg, msg_len);
+                    send_message(sock, INIT_FAILED, body.data(), (uint32_t)body.size());
+                }
+                closesocket(sock); WSACleanup(); return 1;
+            }
+            if (!params.caveCacheFilePath.empty()) {
+                size_t lastSep = params.caveCacheFilePath.find_last_of("\\/");
+                if (lastSep != std::string::npos) {
+                    std::string dir = params.caveCacheFilePath.substr(0, lastSep);
+                    CreateDirectoryA(dir.c_str(), nullptr);
+                }
+                matcher_cave->save_cache(params.caveCacheFilePath);
+            }
         }
     }
 
-    // INIT_COMPLETE
+    // INIT_COMPLETE — report total features from both matchers
+    size_t ow_feat = 0, cv_feat = 0;
     {
+        ow_feat = overworld->feature_count();
+        cv_feat = matcher_cave->feature_count();
+        size_t total_kp = ow_feat + cv_feat;
         uint8_t feat_buf[4];
-        write_be32(feat_buf, (uint32_t)matcher->feature_count());
+        write_be32(feat_buf, (uint32_t)total_kp);
         if (!send_message(sock, INIT_COMPLETE, feat_buf, 4)) {
             LOGERR("Failed to send INIT_COMPLETE");
             closesocket(sock); WSACleanup(); return 1;
         }
+        LOG("INIT_COMPLETE: overworld=%zu cave=%zu total=%zu features",
+            ow_feat, cv_feat, total_kp);
     }
-    LOG("INIT_COMPLETE sent, entering matching loop...");
 
-    // Matching loop
+    // 释放训练内存（persistent_mat 等），FLANN 索引已持有内部拷贝
+    overworld->release_training_memory();
+    matcher_cave->release_training_memory();
+    LOG("Training memory released for both matchers (%zu ow + %zu cave features)",
+        ow_feat, cv_feat);
+
+    // Windows 堆压缩，将空闲内存归还给 OS
+    _heapmin();
+
+    // Matching loop with dual matchers
     std::atomic<bool> g_running{true};
-    int ret = run_match_loop(sock, params, *matcher, g_running);
+    MatcherBase& ref_overworld = *overworld;
+    MatcherBase& ref_cave = *matcher_cave;
+    int ret = run_match_loop(sock, params, ref_overworld, ref_cave, g_running);
 
     closesocket(sock);
     WSACleanup();

@@ -28,15 +28,6 @@ public interface MapMatcher {
     double[][] match(byte[] imageBytes, int width, int height);
 
     /**
-     * 带 ROI 提示的匹配。
-     * hintX/hintY 为预测的参考地图坐标，null 表示无提示（全图搜索）。
-     * 实现类可在 hint 非空时仅搜索周边特征点子集以加速匹配。
-     */
-    default double[][] match(byte[] imageBytes, int width, int height, Double hintX, Double hintY) {
-        return match(imageBytes, width, height);
-    }
-
-    /**
      * 释放Native资源
      */
     void destroy();

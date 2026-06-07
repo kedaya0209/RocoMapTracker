@@ -26,10 +26,11 @@ public final class PathConfig {
     // ============================================================
     // 地图资源
     // ============================================================
-    public static final String MAP_RESOURCE_PATH = "/source/map/map_G.png";
-    public static final String MAP_RESOURCE_DIR = "/source/map/";
-    public static final String SHOW_MAP = "/source/map/WorldMap_Show.png";
-    public static final String SIFT_MAP = "/source/map/WorldMap_SIFT.png";
+    public static final String MULTI_MAP_METADATA = "/source/maps/MultiMap_metadata.json";
+    public static final String MAPS_DIR = "/source/maps/";
+
+    /** MultiMap 缓存文件命名基址（C++ 统一索引缓存路径的前缀） */
+    public static final String MULTI_MAP_BASE = "/source/maps/MultiMap";
 
     // ============================================================
     // 图标

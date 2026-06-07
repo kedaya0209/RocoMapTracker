@@ -126,14 +126,6 @@
                                         <exclude>ai/onnxruntime/native/osx-*/**</exclude>
                                     </excludes>
                                 </filter>
-                                <!-- 排除巨大的洞穴地图瓦片数据（避免嵌入原生镜像导致 1GB+） -->
-                                <filter>
-                                    <artifact>io.github.kedaya0209:roco-map</artifact>
-                                    <excludes>
-                                        <exclude>source/maps/**</exclude>
-                                        <exclude>source/maps.zip</exclude>
-                                    </excludes>
-                                </filter>
                                 <!-- 排除不需要的元数据文件 -->
                                 <filter>
                                     <artifact>*:*</artifact>

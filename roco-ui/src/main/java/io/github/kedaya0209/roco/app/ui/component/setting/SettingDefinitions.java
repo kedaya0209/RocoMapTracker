@@ -1,7 +1,20 @@
 package io.github.kedaya0209.roco.app.ui.component.setting;
 
-import io.github.kedaya0209.roco.app.config.*;
 import net.jcip.annotations.NotThreadSafe;
+import io.github.kedaya0209.roco.app.config.ConfigPersistence;
+import io.github.kedaya0209.roco.app.config.RenderConfig;
+import io.github.kedaya0209.roco.app.config.SocketConfig;
+import io.github.kedaya0209.roco.app.config.UiConfig;
+import io.github.kedaya0209.roco.app.config.CaptureConfig;
+import io.github.kedaya0209.roco.app.config.PlayerConfig;
+import io.github.kedaya0209.roco.app.config.StatsConfig;
+import io.github.kedaya0209.roco.app.config.MiniMapConfig;
+import io.github.kedaya0209.roco.app.config.ViewConfig;
+import io.github.kedaya0209.roco.app.config.DownloadConfig;
+import io.github.kedaya0209.roco.app.config.SiftConfig;
+import io.github.kedaya0209.roco.app.config.NavigConfig;
+import io.github.kedaya0209.roco.app.config.UpdateConfig;
+import io.github.kedaya0209.roco.app.config.BuildConfig;
 import io.github.kedaya0209.roco.app.context.CameraContext;
 import io.github.kedaya0209.roco.app.ui.state.AppState;
 import io.github.kedaya0209.roco.app.ui.state.ViewportState;
@@ -331,6 +344,18 @@ public final class SettingDefinitions {
                                 () -> CameraContext.getInstance().setFollowMode(ViewConfig.DEFAULT_FOLLOW_MODE),
                                 () -> ViewConfig.DEFAULT_FOLLOW_MODE,
                                 v -> ViewConfig.DEFAULT_FOLLOW_MODE = (Boolean) v),
+                        doub("PLAYER_EMA_ALPHA", "位置平滑因子",
+                                () -> PlayerConfig.PLAYER_EMA_ALPHA,
+                                v -> PlayerConfig.PLAYER_EMA_ALPHA = (Double) v),
+                        doub("PLAYER_VELOCITY_EMA_ALPHA", "速度平滑因子",
+                                () -> PlayerConfig.PLAYER_VELOCITY_EMA_ALPHA,
+                                v -> PlayerConfig.PLAYER_VELOCITY_EMA_ALPHA = (Double) v),
+                        doub("PLAYER_ANGLE_EMA_ALPHA", "角度平滑因子",
+                                () -> PlayerConfig.PLAYER_ANGLE_EMA_ALPHA,
+                                v -> PlayerConfig.PLAYER_ANGLE_EMA_ALPHA = (Double) v),
+                        doub("PLAYER_ANGLE_OUTLIER_THRESHOLD", "角度离群阈值(度)",
+                                () -> PlayerConfig.PLAYER_ANGLE_OUTLIER_THRESHOLD,
+                                v -> PlayerConfig.PLAYER_ANGLE_OUTLIER_THRESHOLD = (Double) v),
                         doub("PLAYER_TELEPORT_THRESHOLD", "瞬移检测阈值",
                                 () -> PlayerConfig.PLAYER_TELEPORT_THRESHOLD,
                                 v -> PlayerConfig.PLAYER_TELEPORT_THRESHOLD = (Double) v),
@@ -490,9 +515,6 @@ public final class SettingDefinitions {
                         integer("DOWNLOAD_READ_TIMEOUT", "读取超时(ms)", true,
                                 () -> DownloadConfig.DOWNLOAD_READ_TIMEOUT,
                                 v -> DownloadConfig.DOWNLOAD_READ_TIMEOUT = (Integer) v),
-                        integer("DOWNLOAD_MAX_RETRY", "最大重试次数", true,
-                                () -> DownloadConfig.DOWNLOAD_MAX_RETRY,
-                                v -> DownloadConfig.DOWNLOAD_MAX_RETRY = (Integer) v),
                         integer("DOWNLOAD_THREAD_COUNT", "并发线程数", true,
                                 () -> DownloadConfig.DOWNLOAD_THREAD_COUNT,
                                 v -> DownloadConfig.DOWNLOAD_THREAD_COUNT = (Integer) v),
@@ -506,7 +528,7 @@ public final class SettingDefinitions {
                                 () -> DownloadConfig.DOWNLOAD_CHUNK_SIZE,
                                 v -> DownloadConfig.DOWNLOAD_CHUNK_SIZE = (Integer) v)
                 ),
-                cat("捕获", PathConfig.CAPTURE_ICON_PATH,
+                cat("捕获", "/icon/capture.svg",
                         integer("CAPTURE_BLACK_SAMPLE_SIZE", "黑帧采样字节", false,
                                 () -> CaptureConfig.CAPTURE_BLACK_SAMPLE_SIZE,
                                 v -> CaptureConfig.CAPTURE_BLACK_SAMPLE_SIZE = (Integer) v),

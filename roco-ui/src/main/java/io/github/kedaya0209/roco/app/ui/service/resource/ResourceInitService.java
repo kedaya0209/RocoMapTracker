@@ -2,7 +2,6 @@ package io.github.kedaya0209.roco.app.ui.service.resource;
 
 import net.jcip.annotations.NotThreadSafe;
 import net.jcip.annotations.ThreadSafe;
-import com.fasterxml.jackson.databind.JsonNode;
 import io.github.kedaya0209.roco.app.config.ConfigPersistence;
 import io.github.kedaya0209.roco.app.config.PathConfig;
 import io.github.kedaya0209.roco.app.config.DownloadConfig;
@@ -10,6 +9,7 @@ import io.github.kedaya0209.roco.app.context.MapContext;
 import io.github.kedaya0209.roco.app.context.ResourceConfigContext;
 import io.github.kedaya0209.roco.app.context.ResourcePointContext;
 import io.github.kedaya0209.roco.app.hook.AppEvents;
+import io.github.kedaya0209.roco.app.map.model.CompositeMapMetadata;
 import io.github.kedaya0209.roco.app.hook.event.NotificationType;
 import io.github.kedaya0209.roco.app.hook.event.ProgressEvent;
 import io.github.kedaya0209.roco.app.hook.event.StatusEvent;
@@ -19,8 +19,6 @@ import io.github.kedaya0209.roco.app.map.core.IconDownloader;
 import io.github.kedaya0209.roco.app.map.core.MapDownloader;
 import io.github.kedaya0209.roco.app.map.loader.ImageLoader;
 import io.github.kedaya0209.roco.app.map.model.ResourcePoint;
-import io.github.kedaya0209.roco.app.utils.JsonUtils;
-import io.github.kedaya0209.roco.app.utils.PngUtil;
 import io.github.kedaya0209.roco.app.utils.ResourceUtils;
 import javafx.application.Platform;
 import lombok.extern.slf4j.Slf4j;
@@ -46,7 +44,6 @@ import java.util.Set;
 public class ResourceInitService {
 
     private final ResourceInitUiDelegate uiDelegate;
-    private final TileGeneratorService tileGeneratorService = new TileGeneratorService();
     private volatile boolean downloadCancelled = false;
 
     public ResourceInitService(ResourceInitUiDelegate uiDelegate) {
@@ -112,27 +109,32 @@ public class ResourceInitService {
             List<MissingEntry> missing = validateManifest(initFile);
             if (!missing.isEmpty()) {
                 log.warn("资源文件缺失 {} 个，启动修复流程", missing.size());
-                recoverMissingResources(missing);
+                recoverMissingResourcesAsync(missing, () -> {
+                    try {
+                        continueInitWithExternalProfile(onReady);
+                    } catch (Exception e) {
+                        log.error("资源修复后初始化异常", e);
+                        AppEvents.publish(StatusEvent.class,
+                                new StatusEvent("资源修复后初始化失败: " + e.getMessage(), NotificationType.ERROR));
+                    }
+                });
+                return;
             }
-
-            publishInitStep(0.2, "正在载入地图元数据...");
-            initMapMetadata();
-            publishInitStep(0.4, "正在验证地图瓦片...");
-            if (ResourceConfigContext.getCurrentProfile() != ResourceConfigContext.ResourceProfile.INTERNAL) {
-                tileGeneratorService.validateAndGenerateTiles();
-                // 瓦片生成消耗了大量堆内存，触发 GC 让堆缩回
-                System.gc();
-                log.info("瓦片验证完成，已触发堆内存回收");
-            }
-            publishInitStep(0.6, "构建坐标索引系统...");
-            ResourcePointContext.getInstance().loadAndInit();
-            publishInitStep(0.8, "合并图标纹理图集...");
-            buildIconAtlas();
-            publishInitStep(1.0, "核心引擎已就绪");
-            uiDelegate.onResourceReady(onReady);
+            continueInitWithExternalProfile(onReady);
         } else {
             handleFirstRun(onReady);
         }
+    }
+
+    private void continueInitWithExternalProfile(Runnable onReady) throws Exception {
+        publishInitStep(0.2, "正在载入地图元数据...");
+        initMapMetadata();
+        publishInitStep(0.6, "构建坐标索引系统...");
+        ResourcePointContext.getInstance().loadAndInit();
+        publishInitStep(0.8, "合并图标纹理图集...");
+        buildIconAtlas();
+        publishInitStep(1.0, "核心引擎已就绪");
+        uiDelegate.onResourceReady(onReady);
     }
 
     // ================================================================
@@ -156,7 +158,7 @@ public class ResourceInitService {
                 File f = ResourceUtils.getExternalFile(path);
                 if (!f.exists()) {
                     ResourceType type;
-                    if (path.startsWith(PathConfig.MAP_RESOURCE_DIR)) {
+                    if (path.startsWith(PathConfig.MAPS_DIR)) {
                         type = ResourceType.MAP;
                     } else if (path.startsWith(PathConfig.ICON_DIR)) {
                         type = ResourceType.ICON;
@@ -174,24 +176,54 @@ public class ResourceInitService {
         return missing;
     }
 
-    private void recoverMissingResources(List<MissingEntry> missing) {
+    /**
+     * 异步修复缺失资源，UI 显示下载覆盖层和进度。
+     * 下载完成后在 FX 线程回调 onComplete。
+     */
+    private void recoverMissingResourcesAsync(List<MissingEntry> missing, Runnable onComplete) {
         boolean needMap = missing.stream().anyMatch(e -> e.type() == ResourceType.MAP);
         boolean needConfig = missing.stream().anyMatch(e -> e.type() == ResourceType.CONFIG);
         boolean needIcons = missing.stream().anyMatch(e -> e.type() == ResourceType.ICON);
 
-        if (needMap) {
-            log.info("修复缺失的地图文件...");
-            if (!MapResourceUpdater.updateMapOnly()) {
-                log.warn("地图修复未能完成");
+        downloadCancelled = false;
+
+        uiDelegate.showDownloadOverlay(() -> {
+            downloadCancelled = true;
+            MapDownloader.stopDownload();
+            IconDownloader.stopDownload();
+            uiDelegate.removeDownloadOverlay();
+        });
+
+        DownloadProgressContext.getInstance().setOnProgressUpdate((completed, total) -> {
+            double progress = total <= 0 ? 0 : (double) completed / total;
+            AppEvents.publish(ProgressEvent.class, new ProgressEvent(progress,
+                    String.format("%s (%d/%d)", DownloadProgressContext.getInstance().getStatusText(), completed, total)));
+        });
+
+        Thread.ofPlatform().daemon(true).start(() -> {
+            try {
+                if (needMap) {
+                    log.info("修复缺失的地图文件...");
+                    if (!MapResourceUpdater.updateMapOnly()) {
+                        log.warn("地图修复未能完成");
+                    }
+                }
+                if (needConfig || needIcons) {
+                    log.info("修复缺失的配置/图标文件...");
+                    if (!MapResourceUpdater.updateIconsAndConfigOnly()) {
+                        log.warn("配置/图标修复未能完成");
+                    }
+                }
+                if (!downloadCancelled) {
+                    log.info("资源修复完成");
+                    Platform.runLater(onComplete);
+                }
+            } catch (Exception e) {
+                log.error("资源修复异常", e);
+                AppEvents.publish(StatusEvent.class,
+                        new StatusEvent("资源修复失败: " + e.getMessage(), NotificationType.ERROR));
             }
-        }
-        if (needConfig || needIcons) {
-            log.info("修复缺失的配置/图标文件...");
-            if (!MapResourceUpdater.updateIconsAndConfigOnly()) {
-                log.warn("配置/图标修复未能完成");
-            }
-        }
-        log.info("资源修复完成");
+        });
     }
 
     private void handleFirstRun(Runnable onReady) {
@@ -277,64 +309,38 @@ public class ResourceInitService {
 
     /**
      * 内置资源元数据加载（无需校验，资源打包在 JAR 中）。
-     * 直接从 WorldMap_SIFT.png 头部 IHDR chunk 读取地图尺寸。
+     * 从 MultiMap_metadata.json 读取子图信息，取大陆图尺寸作为局部坐标空间。
      */
     private void initInternalMapMetadata() throws Exception {
-        String mapPath = ResourceConfigContext.getSiftMap();
-        int imgW, imgH;
-
-        int[] size;
-        try (InputStream in = ResourceUtils.getResourceStream(mapPath)) {
-            byte[] header = new byte[24];
-            int offset = 0;
-            while (offset < header.length) {
-                int read = in.read(header, offset, header.length - offset);
-                if (read < 0) break;
-                offset += read;
-            }
-            if (offset < 24) {
-                throw new Exception("PNG 文件不完整，期望 24 字节头部，实际 " + offset);
-            }
-            size = PngUtil.parseSize(header);
-            if (size == null) {
-                throw new Exception("PNG 头部格式无效");
-            }
+        try (InputStream is = ResourceUtils.getResourceStream(
+                ResourceConfigContext.getMultiMapMetadata())) {
+            CompositeMapMetadata metadata = CompositeMapMetadata.load(is);
+            var mainland = metadata.subImages().stream()
+                    .filter(s -> !s.isCave())
+                    .findFirst().orElse(null);
+            int imgW = mainland != null ? mainland.width() : 8192;
+            int imgH = mainland != null ? mainland.height() : 8192;
+            log.info("内置地图元数据从 MultiMap_metadata.json 读取: {}x{} ({} 子图)",
+                    imgW, imgH, metadata.subImages().size());
+            MapContext.getInstance().init("G", imgW, imgH);
+            MapContext.getInstance().setMultiMapMetadata(metadata);
         }
-        imgW = size[0];
-        imgH = size[1];
-        log.info("内置地图元数据从 PNG 头部读取: {}x{}", imgW, imgH);
-        MapContext.getInstance().init("G", imgW, imgH);
     }
 
     private void initMapMetadata() throws Exception {
-        String mapPath = ResourceConfigContext.getShowMap();
-        int imgW, imgH;
-
-        String metaPath = ResourceConfigContext.getTilesDir() + "/tiles_meta.json";
-        try (InputStream metaIn = ResourceUtils. getResourceStream(metaPath)) {
-            JsonNode meta = JsonUtils.getMapper().readTree(metaIn);
-            imgW = meta.get("mapWidth").asInt();
-            imgH = meta.get("mapHeight").asInt();
-            log.info("地图元数据从 tiles_meta.json 读取: {}x{}", imgW, imgH);
-        } catch (IOException metaEx) {
-            try (InputStream in = ResourceUtils.getResourceStream(mapPath)) {
-                byte[] header = new byte[24];
-                int off = 0;
-                while (off < header.length) {
-                    int read = in.read(header, off, header.length - off);
-                    if (read < 0) break;
-                    off += read;
-                }
-                if (off < 24) throw new Exception("PNG 头部不完整");
-                int[] pngSize = PngUtil.parseSize(header);
-                if (pngSize == null) throw new Exception("PNG 头部格式无效");
-                imgW = pngSize[0];
-                imgH = pngSize[1];
-            }
-            log.info("地图元数据从 PNG 读取: {}x{}", imgW, imgH);
+        try (InputStream is = ResourceUtils.getResourceStream(
+                ResourceConfigContext.getMultiMapMetadata())) {
+            CompositeMapMetadata metadata = CompositeMapMetadata.load(is);
+            var mainland = metadata.subImages().stream()
+                    .filter(s -> !s.isCave())
+                    .findFirst().orElse(null);
+            int imgW = mainland != null ? mainland.width() : 8192;
+            int imgH = mainland != null ? mainland.height() : 8192;
+            log.info("地图元数据从 MultiMap_metadata.json 读取: {}x{} ({} 子图)",
+                    imgW, imgH, metadata.subImages().size());
+            MapContext.getInstance().init("G", imgW, imgH);
+            MapContext.getInstance().setMultiMapMetadata(metadata);
         }
-
-        MapContext.getInstance().init("G", imgW, imgH);
     }
 
     private void buildIconAtlas() {

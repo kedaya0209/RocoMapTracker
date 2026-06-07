@@ -1508,6 +1508,10 @@
       "jniAccessible": true
     },
     {
+      "type": "com.sun.prism.d3d.D3DShader",
+      "jniAccessible": true
+    },
+    {
       "type": "com.sun.prism.d3d.D3DResource",
       "jniAccessible": true
     },

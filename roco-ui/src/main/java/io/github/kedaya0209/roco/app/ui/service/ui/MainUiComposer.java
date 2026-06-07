@@ -4,6 +4,7 @@ import atlantafx.base.controls.ModalPane;
 import io.github.kedaya0209.roco.app.config.RenderConfig;
 import io.github.kedaya0209.roco.app.context.MapContext;
 import io.github.kedaya0209.roco.app.context.ResourceConfigContext;
+import io.github.kedaya0209.roco.app.map.model.CompositeMapMetadata;
 import io.github.kedaya0209.roco.app.ui.component.canvas.InteractiveCanvas;
 import io.github.kedaya0209.roco.app.ui.component.overlay.ResourceCounterPanel;
 import io.github.kedaya0209.roco.app.ui.component.overlay.StatsOverlay;
@@ -66,8 +67,10 @@ public final class MainUiComposer {
 
         // 地图渲染器
         MapRenderer renderer = new MapRenderer(canvasContainer);
-        renderer.init((int) MapContext.getInstance().getMapWidth(),
-                (int) MapContext.getInstance().getMapHeight());
+        MapContext mapCtx = MapContext.getInstance();
+        CompositeMapMetadata metadata = mapCtx.getMultiMapMetadata();
+        renderer.init((int) mapCtx.getMapWidth(),
+                (int) mapCtx.getMapHeight(), metadata);
 
         // 玩家图标
         try {

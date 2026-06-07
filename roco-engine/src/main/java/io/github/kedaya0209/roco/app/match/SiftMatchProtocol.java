@@ -45,34 +45,68 @@ public class SiftMatchProtocol {
      *   [8B]ransacReprojThreshold [4B]ransacMaxIters [8B]ransacConfidence
      *   [4B]tileSize [4B]tileOverlap [8B]largeMapThreshold [4B]dedupDistance
      *   [4B]cacheFilePathLen [NB]cacheFilePath(UTF-8)
+     *   [4B]caveCachePathLen [NB]caveCachePath(UTF-8)  // 0 length = no cave cache
+     *   [4B]subImageCount                                  // 0 = not multi-map
+     *   [subImageCount * 4B] subImageHeights[]              // per-sub-image pixel heights
+     *   [subImageCount * 1B] subImageIsCave[]               // per-sub-image cave flag (0=overworld, 1=cave)
+     *   [4B]overrideCount                                   // per-sub-image SIFT params
+     *   overrideCount * {
+     *     [4B]subImageIndex
+     *     [8B]contrastThreshold    // 0.0 = 不覆盖
+     *     [8B]edgeThreshold        // 0.0 = 不覆盖
+     *     [4B]nfeatures            // -1 = 不覆盖
+     *     [4B]nOctaveLayers        // -1 = 不覆盖
+     *     [8B]sigma               // 0.0 = 不覆盖
+     *   }
      * </pre>
      */
-    public static byte[] encodeConfig(int variant, String cacheSuffix, int algoKind) {
+    public static byte[] encodeConfig(int variant, String cacheSuffix, String caveCacheSuffix, int algoKind,
+                                       int[] subImageHeights,
+                                       boolean[] subImageIsCave,
+                                       SubImageSiftOverride[] subImageOverrides,
+                                       SubImageSiftOverride matchingSift) {
         String siftMapPath = ResourceConfigContext.getSiftMap();
         String cacheFilePath = FilePathUtil.getExternalFile(CACHE_PREFIX + siftMapPath + cacheSuffix).getAbsolutePath();
         byte[] cachePathBytes = cacheFilePath.getBytes(StandardCharsets.UTF_8);
 
+        byte[] cavePathBytes = null;
+        if (caveCacheSuffix != null && !caveCacheSuffix.isEmpty()) {
+            String caveFilePath = FilePathUtil.getExternalFile(CACHE_PREFIX + siftMapPath + caveCacheSuffix).getAbsolutePath();
+            cavePathBytes = caveFilePath.getBytes(StandardCharsets.UTF_8);
+        }
+
+        int subCount = (subImageHeights != null) ? subImageHeights.length : 0;
+        int overrideCount = (subImageOverrides != null) ? subImageOverrides.length : 0;
         int bodyLen = 4 + 4 + 4 + 4 + 8 + 8 + 8    // kind + variant + SIFT
                 + 8 + 4 + 4                          // MATCH
                 + 4 + 4                              // FLANN
                 + 8 + 4 + 8                          // RANSAC
                 + 4 + 4 + 8 + 4                      // TILE
-                + 4 + cachePathBytes.length;         // cache path
+                + 4 + cachePathBytes.length          // cache path
+                + 4 + (cavePathBytes != null ? cavePathBytes.length : 0) // cave cache path
+                + 4 + subCount * 4 + subCount           // subImageCount + subImageHeights + subImageIsCave
+                + 4 + overrideCount * (4 + 8 + 8 + 4 + 4 + 8); // per-sub-image SIFT overrides
 
         ByteBuffer buf = ByteBuffer.allocate(bodyLen).order(ByteOrder.BIG_ENDIAN);
 
         buf.putInt(algoKind);
         buf.putInt(variant);
-        buf.putInt(SiftConfig.SIFT_N_FEATURES);
-        buf.putInt(SiftConfig.SIFT_N_OCTAVE_LAYERS);
-        buf.putDouble(SiftConfig.SIFT_CONTRAST_THRESHOLD);
-        buf.putDouble(SiftConfig.SIFT_EDGE_THRESHOLD);
-        buf.putDouble(SiftConfig.SIFT_SIGMA);
+
+        // 匹配侧 SIFT 参数：优先使用元数据 matchingSift 覆盖，否则 fallback 到 SiftConfig
+        int nf = (matchingSift != null && matchingSift.nfeatures() != null) ? matchingSift.nfeatures() : SiftConfig.SIFT_N_FEATURES;
+        int nol = (matchingSift != null && matchingSift.nOctaveLayers() != null) ? matchingSift.nOctaveLayers() : SiftConfig.SIFT_N_OCTAVE_LAYERS;
+        double ct = (matchingSift != null && matchingSift.contrastThreshold() != null) ? matchingSift.contrastThreshold() : SiftConfig.SIFT_CONTRAST_THRESHOLD;
+        double et = (matchingSift != null && matchingSift.edgeThreshold() != null) ? matchingSift.edgeThreshold() : SiftConfig.SIFT_EDGE_THRESHOLD;
+        double sg = (matchingSift != null && matchingSift.sigma() != null) ? matchingSift.sigma() : SiftConfig.SIFT_SIGMA;
+        buf.putInt(nf);
+        buf.putInt(nol);
+        buf.putDouble(ct);
+        buf.putDouble(et);
+        buf.putDouble(sg);
 
         buf.putDouble(SiftConfig.MATCH_RATIO_THRESHOLD);
         buf.putInt(SiftConfig.MATCH_MIN_COUNT);
         buf.putInt(SiftConfig.SEARCH_RADIUS);
-
         buf.putInt(SiftConfig.FLANN_KD_TREES);
         buf.putInt(SiftConfig.FLANN_SEARCH_CHECKS);
 
@@ -89,21 +123,53 @@ public class SiftMatchProtocol {
         buf.putInt(cachePathBytes.length);
         buf.put(cachePathBytes);
 
+        // Second cache path (cave-only, 0 length = no cave cache)
+        int caveLen = cavePathBytes != null ? cavePathBytes.length : 0;
+        buf.putInt(caveLen);
+        if (cavePathBytes != null) {
+            buf.put(cavePathBytes);
+        }
+
+        // Plan B: sub-image heights for unified multi-map index
+        buf.putInt(subCount);
+        if (subImageHeights != null) {
+            for (int h : subImageHeights) {
+                buf.putInt(h);
+            }
+        }
+
+        // Per-sub-image cave flags (1 byte each, 0=overworld, 1=cave)
+        if (subImageIsCave != null) {
+            for (boolean b : subImageIsCave) {
+                buf.put((byte) (b ? 1 : 0));
+            }
+        }
+
+        // Per-sub-image SIFT param overrides
+        buf.putInt(overrideCount);
+        if (subImageOverrides != null) {
+            for (SubImageSiftOverride o : subImageOverrides) {
+                buf.putInt(o.index);
+                buf.putDouble(o.contrastThreshold != null ? o.contrastThreshold : 0.0);
+                buf.putDouble(o.edgeThreshold != null ? o.edgeThreshold : 0.0);
+                buf.putInt(o.nfeatures != null ? o.nfeatures : -1);
+                buf.putInt(o.nOctaveLayers != null ? o.nOctaveLayers : -1);
+                buf.putDouble(o.sigma != null ? o.sigma : 0.0);
+            }
+        }
+
         return buf.array();
     }
 
     /**
      * 编码匹配帧数据（全彩 BGRA）。
      *
-     * @return [w(4B)][h(4B)][hintX(8B)][hintY(8B)][pixelsLen(4B)][BGRA32]
+     * @return [w(4B)][h(4B)][pixelsLen(4B)][BGRA32]
      */
-    public static byte[] encodeFrameData(byte[] bgraData, int width, int height,
-                                         double hintX, double hintY) {
-        ByteBuffer buf = ByteBuffer.allocate(28 + bgraData.length).order(ByteOrder.BIG_ENDIAN);
+    public static byte[] encodeFrameData(byte[] bgraData, int width, int height) {
+        ByteBuffer buf = ByteBuffer.allocate(12 + bgraData.length).order(ByteOrder.BIG_ENDIAN);
         buf.putInt(width);
         buf.putInt(height);
-        buf.putDouble(Double.isNaN(hintX) ? -1 : hintX);
-        buf.putDouble(Double.isNaN(hintY) ? -1 : hintY);
         buf.putInt(bgraData.length);
         buf.put(bgraData);
         return buf.array();
@@ -128,9 +194,9 @@ public class SiftMatchProtocol {
     }
 
     /**
-     * 解析 MATCH_RESULT 体，返回 MatchResult（含耗时统计）
+     * 解析 MATCH_RESULT 体，返回 MatchResult（含耗时统计 + 子图 map_id）
      * <pre>
-     *   [1]success [8]x [8]y [8]angle [4]tMinimapMs [4]tExtractMs [4]tFlannMs
+     *   [1]success [8]x [8]y [8]angle [4]tMinimapMs [4]tExtractMs [4]tFlannMs [4]tArrowMs [1]mapId
      * </pre>
      */
     public static MatchResult decodeMatchResult(byte[] body) {
@@ -144,7 +210,8 @@ public class SiftMatchProtocol {
         float tExtract = buf.getFloat();
         float tFlann = buf.getFloat();
         float tArrow = body.length >= 41 ? buf.getFloat() : 0;
-        return new MatchResult(success, x, y, angle, tMinimap, tExtract, tFlann, tArrow);
+        int mapId = body.length >= 42 ? Byte.toUnsignedInt(buf.get()) : -1;
+        return new MatchResult(success, x, y, angle, tMinimap, tExtract, tFlann, tArrow, mapId);
     }
 
     // ==================== 值对象 ====================
@@ -154,7 +221,21 @@ public class SiftMatchProtocol {
      */
     @ThreadSafe
     public record MatchResult(boolean success, double x, double y, double angle,
-                               float tMinimapMs, float tExtractMs, float tFlannMs, float tArrowMs) {
-        public static final MatchResult FAIL = new MatchResult(false, 0, 0, 0, 0, 0, 0, 0);
+                               float tMinimapMs, float tExtractMs, float tFlannMs, float tArrowMs,
+                               int mapId) {
+        public static final MatchResult FAIL = new MatchResult(false, 0, 0, 0, 0, 0, 0, 0, -1);
     }
+
+    /**
+     * 子图训练 SIFT 参数覆盖（所有字段可空，null = 不覆盖）。
+     */
+    @ThreadSafe
+    public record SubImageSiftOverride(
+            int index,
+            Double contrastThreshold,
+            Double edgeThreshold,
+            Integer nfeatures,
+            Integer nOctaveLayers,
+            Double sigma
+    ) {}
 }
