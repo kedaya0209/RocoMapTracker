@@ -1,6 +1,7 @@
 package io.github.kedaya0209.roco.app.ui.component.setting;
 
 import net.jcip.annotations.NotThreadSafe;
+import io.github.kedaya0209.roco.app.config.SiftConfig;
 import io.github.kedaya0209.roco.app.capture.frame.CaptureFrameBuffer;
 import javafx.animation.AnimationTimer;
 import javafx.geometry.Insets;
@@ -305,10 +306,10 @@ class RoiZoomPopup {
     }
 
     private void setRect(double fw, double fh, double scale, Rectangle rect) {
-        int roiX = RoiPreview.getRoiField(roiPrefix + "X", 8900);
-        int roiY = RoiPreview.getRoiField(roiPrefix + "Y", 300);
-        int roiW = RoiPreview.getRoiField(roiPrefix + "W", 1000);
-        int roiH = RoiPreview.getRoiField(roiPrefix + "H", 0);
+        int roiX = RoiPreview.getRoiField(roiPrefix + "X", SiftConfig.ROI_MAP_X);
+        int roiY = RoiPreview.getRoiField(roiPrefix + "Y", SiftConfig.ROI_MAP_Y);
+        int roiW = RoiPreview.getRoiField(roiPrefix + "W", SiftConfig.ROI_MAP_W);
+        int roiH = RoiPreview.getRoiField(roiPrefix + "H", SiftConfig.ROI_MAP_H);
 
         double rrX = roiX * fw / 10000.0;
         double rrY = roiY * fh / 10000.0;

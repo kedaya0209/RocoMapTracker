@@ -1,6 +1,7 @@
 package io.github.kedaya0209.roco.app.ui.component.setting;
 
 import net.jcip.annotations.NotThreadSafe;
+import io.github.kedaya0209.roco.app.config.SiftConfig;
 import io.github.kedaya0209.roco.app.capture.frame.CaptureFrameBuffer;
 import io.github.kedaya0209.roco.app.ui.service.resource.SvgManager;
 import javafx.animation.AnimationTimer;
@@ -55,8 +56,6 @@ public class RoiPreview {
     // ---- 布局状态 ----
     private final Pane imageArea;
     private final Button zoomBtn;
-    private double currentFw;
-    private double currentFh;
 
     // ---- 复用缓冲区 ----
     private WritableImage cachedImage;
@@ -291,8 +290,8 @@ public class RoiPreview {
             return;
         }
 
-        currentFw = frame.width();
-        currentFh = frame.height();
+        double currentFw = frame.width();
+        double currentFh = frame.height();
         byte[] pixels = frame.pixels();
 
         if (frame.timestamp() <= lastRenderedTimestamp) return;
@@ -379,10 +378,10 @@ public class RoiPreview {
     }
 
     private void setRect(double fw, double fh, double scale, Rectangle rect) {
-        int roiX = getRoiField(roiPrefix + "X", 8900);
-        int roiY = getRoiField(roiPrefix + "Y", 300);
-        int roiW = getRoiField(roiPrefix + "W", 1000);
-        int roiH = getRoiField(roiPrefix + "H", 0);
+        int roiX = getRoiField(roiPrefix + "X", SiftConfig.ROI_MAP_X);
+        int roiY = getRoiField(roiPrefix + "Y", SiftConfig.ROI_MAP_Y);
+        int roiW = getRoiField(roiPrefix + "W", SiftConfig.ROI_MAP_W);
+        int roiH = getRoiField(roiPrefix + "H", SiftConfig.ROI_MAP_H);
 
         double rrX = roiX * fw / 10000.0;
         double rrY = roiY * fh / 10000.0;

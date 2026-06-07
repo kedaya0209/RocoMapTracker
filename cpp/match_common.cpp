@@ -111,11 +111,15 @@ MiniMapProcessor::DetectionResult MiniMapProcessor::detect(uint8_t* data, int w,
     cv::medianBlur(small_gray, blur_mat, 5);
 
     int min_side = std::min(small_gray.cols, small_gray.rows);
+    int sw = ext_ ? ext_->smallWidth : 120;
 
     std::vector<cv::Vec3f> circles;
     cv::HoughCircles(blur_mat, circles, cv::HOUGH_GRADIENT,
-            1.2, min_side * 0.6, 50, 35,
-            (int)(min_side * 0.4), (int)(min_side * 0.55));
+            ext_ ? ext_->houghDp : 1.2f, min_side * 0.6,
+            ext_ ? (float)ext_->houghParam1 : 50.0f,
+            ext_ ? (float)ext_->houghParam2 : 35.0f,
+            (int)(min_side * (ext_ ? ext_->houghMinRadiusRatio : 0.4f)),
+            (int)(min_side * (ext_ ? ext_->houghMaxRadiusRatio : 0.55f)));
 
     if (circles.empty()) {
         return DetectionResult{};
@@ -126,23 +130,29 @@ MiniMapProcessor::DetectionResult MiniMapProcessor::detect(uint8_t* data, int w,
     double det_cy = c[1];
     double det_r = c[2];
 
+    int sample_count = ext_ ? ext_->circleSampleCount : 120;
     int black_count = 0;
-    for (int i = 0; i < 120; i++) {
-        double theta = (i * 3.0) * CV_PI / 180.0;
+    int black_thresh = ext_ ? ext_->circleBlackThreshold : 150;
+    float step_deg = ext_ ? ext_->circleStepDeg : 3.0f;
+    for (int i = 0; i < sample_count; i++) {
+        double theta = (i * step_deg) * CV_PI / 180.0;
         int sx = (int)(det_cx + det_r * cos(theta));
         int sy = (int)(det_cy + det_r * sin(theta));
-        if (sx >= 0 && sx < SMALL_WIDTH && sy >= 0 && sy < (int)small_gray.rows) {
-            if (small_gray_data[sy * SMALL_WIDTH + sx] < 150) {
+        if (sx >= 0 && sx < sw && sy >= 0 && sy < (int)small_gray.rows) {
+            if (small_gray_data[sy * sw + sx] < black_thresh) {
                 black_count++;
             }
         }
     }
 
-    double dcx = det_cx - SMALL_WIDTH / 2.0, dcy = det_cy - small_gray.rows / 2.0;
+    double dcx = det_cx - sw / 2.0, dcy = det_cy - small_gray.rows / 2.0;
     double dist_to_center_sq = dcx * dcx + dcy * dcy;
-    double max_dist = min_side * CENTER_OFFSET_RATIO;
-    if ((double)black_count / 120 > BLACK_RATIO_THRESHOLD && dist_to_center_sq < max_dist * max_dist) {
-        double scale = (double)SMALL_WIDTH / w;
+    double center_offset = ext_ ? ext_->centerOffsetRatio : 0.2;
+    double black_ratio_thresh = ext_ ? ext_->blackRatioThreshold : 0.15;
+    double max_dist = min_side * center_offset;
+    double black_ratio = (double)black_count / sample_count;
+    if (black_ratio > black_ratio_thresh && dist_to_center_sq < max_dist * max_dist) {
+        double scale = (double)sw / w;
         return DetectionResult{
             true,
             det_cx / scale,
@@ -156,12 +166,13 @@ MiniMapProcessor::DetectionResult MiniMapProcessor::detect(uint8_t* data, int w,
 
 void MiniMapProcessor::init_mats(int w, int h) {
     if (gray_mat.cols != w || gray_mat.rows != h) {
-        double scale = (double)SMALL_WIDTH / w;
+        int sw = ext_ ? ext_->smallWidth : 120;
+        double scale = (double)sw / w;
         int sh = (int)(h * scale);
         gray_mat = cv::Mat(h, w, CV_8UC1);
-        small_gray = cv::Mat(sh, SMALL_WIDTH, CV_8UC1);
-        blur_mat = cv::Mat(sh, SMALL_WIDTH, CV_8UC1);
-        small_gray_data.resize(SMALL_WIDTH * sh);
+        small_gray = cv::Mat(sh, sw, CV_8UC1);
+        blur_mat = cv::Mat(sh, sw, CV_8UC1);
+        small_gray_data.resize(sw * sh);
     }
 }
 
@@ -223,34 +234,43 @@ void apply_circle_mask(uint8_t* data, int w, int h,
 // ============================================================================
 float is_dark_minimap(const uint8_t* gray_data, int w, int h,
                      double cx, double cy, int radius,
+                     const AlgoParams::ExtendedConfig* ext,
                      float dark_ratio_threshold) {
-    // Precomputed sigmoid LUT: lut[i] = 255 / (1 + exp(-0.05 * (i - 100)))
-    static const uint8_t SIGMOID_LUT[256] = {
-        1,  1,  1,  1,  2,  2,  2,  2,  2,  2,  2,  2,  3,  3,  3,  3,  3,  3,  4,  4,  4,  4,  5,  5,  5,  5,  6,  6,  6,  7,  7,  7,
-        8,  8,  9,  9,  9, 10, 10, 11, 12, 12, 13, 13, 14, 15, 16, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 29, 30, 31, 33, 34,
-       36, 37, 39, 41, 42, 44, 46, 48, 50, 52, 54, 56, 59, 61, 63, 66, 68, 71, 73, 76, 79, 81, 84, 87, 90, 93, 96, 99,102,105,108,111,
-      114,117,121,124,127,130,133,137,140,143,146,149,152,155,158,161,164,167,170,173,175,178,181,183,186,188,191,193,195,198,200,202,
-      204,206,208,210,212,213,215,217,218,220,221,223,224,225,227,228,229,230,231,232,233,234,235,236,237,238,238,239,240,241,241,242,
-      242,243,244,244,245,245,245,246,246,247,247,247,248,248,248,249,249,249,249,250,250,250,250,251,251,251,251,251,251,252,252,252,
-      252,252,252,252,252,253,253,253,253,253,253,253,253,253,253,253,253,253,253,254,254,254,254,254,254,254,254,254,254,254,254,254,
-      254,254,254,254,254,254,254,254,254,254,254,254,254,254,254,254,254,254,254,254,254,254,254,254,254,254,254,254,254,254,254,254
-    };
-    constexpr int STRIDE = 4;
+    // Compute sigmoid LUT lazily from configurable midpoint/steepness
+    static int cached_midpoint = 0;
+    static float cached_steepness = 0;
+    static uint8_t sigmoid_lut[256] = {0};
+    int midpoint = ext ? ext->darkSigmoidMidpoint : 100;
+    float steepness = ext ? ext->darkSigmoidSteepness : 0.05f;
+    if (midpoint != cached_midpoint || steepness != cached_steepness) {
+        cached_midpoint = midpoint;
+        cached_steepness = steepness;
+        for (int i = 0; i < 256; i++) {
+            float e = expf(-steepness * (float)(i - midpoint));
+            sigmoid_lut[i] = (uint8_t)(255.0f / (1.0f + e));
+        }
+    }
+
+    int stride = ext ? ext->darkStride : 4;
+    int trim_low = ext ? ext->darkTrimLow : 5;
+    int trim_high = ext ? ext->darkTrimHigh : 250;
+    int sig_threshold = ext ? ext->darkSigmoidThreshold : 100;
+
     double r2 = (double)radius * radius;
     double inner_r2 = (double)(radius / 4) * (double)(radius / 4);  // skip flashlight at center
     int dark_count = 0;
     int total = 0;
 
-    for (int y = 0; y < h; y += STRIDE) {
+    for (int y = 0; y < h; y += stride) {
         double dy = y - cy;
         const uint8_t* row = gray_data + (size_t)y * w;
-        for (int x = 0; x < w; x += STRIDE) {
+        for (int x = 0; x < w; x += stride) {
             double dx = x - cx;
             if (dx * dx + dy * dy > r2) continue;        // outside minimap circle
             if (dx * dx + dy * dy < inner_r2) continue;   // skip player flashlight center
             uint8_t gray_val = row[x];
-            if (gray_val < 5 || gray_val > 250) continue;  // trim extremes: borders & UI
-            if (SIGMOID_LUT[gray_val] < 100) {
+            if (gray_val < trim_low || gray_val > trim_high) continue;
+            if (sigmoid_lut[gray_val] < sig_threshold) {
                 dark_count++;
             }
             total++;
@@ -371,27 +391,35 @@ void save_png(const cv::Mat& bgr, const char* path) {
 // Arrow direction detection
 // ============================================================================
 double detect_arrow_angle_hsv(const uint8_t* bgra_data, int w, int h,
-                              double cx, double cy, int radius) {
-    if (radius < 15) return std::numeric_limits<double>::quiet_NaN();
+                              double cx, double cy, int radius,
+                              const AlgoParams::ExtendedConfig* ext) {
+    int min_radius = ext ? ext->arrowMinRadius : 15;
+    if (radius < min_radius) return std::numeric_limits<double>::quiet_NaN();
 
-    static constexpr int CROP_SIZE = 64;
-    int cropX = (int)std::round(cx - CROP_SIZE / 2);
-    int cropY = (int)std::round(cy - CROP_SIZE / 2);
+    int crop_size = ext ? ext->arrowCropSize : 64;
+    int cropX = (int)std::round(cx - crop_size / 2);
+    int cropY = (int)std::round(cy - crop_size / 2);
     if (cropX < 0) cropX = 0;
     if (cropY < 0) cropY = 0;
-    if (cropX + CROP_SIZE > w) cropX = w - CROP_SIZE;
-    if (cropY + CROP_SIZE > h) cropY = h - CROP_SIZE;
+    if (cropX + crop_size > w) cropX = w - crop_size;
+    if (cropY + crop_size > h) cropY = h - crop_size;
     if (cropX < 0 || cropY < 0) return std::numeric_limits<double>::quiet_NaN();
 
     cv::Mat full(h, w, CV_8UC4, const_cast<uint8_t*>(bgra_data));
-    cv::Mat roi(full, cv::Rect(cropX, cropY, CROP_SIZE, CROP_SIZE));
+    cv::Mat roi(full, cv::Rect(cropX, cropY, crop_size, crop_size));
 
     cv::Mat hsv;
     cv::cvtColor(roi, hsv, cv::COLOR_BGRA2BGR);
     cv::cvtColor(hsv, hsv, cv::COLOR_BGR2HSV);
 
     cv::Mat mask;
-    cv::inRange(hsv, cv::Scalar(15, 200, 230), cv::Scalar(25, 240, 255), mask);
+    int h_low  = ext ? ext->arrowHueLow : 15;
+    int h_high = ext ? ext->arrowHueHigh : 25;
+    int s_low  = ext ? ext->arrowSatLow : 200;
+    int s_high = ext ? ext->arrowSatHigh : 240;
+    int v_low  = ext ? ext->arrowValLow : 230;
+    int v_high = ext ? ext->arrowValHigh : 255;
+    cv::inRange(hsv, cv::Scalar(h_low, s_low, v_low), cv::Scalar(h_high, s_high, v_high), mask);
 
     std::vector<std::vector<cv::Point>> contours;
     cv::findContours(mask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
@@ -406,7 +434,8 @@ double detect_arrow_angle_hsv(const uint8_t* bgra_data, int w, int h,
             maxIdx = (int)i;
         }
     }
-    if (maxArea < 20) return std::numeric_limits<double>::quiet_NaN();
+    int min_area = ext ? ext->arrowMinContourArea : 20;
+    if (maxArea < min_area) return std::numeric_limits<double>::quiet_NaN();
 
     // PCA 主轴
     cv::Moments m = cv::moments(contours[maxIdx]);
@@ -581,6 +610,52 @@ bool parse_config_data(const std::vector<uint8_t>& body, AlgoParams& p) {
         }
     }
 
+    // Extended config block (optional, at very end)
+    if (off + 4 <= body.size()) {
+        int32_t extLen = (int32_t)read_be32(body.data() + off); off += 4;
+        if (extLen >= 140 && off + 140 <= body.size()) {
+            p.ext.routingCaveToOw     = read_float_be(body.data() + off); off += 4;
+            p.ext.routingOwToCave     = read_float_be(body.data() + off); off += 4;
+            p.ext.darkSigmoidMidpoint   = (int32_t)read_be32(body.data() + off); off += 4;
+            p.ext.darkSigmoidSteepness  = read_float_be(body.data() + off); off += 4;
+            p.ext.darkStride            = (int32_t)read_be32(body.data() + off); off += 4;
+            p.ext.darkSigmoidThreshold  = (int32_t)read_be32(body.data() + off); off += 4;
+            p.ext.darkTrimLow          = (int32_t)read_be32(body.data() + off); off += 4;
+            p.ext.darkTrimHigh         = (int32_t)read_be32(body.data() + off); off += 4;
+            p.ext.darkRatioThreshold   = read_float_be(body.data() + off); off += 4;
+
+            p.ext.smallWidth          = (int32_t)read_be32(body.data() + off); off += 4;
+            p.ext.blackRatioThreshold = read_float_be(body.data() + off); off += 4;
+            p.ext.centerOffsetRatio   = read_float_be(body.data() + off); off += 4;
+            p.ext.houghDp             = read_float_be(body.data() + off); off += 4;
+            p.ext.houghParam1         = (int32_t)read_be32(body.data() + off); off += 4;
+            p.ext.houghParam2         = (int32_t)read_be32(body.data() + off); off += 4;
+            p.ext.houghMinRadiusRatio = read_float_be(body.data() + off); off += 4;
+            p.ext.houghMaxRadiusRatio = read_float_be(body.data() + off); off += 4;
+            p.ext.circleSampleCount   = (int32_t)read_be32(body.data() + off); off += 4;
+            p.ext.circleStepDeg       = read_float_be(body.data() + off); off += 4;
+            p.ext.circleBlackThreshold = (int32_t)read_be32(body.data() + off); off += 4;
+
+            p.ext.arrowHueLow        = (int32_t)read_be32(body.data() + off); off += 4;
+            p.ext.arrowHueHigh       = (int32_t)read_be32(body.data() + off); off += 4;
+            p.ext.arrowSatLow        = (int32_t)read_be32(body.data() + off); off += 4;
+            p.ext.arrowSatHigh       = (int32_t)read_be32(body.data() + off); off += 4;
+            p.ext.arrowValLow        = (int32_t)read_be32(body.data() + off); off += 4;
+            p.ext.arrowValHigh       = (int32_t)read_be32(body.data() + off); off += 4;
+            p.ext.arrowMinContourArea = (int32_t)read_be32(body.data() + off); off += 4;
+            p.ext.arrowMinRadius     = (int32_t)read_be32(body.data() + off); off += 4;
+            p.ext.arrowCropSize      = (int32_t)read_be32(body.data() + off); off += 4;
+
+            p.ext.cropMargin         = read_float_be(body.data() + off); off += 4;
+            p.ext.cropMinDim         = (int32_t)read_be32(body.data() + off); off += 4;
+            p.ext.cropMaxAreaRatio   = read_float_be(body.data() + off); off += 4;
+
+            p.ext.pcaTargetDim       = (int32_t)read_be32(body.data() + off); off += 4;
+            p.ext.contentRectThreshold = (int32_t)read_be32(body.data() + off); off += 4;
+            p.ext.contentRectStride  = (int32_t)read_be32(body.data() + off); off += 4;
+        }
+    }
+
     LOG("CONFIG: kind=%d SIFT(%d,%d,%d,%.4f,%.1f,%.1f) MATCH(%.2f,%d,%d) FLANN(%d,%d) RANSAC(%.1f,%d,%.2f) TILE(%d,%d,%lld,%.1f) cache=%s subHeights=%zu overrides=%zu",
         (int)p.kind,
         (int)p.siftVariant, (int)p.nfeatures, (int)p.nOctaveLayers, p.contrastThreshold, p.edgeThreshold, p.sigma,
@@ -602,6 +677,7 @@ int run_match_loop(SOCKET sock, AlgoParams& params,
                    MatcherBase& matcher_overworld, MatcherBase& matcher_cave,
                    std::atomic<bool>& g_running) {
     MiniMapProcessor minimap;
+    minimap.setExtConfig(&params.ext);
     cv::Mat gray_mat;
     cv::Mat roi_contiguous;
     int64_t frame_count = 0;
@@ -696,7 +772,7 @@ int run_match_loop(SOCKET sock, AlgoParams& params,
             }
 
             // 2. ROI crop — 从已转换的 gray_mat 中裁剪 + copyTo 获得连续内存
-            constexpr double CROP_MARGIN = 1.5;
+            double CROP_MARGIN = params.ext.cropMargin;
             int crop_r = (int)(detection.radius * CROP_MARGIN);
             int crop_x = std::max(0, (int)(detection.center_x - crop_r));
             int crop_y = std::max(0, (int)(detection.center_y - crop_r));
@@ -707,7 +783,8 @@ int run_match_loop(SOCKET sock, AlgoParams& params,
             int sift_w = fw, sift_h = fh;
             double local_cx = detection.center_x;
             double local_cy = detection.center_y;
-            if (crop_w > 64 && crop_h > 64 && crop_w * crop_h < fw * fh * 0.85) {
+            if (crop_w > params.ext.cropMinDim && crop_h > params.ext.cropMinDim
+                && crop_w * crop_h < fw * fh * params.ext.cropMaxAreaRatio) {
                 cv::Mat roi_full(gray_mat, cv::Rect(crop_x, crop_y, crop_w, crop_h));
                 roi_full.copyTo(roi_contiguous);
                 sift_data = roi_contiguous.data;
@@ -717,27 +794,39 @@ int run_match_loop(SOCKET sock, AlgoParams& params,
                 local_cy = detection.center_y - crop_y;
             }
 
-            // 3. Brightness classification → select cache (with hysteresis)
+            // 3. Brightness classification → primary matcher
             float dark_ratio = is_dark_minimap(sift_data, sift_w, sift_h,
-                                               local_cx, local_cy, detection.radius);
+                                               local_cx, local_cy, detection.radius,
+                                               &params.ext);
             static bool cave_mode = true;
             if (cave_mode) {
-                // Stay in cave unless clearly overworld
-                if (dark_ratio < 0.30f) cave_mode = false;
+                if (dark_ratio < params.ext.routingCaveToOw) cave_mode = false;
             } else {
-                // Switch to cave only if clearly cave
-                if (dark_ratio >= 0.50f) cave_mode = true;
+                if (dark_ratio >= params.ext.routingOwToCave) cave_mode = true;
             }
-            MatcherBase& matcher = cave_mode ? matcher_cave : matcher_overworld;
+            MatcherBase& primary = cave_mode ? matcher_cave : matcher_overworld;
+            MatcherBase& backup  = cave_mode ? matcher_overworld : matcher_cave;
+
+            // 4. Match with primary
+            match_res = primary.match(sift_data, sift_w, sift_h);
+            match_res.t_minimap_ms = t_minimap;
+
+            // 5. Fallback: if primary failed, try the other cache
+            if (!match_res.success && &primary != &backup) {
+                auto backup_res = backup.match(sift_data, sift_w, sift_h);
+                backup_res.t_minimap_ms = t_minimap;
+                if (backup_res.success) {
+                    match_res = backup_res;
+                    cave_mode = !cave_mode;
+                    LOG("fallback: switched to %s (inliers=%d)",
+                        cave_mode ? "cave" : "overworld", backup_res.inliers);
+                }
+            }
 
             if (frame_count <= 3) {
-                LOG("routing: frame=%lld cave=%d dark_ratio=%.3f sift=%dx%d",
-                    (long long)frame_count, (int)cave_mode, dark_ratio, sift_w, sift_h);
+                LOG("routing: frame=%lld cave=%d dark_ratio=%.3f inliers=%d",
+                    (long long)frame_count, (int)cave_mode, dark_ratio, match_res.inliers);
             }
-
-            // 4. Match
-            match_res = matcher.match(sift_data, sift_w, sift_h);
-            match_res.t_minimap_ms = t_minimap;
 
             if (match_res.success) {
                 success_count++;
@@ -746,7 +835,8 @@ int run_match_loop(SOCKET sock, AlgoParams& params,
             // 5. Arrow direction detection
             auto t_arrow_start = std::chrono::steady_clock::now();
             double arrow_angle = detect_arrow_angle_hsv(bgra_data, fw, fh,
-                detection.center_x, detection.center_y, detection.radius);
+                detection.center_x, detection.center_y, detection.radius,
+                &params.ext);
             float t_arrow_ms = std::chrono::duration<float, std::milli>(
                 std::chrono::steady_clock::now() - t_arrow_start).count();
 

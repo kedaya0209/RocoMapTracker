@@ -85,7 +85,8 @@ public class SiftMatchProtocol {
                 + 4 + cachePathBytes.length          // cache path
                 + 4 + (cavePathBytes != null ? cavePathBytes.length : 0) // cave cache path
                 + 4 + subCount * 4 + subCount           // subImageCount + subImageHeights + subImageIsCave
-                + 4 + overrideCount * (4 + 8 + 8 + 4 + 4 + 8); // per-sub-image SIFT overrides
+                + 4 + overrideCount * (4 + 8 + 8 + 4 + 4 + 8) // per-sub-image SIFT overrides
+                + 4 + 35 * 4;                          // extended config block (extLen + 35 fields)
 
         ByteBuffer buf = ByteBuffer.allocate(bodyLen).order(ByteOrder.BIG_ENDIAN);
 
@@ -157,6 +158,54 @@ public class SiftMatchProtocol {
                 buf.putDouble(o.sigma != null ? o.sigma : 0.0);
             }
         }
+
+        // Extended config block (v1: 35 fields × 4 bytes each)
+        buf.putInt(35 * 4); // extLen
+
+        // --- Brightness Routing (9 fields) ---
+        buf.putFloat(SiftConfig.ROUTING_CAVE_TO_OW);
+        buf.putFloat(SiftConfig.ROUTING_OW_TO_CAVE);
+        buf.putInt(SiftConfig.DARK_SIGMOID_MIDPOINT);
+        buf.putFloat(SiftConfig.DARK_SIGMOID_STEEPNESS);
+        buf.putInt(SiftConfig.DARK_STRIDE);
+        buf.putInt(SiftConfig.DARK_SIGMOID_THRESHOLD);
+        buf.putInt(SiftConfig.DARK_TRIM_LOW);
+        buf.putInt(SiftConfig.DARK_TRIM_HIGH);
+        buf.putFloat(SiftConfig.DARK_RATIO_THRESHOLD);
+
+        // --- MiniMap Detection (11 fields) ---
+        buf.putInt(SiftConfig.MM_SMALL_WIDTH);
+        buf.putFloat(SiftConfig.MM_BLACK_RATIO_THRESHOLD);
+        buf.putFloat(SiftConfig.MM_CENTER_OFFSET_RATIO);
+        buf.putFloat(SiftConfig.MM_HOUGH_DP);
+        buf.putInt(SiftConfig.MM_HOUGH_PARAM1);
+        buf.putInt(SiftConfig.MM_HOUGH_PARAM2);
+        buf.putFloat(SiftConfig.MM_HOUGH_MIN_RADIUS_RATIO);
+        buf.putFloat(SiftConfig.MM_HOUGH_MAX_RADIUS_RATIO);
+        buf.putInt(SiftConfig.MM_CIRCLE_SAMPLE_COUNT);
+        buf.putFloat(SiftConfig.MM_CIRCLE_STEP_DEG);
+        buf.putInt(SiftConfig.MM_CIRCLE_BLACK_THRESHOLD);
+
+        // --- Arrow Detection (9 fields) ---
+        buf.putInt(SiftConfig.ARROW_HUE_LOW);
+        buf.putInt(SiftConfig.ARROW_HUE_HIGH);
+        buf.putInt(SiftConfig.ARROW_SAT_LOW);
+        buf.putInt(SiftConfig.ARROW_SAT_HIGH);
+        buf.putInt(SiftConfig.ARROW_VAL_LOW);
+        buf.putInt(SiftConfig.ARROW_VAL_HIGH);
+        buf.putInt(SiftConfig.ARROW_MIN_CONTOUR_AREA);
+        buf.putInt(SiftConfig.ARROW_MIN_RADIUS);
+        buf.putInt(SiftConfig.ARROW_CROP_SIZE);
+
+        // --- ROI Crop (3 fields) ---
+        buf.putFloat(SiftConfig.CROP_MARGIN);
+        buf.putInt(SiftConfig.CROP_MIN_DIM);
+        buf.putFloat(SiftConfig.CROP_MAX_AREA_RATIO);
+
+        // --- Training/Features (3 fields) ---
+        buf.putInt(SiftConfig.PCA_TARGET_DIM);
+        buf.putInt(SiftConfig.CONTENT_RECT_THRESHOLD);
+        buf.putInt(SiftConfig.CONTENT_RECT_STRIDE);
 
         return buf.array();
     }

@@ -135,6 +135,53 @@ struct AlgoParams {
     // If empty, all sub-images use the defaults above.
     std::vector<SubImageSiftParams> subImageSiftParams;
 
+    // ===== Extended config (from CONFIG_DATA ext block, runtime-configurable) =====
+    struct ExtendedConfig {
+        // --- Brightness Routing (9) ---
+        float routingCaveToOw = 0.15f;
+        float routingOwToCave = 0.35f;
+        int32_t darkSigmoidMidpoint = 100;
+        float darkSigmoidSteepness = 0.05f;
+        int32_t darkStride = 4;
+        int32_t darkSigmoidThreshold = 100;
+        int32_t darkTrimLow = 5;
+        int32_t darkTrimHigh = 250;
+        float darkRatioThreshold = 0.5f;
+
+        // --- MiniMap Detection (11) ---
+        int32_t smallWidth = 120;
+        float blackRatioThreshold = 0.15f;
+        float centerOffsetRatio = 0.2f;
+        float houghDp = 1.2f;
+        int32_t houghParam1 = 50;
+        int32_t houghParam2 = 35;
+        float houghMinRadiusRatio = 0.4f;
+        float houghMaxRadiusRatio = 0.55f;
+        int32_t circleSampleCount = 120;
+        float circleStepDeg = 3.0f;
+        int32_t circleBlackThreshold = 150;
+
+        // --- Arrow Detection (9) ---
+        int32_t arrowHueLow = 15;
+        int32_t arrowHueHigh = 25;
+        int32_t arrowSatLow = 200;
+        int32_t arrowSatHigh = 240;
+        int32_t arrowValLow = 230;
+        int32_t arrowValHigh = 255;
+        int32_t arrowMinContourArea = 20;
+        int32_t arrowMinRadius = 15;
+        int32_t arrowCropSize = 64;
+
+        // --- ROI Crop (3) ---
+        float cropMargin = 1.5f;
+        int32_t cropMinDim = 64;
+        float cropMaxAreaRatio = 0.85f;
+
+        // --- Training/Features (3) ---
+        int32_t pcaTargetDim = 64;
+        int32_t contentRectThreshold = 16;
+        int32_t contentRectStride = 4;
+    } ext;
 };
 
 // ============================================================================
@@ -157,9 +204,7 @@ float read_float(FILE* f);
 // ============================================================================
 class MiniMapProcessor {
 public:
-    static constexpr int SMALL_WIDTH = 120;
-    static constexpr double BLACK_RATIO_THRESHOLD = 0.15;
-    static constexpr double CENTER_OFFSET_RATIO = 0.2;
+    void setExtConfig(const AlgoParams::ExtendedConfig* config) { ext_ = config; }
 
     struct DetectionResult {
         bool success = false;
@@ -171,6 +216,7 @@ public:
     DetectionResult detect(uint8_t* data, int w, int h);
 
 private:
+    const AlgoParams::ExtendedConfig* ext_ = nullptr;
     cv::Mat gray_mat;
     cv::Mat small_gray;
     cv::Mat blur_mat;
@@ -191,13 +237,15 @@ void apply_circle_mask(uint8_t* data, int w, int h,
 // ============================================================================
 float is_dark_minimap(const uint8_t* gray_data, int w, int h,
                       double cx, double cy, int radius,
+                      const AlgoParams::ExtendedConfig* ext = nullptr,
                       float dark_ratio_threshold = 0.5f);
 
 // ============================================================================
 // Arrow direction detection: HSV color-based + PCA
 // ============================================================================
 double detect_arrow_angle_hsv(const uint8_t* bgra_data, int w, int h,
-                              double cx, double cy, int radius);
+                              double cx, double cy, int radius,
+                              const AlgoParams::ExtendedConfig* ext = nullptr);
 
 // ============================================================================
 // Debug PNG utilities (no OpenCV imwrite dependency)
@@ -216,6 +264,7 @@ struct MatchResult {
     float t_extract_ms = 0;
     float t_matching_ms = 0;
     int map_id = -1;  // -1=unknown, 0+=sub-image index for multimap
+    int inliers = 0;  // RANSAC inlier count (for comparing match quality)
 };
 
 // ============================================================================
