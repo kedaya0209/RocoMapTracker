@@ -243,7 +243,6 @@ cv::Mat DescriptorTransform::pca_project(cv::Mat& src) {
 SiftMatcher::SiftMatcher(const AlgoParams& p)
     : match_ratio_threshold((float)p.matchRatioThreshold)
     , match_min_count(p.matchMinCount)
-    , search_radius(p.searchRadius)
     , ransac_reproj_threshold(p.ransacReprojThreshold)
     , ransac_max_iters(p.ransacMaxIters)
     , ransac_confidence(p.ransacConfidence)
@@ -278,7 +277,7 @@ bool SiftMatcher::train(const uint8_t* gray_pixels, int w, int h) {
     return train_direct(map_gray);
 }
 
-MatchResult SiftMatcher::match(uint8_t* data, int w, int h, double hint_x, double hint_y) {
+MatchResult SiftMatcher::match(uint8_t* data, int w, int h) {
     MatchResult res{};
     if (!flann_index) {
         LOG("match: FAIL no flann_index (g=%d)", sub_image_group);
@@ -345,39 +344,9 @@ MatchResult SiftMatcher::match(uint8_t* data, int w, int h, double hint_x, doubl
         return res;
     }
 
-    // Spatial filter: 利用 hint 位置过滤远处误匹配
-    bool has_hint = !std::isnan(hint_x) && !std::isnan(hint_y)
-                 && hint_x >= -1e9 && hint_y >= -1e9
-                 && hint_x != -1.0 && hint_y != -1.0; // -1 = Java 无效 sentinel
-    filtered_matches.clear();
-    if (has_hint) {
-        for (auto& dm : good_matches) {
-            if (dm.trainIdx >= 0 && dm.trainIdx < (int)map_keypoint_pts.size()) {
-                auto& pt = map_keypoint_pts[dm.trainIdx];
-                double dist = std::hypot(pt.x - hint_x, pt.y - hint_y);
-                if (dist <= search_radius) {
-                    filtered_matches.push_back(dm);
-                }
-            }
-        }
-        if (filtered_matches.size() < 4) {
-            filtered_matches = good_matches; // fallback
-        }
-    } else {
-        filtered_matches = good_matches;
-    }
-
-    if (filtered_matches.size() < (size_t)match_min_count) {
-        LOG("match: FAIL filtered_matches %zu < min %d (g=%d, has_hint=%d)",
-            filtered_matches.size(), match_min_count, sub_image_group, (int)has_hint);
-        res.t_matching_ms = std::chrono::duration<float, std::milli>(
-            std::chrono::steady_clock::now() - t1).count();
-        return res;
-    }
-
     src_pts.clear();
     dst_pts.clear();
-    for (auto& dm : filtered_matches) {
+    for (auto& dm : good_matches) {
         if (dm.queryIdx >= 0 && dm.queryIdx < (int)scene_kps.size()
             && dm.trainIdx >= 0 && dm.trainIdx < (int)map_keypoint_pts.size()) {
             src_pts.push_back(scene_kps[dm.queryIdx].pt);
@@ -405,17 +374,6 @@ MatchResult SiftMatcher::match(uint8_t* data, int w, int h, double hint_x, doubl
         res.x = dst_center[0].x;
         res.y = dst_center[0].y;
 
-        // 空间一致性校验：匹配结果与 hint 距离远超搜索半径则拒绝。
-        if (has_hint) {
-            double dist = std::hypot(res.x - hint_x, res.y - hint_y);
-            int inlier_cnt = inlier_mask.empty() ? 0 : cv::countNonZero(inlier_mask);
-            if (dist > search_radius * 2 && inlier_cnt < 8) {
-                LOG("  spatial reject: (%.1f,%.1f) too far from hint (%.1f,%.1f), dist=%.1f inliers=%d/%zu",
-                    res.x, res.y, hint_x, hint_y, dist, inlier_cnt, src_pts.size());
-                res.success = false;
-            }
-        }
-
         // 从完整图坐标 y 值确定子图 ID（多子图模式）
         if (res.success && !params.subImageHeights.empty()) {
             res.map_id = resolve_map_id((float)res.y);
@@ -433,14 +391,6 @@ MatchResult SiftMatcher::match(uint8_t* data, int w, int h, double hint_x, doubl
     auto t_end = std::chrono::steady_clock::now();
     res.t_matching_ms = std::chrono::duration<float, std::milli>(t_end - t1).count();
 
-    float t_pca_ms = std::chrono::duration<float, std::milli>(t_pca - t1).count();
-    float t_knn_ms = std::chrono::duration<float, std::milli>(t_knn - t_pca).count();
-    float t_ransac_ms = std::chrono::duration<float, std::milli>(t_end - t_ransac0).count();
-    float t_other_ms = res.t_matching_ms - t_pca_ms - t_knn_ms - t_ransac_ms;
-    LOG("  match timing[g=%d]: pca=%.2f knn=%.2f ransac=%.2f other=%.2f (total=%.2f, kps=%d/%d, index=%zu)",
-        sub_image_group, t_pca_ms, t_knn_ms, t_ransac_ms, t_other_ms,
-        res.t_matching_ms, (int)scene_kps.size(), query_desc.rows,
-        map_keypoint_pts.size());
     return res;
 }
 

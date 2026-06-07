@@ -145,15 +145,8 @@ public class WikiUpdateManager implements SidebarComponent {
         ctx.setOnProgressUpdate((c, t) -> Platform.runLater(() -> {
             progressBar.setProgress(t == 0 ? 0 : (double) c / t);
             updateProgressLabel(ctx.getStatusText(), c, t);
-
-            if (t > 0 && c >= t) {
-                switchToNormalState();
-                AppEvents.publish(StatusEvent.class,
-                        new StatusEvent("WIKI资源同步完成", NotificationType.SUCCESS));
-            } else {
-                AppEvents.publish(ProgressEvent.class,
-                        new ProgressEvent(t == 0 ? 0 : (double) c / t, "WIKI同步: " + ctx.getStatusText()));
-            }
+            AppEvents.publish(ProgressEvent.class,
+                    new ProgressEvent(t == 0 ? 0 : (double) c / t, "WIKI同步: " + ctx.getStatusText()));
         }));
     }
 

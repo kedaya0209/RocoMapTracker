@@ -1,5 +1,6 @@
 package io.github.kedaya0209.roco.app.utils;
 
+import io.github.kedaya0209.roco.app.config.DownloadConfig;
 import lombok.extern.slf4j.Slf4j;
 import net.jcip.annotations.ThreadSafe;
 
@@ -19,13 +20,25 @@ public class ResourceUtils {
     private static final String RESOURCE_BASE_DIR = "resources";
 
     /**
-     * 获取资源输入流，优先使用外部资源
+     * 获取资源输入流。
+     * <p>
+     * INTERNAL 模式仅从 classpath 加载；EXTERNAL 模式优先使用外部文件，回退到 classpath。
      *
      * @param internalPath 内部资源路径
      * @return 资源的输入流
      * @throws IOException 如果资源读取失败
      */
     public static InputStream getResourceStream(String internalPath) throws IOException {
+        // INTERNAL 模式：仅从 classpath 加载，不读取外部文件
+        if (DownloadConfig.INTERNAL_RESOURCE) {
+            InputStream internal = ResourceUtils.class.getResourceAsStream(internalPath);
+            if (internal != null) {
+                return internal;
+            }
+            throw new FileNotFoundException("内置资源不存在：" + internalPath);
+        }
+
+        // EXTERNAL 模式：外部文件优先，回退 classpath
         File external = getExternalFile(internalPath);
         if (external.exists()) {
             log.debug("使用外部资源：{}", external.getPath());

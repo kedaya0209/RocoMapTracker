@@ -2,6 +2,7 @@ package io.github.kedaya0209.roco.app.map;
 
 import io.github.kedaya0209.roco.app.map.model.CompositeMapMetadata;
 import io.github.kedaya0209.roco.app.utils.ResourceUtils;
+import lombok.extern.slf4j.Slf4j;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -10,8 +11,6 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Arrays;
-import java.util.List;
 
 /**
  * 洞穴图像对比度增强工具 — 对洞穴源 PNG 应用 CLAHE（限制对比度自适应直方图均衡化），
@@ -25,6 +24,7 @@ import java.util.List;
  *
  * <p>非洞穴像素（alpha=0）会被置 0（黑色），不影响 SIFT 特征提取。
  */
+@Slf4j
 public class CaveImageEnhancer {
 
     private static final String METADATA_PATH = "/source/maps/MultiMap_metadata.json";
@@ -38,7 +38,7 @@ public class CaveImageEnhancer {
         try (InputStream is = ResourceUtils.getResourceStream(METADATA_PATH)) {
             metadata = CompositeMapMetadata.load(is);
         }
-        System.out.println("元数据加载完成: " + metadata.subImages().size() + " 个子图");
+        log.info("元数据加载完成: {} 个子图", metadata.subImages().size());
 
         // 定位资源目录
         String baseDir = System.getProperty("cave-enhancer.resources",
@@ -48,98 +48,104 @@ public class CaveImageEnhancer {
             String srcPath = sub.sourcePath();
             if (srcPath == null || srcPath.isEmpty()) continue;
             if (!sub.isCave()) {
-                System.out.println("跳过非洞穴: " + sub.name());
+                log.info("跳过非洞穴: {}", sub.name());
                 continue;
             }
 
             // 定位源文件
-            // sourcePath 如 "/source/maps/xxx.png"，去掉前导 "/" 后拼接
             String relPath = srcPath.startsWith("/") ? srcPath.substring(1) : srcPath;
             Path srcFile = Paths.get(baseDir, relPath);
-            if (!Files.exists(srcFile)) {
-                System.out.println("文件不存在，跳过: " + srcFile);
-                continue;
-            }
+            log.info("处理: {} ({})", sub.name(), srcFile);
+            enhance(srcFile);
+        }
+        log.info("=== 全部处理完成 ===");
+    }
 
-            System.out.println("处理: " + sub.name() + " (" + srcFile + ")");
-            BufferedImage img = ImageIO.read(srcFile.toFile());
-            if (img == null) {
-                System.out.println("  读取失败，跳过");
-                continue;
-            }
-
-            int w = img.getWidth();
-            int h = img.getHeight();
-            System.out.println("  尺寸: " + w + "x" + h);
-
-            // 2. 提取 alpha + 原始 RGB + 灰度
-            int[] argb = new int[w * h];
-            img.getRGB(0, 0, w, h, argb, 0, w);
-
-            byte[] alpha = new byte[w * h];
-            byte[] origR = new byte[w * h];
-            byte[] origG = new byte[w * h];
-            byte[] origB = new byte[w * h];
-            byte[] gray = new byte[w * h];
-            int[] grayInt = new int[w * h]; // 0~255 灰度用于 CLAHE
-            boolean[] mask = new boolean[w * h];
-            for (int i = 0; i < argb.length; i++) {
-                int a = (argb[i] >> 24) & 0xFF;
-                alpha[i] = (byte) a;
-                mask[i] = a > 0;
-                if (mask[i]) {
-                    int r = (argb[i] >> 16) & 0xFF;
-                    int g = (argb[i] >> 8) & 0xFF;
-                    int b = argb[i] & 0xFF;
-                    origR[i] = (byte) r;
-                    origG[i] = (byte) g;
-                    origB[i] = (byte) b;
-                    int lum = (r * 299 + g * 587 + b * 114) / 1000;
-                    gray[i] = (byte) lum;
-                    grayInt[i] = lum;
-                } else {
-                    gray[i] = 0;
-                    grayInt[i] = 0;
-                }
-            }
-
-            // 3. CLAHE
-            byte[] enhanced = applyCLAHE(gray, w, h, mask);
-
-            // 4. 非洞穴像素置 0 + 彩色增强
-            for (int i = 0; i < enhanced.length; i++) {
-                if (!mask[i]) enhanced[i] = 0;
-            }
-
-            // 5. 写回彩色 ARGB PNG（CLAHE 亮度比例映射到原始 RGB）
-            BufferedImage out = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
-            int[] outPixels = new int[w * h];
-            for (int i = 0; i < enhanced.length; i++) {
-                int a = alpha[i] & 0xFF;
-                if (!mask[i]) {
-                    outPixels[i] = (a << 24) | 0; // 透明区域全 0
-                } else {
-                    int enhancedGray = enhanced[i] & 0xFF;
-                    int origGray = grayInt[i];
-                    // 防止除零：如果原图灰度为 0，用增强值作为灰度输出
-                    int outR, outG, outB;
-                    if (origGray > 0) {
-                        float scale = (float) enhancedGray / origGray;
-                        outR = Math.min(255, Math.round(((origR[i] & 0xFF) * scale)));
-                        outG = Math.min(255, Math.round(((origG[i] & 0xFF) * scale)));
-                        outB = Math.min(255, Math.round(((origB[i] & 0xFF) * scale)));
-                    } else {
-                        outR = outG = outB = enhancedGray;
-                    }
-                    outPixels[i] = (a << 24) | (outR << 16) | (outG << 8) | outB;
-                }
-            }
-            out.setRGB(0, 0, w, h, outPixels, 0, w);
-            ImageIO.write(out, "png", srcFile.toFile());
-            System.out.println("  已写回: " + srcFile.getFileName());
+    /**
+     * 对洞穴 PNG 执行 CLAHE 增强（直接写回原文件）。
+     *
+     * @param srcFile 洞穴 PNG 路径（ARGB，透明区域为纯 void）
+     * @throws IOException 读写失败时抛出
+     */
+    public static void enhance(Path srcFile) throws IOException {
+        if (!Files.exists(srcFile)) {
+            log.info("文件不存在，跳过: {}", srcFile);
+            return;
         }
 
-        System.out.println("=== 全部处理完成 ===");
+        BufferedImage img = ImageIO.read(srcFile.toFile());
+        if (img == null) {
+            log.info("  读取失败，跳过: {}", srcFile);
+            return;
+        }
+
+        int w = img.getWidth();
+        int h = img.getHeight();
+
+        // 2. 提取 alpha + 原始 RGB + 灰度
+        int[] argb = new int[w * h];
+        img.getRGB(0, 0, w, h, argb, 0, w);
+
+        byte[] alpha = new byte[w * h];
+        byte[] origR = new byte[w * h];
+        byte[] origG = new byte[w * h];
+        byte[] origB = new byte[w * h];
+        byte[] gray = new byte[w * h];
+        int[] grayInt = new int[w * h];
+        boolean[] mask = new boolean[w * h];
+        for (int i = 0; i < argb.length; i++) {
+            int a = (argb[i] >> 24) & 0xFF;
+            alpha[i] = (byte) a;
+            mask[i] = a > 0;
+            if (mask[i]) {
+                int r = (argb[i] >> 16) & 0xFF;
+                int g = (argb[i] >> 8) & 0xFF;
+                int b = argb[i] & 0xFF;
+                origR[i] = (byte) r;
+                origG[i] = (byte) g;
+                origB[i] = (byte) b;
+                int lum = (r * 299 + g * 587 + b * 114) / 1000;
+                gray[i] = (byte) lum;
+                grayInt[i] = lum;
+            } else {
+                gray[i] = 0;
+                grayInt[i] = 0;
+            }
+        }
+
+        // 3. CLAHE
+        byte[] enhanced = applyCLAHE(gray, w, h, mask);
+
+        // 4. 非洞穴像素置 0 + 彩色增强
+        for (int i = 0; i < enhanced.length; i++) {
+            if (!mask[i]) enhanced[i] = 0;
+        }
+
+        // 5. 写回彩色 ARGB PNG（CLAHE 亮度比例映射到原始 RGB）
+        BufferedImage out = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        int[] outPixels = new int[w * h];
+        for (int i = 0; i < enhanced.length; i++) {
+            int a = alpha[i] & 0xFF;
+            if (!mask[i]) {
+                outPixels[i] = (a << 24) | 0;
+            } else {
+                int enhancedGray = enhanced[i] & 0xFF;
+                int origGray = grayInt[i];
+                int outR, outG, outB;
+                if (origGray > 0) {
+                    float scale = (float) enhancedGray / origGray;
+                    outR = Math.min(255, Math.round(((origR[i] & 0xFF) * scale)));
+                    outG = Math.min(255, Math.round(((origG[i] & 0xFF) * scale)));
+                    outB = Math.min(255, Math.round(((origB[i] & 0xFF) * scale)));
+                } else {
+                    outR = outG = outB = enhancedGray;
+                }
+                outPixels[i] = (a << 24) | (outR << 16) | (outG << 8) | outB;
+            }
+        }
+        out.setRGB(0, 0, w, h, outPixels, 0, w);
+        ImageIO.write(out, "png", srcFile.toFile());
+        log.info("  CLAHE 增强完成: {}", srcFile.getFileName());
     }
 
     /**

@@ -356,14 +356,13 @@ public class SiftMatchHandler {
      * @return 匹配结果（成功/失败 + 坐标），超时返回 MatchResult.FAIL
      */
     public MatchResult sendFrameAndWait(byte[] grayData, int width, int height,
-                                        double hintX, double hintY,
                                         long timeoutMs) throws InterruptedException {
         SocketSession s = sessionManager.getActiveSession();
         if (s == null || !sessionManager.isReady()) {
             return MatchResult.FAIL;
         }
 
-        byte[] frameData = encodeFrameData(grayData, width, height, hintX, hintY);
+        byte[] frameData = encodeFrameData(grayData, width, height);
         if (!s.send(MSG_FRAME_DATA, frameData)) {
             return MatchResult.FAIL;
         }

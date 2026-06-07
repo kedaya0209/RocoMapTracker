@@ -45,11 +45,6 @@ public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
     private final StatsContext stats;
     private final MatchingWatchdog watchdog;
 
-    /** hint 过期时间（毫秒）：超过此时间无成功匹配则发 -1 禁用空间约束 */
-    private static final long HINT_STALE_MS = 3000;
-
-    /** 上次成功匹配的时间戳（ms） */
-    private long lastSuccessTimeMs = 0;
 
     // 专用单线程池：SynchronousQueue 无缓冲，忙时新任务直接丢弃（只保留最新帧）
     private final ExecutorService executor = new ThreadPoolExecutor(
@@ -134,20 +129,9 @@ public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
             long tStart = System.currentTimeMillis();
             stats.onFrameProcessed();
 
-            // 获取预测位置 (首帧/重置后为 null)，过期则发 NaN 禁用空间约束
-            Double hintX = stateTracker.getPredictedX();
-            Double hintY = stateTracker.getPredictedY();
-            long now = System.currentTimeMillis();
-            if (hintX != null && (now - lastSuccessTimeMs) > HINT_STALE_MS) {
-                log.debug("hint stale ({}ms since last success), sending NaN", now - lastSuccessTimeMs);
-                hintX = hintY = null;
-            }
-
             try {
                 SiftMatchProtocol.MatchResult result = matchClient.sendFrameAndWait(
                         data, width, height,
-                        hintX != null ? hintX : Double.NaN,
-                        hintY != null ? hintY : Double.NaN,
                         SiftConfig.MATCH_TIMEOUT_MS);
 
                 long elapsed = System.currentTimeMillis() - tStart;
@@ -186,7 +170,6 @@ public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
                     double angle = AngleConverter.toJavaFX(result.angle());
                     stateTracker.onMatchSuccess(fullX, fullY,
                         Double.isNaN(angle) ? null : angle);
-                    lastSuccessTimeMs = now;
 
                     // 用 map_id + 元数据判断大陆/洞穴，更新洞穴状态
                     // 渲染始终使用大陆坐标空间（offsetY=0），不切换活跃子图

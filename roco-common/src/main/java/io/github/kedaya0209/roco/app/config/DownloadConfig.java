@@ -35,6 +35,10 @@ public final class DownloadConfig {
      */
     public static String[] MAP_REMOTE_URL_DISPLAY_NAME = new String[0];
     /**
+     * 远程瓦片 URL 对应的洞穴标记（true=洞穴，false=大陆）
+     */
+    public static boolean[] MAP_REMOTE_URL_IS_CAVE = new boolean[0];
+    /**
      * 地图资源信息页 URL
      */
     public static String MAP_RESOURCE_INFO_URL = "https://wiki.biligame.com/rocom/大地图";
@@ -55,15 +59,15 @@ public final class DownloadConfig {
     /**
      * 下载失败最大重试次数
      */
-    public static int DOWNLOAD_MAX_RETRY = 1;
+    public static int DOWNLOAD_MAX_RETRY = 3;
     /**
      * 并发下载虚拟线程数
      */
-    public static int DOWNLOAD_THREAD_COUNT = 32;
+    public static int DOWNLOAD_THREAD_COUNT = 128;
     /**
      * 瓦片下载间隔（毫秒）
      */
-    public static long DOWNLOAD_TILE_DELAY_MS = 30;
+    public static long DOWNLOAD_TILE_DELAY_MS = 10;
     /**
      * 图标下载间隔（毫秒）
      */
@@ -89,6 +93,7 @@ public final class DownloadConfig {
         MAP_REMOTE_URL_NAME = ConfigHelper.getStrArray(prop, "map.remote.url.name");
         MAP_REMOTE_URL_SORT = ConfigHelper.getIntArray(prop, "map.remote.url.sort");
         MAP_REMOTE_URL_DISPLAY_NAME = ConfigHelper.getStrArray(prop, "map.remote.url.display.name");
+        MAP_REMOTE_URL_IS_CAVE = ConfigHelper.getBoolArray(prop, "map.remote.url.is.cave");
     }
 
     public static void save(StringBuilder sb) {
@@ -115,5 +120,12 @@ public final class DownloadConfig {
         sb.append("map.remote.url.sort=").append(sortArr).append("\n\n");
         sb.append("# 远程瓦片 URL 对应的显示名称（中文名，如\"卡洛西亚大陆\"）\n");
         sb.append("map.remote.url.display.name=").append(String.join(",", MAP_REMOTE_URL_DISPLAY_NAME)).append("\n\n");
+        String isCaveArr = "";
+        for (int i = 0; i < MAP_REMOTE_URL_IS_CAVE.length; i++) {
+            if (i > 0) isCaveArr += ",";
+            isCaveArr += MAP_REMOTE_URL_IS_CAVE[i];
+        }
+        sb.append("# 远程瓦片 URL 对应的洞穴标记（true=洞穴，false=大陆）\n");
+        sb.append("map.remote.url.is.cave=").append(isCaveArr).append("\n\n");
     }
 }

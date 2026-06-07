@@ -635,23 +635,21 @@ int run_match_loop(SOCKET sock, AlgoParams& params,
 
         frame_count++;
 
-        if (recv_body.size() < 28) {
+        if (recv_body.size() < 12) {
             LOGERR("FRAME body too short: %zu bytes (frame=%lld)", recv_body.size(), (long long)frame_count);
             continue;
         }
 
         int fw = (int)read_be32(recv_body.data());
         int fh = (int)read_be32(recv_body.data() + 4);
-        double hint_x = read_double(recv_body.data() + 8);
-        double hint_y = read_double(recv_body.data() + 16);
-        uint32_t pixels_len = read_be32(recv_body.data() + 24);
+        uint32_t pixels_len = read_be32(recv_body.data() + 8);
 
-        if (pixels_len == 0 || 28 + pixels_len > recv_body.size()) {
+        if (pixels_len == 0 || 12 + pixels_len > recv_body.size()) {
             LOGERR("Invalid pixels_len: %u (body=%zu)", pixels_len, recv_body.size());
             continue;
         }
 
-        uint8_t* bgra_data = recv_body.data() + 28;
+        uint8_t* bgra_data = recv_body.data() + 12;
 
         try {
             MatchResult match_res;
@@ -738,7 +736,7 @@ int run_match_loop(SOCKET sock, AlgoParams& params,
             }
 
             // 4. Match
-            match_res = matcher.match(sift_data, sift_w, sift_h, hint_x, hint_y);
+            match_res = matcher.match(sift_data, sift_w, sift_h);
             match_res.t_minimap_ms = t_minimap;
 
             if (match_res.success) {

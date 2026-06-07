@@ -164,15 +164,12 @@ public class SiftMatchProtocol {
     /**
      * 编码匹配帧数据（全彩 BGRA）。
      *
-     * @return [w(4B)][h(4B)][hintX(8B)][hintY(8B)][pixelsLen(4B)][BGRA32]
+     * @return [w(4B)][h(4B)][pixelsLen(4B)][BGRA32]
      */
-    public static byte[] encodeFrameData(byte[] bgraData, int width, int height,
-                                         double hintX, double hintY) {
-        ByteBuffer buf = ByteBuffer.allocate(28 + bgraData.length).order(ByteOrder.BIG_ENDIAN);
+    public static byte[] encodeFrameData(byte[] bgraData, int width, int height) {
+        ByteBuffer buf = ByteBuffer.allocate(12 + bgraData.length).order(ByteOrder.BIG_ENDIAN);
         buf.putInt(width);
         buf.putInt(height);
-        buf.putDouble(Double.isNaN(hintX) ? -1 : hintX);
-        buf.putDouble(Double.isNaN(hintY) ? -1 : hintY);
         buf.putInt(bgraData.length);
         buf.put(bgraData);
         return buf.array();

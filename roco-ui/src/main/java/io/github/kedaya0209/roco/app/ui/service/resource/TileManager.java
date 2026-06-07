@@ -330,8 +330,12 @@ public class TileManager {
         double worldTileSize = TILE_SIZE * (1 << level);
         iv.setLayoutX(col * worldTileSize);
         iv.setLayoutY(row * worldTileSize);
-        iv.setFitWidth(worldTileSize);
-        iv.setFitHeight(worldTileSize);
+
+        // 非 256×256 瓦片（边缘）按实际尺寸等比缩放
+        double imgW = tileImage.getWidth();
+        double imgH = tileImage.getHeight();
+        iv.setFitWidth(worldTileSize * (imgW / TILE_SIZE));
+        iv.setFitHeight(worldTileSize * (imgH / TILE_SIZE));
 
         return iv;
     }

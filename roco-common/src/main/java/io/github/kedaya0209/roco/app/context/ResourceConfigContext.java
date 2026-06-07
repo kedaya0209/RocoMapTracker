@@ -11,7 +11,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * 资源上下文：支持多套资源路径切换
+ * 资源上下文：支持多套资源路径切换（MultiMap 模式）。
  */
 @ThreadSafe
 public class ResourceConfigContext {
@@ -23,11 +23,16 @@ public class ResourceConfigContext {
     public static ResourceProfile getCurrentProfile() {
         return DownloadConfig.INTERNAL_RESOURCE
                 ? ResourceProfile.INTERNAL
-                : ResourceProfile.EXTERNAL;
+                : ResourceProfile.WIKI;
     }
 
+    /**
+     * SIFT 缓存文件命名基址。
+     * 按资源来源（INTERNAL/EXTERNAL）隔离，切换资源模式时重新生成缓存。
+     * C++ 侧根据 metadata 逐子图创建缓存，此处仅提供文件名前缀。
+     */
     public static String getSiftMap() {
-        return getCurrentProfile().siftMap;
+        return PathConfig.MULTI_MAP_BASE + "." + getCurrentProfile().name();
     }
 
     public static String getMultiMapMetadata() {
@@ -44,15 +49,6 @@ public class ResourceConfigContext {
         } catch (Exception e) {
             return false;
         }
-    }
-
-    public static String getShowMap() {
-        return getCurrentProfile().showMap;
-    }
-
-    public static String getTilesDir() {
-        ResourceProfile p = getCurrentProfile();
-        return p.showMap.substring(0, p.showMap.lastIndexOf('.')) + "_tiles";
     }
 
     public static String getPlayerIcon() {
@@ -79,32 +75,24 @@ public class ResourceConfigContext {
     public enum ResourceProfile {
         INTERNAL(
                 "内置资源",
-                PathConfig.SIFT_MAP,
-                PathConfig.SHOW_MAP,
                 PathConfig.PLAYER_ICON_PATH,
                 PathConfig.INTERNAL_RESOURCE_POINT_CONFIG_PATH,
                 PathConfig.INTERNAL_PATHS
         ),
-        EXTERNAL(
+        WIKI(
                 "WIKI资源",
-                PathConfig.MAP_RESOURCE_PATH,
-                PathConfig.MAP_RESOURCE_PATH,
                 PathConfig.PLAYER_ICON_PATH,
                 PathConfig.RESOURCE_POINT_CONFIG_PATH,
                 PathConfig.PATHS
         );
 
         final String tag;
-        final String siftMap;
-        final String showMap;
         final String playerIcon;
         final String pointConfig;
         final String paths;
 
-        ResourceProfile(String tag, String sift, String show, String icon, String point, String paths) {
+        ResourceProfile(String tag, String icon, String point, String paths) {
             this.tag = tag;
-            this.siftMap = sift;
-            this.showMap = show;
             this.playerIcon = icon;
             this.pointConfig = point;
             this.paths = paths;

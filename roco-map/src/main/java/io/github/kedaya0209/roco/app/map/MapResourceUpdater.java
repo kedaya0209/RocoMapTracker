@@ -1,9 +1,9 @@
 package io.github.kedaya0209.roco.app.map;
 
 import io.github.kedaya0209.roco.app.config.DownloadConfig;
+import io.github.kedaya0209.roco.app.map.core.DownloadProgressContext;
 import io.github.kedaya0209.roco.app.map.core.IconDownloader;
 import io.github.kedaya0209.roco.app.map.loader.LoadInfo;
-import io.github.kedaya0209.roco.app.map.util.BrightnessExtractor;
 import io.github.kedaya0209.roco.app.map.util.MapPostProcessor;
 import io.github.kedaya0209.roco.app.utils.FilePathUtil;
 import net.jcip.annotations.NotThreadSafe;
@@ -12,9 +12,14 @@ import io.github.kedaya0209.roco.app.map.core.ResourceConfigBuilder;
 import io.github.kedaya0209.roco.app.map.util.MapFileMover;
 import lombok.extern.slf4j.Slf4j;
 
+import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.Comparator;
+import java.util.List;
+import java.util.stream.IntStream;
+import javax.imageio.ImageIO;
 
 /**
  * 地图资源更新触发器
@@ -118,7 +123,7 @@ public final class MapResourceUpdater {
             System.gc();
             return false;
         }
-        processAllMapBrightness();
+        processAllDownloadedMaps();
         try {
             MapPostProcessor.processMaps();
         } catch (IOException e) {
@@ -134,7 +139,10 @@ public final class MapResourceUpdater {
         IconDownloader.downloadIcons();
         MapFileMover.moveAllResources();
 
-        // 全量下载完成，地图瓦片 byte[] + 图块拼接 BufferedImage + 图标下载临时内存全部回收
+        // 全量下载完成，清理临时文件
+        MapFileMover.cleanupTempFiles();
+
+        // 地图瓦片 byte[] + 图块拼接 BufferedImage + 图标下载临时内存全部回收
         System.gc();
         return true;
     }
@@ -153,27 +161,200 @@ public final class MapResourceUpdater {
     }
 
     /**
-     * 对下载拼接后的所有地图 PNG 做亮度提取处理，覆盖原文件。
-     * 处理完的图片只保留亮度超过阈值的区域（其余透明），
-     * 用于 WIKI 洞穴图这种暗色地图的特征增强。
+     * 对下载拼接后的地图执行一致性处理：
+     * - 洞穴子图：先 CLAHE 增强，再与大陆图融合（暗化的大陆特征填充透明边缘）
+     * - 大陆图：保持不变
+     * <p>自动检测洞穴图（含有透明像素的 PNG 判定为洞穴图）。
+     * 处理完的图像与内置资源管线（CaveImageEnhancer + CaveImageFuser）一致。
      */
-    static void processAllMapBrightness() {
-        File dir = FilePathUtil.getRelativeFile(DOWNLOAD_MAP_DIR);
-        File[] files = dir.listFiles((d, name) -> name.startsWith("map_") && name.endsWith(".png"));
-        if (files == null || files.length == 0) {
-            log.info("无地图文件需要亮度处理");
+    static void processAllDownloadedMaps() {
+        String[] tags = DownloadConfig.MAP_REMOTE_URL_NAME;
+        String[] displayNames = DownloadConfig.MAP_REMOTE_URL_DISPLAY_NAME;
+
+        if (tags.length == 0) {
+            log.info("未配置 MAP_REMOTE_URL_NAME，跳过地图后处理");
             return;
         }
-        log.info("开始亮度提取处理，共 {} 个地图文件", files.length);
-        for (File f : files) {
-            Path p = f.toPath();
-            try {
-                BrightnessExtractor.extractAndSave(p, p);
-                log.info("  亮度处理完成: {}", f.getName());
-            } catch (IOException e) {
-                log.warn("亮度处理失败，跳过: {}", f.getName(), e);
+
+        // 大陆图 / 洞穴图检测
+        // 策略：先按亮度提取阈值(50)模拟提取，透明比例最低的是大陆图（地面图亮区多），
+        // 透明比例高的是洞穴图（暗色缝隙多）。
+        // 优先使用已有的 IS_CAVE 配置（持久化），否则自动检测。
+        BufferedImage mainlandImage = null;
+        int mainlandIdx = -1;
+        String mainlandTag = null;
+        List<Integer> caveIndices = new java.util.ArrayList<>();
+        boolean[] isCave = new boolean[tags.length];
+
+        // 尝试用已有配置识别大陆图
+        if (DownloadConfig.MAP_REMOTE_URL_IS_CAVE.length == tags.length) {
+            isCave = DownloadConfig.MAP_REMOTE_URL_IS_CAVE.clone();
+            for (int i = 0; i < tags.length; i++) {
+                String tag = tags[i];
+                File mapFile = FilePathUtil.getRelativeFile(DOWNLOAD_MAP_DIR, "map_" + tag + ".png");
+                if (!mapFile.exists()) continue;
+
+                if (!isCave[i] && mainlandImage == null) {
+                    BufferedImage img;
+                    try {
+                        img = ImageIO.read(mapFile);
+                    } catch (IOException e) {
+                        log.warn("无法读取地图文件: {}，跳过", mapFile, e);
+                        continue;
+                    }
+                    if (img == null) continue;
+                    mainlandImage = img;
+                    mainlandIdx = i;
+                    mainlandTag = tag;
+                    log.info("配置指定为大陆图: {} ({}x{})", mapFile.getName(), img.getWidth(), img.getHeight());
+                } else if (isCave[i]) {
+                    caveIndices.add(i);
+                }
             }
         }
+
+        // 无已有配置或配置未找到大陆图 → 模拟亮度提取后按透明比例自动检测
+        if (mainlandImage == null) {
+            caveIndices.clear();
+            isCave = new boolean[tags.length];
+
+            // 第一遍：计算每张图亮度提取后的估计透明比例
+            int[] estimatedTransparent = new int[tags.length];
+            int[] totalPixels = new int[tags.length];
+            int validCount = 0;
+
+            for (int i = 0; i < tags.length; i++) {
+                File mapFile = FilePathUtil.getRelativeFile(
+                        DOWNLOAD_MAP_DIR, "map_" + tags[i] + ".png");
+                if (!mapFile.exists()) continue;
+
+                BufferedImage img;
+                try {
+                    img = ImageIO.read(mapFile);
+                } catch (IOException e) {
+                    log.warn("无法读取地图文件: {}，跳过", mapFile, e);
+                    continue;
+                }
+                if (img == null) continue;
+
+                int w = img.getWidth();
+                int h = img.getHeight();
+                int total = w * h;
+                int[] argb = new int[total];
+                img.getRGB(0, 0, w, h, argb, 0, w);
+                img.flush();
+
+                int darkCount = 0;
+                for (int v : argb) {
+                    int a = (v >> 24) & 0xFF;
+                    if (a == 0) {
+                        darkCount++;
+                    } else {
+                        int r = (v >> 16) & 0xFF;
+                        int g = (v >> 8) & 0xFF;
+                        int b = v & 0xFF;
+                        int lum = (r * 299 + g * 587 + b * 114) / 1000;
+                        if (lum <= 50) darkCount++;
+                    }
+                }
+
+                estimatedTransparent[i] = darkCount;
+                totalPixels[i] = total;
+                validCount++;
+                log.info("亮度模拟: {} — 估计透明={} / {} ({}%)",
+                        mapFile.getName(), darkCount, total,
+                        String.format("%.1f", 100.0 * darkCount / total));
+            }
+
+            // 第二遍：透明比例最低的为大陆图，其余为洞穴图
+            if (validCount > 0) {
+                int mainlandIdxLocal = -1;
+                double minRatio = Double.MAX_VALUE;
+                for (int i = 0; i < tags.length; i++) {
+                    if (totalPixels[i] == 0) continue;
+                    double ratio = (double) estimatedTransparent[i] / totalPixels[i];
+                    if (ratio < minRatio) {
+                        minRatio = ratio;
+                        mainlandIdxLocal = i;
+                    }
+                }
+
+                if (mainlandIdxLocal >= 0) {
+                    File mapFile = FilePathUtil.getRelativeFile(
+                            DOWNLOAD_MAP_DIR, "map_" + tags[mainlandIdxLocal] + ".png");
+                    try {
+                        mainlandImage = ImageIO.read(mapFile);
+                        mainlandIdx = mainlandIdxLocal;
+                        mainlandTag = tags[mainlandIdxLocal];
+                        isCave[mainlandIdxLocal] = false;
+                        log.info("自动检测大陆图: {} (透明比例 {}%)",
+                                mapFile.getName(),
+                                String.format("%.1f", minRatio * 100));
+                    } catch (IOException e) {
+                        log.warn("读取大陆图失败: {}", mapFile, e);
+                    }
+
+                    for (int i = 0; i < tags.length; i++) {
+                        if (i == mainlandIdxLocal || totalPixels[i] == 0) continue;
+                        caveIndices.add(i);
+                        isCave[i] = true;
+                        log.info("自动检测洞穴图: {} (透明比例 {}%)",
+                                FilePathUtil.getRelativeFile(
+                                        DOWNLOAD_MAP_DIR, "map_" + tags[i] + ".png"),
+                                String.format("%.1f",
+                                        100.0 * estimatedTransparent[i] / totalPixels[i]));
+                    }
+                }
+            }
+        }
+
+        // 写入 IS_CAVE 配置，供下游 MapPostProcessor 使用
+        DownloadConfig.MAP_REMOTE_URL_IS_CAVE = isCave;
+
+        if (mainlandImage == null) {
+            log.warn("未找到大陆图（所有地图均含透明像素），跳过洞穴增强处理");
+            return;
+        }
+        log.info("大陆图: {}x{}", mainlandImage.getWidth(), mainlandImage.getHeight());
+
+        if (caveIndices.isEmpty()) {
+            log.info("没有洞穴图，跳过增强处理");
+            return;
+        }
+
+        // 初始化进度跟踪
+        DownloadProgressContext progress = DownloadProgressContext.getInstance();
+        progress.reset("图片处理：生成SIFT图片");
+
+        // 处理洞穴图
+        int processed = 0;
+        for (int idx : caveIndices) {
+            progress.addTask();
+
+            String tag = tags.length > idx ? tags[idx] : "unknown";
+            String displayName = displayNames.length > idx && !displayNames[idx].isBlank()
+                    ? displayNames[idx] : tag;
+            File caveFile = FilePathUtil.getRelativeFile(DOWNLOAD_MAP_DIR, "map_" + tag + ".png");
+            if (!caveFile.exists()) {
+                log.warn("洞穴图不存在，跳过: {}", caveFile);
+                progress.finishTask();
+                continue;
+            }
+
+            Path cavePath = caveFile.toPath();
+            try {
+                // 融合大陆特征（内部自动完成亮度提取、CLAHE、膨胀、填充）
+                log.info("融合大陆特征: {} ({})", displayName, caveFile.getName());
+                CaveImageFuser.fuse(cavePath, mainlandImage, 120, 0.3);
+
+                processed++;
+            } catch (IOException e) {
+                log.warn("洞穴处理失败: {} (tag={})", displayName, tag, e);
+            } finally {
+                progress.finishTask();
+            }
+        }
+        log.info("洞穴图处理完成: {}/{} 个", processed, caveIndices.size());
     }
 
     /**

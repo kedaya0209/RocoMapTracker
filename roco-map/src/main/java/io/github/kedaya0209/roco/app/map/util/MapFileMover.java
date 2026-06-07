@@ -80,7 +80,7 @@ public class MapFileMover {
         File src = FilePathUtil.getRelativeFile(MapResourceUpdater.DOWNLOAD_MAP_DIR);
 
         // 使用绝对路径，应用运行时使用
-        File dst = ResourceUtils.getExternalFile(PathConfig.MAP_RESOURCE_DIR);
+        File dst = ResourceUtils.getExternalFile(PathConfig.MAPS_DIR);
 
         // 如果目标目录不存在，自动创建
         if (!dst.exists()) dst.mkdirs();
@@ -98,13 +98,13 @@ public class MapFileMover {
      * 生成 <classpath路径> | <URL/类型标记> 格式的清单。
      */
     public static void writeInitManifest() {
-        // 收集 map 文件（类型标记：MAP）
-        File mapDir = ResourceUtils.getExternalFile(PathConfig.MAP_RESOURCE_DIR);
+        // 收集 map 文件（类型标记：MAP），跳过 _亮度提取.png 中间产物
+        File mapDir = ResourceUtils.getExternalFile(PathConfig.MAPS_DIR);
         File[] mapFiles = mapDir.listFiles();
         if (mapFiles != null) {
             for (File f : mapFiles) {
-                if (f.isFile()) {
-                    urlMap.putIfAbsent(PathConfig.MAP_RESOURCE_DIR + f.getName(), "MAP");
+                if (f.isFile() && !f.getName().contains("_亮度提取")) {
+                    urlMap.putIfAbsent(PathConfig.MAPS_DIR + f.getName(), "MAP");
                 }
             }
         }
@@ -132,6 +132,44 @@ public class MapFileMover {
         } catch (IOException e) {
             log.error("写资源清单失败", e);
         }
+    }
+
+    /**
+     * 清理临时文件：删除下载临时目录，清理已移到 maps 目录的中间产物。
+     * 在全部移动完成后调用。
+     */
+    public static void cleanupTempFiles() {
+        // 删除下载临时目录 download/
+        File downloadDir = FilePathUtil.getRelativeFile(MapResourceUpdater.DOWNLOAD_DIR);
+        deleteRecursively(downloadDir);
+
+        // 清理已移到 /source/maps/ 的 _亮度提取.png 中间文件
+        File mapsDir = ResourceUtils.getExternalFile(PathConfig.MAPS_DIR);
+        File[] files = mapsDir.listFiles();
+        if (files != null) {
+            for (File f : files) {
+                if (f.isFile() && f.getName().contains("_亮度提取")) {
+                    f.delete();
+                }
+            }
+        }
+
+        log.info("临时文件清理完成");
+    }
+
+    /**
+     * 递归删除文件或目录。
+     */
+    private static void deleteRecursively(File file) {
+        if (file.isDirectory()) {
+            File[] children = file.listFiles();
+            if (children != null) {
+                for (File child : children) {
+                    deleteRecursively(child);
+                }
+            }
+        }
+        file.delete();
     }
 
     // ====================== 通用移动 ======================

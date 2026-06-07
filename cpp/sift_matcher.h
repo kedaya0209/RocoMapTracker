@@ -71,7 +71,6 @@ public:
 
     std::vector<cv::KeyPoint> scene_kps;
     std::vector<cv::DMatch> good_matches;
-    std::vector<cv::DMatch> filtered_matches;
     std::vector<cv::Point2f> src_pts;
     std::vector<cv::Point2f> dst_pts;
 
@@ -80,7 +79,6 @@ public:
     double ransac_reproj_threshold = 10.0;
     int ransac_max_iters = 200;
     double ransac_confidence = 0.95;
-    int search_radius = 500;
     int flann_search_checks = 24;
 
     AlgoParams params;
@@ -95,7 +93,7 @@ public:
 
     // MatcherBase interface
     bool train(const uint8_t* gray_pixels, int w, int h) override;
-    MatchResult match(uint8_t* data, int w, int h, double hint_x, double hint_y) override;
+    MatchResult match(uint8_t* data, int w, int h) override;
     size_t feature_count() const override;
     bool save_cache(const std::string& path) override;
     bool load_cache(const std::string& path) override;

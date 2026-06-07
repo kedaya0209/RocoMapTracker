@@ -234,7 +234,7 @@ class MatcherBase {
 public:
     virtual ~MatcherBase() = default;
     virtual bool train(const uint8_t* gray_pixels, int w, int h) = 0;
-    virtual MatchResult match(uint8_t* data, int w, int h, double hint_x, double hint_y) = 0;
+    virtual MatchResult match(uint8_t* data, int w, int h) = 0;
     virtual bool save_cache(const std::string& path) = 0;
     virtual bool load_cache(const std::string& path) = 0;
     virtual size_t feature_count() const = 0;

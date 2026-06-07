@@ -9,7 +9,7 @@ import io.github.kedaya0209.roco.app.hook.event.PlayerStateEvent;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * 玩家状态追踪器：负责位置平滑、方向修正、速度预测（用于 SIFT hint）。
+ * 玩家状态追踪器：负责位置平滑、方向修正。
  * <p>不再包含瞬移检测/地图切换/丢失恢复逻辑。</p>
  */
 @NotThreadSafe
@@ -22,17 +22,6 @@ public class PlayerStateTracker {
     // 角度 EMA 平滑
     private boolean hasSmoothedAngle = false;
     private double smoothedAngle;
-
-    // ROI 预测：基于 EMA 平滑速度预测下一帧位置
-    private double prevRawX, prevRawY;
-    private boolean hasPreviousMatch;
-    private double velocityX, velocityY;
-
-    /** 预测位置（用于 SIFT hint） */
-    @Getter
-    private Double predictedX;
-    @Getter
-    private Double predictedY;
 
     /**
      * 将角度差归一化到 [-180, 180] 范围
@@ -88,27 +77,12 @@ public class PlayerStateTracker {
 
         MapContext.getInstance().updatePlayerState(smoothedX, smoothedY, finalAngle);
         AppEvents.publish(PlayerStateEvent.class, new PlayerStateEvent(smoothedX, smoothedY, finalAngle));
-
-        // 速度预测：为 SIFT 匹配提供 hint（EMA 平滑稳定 hint）
-        if (hasPreviousMatch) {
-            double frameDx = x - prevRawX;
-            double frameDy = y - prevRawY;
-            double vAlpha = PlayerConfig.PLAYER_VELOCITY_EMA_ALPHA;
-            velocityX = vAlpha * frameDx + (1 - vAlpha) * velocityX;
-            velocityY = vAlpha * frameDy + (1 - vAlpha) * velocityY;
-            predictedX = smoothedX + velocityX;
-            predictedY = smoothedY + velocityY;
-        }
-        prevRawX = x;
-        prevRawY = y;
-        hasPreviousMatch = true;
     }
 
     /**
      * 处理匹配失败 — 仅记录日志，不做状态变更。
      */
     public void onMatchFailure(String reason) {
-        // 预测位置可能变陈旧，SIFT hint 本就可以为 NaN，无需特殊处理
     }
 
     public void reset() {
@@ -116,9 +90,5 @@ public class PlayerStateTracker {
         smoothedX = smoothedY = 0;
         hasSmoothedAngle = false;
         smoothedAngle = 0;
-        hasPreviousMatch = false;
-        predictedX = null;
-        predictedY = null;
-        velocityX = velocityY = 0;
     }
 }
