@@ -70,7 +70,7 @@ public class SubImageMapper {
     public int subIndex(double y) {
         List<SubImageInfo> subs = metadata.subImages();
         for (int i = 0; i < subs.size(); i++) {
-            var sub = subs.get(i);
+            SubImageInfo sub = subs.get(i);
             if (y >= sub.offsetY() && y < sub.offsetY() + sub.height()) {
                 return i;
             }

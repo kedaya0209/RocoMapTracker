@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -284,7 +285,7 @@ public class PluginDownloadManager {
         Files.createDirectories(tgtPath.getParent());
 
         // 复制新文件
-        try (var stream = Files.walk(srcPath)) {
+        try (Stream<Path> stream = Files.walk(srcPath)) {
             stream.forEach(source -> {
                 try {
                     Path target = tgtPath.resolve(srcPath.relativize(source));

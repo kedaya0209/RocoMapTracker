@@ -19,6 +19,7 @@ import io.github.kedaya0209.roco.app.map.core.IconDownloader;
 import io.github.kedaya0209.roco.app.map.core.MapDownloader;
 import io.github.kedaya0209.roco.app.map.loader.ImageLoader;
 import io.github.kedaya0209.roco.app.map.model.ResourcePoint;
+import io.github.kedaya0209.roco.app.map.LayerMapTileGenerator;
 import io.github.kedaya0209.roco.app.utils.ResourceUtils;
 import javafx.application.Platform;
 import lombok.extern.slf4j.Slf4j;
@@ -68,16 +69,23 @@ public class ResourceInitService {
                 Thread.ofPlatform().daemon(true).name("init-internal-profile").start(() -> {
                     try {
                         initWithInternalProfile(onReady);
-                    } catch (Exception e) {
+                    } catch (Throwable e) {
                         log.error("内置资源初始化异常: ", e);
-                        AppEvents.publish(StatusEvent.class,
-                                new StatusEvent("内置资源初始化失败: " + e.getMessage(), NotificationType.ERROR));
+                        uiDelegate.onInitFailed("内置资源初始化失败: " + e.getMessage());
                     }
                 });
             } else {
-                initWithExternalProfile(onReady);
+                // 外部资源涉及文件 I/O（校验资源清单），在后台线程执行以免阻塞 FX 线程
+                Thread.ofPlatform().daemon(true).name("init-external-profile").start(() -> {
+                    try {
+                        initWithExternalProfile(onReady);
+                    } catch (Throwable e) {
+                        log.error("外部资源初始化异常: ", e);
+                        uiDelegate.onInitFailed("外部资源初始化失败: " + e.getMessage());
+                    }
+                });
             }
-        } catch (Exception e) {
+        } catch (Throwable e) {
             log.error("环境初始化致命异常: ", e);
             AppEvents.publish(StatusEvent.class,
                     new StatusEvent("核心服务启动失败: " + e.getMessage(), NotificationType.ERROR));
@@ -112,7 +120,7 @@ public class ResourceInitService {
                 recoverMissingResourcesAsync(missing, () -> {
                     try {
                         continueInitWithExternalProfile(onReady);
-                    } catch (Exception e) {
+                    } catch (Throwable e) {
                         log.error("资源修复后初始化异常", e);
                         AppEvents.publish(StatusEvent.class,
                                 new StatusEvent("资源修复后初始化失败: " + e.getMessage(), NotificationType.ERROR));
@@ -129,6 +137,8 @@ public class ResourceInitService {
     private void continueInitWithExternalProfile(Runnable onReady) throws Exception {
         publishInitStep(0.2, "正在载入地图元数据...");
         initMapMetadata();
+        publishInitStep(0.35, "校验瓦片文件...");
+        validateAndRepairTiles();
         publishInitStep(0.6, "构建坐标索引系统...");
         ResourcePointContext.getInstance().loadAndInit();
         publishInitStep(0.8, "合并图标纹理图集...");
@@ -187,12 +197,12 @@ public class ResourceInitService {
 
         downloadCancelled = false;
 
-        uiDelegate.showDownloadOverlay(() -> {
+        Platform.runLater(() -> uiDelegate.showDownloadOverlay(() -> {
             downloadCancelled = true;
             MapDownloader.stopDownload();
             IconDownloader.stopDownload();
             uiDelegate.removeDownloadOverlay();
-        });
+        }));
 
         DownloadProgressContext.getInstance().setOnProgressUpdate((completed, total) -> {
             double progress = total <= 0 ? 0 : (double) completed / total;
@@ -218,7 +228,7 @@ public class ResourceInitService {
                     log.info("资源修复完成");
                     Platform.runLater(onComplete);
                 }
-            } catch (Exception e) {
+            } catch (Throwable e) {
                 log.error("资源修复异常", e);
                 AppEvents.publish(StatusEvent.class,
                         new StatusEvent("资源修复失败: " + e.getMessage(), NotificationType.ERROR));
@@ -227,10 +237,12 @@ public class ResourceInitService {
     }
 
     private void handleFirstRun(Runnable onReady) {
-        uiDelegate.showFirstRunDialog(
-                () -> startResourceDownloadAsync(onReady),
-                () -> startWithBuiltInResources(onReady),
-                Platform::exit
+        Platform.runLater(() ->
+                uiDelegate.showFirstRunDialog(
+                        () -> startResourceDownloadAsync(onReady),
+                        () -> startWithBuiltInResources(onReady),
+                        Platform::exit
+                )
         );
     }
 
@@ -246,20 +258,19 @@ public class ResourceInitService {
                     } else {
                         log.warn("后台资源下载未完成（可忽略，下次启动会重试）");
                     }
-                } catch (RuntimeException e) {
+                } catch (Throwable e) {
                     log.warn("后台资源下载异常（可忽略，下次启动会重试）", e);
                 }
             });
             Thread.ofPlatform().daemon(true).name("init-internal-builtin").start(() -> {
                 try {
                     initWithInternalProfile(onReady);
-                } catch (Exception e) { // initWithInternalProfile 声明 throws Exception，包含文件 I/O 和自定义异常
+                } catch (Throwable e) {
                     log.error("内置资源初始化异常: ", e);
-                    AppEvents.publish(StatusEvent.class,
-                            new StatusEvent("内置资源初始化失败: " + e.getMessage(), NotificationType.ERROR));
+                    uiDelegate.onInitFailed("内置资源初始化失败: " + e.getMessage());
                 }
             });
-        } catch (RuntimeException e) {
+        } catch (Throwable e) {
             log.error("内置资源模式启动失败", e);
         }
     }
@@ -299,7 +310,7 @@ public class ResourceInitService {
                                 new StatusEvent("资源同步失败，请检查网络", NotificationType.ERROR));
                     }
                 }
-            } catch (Exception e) { // 包含网络 I/O 和 initWithExternalProfile（声明 throws Exception）
+            } catch (Throwable e) {
                 log.error("地图资源下载异常", e);
                 AppEvents.publish(StatusEvent.class,
                         new StatusEvent("资源同步中断，请检查网络", NotificationType.ERROR));
@@ -315,7 +326,7 @@ public class ResourceInitService {
         try (InputStream is = ResourceUtils.getResourceStream(
                 ResourceConfigContext.getMultiMapMetadata())) {
             CompositeMapMetadata metadata = CompositeMapMetadata.load(is);
-            var mainland = metadata.subImages().stream()
+            CompositeMapMetadata.SubImageInfo mainland = metadata.subImages().stream()
                     .filter(s -> !s.isCave())
                     .findFirst().orElse(null);
             int imgW = mainland != null ? mainland.width() : 8192;
@@ -331,7 +342,7 @@ public class ResourceInitService {
         try (InputStream is = ResourceUtils.getResourceStream(
                 ResourceConfigContext.getMultiMapMetadata())) {
             CompositeMapMetadata metadata = CompositeMapMetadata.load(is);
-            var mainland = metadata.subImages().stream()
+            CompositeMapMetadata.SubImageInfo mainland = metadata.subImages().stream()
                     .filter(s -> !s.isCave())
                     .findFirst().orElse(null);
             int imgW = mainland != null ? mainland.width() : 8192;
@@ -356,6 +367,80 @@ public class ResourceInitService {
             IconCache.getInstance().clearIndividualCaches();
             ImageLoader.getInstance().clearCache();
             log.info("图标纹理图集已构建: {} 个图标, 已释放单图标缓存", iconPaths.size());
+        }
+    }
+
+    // ================================================================
+    // 瓦片校验与修复
+    // ================================================================
+
+    /**
+     * 校验所有子图的瓦片金字塔文件是否存在，对缺失的尝试从源 PNG 重新生成。
+     * init 资源清单不包含瓦片文件（数量多且层级结构固定），需单独校验。
+     */
+    private void validateAndRepairTiles() {
+        CompositeMapMetadata metadata = MapContext.getInstance().getMultiMapMetadata();
+        if (metadata == null || metadata.subImages().isEmpty()) return;
+
+        boolean needsRepair = false;
+        for (CompositeMapMetadata.SubImageInfo sub : metadata.subImages()) {
+            String tileDir = sub.tileDir();
+            if (tileDir == null || tileDir.isEmpty()) continue;
+
+            File dir = ResourceUtils.getExternalFile(tileDir);
+            if (tilesExist(dir)) continue;
+
+            if (!needsRepair) {
+                needsRepair = true;
+                publishInitStep(0.35, "修复瓦片文件...");
+            }
+
+            log.warn("瓦片目录不存在或不完整: {}，尝试从源 PNG 重新生成", tileDir);
+            if (regenerateTiles(sub, dir)) {
+                log.info("瓦片重新生成成功: {}", tileDir);
+            } else {
+                log.warn("瓦片重新生成失败，渲染时瓦片会按需回退: {}", tileDir);
+            }
+        }
+    }
+
+    /**
+     * 检查瓦片目录是否存在且包含所需的层级文件（至少 level 0 和 4 有瓦片）。
+     */
+    private static boolean tilesExist(File tileDir) {
+        if (!tileDir.isDirectory()) return false;
+        // 检查最高和最低分辨率层级是否有瓦片文件
+        for (int level : new int[]{0, 4}) {
+            File levelDir = new File(tileDir, String.valueOf(level));
+            if (!levelDir.isDirectory()) return false;
+            File[] files = levelDir.listFiles((_, name) -> name.endsWith(".png"));
+            if (files == null || files.length == 0) return false;
+        }
+        return true;
+    }
+
+    /**
+     * 从子图源 PNG 重新生成瓦片金字塔（5 级，0=全分辨率 ~ 4=最低分辨率）。
+     */
+    private static boolean regenerateTiles(CompositeMapMetadata.SubImageInfo sub, File outputDir) {
+        String sourcePath = sub.sourcePath();
+        if (sourcePath == null || sourcePath.isEmpty()) return false;
+
+        File sourceFile = ResourceUtils.getExternalFile(sourcePath);
+        if (!sourceFile.isFile()) {
+            log.warn("源 PNG 不存在，无法生成瓦片: {}", sourceFile);
+            return false;
+        }
+
+        outputDir.mkdirs();
+        try {
+            new LayerMapTileGenerator().generateTiles(
+                    sourceFile.getAbsolutePath(),
+                    outputDir.getAbsolutePath());
+            return true;
+        } catch (Exception e) {
+            log.warn("瓦片生成异常: {}", sourceFile, e);
+            return false;
         }
     }
 

@@ -21,6 +21,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -66,7 +67,7 @@ public class IconDownloader {
 
         Semaphore semaphore = new Semaphore(MapResourceUpdater.THREAD_COUNT);
 
-        try (var exec = Executors.newVirtualThreadPerTaskExecutor()) {
+        try (ExecutorService exec = Executors.newVirtualThreadPerTaskExecutor()) {
             List<CompletableFuture<Void>> futures = new ArrayList<>();
             for (String url : urls) {
                 futures.add(CompletableFuture.runAsync(() -> downloadIcon(url, semaphore), exec));

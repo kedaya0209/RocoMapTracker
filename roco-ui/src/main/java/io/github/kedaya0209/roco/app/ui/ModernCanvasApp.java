@@ -35,6 +35,7 @@ import io.github.kedaya0209.roco.app.ui.service.lifecycle.SiftClientManager;
 import io.github.kedaya0209.roco.app.ui.service.resource.ResourceInitService;
 import io.github.kedaya0209.roco.app.ui.service.resource.ResourceInitUiDelegate;
 import io.github.kedaya0209.roco.app.ui.component.dialog.FirstRunDialog;
+import io.github.kedaya0209.roco.app.ui.component.dialog.ModalConfirmDialog;
 import io.github.kedaya0209.roco.app.ui.service.ui.MainUiComposer;
 import io.github.kedaya0209.roco.app.ui.service.ui.ThemeManager;
 import io.github.kedaya0209.roco.app.ui.service.ui.VersionManager;
@@ -191,7 +192,25 @@ public class ModernCanvasApp extends Application {
 
             @Override
             public void onResourceReady(Runnable runnable) {
-                Platform.runLater(runnable);
+                Platform.runLater(() -> {
+                    rootStack.getChildren().removeIf(n -> n instanceof LoadingOverlay);
+                    runnable.run();
+                });
+            }
+
+            @Override
+            public void onInitFailed(String message) {
+                Platform.runLater(() -> {
+                    rootStack.getChildren().removeIf(n -> n instanceof LoadingOverlay);
+                    ModalConfirmDialog.showModalConfirmDialog(
+                            primaryStage,
+                            "初始化失败",
+                            message,
+                            "退出",
+                            Platform::exit,
+                            Platform::exit
+                    );
+                });
             }
         };
 

@@ -10,6 +10,8 @@ import io.github.kedaya0209.roco.app.ui.service.resource.SvgManager;
 import io.github.kedaya0209.roco.app.ui.component.dialog.ConfirmDialog;
 import io.github.kedaya0209.roco.app.ui.service.lifecycle.PluginProcessRegistry;
 import io.github.kedaya0209.roco.app.ui.util.FxRippleUtil;
+import io.github.kedaya0209.roco.app.process.ProcessMonitor;
+import io.github.kedaya0209.roco.app.update.plugin.PluginAsset;
 import io.github.kedaya0209.roco.app.update.plugin.PluginInfo;
 import io.github.kedaya0209.roco.app.update.plugin.PluginStatus;
 import io.github.kedaya0209.roco.app.update.plugin.PluginUpdateManager;
@@ -227,12 +229,12 @@ public class PluginManagementView {
         long now = System.nanoTime();
         if (now - lastMonitorNs >= 1_000_000_000L) {
             lastMonitorNs = now;
-            var readings = PluginProcessRegistry.sample();
+            Map<String, ProcessMonitor.Reading> readings = PluginProcessRegistry.sample();
             Set<String> updated = new HashSet<>();
-            for (var r : readings.entrySet()) {
+            for (Map.Entry<String, ProcessMonitor.Reading> r : readings.entrySet()) {
                 String id = r.getKey();
                 updated.add(id);
-                var reading = r.getValue();
+                ProcessMonitor.Reading reading = r.getValue();
                 Label cpuLbl = cpuLabels.get(id);
                 Label memLbl = memLabels.get(id);
                 if (cpuLbl != null) {
@@ -248,12 +250,12 @@ public class PluginManagementView {
                 }
             }
             // 进程已退出的插件重置为 "--"
-            for (var entry : cpuLabels.entrySet()) {
+            for (Map.Entry<String, Label> entry : cpuLabels.entrySet()) {
                 if (!updated.contains(entry.getKey())) {
                     entry.getValue().setText("CPU: --");
                 }
             }
-            for (var entry : memLabels.entrySet()) {
+            for (Map.Entry<String, Label> entry : memLabels.entrySet()) {
                 if (!updated.contains(entry.getKey())) {
                     entry.getValue().setText("MEM: --");
                 }
@@ -337,7 +339,7 @@ public class PluginManagementView {
                 PluginUpdateDialog.getRow("仓库", repo));
         if (plugin.assets() != null && !plugin.assets().isEmpty()) {
             StringBuilder sb = new StringBuilder();
-            for (var a : plugin.assets()) {
+            for (PluginAsset a : plugin.assets()) {
                 if (!sb.isEmpty()) sb.append(", ");
                 sb.append(a.remoteName());
             }

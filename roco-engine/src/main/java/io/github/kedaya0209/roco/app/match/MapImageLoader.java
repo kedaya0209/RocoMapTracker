@@ -15,6 +15,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.List;
 
 /**
  * 地图资源加载器 — 从 classpath 加载地图图片并流式转换为灰度像素。
@@ -121,21 +122,21 @@ public final class MapImageLoader {
     public static void writeStreamingMultiFromMetadata(CompositeMapMetadata metadata, OutputStream out) throws IOException {
         int w = metadata.width();
         int totalH = metadata.totalHeight();
-        var subs = metadata.subImages();
+        List<CompositeMapMetadata.SubImageInfo> subs = metadata.subImages();
 
         // 写入多子图协议头: [subImageCount(4B)][w(4B)][totalH(4B)][subH_0(4B)]...[subH_{N-1}(4B)][pixelsLen(4B)]
         ByteBuffer header = ByteBuffer.allocate(16 + subs.size() * 4).order(ByteOrder.BIG_ENDIAN);
         header.putInt(subs.size());
         header.putInt(w);
         header.putInt(totalH);
-        for (var sub : subs) {
+        for (CompositeMapMetadata.SubImageInfo sub : subs) {
             header.putInt(sub.height());
         }
         header.putInt(w * totalH);
         out.write(header.array());
 
         byte[] rowGray = new byte[w];
-        for (var sub : subs) {
+        for (CompositeMapMetadata.SubImageInfo sub : subs) {
             String srcPath = sub.sourcePath();
             if (srcPath == null || srcPath.isEmpty()) {
                 log.warn("子图 {} sourcePath 为空，写入空白占位", sub.name());

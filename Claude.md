@@ -1,7 +1,7 @@
 # RocoMapTracker 项目根目录
 
 AI 协作专用 – 全局架构索引与跨模块约束
-项目版本: 1.1.0 | Java 25 + GraalVM Native Image | OpenCV: JavaCPP 4.13.0-1.5.13
+项目版本: 1.2.0 | Java 25 + GraalVM Native Image | OpenCV: C++ 子进程 (sift_match.exe)
 
 
 # Language & Communication Rules (MANDATORY)
@@ -124,26 +124,21 @@ mvn -Pnative-pgo clean package -pl roco-ui -am          # PGO 优化
 模块依赖树：
 
 roco-ui (最终应用 JavaFX + Native Image)
-└─ roco-engine (核心引擎: 截图/上下文/Hook/匹配调度)
-├─ roco-macher (SIFT 匹配算法)
-│    ├─ roco-model (模型推理 ONNX/DJL)
+├─ roco-engine (核心引擎: 截图/上下文/Hook/匹配调度)
+│    ├─ roco-map (地图管理: 下载/拼接/资源点)
 │    │    └─ roco-common (基础工具)
 │    └─ roco-common
-├─ roco-map (地图管理: 下载/拼接/资源点)
-│    └─ roco-common
+├─ roco-map
 └─ roco-common
 
-模块职责表（使用空格分隔，请视为等宽字体）：
+模块职责表：
 
 模块            职责
 roco-common    配置中心、资源/JSON 工具
-roco-model     ONNX 推理、CNN 箭头检测、OCR
 roco-map       地图下载/拼接、资源点模型
-roco-macher    SIFT 匹配器、小地图检测
 roco-engine    截图采集、上下文、Hook 事件、匹配调度
 roco-ui        JavaFX 界面、渲染引擎、设置面板
 cpp/           C++ WGC 截图 + SIFT 匹配子进程 (Socket)
-c/             JNI 局部引用帧管理 (jniframe.c)
 
 
 # 跨语言边界逻辑
@@ -195,12 +190,6 @@ Hook 事件单向流：数据层 → UI 层
 - System.gc() 在 Serial GC 下有效（同步全量回收）。
 - roco-common 需依赖 graal-sdk (provided)。
 
-## JavaCPP OpenCV 约束 (nopointergc=true)
-- 所有临时 Native 对象在 try (PointerScope scope) 内创建。
-- FlannBasedMatcher 必须在 scope 外创建。
-- 严禁散乱的 .close() 调用，仅在 destroy() 中关闭字段级 Mat。
-- FLANN 强制单树模式：new KDTreeIndexParams(1)。
-
 ## 资源路径系统
 - 内嵌资源通过 classpath 访问，外部资源通过 ResourceUtils.getExternalFile()。
 - SIFT 缓存：.feat / .pca64.ultra.feat (Zstd 压缩)。
@@ -213,7 +202,7 @@ Hook 事件单向流：数据层 → UI 层
 - 之前修复的触发点：`MapMatcherProcessor.executeMatching()` 原使用 `Thread.startVirtualThread()`，涉及 `SocketSession.send()` 阻塞 I/O，已替换为专用单线程池。
 
 
-#ROI 布局 (万分数)
+# ROI 布局 (万分数)
 ROI   用途                坐标 (x,y,w,h)           实际覆盖 (1920×1080)
 0     小地图 (SIFT+箭头)   (8900,700,1000,1800)    右上角 192×194
 1     物品栏 (OCR)         (8750,2870,1100,1700)   右侧中部 211×486

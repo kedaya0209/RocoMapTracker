@@ -15,6 +15,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.Optional;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -102,7 +103,7 @@ public class UpdateChecker {
                     exeUrl = url;
                 } else if (name.endsWith(".hdiff")) {
                     patchUrl = url;
-                    var m = patchPattern.matcher(name);
+                    Matcher m = patchPattern.matcher(name);
                     if (m.matches()) {
                         patchFromVersion = m.group(1);
                     }

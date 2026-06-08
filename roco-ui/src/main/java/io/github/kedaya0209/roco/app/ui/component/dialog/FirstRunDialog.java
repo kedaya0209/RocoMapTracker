@@ -2,6 +2,9 @@ package io.github.kedaya0209.roco.app.ui.component.dialog;
 
 import net.jcip.annotations.NotThreadSafe;
 import atlantafx.base.theme.Styles;
+import javafx.scene.control.Button;
+import javafx.scene.control.Label;
+import javafx.scene.shape.SVGPath;
 import javafx.geometry.Pos;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
@@ -21,25 +24,25 @@ public class FirstRunDialog extends AbstractDialog {
 
         VBox dialogBox = createDialogBox(440, 380);
 
-        var icon = createDefaultIcon("-color-accent-emphasis");
-        var titleLabel = createTitleLabel(title);
-        var msgLabel = createMessageLabel(message);
+        SVGPath icon = createDefaultIcon("-color-accent-emphasis");
+        Label titleLabel = createTitleLabel(title);
+        Label msgLabel = createMessageLabel(message);
 
         VBox btnBox = new VBox(12);
         btnBox.setAlignment(Pos.CENTER);
         btnBox.setFillWidth(true);
 
-        var downloadBtn = createButton("立即同步资源", Styles.SUCCESS, () ->
+        Button downloadBtn = createButton("立即同步资源", Styles.SUCCESS, () ->
                 fadeOutAndRemove(rootStack, mask, onDownload));
         downloadBtn.setMaxWidth(260);
         downloadBtn.setPrefHeight(38);
 
-        var builtInBtn = createButton("离线启动，后台更新", Styles.ACCENT, () ->
+        Button builtInBtn = createButton("离线启动，后台更新", Styles.ACCENT, () ->
                 fadeOutAndRemove(rootStack, mask, onUseBuiltIn));
         builtInBtn.setMaxWidth(260);
         builtInBtn.setPrefHeight(38);
 
-        var exitBtn = createButton("退出程序", Styles.DANGER, () ->
+        Button exitBtn = createButton("退出程序", Styles.DANGER, () ->
                 fadeOutAndRemove(rootStack, mask, onExit));
         exitBtn.setMaxWidth(260);
         exitBtn.setPrefHeight(38);

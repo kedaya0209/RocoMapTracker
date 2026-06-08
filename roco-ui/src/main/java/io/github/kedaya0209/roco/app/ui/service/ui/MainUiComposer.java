@@ -61,7 +61,7 @@ public final class MainUiComposer {
 
         // 画布容器
         Pane canvasContainer = new Pane();
-        canvasContainer.setStyle("-fx-background-color: #1a1a2e;");
+        canvasContainer.setStyle("-fx-background-color: -color-bg-canvas;");
         canvasContainer.prefWidthProperty().bind(rootStack.widthProperty());
         canvasContainer.prefHeightProperty().bind(rootStack.heightProperty());
 
@@ -111,7 +111,7 @@ public final class MainUiComposer {
         sidebarModal.setMouseTransparent(true);
         // 侧边栏打开时地图毛玻璃效果
         // AtomicBoolean 确保首次 showing=true 之后才执行效果，防止初始化阶段误触发
-        var blurReady = new AtomicBoolean(false);
+        AtomicBoolean blurReady = new AtomicBoolean(false);
         sidebarModal.displayProperty().addListener((_, _, showing) -> {
             sidebarModal.setMouseTransparent(!showing);
             if (!blurReady.get()) {

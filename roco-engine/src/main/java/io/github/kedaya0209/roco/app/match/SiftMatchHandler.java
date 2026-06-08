@@ -20,6 +20,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -181,7 +182,7 @@ public class SiftMatchHandler {
                 try (InputStream is = ResourceUtils.getResourceStream(
                         ResourceConfigContext.getMultiMapMetadata())) {
                     CompositeMapMetadata metadata = CompositeMapMetadata.load(is);
-                    var subs = metadata.subImages();
+                    List<CompositeMapMetadata.SubImageInfo> subs = metadata.subImages();
                     subImageHeights = subs.stream()
                             .mapToInt(SubImageInfo::height)
                             .toArray();
@@ -194,7 +195,7 @@ public class SiftMatchHandler {
                     subImageOverrides = subs.stream()
                             .filter(sub -> sub.siftOverride() != null && sub.siftOverride().hasAny())
                             .map(sub -> {
-                                var o = sub.siftOverride();
+                                CompositeMapMetadata.SiftParams o = sub.siftOverride();
                                 return new SubImageSiftOverride(
                                         sub.index(), o.contrastThreshold(),
                                         o.edgeThreshold(), o.nfeatures(),
@@ -268,7 +269,7 @@ public class SiftMatchHandler {
             }
             int w = metadata.width();
             int totalH = metadata.totalHeight();
-            var subs = metadata.subImages();
+            List<CompositeMapMetadata.SubImageInfo> subs = metadata.subImages();
             int subCount = subs.size();
             int bodyLength = 16 + subCount * 4 + w * totalH;
 

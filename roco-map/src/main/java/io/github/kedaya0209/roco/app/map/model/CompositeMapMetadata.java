@@ -92,7 +92,7 @@ public final class CompositeMapMetadata {
      * @return 匹配的子图，越界时返回 null
      */
     public SubImageInfo findByY(double y) {
-        for (var sub : subImages) {
+        for (SubImageInfo sub : subImages) {
             if (y >= sub.offsetY() && y < sub.offsetY() + sub.height()) {
                 return sub;
             }

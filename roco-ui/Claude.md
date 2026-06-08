@@ -8,7 +8,7 @@ AI 协作专用 – 依赖 roco-engine（以及传递依赖），是最终应用
 ## 模块职责
 
 
-- 应用入口：Main 初始化 OpenCV → 启动 JavaFX。
+- 应用入口：Main → JavaFX Application.launch。
 - 主界面：ModernCanvasApp 管理场景、启动截图守护、发布初始化进度。
 - 渲染引擎：MapRenderer 驱动渲染循环，IconLayerManager 管理资源点图标，PlayerRenderer 渲染玩家，RouteRenderer 绘制路线。
 - SVG 管理：SvgManager 门面，委托 SvgAnimator / SvgIconBuilder / SvgPathUtil 分别负责动画、构建、路径。
@@ -25,7 +25,7 @@ AI 协作专用 – 依赖 roco-engine（以及传递依赖），是最终应用
 
 
 入口 (2 个)：
-Main                   入口点：初始化 OpenCV → launch JavaFX
+Main                   入口点：Application.launch(ModernCanvasApp)
 ModernCanvasApp        主 Application：初始化 + UI 构建 + 截图守护
 
 ui.command – Command 系统 (6 个)：

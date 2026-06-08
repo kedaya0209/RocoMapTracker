@@ -54,7 +54,7 @@ public class CheckUpdateManager implements SidebarComponent {
         updateBtn.setOnMouseExited(e -> SvgManager.animateHoverDrawIcon(icon, false, 400));
 
         updateBtn.setOnAction(_ -> {
-            var updateMgr = UpdateManager.getInstance();
+            UpdateManager updateMgr = UpdateManager.getInstance();
             if (updateMgr.isChecking() || updateMgr.isDownloading()) {
                 return;
             }

@@ -171,7 +171,7 @@ public class MapRenderer {
         // ====== 洞穴叠加同步 ======
         if (mm.getMultiMapMetadata() != null && mm.isCaveMode()) {
             int idx = mm.getCaveIndex();
-            var subs = mm.getMultiMapMetadata().subImages();
+            List<CompositeMapMetadata.SubImageInfo> subs = mm.getMultiMapMetadata().subImages();
             String caveDir = (idx >= 0 && idx < subs.size()) ? subs.get(idx).tileDir() : "";
             tileManager.setCaveOverlay(idx, caveDir);
         } else {
