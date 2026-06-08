@@ -1,21 +1,21 @@
 package io.github.kedaya0209.roco.app.capture.pipeline;
 
-import net.jcip.annotations.NotThreadSafe;
 import io.github.kedaya0209.roco.app.capture.frame.CaptureFrameBuffer;
 import io.github.kedaya0209.roco.app.capture.frame.ROIData;
 import io.github.kedaya0209.roco.app.config.CaptureConfig;
 import io.github.kedaya0209.roco.app.config.SiftConfig;
+import io.github.kedaya0209.roco.app.context.MapContext;
 import io.github.kedaya0209.roco.app.context.StatsContext;
 import io.github.kedaya0209.roco.app.hook.AppEvents;
 import io.github.kedaya0209.roco.app.hook.event.NotificationType;
 import io.github.kedaya0209.roco.app.hook.event.StatusEvent;
 import io.github.kedaya0209.roco.app.hook.event.StatusStateMachine;
-import io.github.kedaya0209.roco.app.context.MapContext;
+import io.github.kedaya0209.roco.app.map.model.CompositeMapMetadata;
+import io.github.kedaya0209.roco.app.match.PlayerStateTracker;
 import io.github.kedaya0209.roco.app.match.SiftMatchHandler;
 import io.github.kedaya0209.roco.app.match.SiftMatchProtocol;
-import io.github.kedaya0209.roco.app.match.PlayerStateTracker;
-import io.github.kedaya0209.roco.app.map.model.CompositeMapMetadata;
 import lombok.extern.slf4j.Slf4j;
+import net.jcip.annotations.NotThreadSafe;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.SynchronousQueue;
@@ -63,6 +63,10 @@ public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
     private boolean wasCaveMode;
     /** 上次 GC 触发时间戳，每 15 秒回收一次匹配过程的内存 */
     private long lastGcTime = System.currentTimeMillis();
+    /**
+     * 小地图连续匹配失败计数，超过阈值触发 LOST 状态
+     */
+    private int consecutiveFailures = 0;
 
     public MapMatcherProcessor(int targetRoiIndex, SiftMatchHandler matchClient,
                                 CaptureFrameBuffer frameBuffer,
@@ -98,15 +102,21 @@ public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
         if (enabled != wasMatchingEnabled) {
             wasMatchingEnabled = enabled;
             if (enabled) {
+                StatusStateMachine.getInstance().cascadeTransition(StatusStateMachine.StatusKey.MATCH, StatusStateMachine.State.ACTIVE);
                 AppEvents.publish(StatusEvent.class,
                         new StatusEvent("匹配已开启", NotificationType.SUCCESS, StatusEvent.DisplayMode.CAROUSEL));
-            } else if (StatusStateMachine.getInstance()
-                    .currentState(StatusStateMachine.StatusKey.MATCH) == StatusStateMachine.State.ACTIVE) {
+            } else {
+                StatusStateMachine.getInstance().cascadeTransition(StatusStateMachine.StatusKey.MATCH, StatusStateMachine.State.PAUSED);
                 AppEvents.publish(StatusEvent.class,
                         new StatusEvent("匹配已暂停", NotificationType.INFO, StatusEvent.DisplayMode.CAROUSEL));
             }
             // 匹配关闭时触发 GC 回收匹配过程分配的大块堆内存
             System.gc();
+        }
+        // 匹配开关未变但 MATCH 状态被级联覆盖（如 SIFT 断开后重连），恢复状态
+        if (enabled && StatusStateMachine.getInstance()
+                .currentState(StatusStateMachine.StatusKey.MATCH) != StatusStateMachine.State.ACTIVE) {
+            StatusStateMachine.getInstance().cascadeTransition(StatusStateMachine.StatusKey.MATCH, StatusStateMachine.State.ACTIVE);
         }
         if (!enabled) return;
 
@@ -182,14 +192,27 @@ public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
                         caveIdx = sub.index();
                         caveName = sub.name();
                     }
-                    MapContext.getInstance().updateCaveMode(inCave, caveIdx, caveName);
+                    // 手动覆盖时跳过自动洞穴模式更新
+                    if (!MapContext.getInstance().isManualOverride()) {
+                        MapContext.getInstance().updateCaveMode(inCave, caveIdx, caveName);
 
-                    // 洞穴模式变化时发布轮播事件
-                    if (inCave != wasCaveMode) {
-                        wasCaveMode = inCave;
-                        AppEvents.publish(StatusEvent.class, inCave
-                                ? new StatusEvent("洞穴: " + (caveName != null ? caveName : "?"), NotificationType.INFO, StatusEvent.DisplayMode.CAROUSEL)
-                                : new StatusEvent("大陆", NotificationType.SUCCESS, StatusEvent.DisplayMode.CAROUSEL));
+                        // 洞穴模式变化时发布轮播事件（仅在自动模式下）
+                        if (inCave != wasCaveMode) {
+                            wasCaveMode = inCave;
+                            AppEvents.publish(StatusEvent.class, inCave
+                                    ? new StatusEvent("洞穴: " + (caveName != null ? caveName : "?"), NotificationType.INFO, StatusEvent.DisplayMode.CAROUSEL)
+                                    : new StatusEvent("大陆", NotificationType.SUCCESS, StatusEvent.DisplayMode.CAROUSEL));
+                        }
+                    }
+
+                    // 匹配成功：重置连续失败计数，更新小地图跟踪状态
+                    boolean wasLost = StatusStateMachine.getInstance()
+                            .currentState(StatusStateMachine.StatusKey.MINIMAP) == StatusStateMachine.State.LOST;
+                    consecutiveFailures = 0;
+                    StatusStateMachine.getInstance().cascadeTransition(StatusStateMachine.StatusKey.MINIMAP, StatusStateMachine.State.TRACKING);
+                    if (wasLost) {
+                        AppEvents.publish(StatusEvent.class,
+                                new StatusEvent("检测到小地图，正在跟踪", NotificationType.SUCCESS, StatusEvent.DisplayMode.CAROUSEL));
                     }
 
                     if (log.isTraceEnabled()) {
@@ -201,6 +224,13 @@ public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
                     }
                 } else {
                     stateTracker.onMatchFailure("C++ match failed");
+                    consecutiveFailures++;
+                    if (consecutiveFailures >= 5) {
+                        consecutiveFailures = 0;
+                        StatusStateMachine.getInstance().cascadeTransition(StatusStateMachine.StatusKey.MINIMAP, StatusStateMachine.State.LOST);
+                        AppEvents.publish(StatusEvent.class,
+                                new StatusEvent("未检测到小地图", NotificationType.ERROR, StatusEvent.DisplayMode.CAROUSEL));
+                    }
                     // 匹配失败时不改变洞穴状态（保留上一帧的有效值）
                     if (log.isTraceEnabled()) {
                         log.trace("[seq={}] match FAILED, elapsed={}ms", seq, elapsed);

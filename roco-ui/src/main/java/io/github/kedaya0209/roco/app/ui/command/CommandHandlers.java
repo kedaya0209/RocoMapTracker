@@ -102,6 +102,10 @@ public final class CommandHandlers {
                 cam.setNavAngle(0);
             }
         });
+
+        CommandBus.subscribe(SetLayerCommand.class, cmd -> {
+            MapContext.getInstance().setActiveLayer(cmd.layer());
+        });
     }
 
     // ================================================================

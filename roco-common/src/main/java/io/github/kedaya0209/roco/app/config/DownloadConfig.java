@@ -39,6 +39,10 @@ public final class DownloadConfig {
      */
     public static boolean[] MAP_REMOTE_URL_IS_CAVE = new boolean[0];
     /**
+     * 远程瓦片 URL 对应的层数（0=大陆/地表，1=一层，2=二层...）
+     */
+    public static int[] MAP_REMOTE_URL_LAYER = new int[0];
+    /**
      * 地图资源信息页 URL
      */
     public static String MAP_RESOURCE_INFO_URL = "https://wiki.biligame.com/rocom/大地图";
@@ -89,6 +93,7 @@ public final class DownloadConfig {
         MAP_REMOTE_URL_SORT = ConfigHelper.getIntArray(prop, "map.remote.url.sort");
         MAP_REMOTE_URL_DISPLAY_NAME = ConfigHelper.getStrArray(prop, "map.remote.url.display.name");
         MAP_REMOTE_URL_IS_CAVE = ConfigHelper.getBoolArray(prop, "map.remote.url.is.cave");
+        MAP_REMOTE_URL_LAYER = ConfigHelper.getIntArray(prop, "map.remote.url.layer");
     }
 
     public static void save(StringBuilder sb) {
@@ -121,5 +126,8 @@ public final class DownloadConfig {
         }
         sb.append("# 远程瓦片 URL 对应的洞穴标记（true=洞穴，false=大陆）\n");
         sb.append("map.remote.url.is.cave=").append(isCaveArr).append("\n\n");
+        String layerArr = Arrays.stream(MAP_REMOTE_URL_LAYER).mapToObj(String::valueOf).collect(Collectors.joining(","));
+        sb.append("# 远程瓦片 URL 对应的层数（0=大陆/地表，1=一层，2=二层...）\n");
+        sb.append("map.remote.url.layer=").append(layerArr).append("\n\n");
     }
 }

@@ -1,22 +1,25 @@
 package io.github.kedaya0209.roco.app.match;
 
-import net.jcip.annotations.NotThreadSafe;
 import io.github.kedaya0209.roco.app.config.SiftConfig;
 import io.github.kedaya0209.roco.app.config.SocketConfig;
 import io.github.kedaya0209.roco.app.context.ResourceConfigContext;
 import io.github.kedaya0209.roco.app.hook.AppEvents;
 import io.github.kedaya0209.roco.app.hook.event.NotificationType;
 import io.github.kedaya0209.roco.app.hook.event.StatusEvent;
+import io.github.kedaya0209.roco.app.hook.event.StatusStateMachine;
+import io.github.kedaya0209.roco.app.hook.event.StatusStateMachine.State;
+import io.github.kedaya0209.roco.app.hook.event.StatusStateMachine.StatusKey;
 import io.github.kedaya0209.roco.app.map.model.CompositeMapMetadata;
 import io.github.kedaya0209.roco.app.map.model.CompositeMapMetadata.SubImageInfo;
-import io.github.kedaya0209.roco.app.utils.ResourceUtils;
 import io.github.kedaya0209.roco.app.process.NativeProcess;
 import io.github.kedaya0209.roco.app.process.NativeProcessFactory;
 import io.github.kedaya0209.roco.app.process.ProcessRestartHelper;
 import io.github.kedaya0209.roco.app.socket.HandlerSubscriber;
 import io.github.kedaya0209.roco.app.socket.SocketServer;
 import io.github.kedaya0209.roco.app.socket.SocketSession;
+import io.github.kedaya0209.roco.app.utils.ResourceUtils;
 import lombok.extern.slf4j.Slf4j;
+import net.jcip.annotations.NotThreadSafe;
 
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -147,6 +150,7 @@ public class SiftMatchHandler {
     private void handleActiveDisconnect(SocketSession session, String reason) {
         log.warn("SiftMatchHandler 活跃会话 #{} 断开: {}", session.id(), reason);
         sessionManager.handleActiveDisconnect();
+        StatusStateMachine.getInstance().cascadeTransition(StatusKey.SIFT, State.DISCONNECTED);
         AppEvents.publish(StatusEvent.class,
                 new StatusEvent("sift引擎断开", NotificationType.ERROR, StatusEvent.DisplayMode.CAROUSEL));
 
@@ -295,6 +299,7 @@ public class SiftMatchHandler {
             return;
         }
         int featureCount = sessionManager.handleInitComplete(body);
+        StatusStateMachine.getInstance().cascadeTransition(StatusKey.SIFT, State.READY);
         AppEvents.publish(StatusEvent.class,
                 new StatusEvent("sift引擎加载完成", NotificationType.SUCCESS, StatusEvent.DisplayMode.CAROUSEL));
         if (stateCallback != null) {
@@ -308,6 +313,7 @@ public class SiftMatchHandler {
             return;
         }
         String msg = sessionManager.handleInitFailed(body);
+        StatusStateMachine.getInstance().cascadeTransition(StatusKey.SIFT, State.FAILED);
         AppEvents.publish(StatusEvent.class,
                 new StatusEvent("sift引擎加载失败", NotificationType.ERROR, StatusEvent.DisplayMode.CAROUSEL));
         if (stateCallback != null) {
@@ -392,6 +398,7 @@ public class SiftMatchHandler {
         }
         processManager.setActiveProcess(proc);
 
+        StatusStateMachine.getInstance().cascadeTransition(StatusKey.SIFT, State.LOADING);
         AppEvents.publish(StatusEvent.class,
                 new StatusEvent("sift引擎加载中", NotificationType.LOADING, StatusEvent.DisplayMode.CAROUSEL));
         return true;

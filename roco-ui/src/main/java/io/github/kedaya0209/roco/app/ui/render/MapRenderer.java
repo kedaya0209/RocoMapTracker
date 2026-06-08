@@ -169,13 +169,25 @@ public class MapRenderer {
                 || Math.abs(localOy - lastOy) > 1e-9;
 
         // ====== 洞穴叠加同步 ======
-        if (mm.getMultiMapMetadata() != null && mm.isCaveMode()) {
+        int activeLayer = mm.getActiveLayer();
+        if (activeLayer >= 0) {
+            // 手动图层覆盖：支持层内全部洞穴或单个洞穴（overrideCaveIndex）
+            java.util.List<String> caveDirs = mm.getCaveDirsToRender();
+            tileManager.setLayerOverlay(activeLayer, caveDirs);
+        } else if (mm.isCaveMode() && mm.getMultiMapMetadata() != null) {
+            // 自动模式 — 跟随匹配结果，显示单个洞穴
             int idx = mm.getCaveIndex();
-            List<CompositeMapMetadata.SubImageInfo> subs = mm.getMultiMapMetadata().subImages();
-            String caveDir = (idx >= 0 && idx < subs.size()) ? subs.get(idx).tileDir() : "";
-            tileManager.setCaveOverlay(idx, caveDir);
+            String caveDir = "";
+            if (idx >= 0) {
+                List<CompositeMapMetadata.SubImageInfo> subs = mm.getMultiMapMetadata().subImages();
+                if (idx < subs.size()) {
+                    caveDir = subs.get(idx).tileDir();
+                }
+            }
+            tileManager.setLayerOverlay(-1, caveDir.isEmpty()
+                    ? java.util.List.of() : java.util.List.of(caveDir));
         } else {
-            tileManager.setCaveOverlay(-1, null);
+            tileManager.setLayerOverlay(-1, java.util.List.of());
         }
 
         // ====== GPU 变换（局部坐标系） ======

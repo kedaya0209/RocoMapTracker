@@ -1,7 +1,7 @@
 package io.github.kedaya0209.roco.app.hook.event;
 
-import net.jcip.annotations.ThreadSafe;
 import lombok.extern.slf4j.Slf4j;
+import net.jcip.annotations.ThreadSafe;
 
 import java.util.EnumMap;
 import java.util.Map;
@@ -140,6 +140,46 @@ public final class StatusStateMachine {
 
         log.warn("状态转换非法: {}: {} → {}", key, current, newState);
         return false;
+    }
+
+    /**
+     * 级联转换 — 先转换父级状态，再自动派生子级状态。
+     *
+     * <p>级联规则：
+     * <ul>
+     *   <li>CAPTURE → DISCONNECTED：子级 SIFT → DISCONNECTED</li>
+     *   <li>SIFT → DISCONNECTED / FAILED：子级 MATCH → PAUSED、MINIMAP → LOST</li>
+     * </ul>
+     * 级联只更新状态机，不发布 UI 事件。
+     */
+    public synchronized void cascadeTransition(StatusKey key, State newState) {
+        State current = currentStates.get(key);
+        if (current == newState) return;
+        if (!tryTransition(key, newState)) return;
+
+        switch (key) {
+            case CAPTURE:
+                if (newState == State.DISCONNECTED) {
+                    forceState(StatusKey.SIFT, State.DISCONNECTED);
+                }
+                break;
+            case SIFT:
+                if (newState == State.DISCONNECTED || newState == State.FAILED) {
+                    forceState(StatusKey.MATCH, State.PAUSED);
+                    forceState(StatusKey.MINIMAP, State.LOST);
+                } else if (newState == State.READY) {
+                    forceState(StatusKey.MINIMAP, State.TRACKING);
+                    // MATCH 状态由 MapMatcherProcessor 根据匹配开关恢复
+                }
+                break;
+        }
+    }
+
+    private void forceState(StatusKey key, State target) {
+        State current = currentStates.get(key);
+        if (current == target) return;
+        currentStates.put(key, target);
+        log.debug("级联状态: {}: {} → {}", key, current, target);
     }
 
     /**
