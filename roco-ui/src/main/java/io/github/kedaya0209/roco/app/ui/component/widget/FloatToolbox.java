@@ -23,6 +23,7 @@ import javafx.scene.control.Tooltip;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Pane;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
@@ -51,11 +52,10 @@ public class FloatToolbox extends VBox {
     // 大陆/层切换按钮
     private final StackPane mainlandBtn;
     private final List<LayerGroup> layerGroups = new ArrayList<>();
-    // 右侧列 — 当前选中层的洞穴选择按钮
-    private final VBox rightCol;
     @Getter
     private boolean resourcePanelVisible = false;
-    private final Map<Integer, List<StackPane>> caveButtonsByLayer = new HashMap<>();
+    private final Map<Integer, VBox> caveColumnsByLayer = new HashMap<>();
+    private final Pane cavePane;
     // UI 选中层（仅展开洞穴按钮列表，不加载瓦片）
     private int selectedLayer = -1;
     private final Image mainlandImg;
@@ -78,7 +78,7 @@ public class FloatToolbox extends VBox {
         this.coverImg = new Image(getClass().getResourceAsStream("/icon/cover.png"));
         this.coverActiveImg = new Image(getClass().getResourceAsStream("/icon/cover_active.png"));
 
-        // 左侧列：主图标
+        // 左侧列：全部按钮（跟随、大陆、层按钮）
         leftCol = new VBox(12);
         leftCol.setAlignment(Pos.TOP_CENTER);
 
@@ -86,7 +86,10 @@ public class FloatToolbox extends VBox {
         mainlandBtn = createMainlandButton();
         leftCol.getChildren().addAll(followBtn, mainlandBtn);
 
-        // 构建层按钮（左列）+ 洞穴按钮（右列）
+        // 构建层按钮 + 右侧洞穴按钮列
+        cavePane = new Pane();
+        cavePane.setPickOnBounds(false);
+
         CompositeMapMetadata meta = MapContext.getInstance().getMultiMapMetadata();
         if (meta != null) {
             List<Integer> caveLayers = meta.subImages().stream()
@@ -101,34 +104,32 @@ public class FloatToolbox extends VBox {
                 layerGroups.add(new LayerGroup(layer, layerBtn));
                 leftCol.getChildren().add(layerBtn);
 
-                // 仅子图 >1 的层才需要子图标，预创建洞穴按钮
                 List<Integer> caveIndices = MapContext.getInstance().getCaveIndicesForLayer(layer);
+                VBox caveCol = new VBox(4);
+                caveCol.setAlignment(Pos.TOP_CENTER);
+                caveCol.setManaged(false); // Pane 不干涉子节点布局
+                caveCol.setVisible(false);
                 if (caveIndices.size() > 1) {
-                    List<StackPane> caveBtns = new ArrayList<>();
                     for (int idx : caveIndices) {
                         StackPane caveBtn = createCaveButton(idx);
-                        caveBtn.setVisible(false);
-                        caveBtn.setManaged(false);
-                        caveBtns.add(caveBtn);
+                        caveCol.getChildren().add(caveBtn);
                     }
-                    caveButtonsByLayer.put(layer, caveBtns);
                 }
+                caveColumnsByLayer.put(layer, caveCol);
+                cavePane.getChildren().add(caveCol);
             }
         }
 
-        // 右侧列：子图 >1 的层对应的洞穴按钮列（默认隐藏）
-        rightCol = new VBox(4);
-        rightCol.setVisible(false);
-        rightCol.setAlignment(Pos.TOP_CENTER);
-        for (List<StackPane> btns : caveButtonsByLayer.values()) {
-            rightCol.getChildren().addAll(btns);
-        }
-
-        // 主行：左列 + 右列
-        HBox mainRow = new HBox(8);
-        mainRow.setAlignment(Pos.TOP_CENTER);
-        mainRow.getChildren().addAll(leftCol, rightCol);
-        getChildren().add(mainRow);
+        // 主布局：左侧按钮列 + 右侧洞穴覆盖层（translateX 跟随 leftCol 宽度）
+        StackPane layoutStack = new StackPane();
+        layoutStack.setAlignment(Pos.TOP_LEFT);
+        HBox leftWrapper = new HBox(leftCol);
+        layoutStack.getChildren().add(leftWrapper);
+        cavePane.translateXProperty().bind(leftCol.widthProperty().add(16));
+        // 防止 StackPane 拉伸 cavePane
+        cavePane.setMaxSize(0, 0);
+        layoutStack.getChildren().add(cavePane);
+        getChildren().add(layoutStack);
 
         // 资源计数切换（仅在高级版显示）
         collectBtn = createVectorIconButton(
@@ -138,12 +139,12 @@ public class FloatToolbox extends VBox {
         );
 
         if (VersionManager.getInstance().getCurrentMode() == VersionMode.ADVANCED) {
-            insertCollctButton();
+            insertCollectButton();
         }
         updateCaveButtonStates();
     }
 
-    private void insertCollctButton() {
+    private void insertCollectButton() {
         ObservableList<Node> children = leftCol.getChildren();
         if (children.contains(collectBtn)) {
             return;
@@ -153,7 +154,7 @@ public class FloatToolbox extends VBox {
 
     public void setCollectButtonVisible(boolean visible) {
         if (visible) {
-            insertCollctButton();
+            insertCollectButton();
             return;
         }
         leftCol.getChildren().remove(collectBtn);
@@ -388,19 +389,32 @@ public class FloatToolbox extends VBox {
                     layerSelected ? coverActiveImg : coverImg);
         }
 
-        // 右侧列：仅在有选中层且该层有子图标时可见
-        boolean hasSelectedLayer = selectedLayer >= 0 && caveButtonsByLayer.containsKey(selectedLayer);
-        rightCol.setVisible(hasSelectedLayer);
-        rightCol.setManaged(hasSelectedLayer);
-        if (hasSelectedLayer) {
-            for (Map.Entry<Integer, List<StackPane>> entry : caveButtonsByLayer.entrySet()) {
-                boolean isActiveLayer = entry.getKey() == selectedLayer;
-                for (StackPane caveBtn : entry.getValue()) {
-                    caveBtn.setVisible(isActiveLayer);
-                    caveBtn.setManaged(isActiveLayer);
-                    int caveIdx = (int) caveBtn.getUserData();
-                    ((ImageView) caveBtn.getChildren().get(0)).setImage(
-                            overrideIdx == caveIdx ? coverActiveImg : coverImg);
+        // 右侧洞穴列 — 仅显示选中层，中心与对应层按钮对齐
+        for (Map.Entry<Integer, VBox> entry : caveColumnsByLayer.entrySet()) {
+            boolean active = entry.getKey() == selectedLayer;
+            VBox caveCol = entry.getValue();
+            caveCol.setVisible(active);
+            if (active) {
+                // 计算层按钮的中心 Y（场景坐标），将洞穴列中心与之对齐
+                for (LayerGroup lg : layerGroups) {
+                    if (lg.layer() == selectedLayer) {
+                        double btnCenterSceneY = lg.btn().localToScene(
+                                lg.btn().getBoundsInLocal().getCenterX(),
+                                lg.btn().getBoundsInLocal().getCenterY()).getY();
+                        int n = caveCol.getChildren().size();
+                        double colHeight = n * 46.0 + (n - 1) * 4.0;
+                        double localY = cavePane.sceneToLocal(0, btnCenterSceneY).getY();
+                        caveCol.setLayoutY(localY - colHeight / 2);
+                        break;
+                    }
+                }
+                // 更新洞穴按钮高亮
+                for (Node child : caveCol.getChildren()) {
+                    if (child instanceof StackPane caveBtn) {
+                        int caveIdx = (int) caveBtn.getUserData();
+                        ((ImageView) caveBtn.getChildren().get(0)).setImage(
+                                overrideIdx == caveIdx ? coverActiveImg : coverImg);
+                    }
                 }
             }
         }

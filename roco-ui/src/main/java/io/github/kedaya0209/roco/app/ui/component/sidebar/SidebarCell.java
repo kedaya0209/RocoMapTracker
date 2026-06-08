@@ -164,7 +164,7 @@ class SidebarCell extends ListCell<Sidebar.SidebarItem> {
         HBox row = new HBox(title);
         row.setAlignment(Pos.CENTER_LEFT);
         row.setPrefHeight(36);
-        row.setPadding(new Insets(0, 0, 0, 20));
+        row.setPadding(new Insets(0, 0, 0, 38));
         row.setMouseTransparent(true);
 
         if (item.selected()) {
