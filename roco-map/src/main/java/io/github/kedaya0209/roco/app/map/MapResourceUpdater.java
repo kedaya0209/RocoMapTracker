@@ -275,6 +275,28 @@ public final class MapResourceUpdater {
         // 写入 IS_CAVE 配置，供下游 MapPostProcessor 使用
         DownloadConfig.MAP_REMOTE_URL_IS_CAVE = isCave;
 
+        // 根据命名约定推导层数：大陆=0，洞穴从名称提取数字（B1→1, B2→2），默认=1
+        int[] layerArr = new int[tags.length];
+        for (int i = 0; i < tags.length; i++) {
+            if (!isCave[i]) {
+                layerArr[i] = 0;
+            } else {
+                String tag = tags[i];
+                int num = 1;
+                StringBuilder digits = new StringBuilder();
+                for (int ci = tag.length() - 1; ci >= 0; ci--) {
+                    if (Character.isDigit(tag.charAt(ci))) {
+                        digits.insert(0, tag.charAt(ci));
+                    } else break;
+                }
+                if (!digits.isEmpty()) {
+                    try { num = Integer.parseInt(digits.toString()); } catch (NumberFormatException ignored) {}
+                }
+                layerArr[i] = Math.max(1, num);
+            }
+        }
+        DownloadConfig.MAP_REMOTE_URL_LAYER = layerArr;
+
         if (mainlandMapFile == null) {
             log.warn("未找到大陆图（所有地图均含透明像素），跳过洞穴增强处理");
             return;

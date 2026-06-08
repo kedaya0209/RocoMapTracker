@@ -41,6 +41,18 @@ public class MapContext {
     private volatile int activeSubImageIndex = 0;
     private volatile double activeSubImageOffsetY = 0;
 
+    /**
+     * 手动图层覆盖：
+     * -1=自动跟随匹配结果，{@code >=0}=强制显示该层所有洞穴的瓦片叠加
+     */
+    private volatile int activeLayer = -1;
+
+    /**
+     * 单洞穴覆盖（在 activeLayer 之上）：
+     * -1=显示该层全部洞穴，{@code >=0}=仅显示指定子图索引的洞穴瓦片
+     */
+    private volatile int overrideCaveIndex = -1;
+
     private volatile CompositeMapMetadata multiMapMetadata = null;
 
     private String currentMapKey; // 当前地图唯一标识
@@ -109,6 +121,84 @@ public class MapContext {
     public void setActiveSubImage(int index, double offsetY) {
         this.activeSubImageIndex = index;
         this.activeSubImageOffsetY = offsetY;
+    }
+
+    /**
+     * @return 手动图层覆盖，-1=自动
+     */
+    public int getActiveLayer() { return activeLayer; }
+
+    /**
+     * 设置手动图层覆盖。
+     * @param layer -1=自动（跟随匹配结果），{@code >=0}=强制显示该层所有洞穴瓦片
+     */
+    public void setActiveLayer(int layer) { this.activeLayer = layer; }
+
+    /**
+     * @return 是否有手动覆盖生效
+     */
+    public boolean isManualOverride() { return activeLayer >= 0; }
+
+    /**
+     * @return 当前单洞穴覆盖索引，-1=无覆盖
+     */
+    public int getOverrideCaveIndex() { return overrideCaveIndex; }
+
+    /**
+     * 设置单洞穴覆盖索引。仅在 activeLayer >= 0 时有效。
+     * @param idx 子图列表索引，-1=显示该层全部洞穴
+     */
+    public void setOverrideCaveIndex(int idx) { this.overrideCaveIndex = idx; }
+
+    /**
+     * 重置单洞穴覆盖。
+     */
+    public void resetOverrideCaveIndex() { this.overrideCaveIndex = -1; }
+
+    /**
+     * 根据 activeLayer + overrideCaveIndex 获取当前要渲染的瓦片目录列表。
+     * 优先返回单洞穴覆盖指定的瓦片目录。
+     */
+    public java.util.List<String> getCaveDirsToRender() {
+        if (activeLayer < 0 || multiMapMetadata == null) return java.util.List.of();
+        if (overrideCaveIndex >= 0) {
+            java.util.List<CompositeMapMetadata.SubImageInfo> subs = multiMapMetadata.subImages();
+            if (overrideCaveIndex < subs.size()) {
+                String dir = subs.get(overrideCaveIndex).tileDir();
+                return dir == null || dir.isEmpty() ? java.util.List.of() : java.util.List.of(dir);
+            }
+        }
+        return getCaveDirsForLayer(activeLayer);
+    }
+
+    /**
+     * 获取指定图层所有洞穴的瓦片目录列表。
+     */
+    public java.util.List<String> getCaveDirsForLayer(int layer) {
+        if (multiMapMetadata == null) return java.util.List.of();
+        java.util.List<String> dirs = new java.util.ArrayList<>();
+        for (CompositeMapMetadata.SubImageInfo sub : multiMapMetadata.subImages()) {
+            if (sub.isCave() && sub.layer() == layer) {
+                dirs.add(sub.tileDir());
+            }
+        }
+        return dirs;
+    }
+
+    /**
+     * 获取指定图层所有洞穴的列表索引（用于 UI 按钮状态判断）。
+     */
+    public java.util.List<Integer> getCaveIndicesForLayer(int layer) {
+        if (multiMapMetadata == null) return java.util.List.of();
+        java.util.List<Integer> indices = new java.util.ArrayList<>();
+        java.util.List<CompositeMapMetadata.SubImageInfo> subs = multiMapMetadata.subImages();
+        for (int i = 0; i < subs.size(); i++) {
+            CompositeMapMetadata.SubImageInfo sub = subs.get(i);
+            if (sub.isCave() && sub.layer() == layer) {
+                indices.add(i);
+            }
+        }
+        return indices;
     }
 
     /**

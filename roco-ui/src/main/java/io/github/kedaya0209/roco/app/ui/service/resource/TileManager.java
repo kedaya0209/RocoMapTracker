@@ -38,8 +38,8 @@ public class TileManager {
     private final int mapW, mapH;
     // 大陆瓦片集（始终存在）
     private final Map<String, ImageView> mainlandTiles = new HashMap<>();
-    // 洞穴叠加瓦片集（进入洞穴模式时叠加）
-    private final Map<String, ImageView> caveOverlayTiles = new HashMap<>();
+    // 洞穴叠加瓦片集（每层每个洞穴一组瓦片）
+    private final List<CaveTileSet> caveTileSets = new ArrayList<>();
     private final Set<String> needed = new HashSet<>();
     private final List<String> missingKeys = new ArrayList<>();
     private final Map<String, byte[]> loadedBytes = new ConcurrentHashMap<>();
@@ -57,8 +57,19 @@ public class TileManager {
 
     // 洞穴模式状态
     private boolean caveMode = false;
-    private int activeCaveIndex = -1;
-    private String caveTileDir;
+    @Getter
+    private int activeLayer = -1;
+
+    /**
+     * 单个洞穴的瓦片集 — 包含瓦片目录和已加载的瓦片映射。
+     */
+    private record CaveTileSet(String dir, Map<String, ImageView> tiles) {
+        CaveTileSet {
+            // 确保目录以 / 结尾
+            String d = (dir == null || dir.endsWith("/")) ? dir : dir + "/";
+            dir = d;
+        }
+    }
 
     public TileManager(Group worldGroup, int mapW, int mapH) {
         this.worldGroup = worldGroup;
@@ -81,36 +92,89 @@ public class TileManager {
     }
 
     /**
-     * 根据洞穴索引从元数据获取瓦片目录。
+     * 设置图层叠加：显示指定层的所有洞穴瓦片（或自动模式下的单个洞穴）。
+     * @param layer 图层编号（{@code >=0}=手动层号，-1=自动模式）
+     * @param caveDirs 该层所有洞穴的瓦片目录列表（空列表=清除叠加）
      */
-    public void setCaveOverlay(int caveIdx, String caveDir) {
-        if (caveIdx < 0 || caveDir == null || caveDir.isEmpty()) {
-            // 退出洞穴叠加
-            if (this.caveMode) {
-                this.caveMode = false;
-                this.activeCaveIndex = -1;
-                this.caveTileDir = null;
-                clearTiles(caveOverlayTiles);
+    public void setLayerOverlay(int layer, java.util.List<String> caveDirs) {
+        if (caveDirs == null) caveDirs = java.util.List.of();
+        boolean empty = caveDirs.isEmpty();
+
+        // 短回路：检查状态是否无变化
+        if (this.caveMode) {
+            if (this.activeLayer == layer) {
+                if (layer >= 0) {
+                    // 手动模式：检查瓦片目录是否变化（支持同层切换不同洞穴）
+                    if (caveDirsMatch(caveDirs)) return;
+                } else {
+                    // 自动模式：检查是否同个洞穴
+                    if (!empty && caveTileSets.size() == 1) {
+                        String nd = normalizeDir(caveDirs.get(0));
+                        if (caveTileSets.get(0).dir().equals(nd)) return;
+                    }
+                }
             }
+        } else if (empty && !this.caveMode) {
+            return; // 都已清除
+        }
+
+        clearAllCaveTiles();
+        caveTileSets.clear();
+
+        if (empty) {
+            this.caveMode = false;
+            this.activeLayer = -1;
             return;
         }
-        String dir = normalizeDir(caveDir);
-        if (this.caveMode && this.activeCaveIndex == caveIdx && Objects.equals(this.caveTileDir, dir)) {
-            return; // 无变化
+
+        for (String dir : caveDirs) {
+            if (dir != null && !dir.isEmpty()) {
+                caveTileSets.add(new CaveTileSet(dir, new HashMap<>()));
+            }
         }
         this.caveMode = true;
-        this.activeCaveIndex = caveIdx;
-        this.caveTileDir = dir;
-        clearTiles(caveOverlayTiles);
+        this.activeLayer = layer;
+    }
+
+    /**
+     * 检查当前加载的瓦片目录列表是否与给定列表一致。
+     */
+    private boolean caveDirsMatch(java.util.List<String> caveDirs) {
+        if (caveTileSets.size() != caveDirs.size()) return false;
+        for (int i = 0; i < caveTileSets.size(); i++) {
+            String nd = normalizeDir(caveDirs.get(i));
+            if (!caveTileSets.get(i).dir().equals(nd)) return false;
+        }
+        return true;
+    }
+
+    /**
+     * 清除所有洞穴叠加瓦片。
+     */
+    public void clearLayerOverlay() {
+        clearAllCaveTiles();
+        caveTileSets.clear();
+        this.caveMode = false;
+        this.activeLayer = -1;
+    }
+
+    private void clearAllCaveTiles() {
+        for (CaveTileSet cts : caveTileSets) {
+            for (ImageView iv : cts.tiles().values()) {
+                iv.setImage(null);
+                worldGroup.getChildren().remove(iv);
+            }
+            cts.tiles().clear();
+        }
+    }
+
+    public void dispose() {
+        tileExecutor.shutdownNow();
     }
 
     private static String normalizeDir(String dir) {
         if (dir == null || dir.isEmpty()) return dir;
         return dir.endsWith("/") ? dir : dir + "/";
-    }
-
-    public void dispose() {
-        tileExecutor.shutdownNow();
     }
 
     private static String key(int level, int row, int col) {
@@ -141,7 +205,8 @@ public class TileManager {
 
     public void reset() {
         clearTiles(mainlandTiles);
-        clearTiles(caveOverlayTiles);
+        clearAllCaveTiles();
+        caveTileSets.clear();
         lastLevel = -1;
         scaleStableFrames = 0;
     }
@@ -210,12 +275,13 @@ public class TileManager {
         // 第一趟：大陆底图（始终加载）
         updateTileLayer(needed, mainlandTiles, mainlandTileDir, level, 1.0, false);
 
-        // 第二趟：洞穴叠加（仅在洞穴模式下）
-        if (caveMode && caveTileDir != null) {
-            updateTileLayer(needed, caveOverlayTiles, caveTileDir, level, 1.0, true);
-        } else if (!caveOverlayTiles.isEmpty()) {
-            // 已退出洞穴模式，清理残留叠加瓦片
-            clearTiles(caveOverlayTiles);
+        // 第二趟：洞穴叠加（每层每个洞穴独立瓦片集）
+        if (caveMode && !caveTileSets.isEmpty()) {
+            for (CaveTileSet cts : caveTileSets) {
+                updateTileLayer(needed, cts.tiles(), cts.dir(), level, 1.0, true);
+            }
+        } else if (!caveTileSets.isEmpty()) {
+            clearAllCaveTiles();
         }
     }
 

@@ -192,14 +192,17 @@ public class MapMatcherProcessor implements RoiProcessor, AutoCloseable {
                         caveIdx = sub.index();
                         caveName = sub.name();
                     }
-                    MapContext.getInstance().updateCaveMode(inCave, caveIdx, caveName);
+                    // 手动覆盖时跳过自动洞穴模式更新
+                    if (!MapContext.getInstance().isManualOverride()) {
+                        MapContext.getInstance().updateCaveMode(inCave, caveIdx, caveName);
 
-                    // 洞穴模式变化时发布轮播事件
-                    if (inCave != wasCaveMode) {
-                        wasCaveMode = inCave;
-                        AppEvents.publish(StatusEvent.class, inCave
-                                ? new StatusEvent("洞穴: " + (caveName != null ? caveName : "?"), NotificationType.INFO, StatusEvent.DisplayMode.CAROUSEL)
-                                : new StatusEvent("大陆", NotificationType.SUCCESS, StatusEvent.DisplayMode.CAROUSEL));
+                        // 洞穴模式变化时发布轮播事件（仅在自动模式下）
+                        if (inCave != wasCaveMode) {
+                            wasCaveMode = inCave;
+                            AppEvents.publish(StatusEvent.class, inCave
+                                    ? new StatusEvent("洞穴: " + (caveName != null ? caveName : "?"), NotificationType.INFO, StatusEvent.DisplayMode.CAROUSEL)
+                                    : new StatusEvent("大陆", NotificationType.SUCCESS, StatusEvent.DisplayMode.CAROUSEL));
+                        }
                     }
 
                     // 匹配成功：重置连续失败计数，更新小地图跟踪状态

@@ -54,6 +54,7 @@ public final class MapPostProcessor {
         String[] tags = DownloadConfig.MAP_REMOTE_URL_NAME;
         String[] displayNames = DownloadConfig.MAP_REMOTE_URL_DISPLAY_NAME;
         boolean[] isCave = DownloadConfig.MAP_REMOTE_URL_IS_CAVE;
+        int[] layers = DownloadConfig.MAP_REMOTE_URL_LAYER;
         int[] sort = DownloadConfig.MAP_REMOTE_URL_SORT;
 
         if (tags.length == 0) {
@@ -202,10 +203,12 @@ public final class MapPostProcessor {
                 }
             }
 
+            int caveLayer = layers.length > idx ? layers[idx] : (cave ? 0 : 0);
             entries.add(new SubImageEntry(
                     entries.size(), // index
                     displayName,
                     cave,
+                    caveLayer,
                     offsetY,
                     w, h,
                     "/source/maps/" + displayName + ".png",
@@ -254,6 +257,7 @@ public final class MapPostProcessor {
             sb.append("      \"index\": ").append(e.index).append(",\n");
             sb.append("      \"name\": \"").append(e.name).append("\",\n");
             sb.append("      \"isCave\": ").append(e.isCave).append(",\n");
+            sb.append("      \"layer\": ").append(e.layer).append(",\n");
             sb.append("      \"offsetY\": ").append(e.offsetY).append(",\n");
             sb.append("      \"width\": ").append(e.width).append(",\n");
             sb.append("      \"height\": ").append(e.height).append(",\n");
@@ -271,7 +275,7 @@ public final class MapPostProcessor {
         log.info("MultiMap 元数据已写入: {}", metaFile);
     }
 
-    private record SubImageEntry(int index, String name, boolean isCave, int offsetY,
+    private record SubImageEntry(int index, String name, boolean isCave, int layer, int offsetY,
                                  int width, int height, String sourcePath, String tileDir) {
     }
 

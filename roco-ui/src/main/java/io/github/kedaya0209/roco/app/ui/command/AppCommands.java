@@ -40,4 +40,9 @@ public final class AppCommands {
     @ThreadSafe
     public record ToggleNavModeCommand() implements UiCommand {
     }
+
+    /** 设置图层覆盖（大陆/洞穴手动切换，-1=自动，{@code >=0}=显示该层所有洞穴） */
+    @ThreadSafe
+    public record SetLayerCommand(int layer) implements UiCommand {
+    }
 }

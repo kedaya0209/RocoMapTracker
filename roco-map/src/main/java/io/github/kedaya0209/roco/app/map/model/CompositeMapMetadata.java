@@ -46,10 +46,12 @@ public final class CompositeMapMetadata {
             if (node.has("sift")) {
                 siftOverride = parseSiftParams(node.get("sift"));
             }
+            int layer = node.has("layer") ? node.get("layer").asInt() : 0;
             subs.add(new SubImageInfo(
                     node.get("index").asInt(),
                     node.get("name").asText(),
                     node.get("isCave").asBoolean(),
+                    layer,
                     node.get("offsetY").asInt(),
                     node.get("width").asInt(),
                     node.get("height").asInt(),
@@ -134,6 +136,7 @@ public final class CompositeMapMetadata {
             int index,
             String name,
             boolean isCave,
+            int layer,
             int offsetY,
             int width,
             int height,
@@ -141,10 +144,10 @@ public final class CompositeMapMetadata {
             String tileDir,
             SiftParams siftOverride
     ) {
-        /** @deprecated 兼容旧代码，使用 index/name/isCave/sourcePath/tileDir 代替 */
+        /** @deprecated 兼容旧代码，使用 index/name/isCave/layer/sourcePath/tileDir 代替 */
         @Deprecated
         public SubImageInfo(String name, int width, int height, int offsetY) {
-            this(0, name, false, offsetY, width, height, null, null, null);
+            this(0, name, false, 0, offsetY, width, height, null, null, null);
         }
     }
 }
