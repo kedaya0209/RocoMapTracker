@@ -4,7 +4,6 @@ import io.github.kedaya0209.roco.app.capture.frame.CaptureFrameBuffer;
 import io.github.kedaya0209.roco.app.capture.frame.ROIData;
 import io.github.kedaya0209.roco.app.capture.pipeline.RoiProcessor;
 import io.github.kedaya0209.roco.app.config.CaptureConfig;
-import io.github.kedaya0209.roco.app.platform.WindowFinder;
 import io.github.kedaya0209.roco.app.config.PathConfig;
 import io.github.kedaya0209.roco.app.hook.AppEvents;
 import io.github.kedaya0209.roco.app.hook.event.CaptureStateEvent;
@@ -13,13 +12,14 @@ import io.github.kedaya0209.roco.app.hook.event.StatusEvent;
 import io.github.kedaya0209.roco.app.hook.event.StatusStateMachine;
 import io.github.kedaya0209.roco.app.hook.event.StatusStateMachine.State;
 import io.github.kedaya0209.roco.app.hook.event.StatusStateMachine.StatusKey;
+import io.github.kedaya0209.roco.app.platform.WindowFinder;
 import io.github.kedaya0209.roco.app.process.NativeProcess;
 import io.github.kedaya0209.roco.app.socket.SocketServer;
 import io.github.kedaya0209.roco.app.utils.FilePathUtil;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
-
 import net.jcip.annotations.NotThreadSafe;
+
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -101,12 +101,12 @@ public class CaptureService implements FullFrameControl {
         stateCallback = (connected, detail) -> {
             if (!connected) {
                 log.warn("capture.exe 断开: {}", detail);
-                AppEvents.publish(CaptureStateEvent.class,
-                        new CaptureStateEvent(-1, false, windowTitle));
+                StatusStateMachine.getInstance().cascadeTransition(StatusKey.CAPTURE, State.DISCONNECTED);
                 AppEvents.publish(StatusEvent.class,
                         new StatusEvent("capture断开", NotificationType.ERROR, StatusEvent.DisplayMode.CAROUSEL));
             } else {
                 log.info("capture.exe 已连接: {}", detail);
+                StatusStateMachine.getInstance().cascadeTransition(StatusKey.CAPTURE, State.READY);
                 AppEvents.publish(StatusEvent.class,
                         new StatusEvent("capture加载完成", NotificationType.SUCCESS, StatusEvent.DisplayMode.CAROUSEL));
             }
@@ -150,12 +150,14 @@ public class CaptureService implements FullFrameControl {
         // 兜底：看门狗重连时如果状态机卡在 READY（例如前一次 stop() 未触发断开回调），
         // 先走 DISCONNECTED 确保后续 captureRetry/captureLoading 转换合法
         if (StatusStateMachine.getInstance().currentState(StatusKey.CAPTURE) == State.READY) {
+            StatusStateMachine.getInstance().cascadeTransition(StatusKey.CAPTURE, State.DISCONNECTED);
             AppEvents.publish(StatusEvent.class,
                     new StatusEvent("capture断开", NotificationType.ERROR, StatusEvent.DisplayMode.CAROUSEL));
         }
 
         long hwnd = WindowFinder.findWindowByKeyword(windowTitle);
         if (hwnd <= 0) {
+            StatusStateMachine.getInstance().cascadeTransition(StatusKey.CAPTURE, State.RETRY);
             AppEvents.publish(StatusEvent.class,
                     new StatusEvent("未找到游戏窗口，5秒后重试...", NotificationType.INFO, StatusEvent.DisplayMode.CAROUSEL));
             return false;
@@ -164,6 +166,7 @@ public class CaptureService implements FullFrameControl {
         String exePath = FilePathUtil.getExternalPath(PathConfig.CAPTURE_EXE, true);
 
         // 发布捕获加载中状态
+        StatusStateMachine.getInstance().cascadeTransition(StatusKey.CAPTURE, State.LOADING);
         AppEvents.publish(StatusEvent.class,
                 new StatusEvent("capture加载中", NotificationType.LOADING, StatusEvent.DisplayMode.CAROUSEL));
 
@@ -172,6 +175,7 @@ public class CaptureService implements FullFrameControl {
 
         if (ok) {
             log.info("成功连接窗口 [{}], HWND: 0x{}", windowTitle, Long.toHexString(hwnd));
+            StatusStateMachine.getInstance().cascadeTransition(StatusKey.CAPTURE, State.READY);
             AppEvents.publish(CaptureStateEvent.class,
                     new CaptureStateEvent(1, true, windowTitle));
             AppEvents.publish(StatusEvent.class,
@@ -180,6 +184,7 @@ public class CaptureService implements FullFrameControl {
         }
 
         // handler.start 失败（如 capture.exe 启动异常）
+        StatusStateMachine.getInstance().cascadeTransition(StatusKey.CAPTURE, State.START_FAILED);
         AppEvents.publish(StatusEvent.class,
                 new StatusEvent("capture启动失败，5秒后重试...", NotificationType.ERROR, StatusEvent.DisplayMode.CAROUSEL));
         return false;
@@ -239,6 +244,7 @@ public class CaptureService implements FullFrameControl {
         // 不反注册 handler — handler 注册于构造函数，生命周期与 CaptureService 相同。
         // 反注册会导致后续 tryConnect() 启动的 capture.exe 无法完成 Socket 握手（onConnect 不被调用），
         // 从而 isRunning() 永远返回 false，watchdog 陷入"创建→丢弃→创建"的死循环。
+        StatusStateMachine.getInstance().cascadeTransition(StatusKey.CAPTURE, State.DISCONNECTED);
         AppEvents.publish(CaptureStateEvent.class,
                 new CaptureStateEvent(-1, false, windowTitle));
         AppEvents.publish(StatusEvent.class,
