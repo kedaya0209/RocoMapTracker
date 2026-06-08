@@ -1,22 +1,23 @@
 package io.github.kedaya0209.roco.app.ui.component.widget;
 
-import net.jcip.annotations.NotThreadSafe;
-import io.github.kedaya0209.roco.app.ui.component.overlay.ResourceCounterPanel;
 import io.github.kedaya0209.roco.app.context.MapContext;
 import io.github.kedaya0209.roco.app.map.model.CompositeMapMetadata;
-import io.github.kedaya0209.roco.app.ui.command.AppCommands.SetLayerCommand;
 import io.github.kedaya0209.roco.app.ui.command.AppCommands.SetFollowModeCommand;
+import io.github.kedaya0209.roco.app.ui.command.AppCommands.SetLayerCommand;
 import io.github.kedaya0209.roco.app.ui.command.AppCommands.ToggleMaterialCollectionCommand;
 import io.github.kedaya0209.roco.app.ui.command.CommandBus;
-import io.github.kedaya0209.roco.app.ui.state.AppState;
-import javafx.beans.binding.Bindings;
+import io.github.kedaya0209.roco.app.ui.component.overlay.ResourceCounterPanel;
 import io.github.kedaya0209.roco.app.ui.service.VersionMode;
 import io.github.kedaya0209.roco.app.ui.service.resource.SvgManager;
 import io.github.kedaya0209.roco.app.ui.service.ui.VersionManager;
+import io.github.kedaya0209.roco.app.ui.state.AppState;
 import io.github.kedaya0209.roco.app.ui.state.ViewportState;
+import javafx.beans.binding.Bindings;
+import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Group;
+import javafx.scene.Node;
 import javafx.scene.control.Label;
 import javafx.scene.control.Tooltip;
 import javafx.scene.image.Image;
@@ -28,6 +29,8 @@ import javafx.scene.paint.Color;
 import javafx.scene.shape.SVGPath;
 import javafx.scene.transform.Scale;
 import javafx.util.Duration;
+import lombok.Getter;
+import net.jcip.annotations.NotThreadSafe;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -36,11 +39,12 @@ import java.util.Map;
 
 @NotThreadSafe
 public class FloatToolbox extends VBox {
+    @Getter
     private static volatile FloatToolbox instance;
-
-    private boolean resourcePanelVisible = false;
-    private final StackPane collectBtn;
+    @Getter
     private final ResourceCounterPanel resourcePanel;
+    private final StackPane collectBtn;
+    private final VBox leftCol;
 
     private record LayerGroup(int layer, StackPane btn) {}
 
@@ -49,6 +53,8 @@ public class FloatToolbox extends VBox {
     private final List<LayerGroup> layerGroups = new ArrayList<>();
     // 右侧列 — 当前选中层的洞穴选择按钮
     private final VBox rightCol;
+    @Getter
+    private boolean resourcePanelVisible = false;
     private final Map<Integer, List<StackPane>> caveButtonsByLayer = new HashMap<>();
     // UI 选中层（仅展开洞穴按钮列表，不加载瓦片）
     private int selectedLayer = -1;
@@ -56,10 +62,6 @@ public class FloatToolbox extends VBox {
     private final Image mainlandActiveImg;
     private final Image coverImg;
     private final Image coverActiveImg;
-
-    public static FloatToolbox getInstance() {
-        return instance;
-    }
 
     public FloatToolbox(ResourceCounterPanel resourcePanel, String unifiedBlueColor) {
         super(12);
@@ -77,7 +79,7 @@ public class FloatToolbox extends VBox {
         this.coverActiveImg = new Image(getClass().getResourceAsStream("/icon/cover_active.png"));
 
         // 左侧列：主图标
-        VBox leftCol = new VBox(12);
+        leftCol = new VBox(12);
         leftCol.setAlignment(Pos.TOP_CENTER);
 
         StackPane followBtn = createFollowButton(unifiedBlueColor);
@@ -136,17 +138,25 @@ public class FloatToolbox extends VBox {
         );
 
         if (VersionManager.getInstance().getCurrentMode() == VersionMode.ADVANCED) {
-            getChildren().add(collectBtn);
+            insertCollctButton();
         }
         updateCaveButtonStates();
     }
 
-    public void setCollectButtonVisible(boolean visible) {
-        if (visible && !getChildren().contains(collectBtn)) {
-            getChildren().add(collectBtn);
-        } else if (!visible) {
-            getChildren().remove(collectBtn);
+    private void insertCollctButton() {
+        ObservableList<Node> children = leftCol.getChildren();
+        if (children.contains(collectBtn)) {
+            return;
         }
+        children.add(1, collectBtn);
+    }
+
+    public void setCollectButtonVisible(boolean visible) {
+        if (visible) {
+            insertCollctButton();
+            return;
+        }
+        leftCol.getChildren().remove(collectBtn);
     }
 
     /**

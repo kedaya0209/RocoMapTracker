@@ -47,7 +47,7 @@ public class LayerMapCompositor {
 
     /** 遮罩透明度 (0~255，值越大越黑) */
     /** 遮罩透明度 (0~255，越大越黑) */
-    private static final int OVERLAY_ALPHA = 90;
+    private static final int OVERLAY_ALPHA = 153;
 
     private final String mapDir;
     private final String configPath;

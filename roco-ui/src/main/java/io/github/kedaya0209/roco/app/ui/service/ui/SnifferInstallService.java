@@ -1,6 +1,5 @@
 package io.github.kedaya0209.roco.app.ui.service.ui;
 
-import net.jcip.annotations.NotThreadSafe;
 import io.github.kedaya0209.roco.app.config.SnifferConfig;
 import io.github.kedaya0209.roco.app.ui.component.dialog.ConfirmDialog;
 import io.github.kedaya0209.roco.app.ui.component.dialog.DownloadProgressDialog;
@@ -11,6 +10,8 @@ import io.github.kedaya0209.roco.app.update.plugin.PluginUpdateManager;
 import javafx.application.Platform;
 import javafx.scene.layout.StackPane;
 import lombok.extern.slf4j.Slf4j;
+import net.jcip.annotations.NotThreadSafe;
+
 import java.util.concurrent.atomic.AtomicBoolean;
 
 @NotThreadSafe
@@ -37,6 +38,8 @@ public class SnifferInstallService {
 
         if (snifferReady) {
             pcapBridgeManager.init(port, null);
+            pm.checkAllPlugins(true);
+            Platform.runLater(() -> showReadyDialog(rootStack));
         } else if (installAttempted.compareAndSet(false, true)) {
             // CAS 成功：这是第一次尝试安装
             ProgressControl pc = DownloadProgressDialog.showDownloadProgressDialog(
@@ -50,6 +53,8 @@ public class SnifferInstallService {
                                     pc.close();
                                     pm.scanPlugins();
                                     pcapBridgeManager.init(port, null);
+                                    pm.checkAllPlugins(true);
+                                    Platform.runLater(() -> showReadyDialog(rootStack));
                                 },
                                 err -> {
                                     pc.close();
@@ -70,5 +75,12 @@ public class SnifferInstallService {
         } else {
             log.info("sniffer 安装已在之前尝试过，跳过重复下载");
         }
+    }
+
+    private static void showReadyDialog(StackPane rootStack) {
+        ConfirmDialog.showSimpleDialog(rootStack, "提示",
+                "高级版组件 (sniffer) 已就绪，请手动断开游戏网络连接后重连，以便抓包组件捕获通信密钥。",
+                "确定", true, () -> {
+                });
     }
 }
