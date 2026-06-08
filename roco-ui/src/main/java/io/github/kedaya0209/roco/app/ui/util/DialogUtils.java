@@ -35,6 +35,7 @@ import javafx.scene.text.TextAlignment;
 import javafx.util.Duration;
 
 import io.github.kedaya0209.roco.app.ui.service.resource.SvgManager;
+import io.github.kedaya0209.roco.app.update.plugin.PluginAsset;
 import io.github.kedaya0209.roco.app.update.plugin.PluginInfo;
 import io.github.kedaya0209.roco.app.update.plugin.PluginUpdateInfo;
 
@@ -593,7 +594,7 @@ public class DialogUtils {
             }
             if (!update.remoteAssets().isEmpty()) {
                 StringBuilder sb = new StringBuilder();
-                for (var a : update.remoteAssets()) {
+                for (PluginAsset a : update.remoteAssets()) {
                     if (!sb.isEmpty()) sb.append(", ");
                     sb.append(a.remoteName());
                 }

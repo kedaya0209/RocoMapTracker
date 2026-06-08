@@ -14,6 +14,7 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
+import java.util.stream.Stream;
 
 /**
  * 插件更新管理器 - 单例编排扫描/检查/下载全流程. 
@@ -147,7 +148,7 @@ public class PluginUpdateManager {
     }
 
     private static void registerAllDirectories(Path root, WatchService ws) throws IOException {
-        try (var stream = Files.walk(root)) {
+        try (Stream<Path> stream = Files.walk(root)) {
             stream.filter(Files::isDirectory).forEach(dir -> {
                 try {
                     dir.register(ws,

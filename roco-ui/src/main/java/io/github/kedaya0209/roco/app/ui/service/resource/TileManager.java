@@ -73,7 +73,7 @@ public class TileManager {
         if (metadata == null || metadata.subImages().isEmpty()) return;
         this.hasMultiMap = true;
         // 寻找大陆子图（第一个非洞穴子图），否则用子图0
-        var mainland = metadata.subImages().stream()
+        CompositeMapMetadata.SubImageInfo mainland = metadata.subImages().stream()
                 .filter(s -> !s.isCave())
                 .findFirst()
                 .orElse(metadata.subImages().get(0));

@@ -435,7 +435,7 @@ public class SettingsStage extends Stage {
         VBox outerContent = new VBox(10);
         outerContent.setPadding(new Insets(5, 10, 10, 10));
 
-        for (var entry : groups.entrySet()) {
+        for (Map.Entry<String, List<SettingDef>> entry : groups.entrySet()) {
             String sub = entry.getKey();
             List<SettingDef> groupFields = entry.getValue();
             if (groupFields.isEmpty()) continue;

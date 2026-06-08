@@ -2,6 +2,9 @@ package io.github.kedaya0209.roco.app.ui.component.dialog;
 
 import net.jcip.annotations.NotThreadSafe;
 import atlantafx.base.theme.Styles;
+import javafx.scene.control.Button;
+import javafx.scene.control.Label;
+import javafx.scene.shape.SVGPath;
 import javafx.event.Event;
 import javafx.scene.Scene;
 import javafx.scene.layout.HBox;
@@ -32,21 +35,21 @@ public class ModalConfirmDialog {
 
         VBox dialogBox = AbstractDialog.createDialogBox();
 
-        var icon = AbstractDialog.createDefaultIcon("-color-warning-emphasis");
-        var titleLabel = AbstractDialog.createTitleLabel(title);
-        var msgLabel = AbstractDialog.createMessageLabel(message);
+        SVGPath icon = AbstractDialog.createDefaultIcon("-color-warning-emphasis");
+        Label titleLabel = AbstractDialog.createTitleLabel(title);
+        Label msgLabel = AbstractDialog.createMessageLabel(message);
 
         HBox btnBox = new HBox(15);
         btnBox.setAlignment(javafx.geometry.Pos.CENTER);
 
-        var confirmBtn = AbstractDialog.createButton(confirmText, Styles.DANGER, () -> {
+        Button confirmBtn = AbstractDialog.createButton(confirmText, Styles.DANGER, () -> {
             dialog.close();
             if (onConfirm != null) onConfirm.run();
         });
         btnBox.getChildren().add(confirmBtn);
 
         if (onCancel != null) {
-            var cancelBtn = AbstractDialog.createButton("取消", null, () -> {
+            Button cancelBtn = AbstractDialog.createButton("取消", null, () -> {
                 dialog.close();
                 onCancel.run();
             });

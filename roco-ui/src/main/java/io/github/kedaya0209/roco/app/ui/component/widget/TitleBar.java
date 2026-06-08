@@ -10,6 +10,7 @@ import io.github.kedaya0209.roco.app.config.PathConfig;
 import io.github.kedaya0209.roco.app.hook.AppEvents;
 import io.github.kedaya0209.roco.app.hook.event.StatusEvent;
 import io.github.kedaya0209.roco.app.ui.service.resource.SvgManager;
+import io.github.kedaya0209.roco.app.ui.service.ui.ThemeManager;
 import io.github.kedaya0209.roco.app.ui.command.AppCommands.SetWindowOpacityCommand;
 import io.github.kedaya0209.roco.app.ui.command.AppCommands.ToggleGhostModeCommand;
 import io.github.kedaya0209.roco.app.ui.command.AppCommands.ToggleMatchingCommand;
@@ -27,6 +28,16 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.Slider;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Background;
+import javafx.scene.layout.BackgroundFill;
+import javafx.scene.layout.Border;
+import javafx.scene.layout.BorderStroke;
+import javafx.scene.layout.BorderStrokeStyle;
+import javafx.scene.layout.BorderWidths;
+import javafx.scene.layout.CornerRadii;
+import javafx.scene.paint.Color;
+import javafx.scene.paint.Paint;
+import javafx.scene.shape.Shape;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
@@ -69,11 +80,19 @@ public class TitleBar extends HBox {
     private AnimationTimer cursorEnforcer;
     /** 幽灵模式图标 */
     private final Node ghostIcon;
+    /** 匹配开关图标 */
+    private final Node matchIcon;
+    /** 关闭按钮图标 SVGPath（final 但可在构造期间初始化为 null 再赋值） */
+    private SVGPath closeIcon;
+    /** 最小化按钮图标 SVGPath */
+    private SVGPath minimizeIcon;
     /** 幽灵模式透明度滑块 */
     private final Slider opacitySlider;
     /** 标题栏内联状态轮播标签 */
     private final Label statusLabel = new Label();
     private static final double STATUS_H = 20;
+    /** 缓存当前主题的 -color-bg-subtle，供 Java API hover 背景使用 */
+    private static volatile Paint cachedBgSubtle = Color.gray(0.8, 0.15);
     /** 最小化至托盘回调
      * -- SETTER --
      *  设置最小化至托盘回调。
@@ -127,6 +146,7 @@ public class TitleBar extends HBox {
         /** 幽灵模式按钮 */
         Button ghostBtn = new Button();
         ghostBtn.setFocusTraversable(false);
+        ghostBtn.setBackground(Background.EMPTY);
         ghostBtn.getStyleClass().add("title-bar-btn");
 
         ghostIcon = createGhostIcon();
@@ -201,6 +221,7 @@ public class TitleBar extends HBox {
         // --- 3. 导航模式按钮 ---
         navBtn = new Button();
         navBtn.setFocusTraversable(false);
+        navBtn.setBackground(Background.EMPTY);
         navBtn.getStyleClass().add("title-bar-btn");
 
         Node navIcon = createNavIcon();
@@ -213,9 +234,10 @@ public class TitleBar extends HBox {
         /** 匹配开关按钮 */
         Button matchToggleBtn = new Button();
         matchToggleBtn.setFocusTraversable(false);
+        matchToggleBtn.setBackground(Background.EMPTY);
         matchToggleBtn.getStyleClass().add("title-bar-btn");
 
-        Node matchIcon = createMatchToggleIcon();
+        this.matchIcon = createMatchToggleIcon();
         AppState appState = AppState.getInstance();
         // 响应式绑定：匹配状态变化时自动更新图标颜色
         appState.matchingEnabledProperty().addListener((_, _, now) ->
@@ -233,6 +255,20 @@ public class TitleBar extends HBox {
 
         // --- 4. 调整子组件顺序：滑块在图标左侧，图标靠右锚定 ---
         getChildren().addAll(menuBtn, titleLabel, statusContainer, spacer, opacitySlider, ghostBtn, matchToggleBtn, navBtn, minimizeBtn, closeBtn);
+
+        // 为所有 title-bar-btn 添加 hover 背景（使用内联样式 + 解析后的具体色值，样式表无法覆盖内联样式）
+        for (Node child : getChildren()) {
+            if (child instanceof Button btn && btn.getStyleClass().contains("title-bar-btn")) {
+                btn.hoverProperty().addListener((_, _, hovering) -> {
+                    if (hovering) {
+                        String cssColor = toCssColor(cachedBgSubtle);
+                        btn.setStyle("-fx-background-color: " + cssColor + "; -fx-border-color: transparent; -fx-focus-color: transparent;");
+                    } else {
+                        btn.setStyle("-fx-background-color: transparent; -fx-border-color: transparent; -fx-focus-color: transparent;");
+                    }
+                });
+            }
+        }
 
         // 窗口移动逻辑 — WM_NCHITTEST 拦截控制穿透，此处无需 ghostMode 守卫
         setOnMousePressed(e -> {
@@ -253,6 +289,77 @@ public class TitleBar extends HBox {
         // 导航模式通过 ViewportState property 响应外部变更
         ViewportState.getInstance().navModeProperty().addListener((_, _, now) ->
                 syncNavUi(now));
+
+        // 主题切换 → 通过 Java API 直接设置颜色，彻底绕过 CSS looked-up colors 不重新解析的问题
+        ThemeManager.addThemeChangeListener(() -> {
+            Scene sc = getScene();
+            if (sc == null) return;
+            // 利用同一场景内的临时节点解析 CSS 变量为具体 Color 对象
+            Label resolver = new Label();
+            resolver.setVisible(false);
+            ((StackPane) sc.getRoot()).getChildren().add(resolver);
+            try {
+                resolver.setStyle("-fx-text-fill: -color-bg-default;");
+                resolver.applyCss();
+                Paint bgDefault = resolver.getTextFill();
+                resolver.setStyle("-fx-text-fill: -color-fg-muted;");
+                resolver.applyCss();
+                Paint fgMuted = resolver.getTextFill();
+                resolver.setStyle("-fx-text-fill: -color-accent-emphasis;");
+                resolver.applyCss();
+                Paint accentEmphasis = resolver.getTextFill();
+                resolver.setStyle("-fx-text-fill: -color-border-muted;");
+                resolver.applyCss();
+                Paint borderMuted = resolver.getTextFill();
+                resolver.setStyle("-fx-text-fill: -color-bg-subtle;");
+                resolver.applyCss();
+                Paint bgSubtle = resolver.getTextFill();
+                // 重新设置各控件颜色（使用解析后的具体 Paint，不依赖 CSS 重新解析）
+                applyThemeColors(bgDefault, fgMuted, accentEmphasis, borderMuted, bgSubtle);
+            } finally {
+                ((StackPane) sc.getRoot()).getChildren().remove(resolver);
+            }
+        });
+    }
+
+    private void applyThemeColors(Paint bgDefault, Paint fgMuted, Paint accentEmphasis, Paint borderMuted, Paint bgSubtle) {
+        // 标题栏背景色
+        setBackground(new Background(new BackgroundFill(bgDefault, CornerRadii.EMPTY, Insets.EMPTY)));
+        // 标题栏底部边框（1px 底部边框）
+        setBorder(new Border(new BorderStroke(
+                borderMuted, BorderStrokeStyle.SOLID, CornerRadii.EMPTY, new BorderWidths(0, 0, 1, 0))));
+        // 状态标签
+        statusLabel.setTextFill(fgMuted);
+        // 滑块
+        opacitySlider.setStyle("-fx-control-inner-background: " + toCssColor(accentEmphasis) + ";");
+        // 幽灵图标
+        setSvgFillPaint(ghostIcon, ghostMode ? accentEmphasis : fgMuted);
+        // 导航图标
+        Node navG = navBtn.getGraphic();
+        if (navG != null) setSvgFillPaint(navG, navMode ? accentEmphasis : fgMuted);
+        // 匹配图标
+        setSvgFillPaint(matchIcon, AppState.getInstance().isMatchingEnabled() ? accentEmphasis : fgMuted);
+        // 关闭 & 最小化图标
+        if (closeIcon != null) closeIcon.setStroke(fgMuted);
+        if (minimizeIcon != null) minimizeIcon.setStroke(fgMuted);
+        // 更新缓存 hover 背景色，供已注册的 hoverProperty 监听器使用
+        cachedBgSubtle = bgSubtle;
+        // 重置 title-bar 按钮内联样式为透明（内联优先级高于样式表，CSS 无法覆盖）
+        for (Node child : getChildren()) {
+            if (child instanceof Button btn && btn.getStyleClass().contains("title-bar-btn")) {
+                btn.setStyle("-fx-background-color: transparent; -fx-border-color: transparent; -fx-focus-color: transparent;");
+            }
+        }
+    }
+
+    private static String toCssColor(Paint p) {
+        if (p instanceof Color c) {
+            return String.format("#%02x%02x%02x",
+                    (int) (c.getRed() * 255),
+                    (int) (c.getGreen() * 255),
+                    (int) (c.getBlue() * 255));
+        }
+        return p.toString();
     }
 
     public static TitleBar getInstance(Stage stage, Button menuBtn, Node... overlayNodes) {
@@ -264,7 +371,7 @@ public class TitleBar extends HBox {
     }
 
     /**
-     * 为 SVG 图标节点设置 CSS fill 颜色
+     * 为 SVG 图标节点设置 CSS fill 颜色（已废弃，保留用于旧调用点）
      */
     private static void setSvgFill(Node iconNode, String cssColor) {
         String style = "-fx-fill: " + cssColor + ";";
@@ -280,6 +387,31 @@ public class TitleBar extends HBox {
             for (Node child : g.getChildren()) {
                 child.setStyle(style);
             }
+        }
+    }
+
+    /**
+     * 为 SVG 图标节点设置 fill Paint（直接 Java API，不依赖 CSS 变量）
+     */
+    private static void setSvgFillPaint(Node iconNode, Paint fill) {
+        if (iconNode instanceof StackPane sp) {
+            for (Node child : sp.getChildren()) {
+                if (child instanceof Group g) {
+                    for (Node gc : g.getChildren()) {
+                        if (gc instanceof Shape s) {
+                            s.setFill(fill);
+                        }
+                    }
+                }
+            }
+        } else if (iconNode instanceof Group g) {
+            for (Node child : g.getChildren()) {
+                if (child instanceof Shape s) {
+                    s.setFill(fill);
+                }
+            }
+        } else if (iconNode instanceof Shape s) {
+            s.setFill(fill);
         }
     }
 
@@ -418,7 +550,7 @@ public class TitleBar extends HBox {
     }
 
     private Button createMinimizeButton() {
-        SVGPath minimizeIcon = new SVGPath();
+        minimizeIcon = new SVGPath();
         minimizeIcon.setContent("M2 10 L14 10");
         minimizeIcon.setStyle("-fx-stroke: -color-fg-muted; -fx-stroke-width: 2; -fx-stroke-line-cap: round;");
         StackPane minimizeGraphic = new StackPane(minimizeIcon);
@@ -428,6 +560,7 @@ public class TitleBar extends HBox {
 
         Button btn = new Button();
         btn.setFocusTraversable(false);
+        btn.setBackground(Background.EMPTY);
         btn.setGraphic(minimizeGraphic);
         btn.getStyleClass().add("title-bar-btn");
 
@@ -443,7 +576,7 @@ public class TitleBar extends HBox {
 
     private Button getCloseButton(Stage stage) {
         // SVG X 图标（与路线管理器一致）
-        SVGPath closeIcon = new SVGPath();
+        closeIcon = new SVGPath();
         closeIcon.setContent("M1 1 L9 9 M9 1 L1 9");
         closeIcon.setStyle("-fx-stroke: -color-fg-muted; -fx-stroke-width: 2; -fx-stroke-line-cap: round;");
         StackPane closeGraphic = new StackPane(closeIcon);
@@ -453,6 +586,7 @@ public class TitleBar extends HBox {
 
         Button closeBtn = new Button();
         closeBtn.setFocusTraversable(false);
+        closeBtn.setBackground(Background.EMPTY);
         closeBtn.setGraphic(closeGraphic);
         closeBtn.getStyleClass().add("title-bar-btn");
 

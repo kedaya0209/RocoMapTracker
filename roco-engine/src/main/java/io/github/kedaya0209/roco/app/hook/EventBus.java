@@ -31,16 +31,16 @@ public final class EventBus {
 
     /** 取消订阅 */
     public <T> void unsubscribe(Class<T> eventType, Consumer<T> handler) {
-        var list = subscribers.get(eventType);
+        CopyOnWriteArrayList<Consumer<?>> list = subscribers.get(eventType);
         if (list != null) list.remove(handler);
     }
 
     /** 同步分发事件（调用线程上执行所有 handler） */
     @SuppressWarnings("unchecked")
     public <T> void publish(Class<T> eventType, T data) {
-        var list = subscribers.get(eventType);
+        CopyOnWriteArrayList<Consumer<?>> list = subscribers.get(eventType);
         if (list == null) return;
-        for (var handler : list) {
+        for (Consumer<?> handler : list) {
             ((Consumer<T>) handler).accept(data);
         }
     }
@@ -71,9 +71,9 @@ public final class EventBus {
 
     @SuppressWarnings("unchecked")
     private <T> void dispatch(AsyncEvent<T> evt) {
-        var list = subscribers.get(evt.type);
+        CopyOnWriteArrayList<Consumer<?>> list = subscribers.get(evt.type);
         if (list == null) return;
-        for (var handler : list) {
+        for (Consumer<?> handler : list) {
             ((Consumer<T>) handler).accept(evt.data);
         }
     }

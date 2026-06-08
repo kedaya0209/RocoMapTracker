@@ -25,6 +25,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.util.Duration;
 
+import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -187,7 +188,7 @@ public class ResourceCounterPanel extends VBox {
 
         // 尝试加载
         String path = "/source/icon/" + sanitizeName(name) + ".png";
-        try (var is = ResourceUtils.getResourceStream(path)) {
+        try (InputStream is = ResourceUtils.getResourceStream(path)) {
             Image img = new Image(is);
             iconCache.put(name, img);
             return img;
@@ -195,7 +196,7 @@ public class ResourceCounterPanel extends VBox {
         }
 
         // 没找到图标 → 返回 player.png 占位图
-        try (var is = ResourceUtils.getResourceStream("/source/icon/player.png")) {
+        try (InputStream is = ResourceUtils.getResourceStream("/source/icon/player.png")) {
             Image placeholder = new Image(is, ICON_SIZE, ICON_SIZE, true, true);
             iconCache.put(name, placeholder);
             return placeholder;
@@ -214,7 +215,7 @@ public class ResourceCounterPanel extends VBox {
 
     private boolean hasIcon(String name) {
         String path = "/source/icon/" + sanitizeName(name) + ".png";
-        try (var is = ResourceUtils.getResourceStream(path)) {
+        try (InputStream is = ResourceUtils.getResourceStream(path)) {
             return true;
         } catch (Exception e) {
             return false;

@@ -6,10 +6,13 @@ import atlantafx.base.theme.*;
 import io.github.kedaya0209.roco.app.config.ConfigPersistence;
 import io.github.kedaya0209.roco.app.config.UiConfig;
 import javafx.application.Application;
+import javafx.scene.Group;
+import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
 import javafx.stage.Window;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -52,13 +55,19 @@ public class ThemeManager {
         };
         currentStylesheetUrl = theme.getUserAgentStylesheet();
         Application.setUserAgentStylesheet(currentStylesheetUrl);
-        // 强制所有已打开 Stage 重新应用 CSS（设置面板、路线管理等）
+        // 强制所有已打开 Stage 重新应用 CSS
         for (Window window : Window.getWindows()) {
             if (window instanceof Stage stage && stage.getScene() != null) {
                 Scene scene = stage.getScene();
                 scene.getStylesheets().removeIf(url -> url != null
                         && (url.contains("atlantafx") || url.contains("theme")));
                 scene.getStylesheets().add(currentStylesheetUrl);
+                // 完全重置 CSS：清空样式表列表再重新加入，强制 CSS 引擎重新处理所有样式表
+                //（含 ui.css 等固有三方样式表），确保所有 looked-up colors 重新解析
+                List<String> allSheets = new ArrayList<>(scene.getStylesheets());
+                scene.getStylesheets().clear();
+                scene.getStylesheets().addAll(allSheets);
+                // 强制根节点立即重算 CSS
                 scene.getRoot().applyCss();
             }
         }

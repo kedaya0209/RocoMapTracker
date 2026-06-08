@@ -39,7 +39,7 @@ public class CaveImageEnhancer {
         String baseDir = System.getProperty("cave-enhancer.resources",
                 "roco-map/src/main/resources");
 
-        for (var sub : metadata.subImages()) {
+        for (CompositeMapMetadata.SubImageInfo sub : metadata.subImages()) {
             String srcPath = sub.sourcePath();
             if (srcPath == null || srcPath.isEmpty()) continue;
             if (!sub.isCave()) {

@@ -28,4 +28,9 @@ public interface ResourceInitUiDelegate {
      * 资源就绪，构建主界面
      */
     void onResourceReady(Runnable buildMainUi);
+
+    /**
+     * 资源初始化失败，显示错误信息（移除加载遮罩）。
+     */
+    void onInitFailed(String message);
 }

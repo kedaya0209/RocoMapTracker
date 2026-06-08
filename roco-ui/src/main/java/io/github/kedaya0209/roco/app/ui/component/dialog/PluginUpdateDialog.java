@@ -6,12 +6,14 @@ import javafx.animation.FadeTransition;
 import javafx.animation.RotateTransition;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.Label;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.scene.shape.SVGPath;
 import javafx.util.Duration;
 
 import java.util.List;
@@ -19,6 +21,7 @@ import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 
+import io.github.kedaya0209.roco.app.update.plugin.PluginAsset;
 import io.github.kedaya0209.roco.app.update.plugin.PluginInfo;
 import io.github.kedaya0209.roco.app.update.plugin.PluginUpdateInfo;
 
@@ -34,8 +37,8 @@ public class PluginUpdateDialog {
 
         VBox dialogBox = AbstractDialog.createDialogBox(480, 420);
 
-        var icon = AbstractDialog.createDefaultIcon("-color-accent-emphasis");
-        var titleLabel = AbstractDialog.createTitleLabel("插件更新可用");
+        SVGPath icon = AbstractDialog.createDefaultIcon("-color-accent-emphasis");
+        Label titleLabel = AbstractDialog.createTitleLabel("插件更新可用");
 
         VBox listBox = new VBox(6);
         listBox.setMaxHeight(240);
@@ -75,7 +78,7 @@ public class PluginUpdateDialog {
                 detailPanel.getChildren().add(createDetailRow("更新说明", update.releaseNotes().strip()));
             if (!update.remoteAssets().isEmpty()) {
                 StringBuilder sb = new StringBuilder();
-                for (var a : update.remoteAssets()) {
+                for (PluginAsset a : update.remoteAssets()) {
                     if (!sb.isEmpty()) sb.append(", ");
                     sb.append(a.remoteName());
                 }
@@ -104,13 +107,13 @@ public class PluginUpdateDialog {
         HBox btnBox = new HBox(15);
         btnBox.setAlignment(Pos.CENTER);
 
-        var cancelBtn = AbstractDialog.createButton("取消", null, () -> {
+        Button cancelBtn = AbstractDialog.createButton("取消", null, () -> {
             FadeTransition ft = new FadeTransition(Duration.millis(150), mask);
             ft.setToValue(0);
             ft.setOnFinished(_ -> rootStack.getChildren().remove(mask));
             ft.play();
         });
-        var updateBtn = AbstractDialog.createButton("更新选中", Styles.SUCCESS, () -> {
+        Button updateBtn = AbstractDialog.createButton("更新选中", Styles.SUCCESS, () -> {
             rootStack.getChildren().remove(mask);
             if (!selectedIds.isEmpty() && onDownloadSelected != null)
                 onDownloadSelected.accept(List.copyOf(selectedIds));
