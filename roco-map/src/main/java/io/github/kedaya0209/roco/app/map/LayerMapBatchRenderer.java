@@ -41,7 +41,7 @@ public class LayerMapBatchRenderer {
     private static final double ORIGIN_X = MAP_CENTER_X - SIDE_LENGTH / 2;
     private static final double ORIGIN_Y = MAP_CENTER_Y - SIDE_LENGTH / 2;
     private static final double SCALE = SIDE_LENGTH / MAP_SIZE;
-    private static final int OVERLAY_ALPHA = 90;
+    private static final int OVERLAY_ALPHA = 153;
 
     private final String configPath;
     private final String layermapDir;

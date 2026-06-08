@@ -1,41 +1,28 @@
 package io.github.kedaya0209.roco.app.ui.component.widget;
 
 import atlantafx.base.theme.Styles;
-import com.fasterxml.jackson.databind.JsonNode;
 import io.github.kedaya0209.roco.app.config.SnifferConfig;
 import io.github.kedaya0209.roco.app.ui.service.VersionMode;
 import io.github.kedaya0209.roco.app.ui.service.ui.VersionManager;
-import io.github.kedaya0209.roco.app.ui.component.dialog.ConfirmDialog;
 import io.github.kedaya0209.roco.app.ui.util.FxRippleUtil;
-import io.github.kedaya0209.roco.app.utils.FilePathUtil;
-import io.github.kedaya0209.roco.app.utils.JsonUtils;
+import io.github.kedaya0209.roco.app.update.plugin.PluginStatus;
+import io.github.kedaya0209.roco.app.update.plugin.PluginUpdateManager;
 import javafx.animation.FadeTransition;
-import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Hyperlink;
 import javafx.scene.control.Label;
-import javafx.scene.control.ProgressBar;
 import javafx.scene.layout.*;
 import javafx.scene.text.TextAlignment;
 import javafx.util.Duration;
 import lombok.extern.slf4j.Slf4j;
 import net.jcip.annotations.NotThreadSafe;
 
-import java.io.*;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.io.File;
+import java.io.IOException;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.BiConsumer;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
 
 /**
  * 版本选择覆盖层 — 全屏半透明遮罩，左右两栏展示标准版/高级版功能对比。
@@ -56,13 +43,11 @@ public class VersionSelectorPanel extends StackPane {
     private final VBox advCard;
     private final Button stdBtn;
     private final Button advBtn;
-    private static final String GITHUB_API = "https://api.github.com/repos/" + SnifferConfig.SNIFFER_REPO + "/releases/latest";
-    private static final String GITHUB_DL_MIRROR = "https://gh-proxy.org/";
 
     public VersionSelectorPanel(StackPane rootStack) {
         this.rootStack = rootStack;
         setPickOnBounds(false);
-        setViewOrder(-20);
+        setViewOrder(-40);
         setStyle("-fx-background-color: rgba(0,0,0,0.55);");
 
         Label title = new Label("选择版本模式");
@@ -104,33 +89,34 @@ public class VersionSelectorPanel extends StackPane {
         ft.play();
     }
 
+    /**
+     * 检测 sniffer 插件是否已就绪
+     */
+    private static boolean isSnifferReady() {
+        PluginUpdateManager pm = PluginUpdateManager.getInstance();
+        pm.scanPlugins();
+        return pm.getPlugin("sniffer")
+                .filter(p -> p.status() != PluginStatus.DAMAGED
+                        && p.status() != PluginStatus.DISABLED)
+                .isPresent();
+    }
+
     private void select(VersionMode mode) {
         if (mode == VersionMode.STANDARD) {
             vm.switchTo(mode);
             hide();
         } else {
-            checkResourcesReady();
+            if (!isNpcapInstalled()) {
+                showNpcapDialog();
+                return;
+            }
+            if (isSnifferReady()) {
+                vm.switchTo(VersionMode.ADVANCED);
+                hide();
+            } else {
+                showConfirmDownloadDialog();
+            }
         }
-    }
-
-    // ── 抓包环境检测与懒下载 ──────────────────────────────────
-
-    /**
-     * 检查抓包环境：npcap 驱动 + sniffer 组件，缺失则弹窗引导处理。
-     */
-    private void checkResourcesReady() {
-        if (!isNpcapInstalled()) {
-            showNpcapDialog();
-            return;
-        }
-        // npcap 已就绪，检查 sniffer 组件是否已下载
-        File snifferExe = new File(FilePathUtil.getExternalPath(SnifferConfig.SNIFFER_EXE, true));
-        if (!snifferExe.exists()) {
-            showSnifferDownloadConfirmDialog();
-            return;
-        }
-        vm.switchTo(VersionMode.ADVANCED);
-        hide();
     }
 
     /** 检测 npcap 或 WinPcap 抓包驱动是否安装 */
@@ -149,10 +135,6 @@ public class VersionSelectorPanel extends StackPane {
     }
 
     // ── 弹窗通用组件 ──────────────────────────────────────────
-
-    private void showAlert(String msg) {
-        ConfirmDialog.showSimpleDialog(rootStack, "提示", msg, "确定", true, () -> {});
-    }
 
     /** 创建统一样式的遮罩并淡入 */
     private StackPane fadeInMask() {
@@ -233,218 +215,36 @@ public class VersionSelectorPanel extends StackPane {
         okBtn.setOnAction(_ -> rootStack.getChildren().remove(mask));
     }
 
-    // ── sniffer 组件下载确认 ──────────────────────────────────
+    // ── 确认下载 sniffer 弹窗 ──────────────────────────────────
 
-    private void showSnifferDownloadConfirmDialog() {
-        String repoUrl = "https://github.com/" + SnifferConfig.SNIFFER_REPO + "/releases/latest";
-
-        HBox btnBox = new HBox(15);
-        btnBox.setAlignment(Pos.CENTER);
-
-        Button cancelBtn = new Button("取消");
-        cancelBtn.setPrefWidth(120);
-        cancelBtn.getStyleClass().addAll(Styles.BUTTON_OUTLINED);
-        FxRippleUtil.install(cancelBtn);
-
-        Button confirmBtn = new Button("开始下载");
-        confirmBtn.setPrefWidth(120);
+    private void showConfirmDownloadDialog() {
+        Button confirmBtn = new Button("确认下载");
+        confirmBtn.setPrefWidth(140);
         confirmBtn.getStyleClass().addAll(Styles.BUTTON_OUTLINED, Styles.ACCENT);
         FxRippleUtil.install(confirmBtn);
 
-        btnBox.getChildren().addAll(cancelBtn, confirmBtn);
-
-        VBox dialogBox = dialogBox(300);
-        dialogBox.getChildren().addAll(
-                titleLabel("下载 sniffer 组件"),
-                msgLabel("需要下载 sniffer 抓包组件，是否继续？"),
-                createLink(repoUrl, repoUrl),
-                btnBox);
-
-        StackPane mask = fadeInMask();
-        mask.getChildren().add(dialogBox);
-        cancelBtn.setOnAction(_ -> rootStack.getChildren().remove(mask));
-        confirmBtn.setOnAction(_ -> {
-            rootStack.getChildren().remove(mask);
-            startDownload();
-        });
-    }
-
-    private void startDownload() {
-        AtomicBoolean cancelFlag = new AtomicBoolean(false);
-
-        // 进度弹窗（统一样式）
-        ProgressBar progressBar = new ProgressBar(0);
-        progressBar.setPrefWidth(360);
-
-        Label statusLabel = new Label("准备下载...");
-        statusLabel.setStyle("-fx-text-fill: -color-fg-muted; -fx-font-size: 13px;");
-
-        Button cancelBtn = new Button("取消下载");
-        cancelBtn.setPrefWidth(120);
-        cancelBtn.getStyleClass().addAll(Styles.BUTTON_OUTLINED, Styles.DANGER);
+        Button cancelBtn = new Button("取消");
+        cancelBtn.setPrefWidth(140);
+        cancelBtn.getStyleClass().addAll(Styles.BUTTON_OUTLINED);
         FxRippleUtil.install(cancelBtn);
 
-        VBox dialogBox = dialogBox(280);
+        HBox btnRow = new HBox(12, confirmBtn, cancelBtn);
+        btnRow.setAlignment(Pos.CENTER);
+
+        VBox dialogBox = dialogBox(220);
         dialogBox.getChildren().addAll(
-                titleLabel("正在下载 sniffer 组件..."),
-                progressBar, statusLabel, cancelBtn);
+                titleLabel("下载高级版组件"),
+                msgLabel("切换至高级版需要下载 sniffer 抓包组件。\n是否下载？"),
+                btnRow);
 
         StackPane mask = fadeInMask();
         mask.getChildren().add(dialogBox);
-        cancelBtn.setOnAction(_ -> {
-            cancelFlag.set(true);
+        confirmBtn.setOnAction(_ -> {
             rootStack.getChildren().remove(mask);
+            vm.switchTo(VersionMode.ADVANCED);
+            hide();
         });
-
-        // 异步下载流程：解析 URL → 下载（有进度）→ 解压 → 校验
-        Thread.ofPlatform().daemon(true).name("sniffer-download").start(() -> {
-            try {
-                String downloadUrl = resolveDownloadUrl();
-                Platform.runLater(() -> statusLabel.setText("正在下载..."));
-                Path zipPath = downloadFile(downloadUrl, (read, total) ->
-                        Platform.runLater(() -> {
-                            double p = Math.clamp((double) read / total, 0, 1);
-                            progressBar.setProgress(p);
-                            statusLabel.setText(formatProgress(p, read, total));
-                        }), cancelFlag);
-
-                if (zipPath == null) return; // 用户取消
-
-                Platform.runLater(() -> statusLabel.setText("正在解压..."));
-                extractZip(zipPath, SnifferConfig.SNIFFER_EXE);
-                Files.deleteIfExists(zipPath);
-
-                Platform.runLater(() -> {
-                    rootStack.getChildren().remove(mask);
-                    if (new File(FilePathUtil.getExternalPath(SnifferConfig.SNIFFER_EXE, true)).exists()) {
-                        vm.switchTo(VersionMode.ADVANCED);
-                        hide();
-                    } else {
-                        showAlert("下载完成但部分资源仍缺失，请重试");
-                    }
-                });
-            } catch (Exception e) {
-                log.error("下载 sniffer 组件失败", e);
-                Platform.runLater(() -> {
-                    rootStack.getChildren().remove(mask);
-                    if (!cancelFlag.get()) {
-                        showAlert("下载失败，请检查网络连接后重试，或通过上方链接手动下载。");
-                    }
-                });
-            }
-        });
-    }
-
-    /** 调用 GitHub API 获取最新 release 的 zip 下载 URL */
-    private String resolveDownloadUrl() throws Exception {
-        try (HttpClient client = HttpClient.newBuilder()
-                .followRedirects(HttpClient.Redirect.NORMAL)
-                .build()) {
-            HttpRequest apiReq = HttpRequest.newBuilder()
-                    .uri(URI.create(GITHUB_API))
-                    .header("User-Agent", "RocoMapTracker")
-                    .header("Accept", "application/json")
-                    .GET()
-                    .build();
-            HttpResponse<String> apiRes = client.send(apiReq, HttpResponse.BodyHandlers.ofString());
-            if (apiRes.statusCode() != 200) {
-                throw new IOException("GitHub API 返回 " + apiRes.statusCode());
-            }
-
-            JsonNode root = JsonUtils.getMapper().readTree(apiRes.body());
-            for (JsonNode asset : root.get("assets")) {
-                String name = asset.get("name").asText();
-                if (name.endsWith(".zip")) {
-                    String url = asset.get("browser_download_url").asText();
-                    log.info("sniffer 下载 URL: {}", url);
-                    return GITHUB_DL_MIRROR + url;
-                }
-            }
-            throw new IOException("未在最新 release 中找到 zip 文件");
-        }
-
-    }
-
-    /** 格式化进度文本：xx.x% (xx.x MB/xx.x MB) */
-    private static String formatProgress(double pct, long read, long total) {
-        String pctStr = String.format("%.1f%%", pct * 100);
-        if (total <= 0) return pctStr;
-        return pctStr + " (" + formatSize(read) + "/" + formatSize(total) + ")";
-    }
-
-    private static String formatSize(long bytes) {
-        if (bytes < 1024) return bytes + " B";
-        if (bytes < 1024 * 1024) return String.format("%.1f KB", bytes / 1024.0);
-        return String.format("%.1f MB", bytes / (1024.0 * 1024.0));
-    }
-
-    /** 下载文件到 download/ 目录，实时报告进度，支持取消 */
-    private Path downloadFile(String url, BiConsumer<Long, Long> progressCallback,
-                              AtomicBoolean cancelFlag) throws Exception {
-        try (HttpClient client = HttpClient.newBuilder()
-                .followRedirects(HttpClient.Redirect.NORMAL)
-                .build()) {
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .header("User-Agent", "RocoMapTracker")
-                    .GET()
-                    .build();
-
-            HttpResponse<InputStream> response = client.send(request,
-                    HttpResponse.BodyHandlers.ofInputStream());
-            long totalBytes = response.headers().firstValueAsLong("Content-Length").orElse(-1L);
-
-            Path downloadDir = Path.of("download");
-            Files.createDirectories(downloadDir);
-            Path tempFile = downloadDir.resolve("sniffer.zip");
-            try (InputStream in = response.body();
-                 FileOutputStream fos = new FileOutputStream(tempFile.toFile())) {
-                byte[] buf = new byte[8192];
-                long readBytes = 0;
-                int n;
-                while ((n = in.read(buf)) >= 0) {
-                    if (cancelFlag.get()) {
-                        log.info("用户取消下载");
-                        Files.deleteIfExists(tempFile);
-                        return null;
-                    }
-                    fos.write(buf, 0, n);
-                    readBytes += n;
-                    if (totalBytes > 0) {
-                        progressCallback.accept(readBytes, totalBytes);
-                    }
-                }
-            }
-            return tempFile;
-        }
-    }
-
-    /** 解压 zip 到外部 sniffer 目录 */
-    private void extractZip(Path zipPath, String exeClasspath) throws IOException {
-        File targetDir = new File(FilePathUtil.getExternalPath(exeClasspath, true)).getParentFile();
-        if (!targetDir.exists() && !targetDir.mkdirs()) {
-            log.warn("无法创建目录: {}", targetDir);
-        }
-
-        try (ZipInputStream zis = new ZipInputStream(new FileInputStream(zipPath.toFile()))) {
-            ZipEntry entry;
-            byte[] buf = new byte[8192];
-            while ((entry = zis.getNextEntry()) != null) {
-                File outFile = new File(targetDir, entry.getName());
-                if (!outFile.getCanonicalPath().startsWith(targetDir.getCanonicalPath() + File.separator)) continue;
-                if (entry.isDirectory()) {
-                    outFile.mkdirs();
-                } else {
-                    outFile.getParentFile().mkdirs();
-                    try (FileOutputStream fos = new FileOutputStream(outFile)) {
-                        int n;
-                        while ((n = zis.read(buf)) >= 0) fos.write(buf, 0, n);
-                    }
-                }
-                zis.closeEntry();
-            }
-        }
-        log.info("sniffer 组件已解压到 {}", targetDir);
+        cancelBtn.setOnAction(_ -> rootStack.getChildren().remove(mask));
     }
 
     // ── 标准版卡片 ──────────────────────────────────────────

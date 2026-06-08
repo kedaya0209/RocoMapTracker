@@ -1,10 +1,6 @@
 package io.github.kedaya0209.roco.app.ui.command;
 
-import io.github.kedaya0209.roco.app.config.ConfigPersistence;
-import io.github.kedaya0209.roco.app.config.DownloadConfig;
-import io.github.kedaya0209.roco.app.config.NavigConfig;
-import io.github.kedaya0209.roco.app.config.SiftConfig;
-import io.github.kedaya0209.roco.app.config.ViewConfig;
+import io.github.kedaya0209.roco.app.config.*;
 import io.github.kedaya0209.roco.app.context.CameraContext;
 import io.github.kedaya0209.roco.app.context.MapContext;
 import io.github.kedaya0209.roco.app.hook.AppEvents;
@@ -13,20 +9,24 @@ import io.github.kedaya0209.roco.app.hook.event.StatusEvent;
 import io.github.kedaya0209.roco.app.match.map.SwitchMapMatcher;
 import io.github.kedaya0209.roco.app.socket.SocketServer;
 import io.github.kedaya0209.roco.app.ui.command.AppCommands.*;
-import io.github.kedaya0209.roco.app.ui.command.SidebarCommands.*;
-import io.github.kedaya0209.roco.app.ui.command.ViewportCommands.*;
+import io.github.kedaya0209.roco.app.ui.command.SidebarCommands.SwitchAlgorithmCommand;
+import io.github.kedaya0209.roco.app.ui.command.SidebarCommands.SwitchResourceCommand;
+import io.github.kedaya0209.roco.app.ui.command.SidebarCommands.SwitchThemeCommand;
+import io.github.kedaya0209.roco.app.ui.command.SidebarCommands.SwitchVersionCommand;
+import io.github.kedaya0209.roco.app.ui.command.ViewportCommands.DragViewportCommand;
+import io.github.kedaya0209.roco.app.ui.command.ViewportCommands.ResetViewportCommand;
+import io.github.kedaya0209.roco.app.ui.command.ViewportCommands.SetViewportSizeCommand;
+import io.github.kedaya0209.roco.app.ui.command.ViewportCommands.ZoomViewportCommand;
 import io.github.kedaya0209.roco.app.ui.component.overlay.ResourceCounterPanel;
 import io.github.kedaya0209.roco.app.ui.component.widget.FloatToolbox;
-import io.github.kedaya0209.roco.app.ui.component.dialog.ConfirmDialog;
 import io.github.kedaya0209.roco.app.ui.service.VersionMode;
 import io.github.kedaya0209.roco.app.ui.service.lifecycle.PcapBridgeManager;
 import io.github.kedaya0209.roco.app.ui.service.ui.SnifferInstallService;
 import io.github.kedaya0209.roco.app.ui.service.ui.ThemeManager;
 import io.github.kedaya0209.roco.app.ui.state.AppState;
-import io.github.kedaya0209.roco.app.update.plugin.PluginUpdateManager;
 import io.github.kedaya0209.roco.app.ui.state.ViewportState;
-import javafx.application.Platform;
 import javafx.scene.layout.StackPane;
+import lombok.extern.slf4j.Slf4j;
 import net.jcip.annotations.ThreadSafe;
 
 /**
@@ -35,6 +35,7 @@ import net.jcip.annotations.ThreadSafe;
  * 每个 handler 负责：状态写入 → Config 同步 → EventBus 通知 → 服务调用。
  * 保证 UI 组件只调用 {@link CommandBus#dispatch(UiCommand)}，不混写其他数据路径。
  */
+@Slf4j
 @ThreadSafe
 public final class CommandHandlers {
 
@@ -199,22 +200,21 @@ public final class CommandHandlers {
         });
 
         CommandBus.subscribe(SwitchVersionCommand.class, cmd -> {
-            if (cmd.mode() == VersionMode.ADVANCED) {
-                int port = SocketServer.instance().getPort();
-                SnifferInstallService.installIfNeeded(rootStack, port, pcapBridgeManager);
-                ResourceCounterPanel.getInstance().toggle(false);
-                FloatToolbox.getInstance().setCollectButtonVisible(true);
-                SiftConfig.SIFT_MATCHING_ENABLED = true;
-                Platform.runLater(() ->
-                        ConfirmDialog.showSimpleDialog(rootStack, "提示",
-                                "高级版组件 (sniffer) 已就绪，请手动断开游戏网络连接后重连，以便抓包组件捕获通信密钥。",
-                                "确定", true, () -> {}));
-                PluginUpdateManager.getInstance().checkAllPlugins(true);
-            } else {
-                pcapBridgeManager.stop();
-                ResourceCounterPanel.getInstance().toggle(false);
-                FloatToolbox.getInstance().setCollectButtonVisible(false);
-                SiftConfig.SIFT_MATCHING_ENABLED = false;
+            try {
+                if (cmd.mode() == VersionMode.ADVANCED) {
+                    int port = SocketServer.instance().getPort();
+                    SnifferInstallService.installIfNeeded(rootStack, port, pcapBridgeManager);
+                    ResourceCounterPanel.getInstance().toggle(false);
+                    FloatToolbox.getInstance().setCollectButtonVisible(true);
+                    SiftConfig.SIFT_MATCHING_ENABLED = true;
+                } else {
+                    pcapBridgeManager.stop();
+                    ResourceCounterPanel.getInstance().toggle(false);
+                    FloatToolbox.getInstance().setCollectButtonVisible(false);
+                    SiftConfig.SIFT_MATCHING_ENABLED = false;
+                }
+            } catch (Exception e) {
+                log.error("版本切换失败", e);
             }
         });
     }
