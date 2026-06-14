@@ -14,22 +14,40 @@ import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Node;
+import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.control.Tooltip;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
+import javafx.stage.FileChooser;
 import javafx.util.Duration;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStreamWriter;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
+import io.github.kedaya0209.roco.app.config.PathConfig;
+import io.github.kedaya0209.roco.app.hook.event.NotificationType;
+import io.github.kedaya0209.roco.app.hook.event.StatusEvent;
+import io.github.kedaya0209.roco.app.ui.service.resource.SvgManager;
+import lombok.extern.slf4j.Slf4j;
+
 @NotThreadSafe
+@Slf4j
 public class ResourceCounterPanel extends VBox {
 
     private static volatile ResourceCounterPanel instance;
@@ -44,6 +62,9 @@ public class ResourceCounterPanel extends VBox {
     private final AtomicReference<MaterialCollectionEvent> pendingData = new AtomicReference<>();
     /** 脏标记：表示有待刷新数据 */
     private final AtomicBoolean dirty = new AtomicBoolean(false);
+    /** 缓存最新数据，供 CSV 导出使用 */
+    private Map<String, Integer> lastSummary = Map.of();
+    private Map<String, Integer> lastBackpackTotals = Map.of();
 
     private ResourceCounterPanel() {
         super(0);
@@ -57,10 +78,26 @@ public class ResourceCounterPanel extends VBox {
                 "-fx-border-radius: 10;");
         setOpacity(UiConfig.RESOURCE_COUNTER_OPACITY);
 
+        // 标题栏：标题 + 右侧保存按钮
         Label titleLabel = new Label("采集统计");
         titleLabel.getStyleClass().add(Styles.TEXT_BOLD);
         titleLabel.setStyle("-fx-text-fill: -color-fg-default;");
-        titleLabel.setPadding(new Insets(0, 0, 4, 0));
+
+        Button saveBtn = new Button();
+        saveBtn.setFocusTraversable(false);
+        saveBtn.setBackground(javafx.scene.layout.Background.EMPTY);
+        saveBtn.getStyleClass().add("title-bar-btn");
+        saveBtn.setPadding(new Insets(2));
+        saveBtn.setGraphic(SvgManager.createIcon(PathConfig.SAVE, 16));
+        saveBtn.setOnAction(_ -> exportToCsv());
+        Tooltip.install(saveBtn, new Tooltip("导出 CSV"));
+
+        Region titleSpacer = new Region();
+        HBox.setHgrow(titleSpacer, Priority.ALWAYS);
+
+        HBox titleBar = new HBox(4, titleLabel, titleSpacer, saveBtn);
+        titleBar.setPadding(new Insets(0, 0, 4, 0));
+        titleBar.setAlignment(Pos.CENTER_LEFT);
 
         rowsContainer = new FlowPane(8, 6);
         rowsContainer.setPrefWrapLength(UiConfig.RESOURCE_COUNTER_WIDTH - 30);
@@ -70,7 +107,7 @@ public class ResourceCounterPanel extends VBox {
         scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
         scrollPane.setStyle("-fx-background-color: transparent; -fx-background: transparent;");
 
-        getChildren().addAll(titleLabel, scrollPane);
+        getChildren().addAll(titleBar, scrollPane);
         VBox.setVgrow(scrollPane, javafx.scene.layout.Priority.ALWAYS);
         rowsContainer.prefWidthProperty().bind(scrollPane.widthProperty().subtract(4));
 
@@ -109,6 +146,10 @@ public class ResourceCounterPanel extends VBox {
     }
 
     public void refreshData(Map<String, Integer> summary, Map<String, Integer> backpackTotals) {
+        // 缓存最新数据供 CSV 导出
+        lastSummary = summary != null ? summary : Map.of();
+        lastBackpackTotals = backpackTotals != null ? backpackTotals : Map.of();
+
         rowsContainer.getChildren().clear();
 
         if (summary == null || summary.isEmpty()) {
@@ -225,5 +266,52 @@ public class ResourceCounterPanel extends VBox {
             ft.setOnFinished(_ -> setVisible(false));
         }
         ft.play();
+    }
+
+    /** 弹出文件选择框，将当前采集数据保存为 CSV 文件 */
+    private void exportToCsv() {
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle("导出采集统计");
+        chooser.getExtensionFilters().add(
+                new FileChooser.ExtensionFilter("CSV 文件 (*.csv)", "*.csv"));
+        chooser.setInitialFileName("采集统计.csv");
+
+        File file = chooser.showSaveDialog(getScene().getWindow());
+        if (file == null) return;
+
+        try (OutputStreamWriter writer = new OutputStreamWriter(
+                new FileOutputStream(file), StandardCharsets.UTF_8)) {
+            // 写入 UTF-8 BOM，确保 Excel 正确识别中文
+            writer.write('﻿');
+            writer.write("物品名称,采集数量,背包总量\n");
+            for (Map.Entry<String, Integer> entry : lastSummary.entrySet()) {
+                String name = entry.getKey();
+                int total = entry.getValue();
+                int bpTotal = lastBackpackTotals.getOrDefault(name, 0);
+                writer.write(escapeCsv(name) + "," + total + "," + bpTotal + "\n");
+            }
+            writer.flush();
+
+            log.info("采集统计已导出: {} ({} 条记录)", file.getAbsolutePath(), lastSummary.size());
+            AppEvents.publish(StatusEvent.class,
+                    new StatusEvent(
+                            "已导出 " + lastSummary.size() + " 条记录",
+                            NotificationType.SUCCESS));
+        } catch (IOException e) {
+            log.warn("CSV 导出失败", e);
+            AppEvents.publish(StatusEvent.class,
+                    new StatusEvent(
+                            "CSV 导出失败: " + e.getMessage(),
+                            NotificationType.ERROR));
+        }
+    }
+
+    /** 转义 CSV 字段（含逗号或引号时包裹双引号） */
+    private static String escapeCsv(String value) {
+        if (value == null) return "";
+        if (value.contains(",") || value.contains("\"") || value.contains("\n")) {
+            return "\"" + value.replace("\"", "\"\"") + "\"";
+        }
+        return value;
     }
 }

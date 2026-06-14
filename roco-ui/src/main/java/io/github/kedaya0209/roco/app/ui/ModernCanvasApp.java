@@ -110,10 +110,13 @@ public class ModernCanvasApp extends Application {
         this.primaryStage = primaryStage;
         this.trayManager = new TrayManager(primaryStage);
 
-        // ---- 1. 主题（必须在场景创建前，否则 CSS 变量不可用）----
+        // ---- 1. 释放 DLL 原生资源（必须在 JavaFX 场景创建前，否则 Native Image 下找不到 JVM DLL）----
+        ResourceExtractor.extractAll("/dll/", null);
+
+        // ---- 2. 主题（必须在场景创建前，否则 CSS 变量不可用）----
         ThemeManager.applyTheme(UiConfig.THEME);
 
-        // ---- 2. 场景骨架 ----
+        // ---- 3. 场景骨架 ----
         initScene();
 
         primaryStage.setTitle(CaptureConfig.APP_MAIN_TITLE);
