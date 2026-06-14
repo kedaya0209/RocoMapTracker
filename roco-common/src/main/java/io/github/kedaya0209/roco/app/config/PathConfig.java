@@ -64,4 +64,5 @@ public final class PathConfig {
     public static final String MATCH_TOGGLE = "/icon/match_toggle.svg";
     public static final String FOLLOW = "/icon/follow.svg";
     public static final String PLUGINS = "/icon/plugins.svg";
+    public static final String SAVE = "/icon/save.svg";
 }

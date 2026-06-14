@@ -44,6 +44,16 @@ public final class ResourceExtractor {
      * @param onFileDone 每个文件处理完成后回调 (total, done)，可为 null
      */
     public static void extractAll(BiConsumer<Integer, Integer> onFileDone) {
+        extractAll(null, onFileDone);
+    }
+
+    /**
+     * 解析 extract-list.txt 并按源路径前缀过滤，仅释放匹配的资源。
+     *
+     * @param sourcePrefix 源路径前缀（如 "/dll/"），null 表示释放所有
+     * @param onFileDone   每个文件处理完成后回调 (total, done)，可为 null
+     */
+    public static void extractAll(String sourcePrefix, BiConsumer<Integer, Integer> onFileDone) {
         List<String[]> entries;
         try (InputStream in = ResourceExtractor.class.getResourceAsStream(EXTRACT_LIST)) {
             if (in == null) {
@@ -66,7 +76,9 @@ public final class ResourceExtractor {
                         sourcePath = split[0];
                         destPath = split[0];
                     }
-                    entries.add(new String[]{sourcePath, destPath, operator});
+                    if (sourcePrefix == null || sourcePath.startsWith(sourcePrefix)) {
+                        entries.add(new String[]{sourcePath, destPath, operator});
+                    }
                 });
             }
         } catch (IOException e) {
