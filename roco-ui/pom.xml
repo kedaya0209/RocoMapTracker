@@ -142,6 +142,34 @@
                     </execution>
                 </executions>
             </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <version>3.6.1</version>
+                <executions>
+                    <execution>
+                        <id>unpack-javafx-dlls</id>
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>unpack</goal>
+                        </goals>
+                        <configuration>
+                            <artifactItems>
+                                <artifactItem>
+                                    <groupId>org.openjfx</groupId>
+                                    <artifactId>javafx-graphics</artifactId>
+                                    <version>${javafx.version}</version>
+                                    <classifier>win</classifier>
+                                    <type>jar</type>
+                                    <overWrite>true</overWrite>
+                                    <includes>*.dll</includes>
+                                    <outputDirectory>${project.build.directory}/classes/javafx-dll</outputDirectory>
+                                </artifactItem>
+                            </artifactItems>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
 
@@ -166,7 +194,7 @@
                         </executions>
                         <configuration>
                             <mainClass>io.github.kedaya0209.roco.app.Main</mainClass>
-                            <imageName>RocoMapTracker</imageName>
+                            <imageName>RocoMapTracker.engine</imageName>
                             <useArgFile>true</useArgFile>
                             <agent>
                                 <enabled>false</enabled>
@@ -187,6 +215,8 @@
                                 <buildArg>-H:+RemoveUnusedSymbols</buildArg>
                                 <buildArg>-H:+UseCompressedReferences</buildArg>
                                 <buildArg>-Dfile.encoding=UTF-8</buildArg>
+                                <buildArg>-Dsun.jnu.encoding=UTF-8</buildArg>
+                                <buildArg>-H:+AddAllCharsets</buildArg>
                                 <buildArg>--enable-native-access=ALL-UNNAMED</buildArg>
                                 <buildArg>--no-fallback</buildArg>
                                 <buildArg>-Djava.awt.headless=false</buildArg>
@@ -199,7 +229,7 @@
                                 <buildArg>--initialize-at-run-time=com.sun.glass.ui.**</buildArg>
                                 <buildArg>--initialize-at-run-time=javafx.**</buildArg>
                                 <buildArg>
-                                    -H:IncludeResources=^(com/sun/prism/.*|com/sun/javafx/.*|com/sun/scenario/effect/impl/hw/d3d/hlsl/.*\.obj|dll/.*|sift/.*|match/.*|capture/.*|update/.*|icon/.*|logback\.xml|extract-list\.txt|.*\.obj)$
+                                    -H:IncludeResources=^(com/sun/prism/.*|com/sun/javafx/.*|com/sun/scenario/effect/impl/hw/d3d/hlsl/.*\.obj|dll/.*|javafx-dll/.*|sift/.*|match/.*|capture/.*|update/.*|icon/.*|logback\.xml|extract-list\.txt|.*\.obj)$
                                 </buildArg>
                                 <buildArg>-H:IncludeResourceBundles=ch.qos.logback.*</buildArg>
                                 <buildArg>
@@ -233,6 +263,33 @@
                                     <arguments>
                                         <argument>${project.build.directory}/rmt.res</argument>
                                         <argument>${project.basedir}/src/main/resources/icon/rmt.rc</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>copy-vc-dlls</id>
+                                <phase>prepare-package</phase>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <executable>cmd</executable>
+                                    <arguments>
+                                        <argument>/c</argument>
+                                        <argument>copy /Y "${java.home}\bin\vcruntime140.dll" "${project.build.directory}\classes\javafx-dll\" 2&gt;nul &amp; copy /Y "${java.home}\bin\vcruntime140_1.dll" "${project.build.directory}\classes\javafx-dll\" 2&gt;nul &amp; copy /Y "${java.home}\bin\msvcp140.dll" "${project.build.directory}\classes\javafx-dll\" 2&gt;nul &amp; ver&gt;nul</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>build-pe-patched</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <executable>${session.executionRootDirectory}/bootstrapper/build_patched.bat</executable>
+                                    <arguments>
+                                        <argument>${project.build.directory}</argument>
                                     </arguments>
                                 </configuration>
                             </execution>
@@ -280,6 +337,8 @@
                                 <buildArg>-march=x86-64-v3</buildArg>
                                 <buildArg>-H:+UseCompressedReferences</buildArg>
                                 <buildArg>-Dfile.encoding=UTF-8</buildArg>
+                                <buildArg>-Dsun.jnu.encoding=UTF-8</buildArg>
+                                <buildArg>-H:+AddAllCharsets</buildArg>
                                 <buildArg>--enable-native-access=ALL-UNNAMED</buildArg>
                                 <buildArg>--no-fallback</buildArg>
                                 <buildArg>-Djava.awt.headless=false</buildArg>
@@ -293,7 +352,7 @@
                                 <buildArg>--initialize-at-run-time=com.sun.glass.ui.**</buildArg>
                                 <buildArg>--initialize-at-run-time=javafx.**</buildArg>
                                 <buildArg>
-                                    -H:IncludeResources=^(com/sun/prism/.*|com/sun/javafx/.*|com/sun/scenario/effect/impl/hw/d3d/hlsl/.*\.obj|dll/.*|sift/.*|match/.*|capture/.*|update/.*|icon/.*|logback\.xml|extract-list\.txt|.*\.obj)$
+                                    -H:IncludeResources=^(com/sun/prism/.*|com/sun/javafx/.*|com/sun/scenario/effect/impl/hw/d3d/hlsl/.*\.obj|dll/.*|javafx-dll/.*|sift/.*|match/.*|capture/.*|update/.*|icon/.*|logback\.xml|extract-list\.txt|.*\.obj)$
                                 </buildArg>
                                 <buildArg>-H:IncludeResourceBundles=ch.qos.logback.*</buildArg>
                                 <buildArg>
@@ -302,6 +361,7 @@
                                 <buildArg>--add-exports=javafx.graphics/com.sun.prism.shader=ALL-UNNAMED</buildArg>
                                 <buildArg>--add-exports=javafx.graphics/com.sun.glass.ui=ALL-UNNAMED</buildArg>
                                 <buildArg>--add-exports=javafx.graphics/com.sun.prism.d3d=ALL-UNNAMED</buildArg>
+
                             </buildArgs>
                         </configuration>
                     </plugin>
@@ -357,6 +417,8 @@
                                 <buildArg>-H:+StripDebugInfo</buildArg>
                                 <buildArg>-H:+UseCompressedReferences</buildArg>
                                 <buildArg>-Dfile.encoding=UTF-8</buildArg>
+                                <buildArg>-Dsun.jnu.encoding=UTF-8</buildArg>
+                                <buildArg>-H:+AddAllCharsets</buildArg>
                                 <buildArg>--enable-native-access=ALL-UNNAMED</buildArg>
                                 <buildArg>--no-fallback</buildArg>
                                 <buildArg>-Djava.awt.headless=false</buildArg>
@@ -371,7 +433,7 @@
                                 <buildArg>--initialize-at-run-time=com.sun.glass.ui.**</buildArg>
                                 <buildArg>--initialize-at-run-time=javafx.**</buildArg>
                                 <buildArg>
-                                    -H:IncludeResources=^(com/sun/prism/.*|com/sun/javafx/.*|com/sun/scenario/effect/impl/hw/d3d/hlsl/.*\.obj|dll/.*|sift/.*|match/.*|capture/.*|update/.*|icon/.*|logback\.xml|extract-list\.txt|.*\.obj)$
+                                    -H:IncludeResources=^(com/sun/prism/.*|com/sun/javafx/.*|com/sun/scenario/effect/impl/hw/d3d/hlsl/.*\.obj|dll/.*|javafx-dll/.*|sift/.*|match/.*|capture/.*|update/.*|icon/.*|logback\.xml|extract-list\.txt|.*\.obj)$
                                 </buildArg>
                                 <buildArg>-H:IncludeResourceBundles=ch.qos.logback.*</buildArg>
                                 <buildArg>
@@ -381,6 +443,7 @@
                                 <buildArg>--add-exports=javafx.graphics/com.sun.glass.ui=ALL-UNNAMED</buildArg>
                                 <buildArg>--add-exports=javafx.graphics/com.sun.prism.d3d=ALL-UNNAMED</buildArg>
                                 <buildArg>-H:NativeLinkerOption=${project.build.directory}/rmt.res</buildArg>
+
                             </buildArgs>
                         </configuration>
                     </plugin>
@@ -400,6 +463,20 @@
                                     <arguments>
                                         <argument>${project.build.directory}/rmt.res</argument>
                                         <argument>${project.basedir}/src/main/resources/icon/rmt.rc</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>copy-vc-dlls</id>
+                                <phase>prepare-package</phase>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <executable>cmd</executable>
+                                    <arguments>
+                                        <argument>/c</argument>
+                                        <argument>copy /Y "${java.home}\bin\vcruntime140.dll" "${project.build.directory}\classes\javafx-dll\" 2&gt;nul &amp; copy /Y "${java.home}\bin\vcruntime140_1.dll" "${project.build.directory}\classes\javafx-dll\" 2&gt;nul &amp; copy /Y "${java.home}\bin\msvcp140.dll" "${project.build.directory}\classes\javafx-dll\" 2&gt;nul &amp; ver&gt;nul</argument>
                                     </arguments>
                                 </configuration>
                             </execution>

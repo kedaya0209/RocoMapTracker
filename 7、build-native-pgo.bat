@@ -3,19 +3,30 @@ chcp 65001 >nul
 setlocal enabledelayedexpansion
 cls
 
-set "VCVARS_PATH=C:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvarsall.bat"
-if not exist "%VCVARS_PATH%" (
-    echo [错误] 找不到 vcvarsall.bat: %VCVARS_PATH%
-    pause
-    exit /b 1
-)
-call "%VCVARS_PATH%" x64
-if %ERRORLEVEL% neq 0 (
+:: 检测 Visual Studio 环境
+where ml64.exe >nul 2>&1
+if %ERRORLEVEL% EQU 0 goto :check_profiles
+
+set "VSWHERE=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe"
+if not exist "%VSWHERE%" goto :no_vs
+
+for /f "usebackq delims=" %%i in (`"%VSWHERE%" -latest -property installationPath`) do set "VS_DIR=%%i"
+if not defined VS_DIR goto :no_vs
+
+call "!VS_DIR!\VC\Auxiliary\Build\vcvarsall.bat" x64
+if !ERRORLEVEL! neq 0 (
     echo [错误] VS 环境初始化失败
     pause
     exit /b 1
 )
+goto :check_profiles
 
+:no_vs
+echo [错误] 找不到 Visual Studio, 请从 VS x64 Native Tools 命令行运行
+pause
+exit /b 1
+
+:check_profiles
 echo ==============================
 echo Step 7: Build PGO Optimized EXE
 echo ==============================
@@ -61,7 +72,7 @@ echo   !PGO_LIST!
 echo.
 
 echo Building optimized native image...
-mvn clean package -Pnative-pgo -pl roco-ui -am -DskipTests "-Dpgo.file=!PGO_LIST!"
+mvn clean verify -Pnative-pgo -pl roco-ui -am -DskipTests "-Dpgo.file=!PGO_LIST!"
 
 echo.
 echo ======================================

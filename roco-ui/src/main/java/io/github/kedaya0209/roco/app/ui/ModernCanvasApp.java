@@ -110,7 +110,7 @@ public class ModernCanvasApp extends Application {
         this.primaryStage = primaryStage;
         this.trayManager = new TrayManager(primaryStage);
 
-        // ---- 1. 释放 DLL 原生资源（必须在 JavaFX 场景创建前，否则 Native Image 下找不到 JVM DLL）----
+        // ---- 1. 释放 JVM 原生 DLL（awt/fontmanager 等）----
         ResourceExtractor.extractAll("/dll/", null);
 
         // ---- 2. 主题（必须在场景创建前，否则 CSS 变量不可用）----
