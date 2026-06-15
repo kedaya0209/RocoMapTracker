@@ -213,7 +213,6 @@
                                 <buildArg>-R:MaxDirectMemorySize=512m</buildArg>
                                 <buildArg>-H:+StaticExecutableWithDynamicLibC</buildArg>
                                 <buildArg>-H:+RemoveUnusedSymbols</buildArg>
-                                <buildArg>-H:+UseCompressedReferences</buildArg>
                                 <buildArg>-Dfile.encoding=UTF-8</buildArg>
                                 <buildArg>-Dsun.jnu.encoding=UTF-8</buildArg>
                                 <buildArg>-H:+AddAllCharsets</buildArg>
@@ -238,7 +237,6 @@
                                 <buildArg>--add-exports=javafx.graphics/com.sun.prism.shader=ALL-UNNAMED</buildArg>
                                 <buildArg>--add-exports=javafx.graphics/com.sun.glass.ui=ALL-UNNAMED</buildArg>
                                 <buildArg>--add-exports=javafx.graphics/com.sun.prism.d3d=ALL-UNNAMED</buildArg>
-                                <buildArg>--emit build-report</buildArg>
                                 <buildArg>-H:+ReportExceptionStackTraces</buildArg>
                                 <buildArg>--enable-url-protocols=http,https</buildArg>
                                 <buildArg>-H:+JNI</buildArg>
@@ -335,7 +333,6 @@
                                 <buildArg>--pgo-instrument</buildArg>
                                 <buildArg>-J-Xmx24g</buildArg>
                                 <buildArg>-march=x86-64-v3</buildArg>
-                                <buildArg>-H:+UseCompressedReferences</buildArg>
                                 <buildArg>-Dfile.encoding=UTF-8</buildArg>
                                 <buildArg>-Dsun.jnu.encoding=UTF-8</buildArg>
                                 <buildArg>-H:+AddAllCharsets</buildArg>
@@ -415,7 +412,6 @@
                                 <buildArg>-Os</buildArg>
                                 <buildArg>-march=x86-64-v3</buildArg>
                                 <buildArg>-H:+StripDebugInfo</buildArg>
-                                <buildArg>-H:+UseCompressedReferences</buildArg>
                                 <buildArg>-Dfile.encoding=UTF-8</buildArg>
                                 <buildArg>-Dsun.jnu.encoding=UTF-8</buildArg>
                                 <buildArg>-H:+AddAllCharsets</buildArg>

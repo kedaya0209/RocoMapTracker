@@ -161,14 +161,14 @@ typedef struct {
 // Stub layout constants (must match loader_stub.asm)
 enum {
     CONTEXT_OFFSET      = 0x800,
-    STUB_FUNCPTR_OFFSET = 0x828,   // 8 qword function pointer slots (CONTEXT_OFFSET + 40)
-    STUB_FUNCPTR_SIZE   = 64,      // 8 * 8
-    FIXUP_TABLE_OFFSET  = 0x868,   // STUB_FUNCPTR_OFFSET + STUB_FUNCPTR_SIZE
+    STUB_FUNCPTR_OFFSET = 0x828,   // 9 qword function pointer slots (CONTEXT_OFFSET + 40)
+    STUB_FUNCPTR_SIZE   = 72,      // 9 * 8
+    FIXUP_TABLE_OFFSET  = 0x870,   // STUB_FUNCPTR_OFFSET + STUB_FUNCPTR_SIZE
     DLL_DATA_ALIGN      = 0x1000,  // DLL data page alignment
 };
 
 // Number of built-in strings the stub needs
-#define NUM_STUB_NAMES  8
+#define NUM_STUB_NAMES  9
 
 // Fixed name string offsets within the name table (must match loader_stub.asm)
 // "GetProcAddress\0"     = 15 bytes -> offset 0
@@ -179,6 +179,7 @@ enum {
 // "VirtualProtect\0"     = 15 bytes -> offset 62
 // "GetModuleFileNameW\0" = 19 bytes -> offset 77
 // "FlushFileBuffers\0"   = 17 bytes -> offset 96
+// "SetDllDirectoryW\0"   = 18 bytes -> offset 113
 static const char *stub_names[] = {
     "GetProcAddress",
     "LoadLibraryW",
@@ -188,6 +189,7 @@ static const char *stub_names[] = {
     "VirtualProtect",
     "GetModuleFileNameW",
     "FlushFileBuffers",
+    "SetDllDirectoryW",
 };
 
 // ============================================================

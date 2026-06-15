@@ -1,5 +1,6 @@
 package io.github.kedaya0209.roco.app;
 
+import io.github.kedaya0209.roco.app.utils.EnvironmentUtil;
 import io.github.kedaya0209.roco.app.utils.FilePathUtil;
 import io.github.kedaya0209.roco.app.utils.ResourceUtils;
 import net.jcip.annotations.NotThreadSafe;
@@ -38,12 +39,14 @@ public class Main {
      * {@code System.load} 的 Unicode 缺陷）。
      */
     private static void preloadNativeLibraries() {
+        if (!EnvironmentUtil.isNative()) return;
         File exeDir = FilePathUtil.getAppRootDir().toFile();
-        // 让 JavaFX 也在 exe 目录提取/加载 DLL
-        System.setProperty("javafx.cachedir", exeDir.getAbsolutePath());
-        log.info("javafx.cachedir = {}", exeDir.getAbsolutePath());
+        File dllDir = new File(exeDir, "dll");
+        dllDir.mkdirs();
 
-        // VC++ 运行时（启动器已解压，此处只为确保已加载）+ JavaFX JNI DLL
+        System.setProperty("javafx.cachedir", dllDir.getAbsolutePath());
+        log.info("javafx.cachedir = {}", dllDir.getAbsolutePath());
+
         String[] dlls = {
                 "ucrtbase", "vcruntime140", "vcruntime140_1",
                 "msvcp140", "msvcp140_1", "msvcp140_2",
@@ -51,12 +54,12 @@ public class Main {
                 "prism_common", "prism_sw", "decora_sse"
         };
         for (String dll : dlls) {
-            File f = new File(exeDir, dll + ".dll");
+            File f = new File(dllDir, dll + ".dll");
             if (!f.exists()) {
                 extractDllFromClasspath(dll, f);
             }
             try {
-                System.load(f.getAbsolutePath());
+                System.loadLibrary(dll);
             } catch (UnsatisfiedLinkError e) {
                 log.warn("DLL 预加载失败: {} - {}", dll, e.getMessage());
             }
@@ -65,8 +68,8 @@ public class Main {
 
     private static void extractDllFromClasspath(String dllName, File destFile) {
         String resourcePath = "/javafx-dll/" + dllName + ".dll";
-        destFile.getParentFile().mkdirs();
         try (InputStream in = ResourceUtils.getResourceStream(resourcePath)) {
+            destFile.getParentFile().mkdirs();
             Files.copy(in, destFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
             log.info("提取 DLL: {} → {}", resourcePath, destFile.getAbsolutePath());
         } catch (IOException e) {

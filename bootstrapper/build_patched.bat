@@ -88,7 +88,7 @@ echo.
 
 rem ---- Run pe_patch to produce final exe ----
 echo [5] Running PE patcher...
-pe_patch.exe ^
+.\pe_patch.exe ^
     --engine engine.exe ^
     --output "%ENGINE_DIR%\RocoMapTracker.exe" ^
     --vcr140 vcruntime140.dll ^
