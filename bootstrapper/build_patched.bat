@@ -72,7 +72,7 @@ if %ERRORLEVEL% NEQ 0 (
     popd
     exit /b %ERRORLEVEL%
 )
-echo loader_stub.obj created.
+echo loader_stub.obj compiled.
 echo.
 
 rem ---- Compile pe_patch.c -> pe_patch.exe ----

@@ -33,10 +33,9 @@ public class Main {
      * 启动器在同一目录已经放下了 vcruntime140.dll / vcruntime140_1.dll，
      * 这里补上 JavaFX 需要的其他 DLL（prism_d3d、glass 等）。
      * <p>
-     * 同时设置 {@code javafx.cachedir} 为 exe 所在目录，使 JavaFX
-     * 的 NativeLibLoader 也使用此路径，避开默认的
-     * {@code ~/.openjfx/cache/}（在中文用户名下会触发 GraalVM
-     * {@code System.load} 的 Unicode 缺陷）。
+     * 提取 JavaFX JNI DLL 到 dll/ 并用 System.loadLibrary 预加载。
+     * 全部加载完成后才设置 javafx.cachedir，避免 JavaFX 过早初始化
+     * 时通过 System.load(绝对路径) 触发 GraalVM Unicode 路径缺陷。
      */
     private static void preloadNativeLibraries() {
         if (!EnvironmentUtil.isNative()) return;
@@ -44,11 +43,8 @@ public class Main {
         File dllDir = new File(exeDir, "dll");
         dllDir.mkdirs();
 
-        System.setProperty("javafx.cachedir", dllDir.getAbsolutePath());
-        log.info("javafx.cachedir = {}", dllDir.getAbsolutePath());
-
         String[] dlls = {
-                "ucrtbase", "vcruntime140", "vcruntime140_1",
+                "vcruntime140", "vcruntime140_1",
                 "msvcp140", "msvcp140_1", "msvcp140_2",
                 "prism_d3d", "glass", "javafx_font", "javafx_iio",
                 "prism_common", "prism_sw", "decora_sse"
@@ -64,6 +60,11 @@ public class Main {
                 log.warn("DLL 预加载失败: {} - {}", dll, e.getMessage());
             }
         }
+
+        // javafx.cachedir 须在所有 DLL 加载完成后设置，否则 JavaFX 的
+        // NativeLibLoader 会调用 System.load(绝对路径) 命中中文路径 bug
+        System.setProperty("javafx.cachedir", dllDir.getAbsolutePath());
+        log.info("javafx.cachedir = {}", dllDir.getAbsolutePath());
     }
 
     private static void extractDllFromClasspath(String dllName, File destFile) {

@@ -123,6 +123,14 @@ coverage/
 /roco-map/src/main/resources/source/
 
 # ==============================
+# ==============================
+# bootstrapper 构建中间产物
+# ==============================
+/bootstrapper/loader_stub.obj
+/bootstrapper/pe_patch.exe
+/bootstrapper/pe_patch.obj
+
+# ==============================
 # 运行时释放的依赖（Maven 提取）
 # ==============================
 /atlantafx/
