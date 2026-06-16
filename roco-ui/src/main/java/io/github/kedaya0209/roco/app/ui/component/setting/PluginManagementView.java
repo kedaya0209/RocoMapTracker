@@ -66,6 +66,9 @@ public class PluginManagementView {
     /** 插件 ID → 内存占用标签 */
     private final Map<String, Label> memLabels = new HashMap<>();
 
+    /** 插件 ID → 下载进度标签 */
+    private final Map<String, Label> progressLabels = new HashMap<>();
+
     /** 当前正在下载的插件 ID 集合，用于检测下载完成 */
     private final Set<String> downloadingPlugins = new HashSet<>();
 
@@ -147,6 +150,7 @@ public class PluginManagementView {
         badgeLabels.clear();
         cpuLabels.clear();
         memLabels.clear();
+        progressLabels.clear();
 
         PluginUpdateManager mgr = PluginUpdateManager.getInstance();
         List<PluginInfo> userPlugins = rescan ? mgr.scanPlugins() : mgr.getCachedPlugins();
@@ -196,12 +200,22 @@ public class PluginManagementView {
             String pluginId = entry.getKey();
             // 下载进度
             double p = mgr.getDownloadProgress(pluginId);
+            Label progressLabel = progressLabels.get(pluginId);
             if (p > 0 && p < 1) {
                 updateCardStyle(entry.getValue(), p);
                 downloadingPlugins.add(pluginId);
+                if (progressLabel != null) {
+                    progressLabel.setText(String.format("下载中 %.0f%%", p * 100));
+                    progressLabel.setVisible(true);
+                    progressLabel.setManaged(true);
+                }
             } else {
                 // 不在下载中，重置背景
                 updateCardStyle(entry.getValue(), 0);
+                if (progressLabel != null) {
+                    progressLabel.setVisible(false);
+                    progressLabel.setManaged(false);
+                }
                 if (downloadingPlugins.remove(pluginId)) {
                     // 之前正在下载，现在完成了 → 刷新卡片内容
                     needRefresh = true;
@@ -447,6 +461,13 @@ public class PluginManagementView {
         }
 
         VBox info = createInfoBox(plugin);
+
+        Label progressLabel = new Label();
+        progressLabel.setStyle("-fx-text-fill: #2a7de1; -fx-font-size: 11px; -fx-font-weight: bold;");
+        progressLabel.setVisible(false);
+        progressLabel.setManaged(false);
+        info.getChildren().add(progressLabel);
+        progressLabels.put(plugin.id(), progressLabel);
 
         CheckBox enableCb = new CheckBox();
         enableCb.setSelected(!PluginUpdateManager.getInstance().isPluginDisabled(plugin.id()));
