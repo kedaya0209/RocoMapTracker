@@ -6,6 +6,7 @@ import io.github.kedaya0209.roco.app.ui.component.dialog.DownloadProgressDialog;
 import io.github.kedaya0209.roco.app.ui.component.dialog.DownloadProgressDialog.ProgressControl;
 import io.github.kedaya0209.roco.app.ui.service.lifecycle.PcapBridgeManager;
 import io.github.kedaya0209.roco.app.update.plugin.PluginSource;
+import io.github.kedaya0209.roco.app.update.plugin.PluginStatus;
 import io.github.kedaya0209.roco.app.update.plugin.PluginUpdateManager;
 import javafx.application.Platform;
 import javafx.scene.layout.StackPane;
@@ -32,8 +33,8 @@ public class SnifferInstallService {
 
         pm.scanPlugins();
         boolean snifferReady = pm.getPlugin("sniffer")
-                .filter(p -> p.status() != io.github.kedaya0209.roco.app.update.plugin.PluginStatus.DAMAGED
-                        && p.status() != io.github.kedaya0209.roco.app.update.plugin.PluginStatus.DISABLED)
+                .filter(p -> p.status() != PluginStatus.DAMAGED
+                        && p.status() != PluginStatus.DISABLED)
                 .isPresent();
 
         if (snifferReady) {
@@ -43,12 +44,12 @@ public class SnifferInstallService {
         } else if (installAttempted.compareAndSet(false, true)) {
             // CAS 成功：这是第一次尝试安装
             ProgressControl pc = DownloadProgressDialog.showDownloadProgressDialog(
-                    rootStack, "需要下载高级版组件 (sniffer)...", null);
+                    rootStack, "高级版组件 (sniffer)...", null);
             Thread.ofPlatform().daemon(true).name("sniffer-install").start(() -> pm.checkRemotePlugin("sniffer",
                         new PluginSource("github-release", SnifferConfig.SNIFFER_REPO))
                     .ifPresentOrElse(update ->
                             pm.downloadPlugin(update,
-                                prog -> pc.updateProgress(prog, "下载中..."),
+                                prog -> pc.updateProgress(prog, String.format("下载中 %.0f%%", prog * 100)),
                                 () -> {
                                     pc.close();
                                     pm.scanPlugins();
