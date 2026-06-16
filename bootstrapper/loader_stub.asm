@@ -15,6 +15,7 @@ CTX_NAME_TABLE       equ 32
 CTX_ORIG_ENTRY       equ 36
 CTX_SIZE             equ 40
 
+DEBUG_PHASE             equ 7C0h  ; debug: phase counter (writable by stub)
 STUB_GetProcAddress      equ 828h
 STUB_LoadLibraryW        equ 830h
 STUB_CreateFileW         equ 838h
@@ -43,7 +44,10 @@ fixup_entry MACRO
     mov rcx, r12
     call qword ptr [r15+STUB_GetProcAddress]
     test rax, rax
-    jz @F
+    jnz @F
+    inc dword ptr [r15 + DEBUG_PHASE + 4]  ; debug: count unresolved
+    jmp @F
+  @@:
     mov r13, rax
     mov rcx, r14
     add rcx, rbx
@@ -160,6 +164,8 @@ _found_sec:
     mov eax, [rsi+0Ch]
     add rax, r14
     mov r15, rax                ; r15 = .rmtldr 段基址
+    mov dword ptr [r15 + DEBUG_PHASE], 2  ; debug: Phase 2 done
+    mov dword ptr [r15 + DEBUG_PHASE + 4], 0  ; debug: clear fail counter
 
     ; ----------------------------------------------------------
     ; Phase 3: kernel32 导出表 -> GetProcAddress
@@ -227,6 +233,7 @@ _gpa_found:
     test rax, rax
     jz _abort
     mov [r15+STUB_VirtualProtect], rax
+    mov dword ptr [r15 + DEBUG_PHASE], 4  ; debug: Phase 4 done
 
     ; ----------------------------------------------------------
     ; Phase 5: 修补 VCRUNTIME140 IAT (14个函数, 展开)
@@ -253,6 +260,7 @@ _gpa_found:
     fixup_entry  ; [11] _CxxThrowException
     fixup_entry  ; [12] memmove
     fixup_entry  ; [13] __current_exception
+    mov dword ptr [r15 + DEBUG_PHASE], 5  ; debug: Phase 5 done
 
     ; ----------------------------------------------------------
     ; Phase 6: 修补 VCRUNTIME140_1 IAT (1个函数)
@@ -270,6 +278,7 @@ _gpa_found:
     ; Phase 7: SetDllDirectoryW(exeDir\dll\)
     ; ----------------------------------------------------------
 _setdll:
+    mov dword ptr [r15 + DEBUG_PHASE], 6  ; debug: Phase 6 done
     ; 解析 GetModuleFileNameW
     mov rcx, rdi
     lea rdx, [rbp + STR_GetModuleFileNameW]
@@ -317,11 +326,13 @@ _find_slash:
     ; SetDllDirectoryW(buf)
     lea rcx, [rsp + 128]
     call qword ptr [r15 + STUB_SetDllDirectoryW]
+    mov dword ptr [r15 + DEBUG_PHASE], 7  ; debug: Phase 7 done
 
     ; ----------------------------------------------------------
     ; Phase 8: 跳转到原始入口点
     ; ----------------------------------------------------------
 _done:
+    mov dword ptr [r15 + DEBUG_PHASE], 8  ; debug: Phase 8 (entering original code)
     mov ecx, [r15+CONTEXT_OFFSET+CTX_ORIG_ENTRY]
     add rcx, r14
 
