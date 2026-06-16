@@ -119,6 +119,7 @@ public class MapDownloader {
                 Thread.ofVirtual().start(() -> {
                     if (!fChunk.isEmpty()) {
                         File f = FilePathUtil.getRelativeFile(MapResourceUpdater.CHUNK_DIR, fTag + "_" + fChunkIdx + ".chunk");
+                        f.getParentFile().mkdirs();
                         try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(f))) {
                             oos.writeObject(fChunk);
                         } catch (IOException e) {
@@ -224,6 +225,7 @@ public class MapDownloader {
     private static void saveChunk(String tag) {
         if (chunkBuffer.isEmpty()) return;
         File f = FilePathUtil.getRelativeFile(MapResourceUpdater.CHUNK_DIR, tag + "_" + chunkIndex + ".chunk");
+        f.getParentFile().mkdirs();
         try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(f))) {
             oos.writeObject(new ArrayList<>(chunkBuffer));
             chunkBuffer.clear();
@@ -247,6 +249,7 @@ public class MapDownloader {
 
     private static void saveMeta(List<Tile> tiles, String tag) {
         File f = FilePathUtil.getRelativeFile(String.format(MapResourceUpdater.METADATA_FILE, tag));
+        f.getParentFile().mkdirs();
         try (PrintWriter pw = new PrintWriter(f)) {
             for (Tile t : tiles) pw.println(t.x() + "," + t.y());
         } catch (IOException e) {

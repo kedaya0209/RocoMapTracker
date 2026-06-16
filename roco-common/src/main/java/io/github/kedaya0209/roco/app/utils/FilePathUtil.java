@@ -82,11 +82,7 @@ public final class FilePathUtil {
             String safePath = sub.replaceFirst("^[/\\\\]+", "");
             path = path.resolve(safePath);
         }
-        File file = path.toFile();
-        if (!file.getParentFile().exists()) {
-            file.getParentFile().mkdirs();
-        }
-        return file;
+        return path.toFile();
     }
 
     // ==================== 外部文件路径映射 ====================

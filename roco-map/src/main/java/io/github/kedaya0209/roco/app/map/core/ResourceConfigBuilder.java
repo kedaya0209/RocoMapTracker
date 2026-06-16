@@ -51,6 +51,7 @@ public class ResourceConfigBuilder {
             }
 
             File out = FilePathUtil.getRelativeFile(MapResourceUpdater.DOWNLOAD_POINT_DIR, "resource_config.json");
+            out.getParentFile().mkdirs();
             om.writerWithDefaultPrettyPrinter().writeValue(out, list);
 
             log.info("✅ 配置生成完成：{} 条", list.size());

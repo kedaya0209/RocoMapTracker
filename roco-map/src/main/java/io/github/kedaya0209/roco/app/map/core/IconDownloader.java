@@ -92,6 +92,7 @@ public class IconDownloader {
             progress.setStatusText("正在下载图标: " + name);
 
             File file = FilePathUtil.getRelativeFile(MapResourceUpdater.DOWNLOAD_ICON_DIR, name);
+            file.getParentFile().mkdirs();
 
             if (file.exists()) {
                 progress.finishTask();

@@ -72,6 +72,7 @@ public class MapStitcher {
             g2d.dispose();
 
             File outFile = FilePathUtil.getRelativeFile(String.format(MapResourceUpdater.OUTPUT_FILE, tag));
+            outFile.getParentFile().mkdirs();
             ImageIO.write(image, "png", outFile);
             image.flush();
 

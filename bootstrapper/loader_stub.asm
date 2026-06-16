@@ -15,23 +15,25 @@ CTX_NAME_TABLE       equ 32
 CTX_ORIG_ENTRY       equ 36
 CTX_SIZE             equ 40
 
-STUB_GetProcAddress     equ 828h
-STUB_LoadLibraryW       equ 830h
-STUB_CreateFileW        equ 838h
-STUB_WriteFile          equ 840h
-STUB_CloseHandle        equ 848h
-STUB_VirtualProtect     equ 850h
-STUB_GetModuleFileNameW equ 858h
-STUB_FlushFileBuffers   equ 860h
+STUB_GetProcAddress      equ 828h
+STUB_LoadLibraryW        equ 830h
+STUB_CreateFileW         equ 838h
+STUB_WriteFile           equ 840h
+STUB_CloseHandle         equ 848h
+STUB_VirtualProtect      equ 850h
+STUB_GetModuleFileNameW  equ 858h
+STUB_FlushFileBuffers    equ 860h
+STUB_SetDllDirectoryW    equ 868h
 
-STR_GetProcAddress      equ 0
-STR_LoadLibraryW        equ 15
-STR_CreateFileW         equ 28
-STR_WriteFile           equ 40
-STR_CloseHandle         equ 50
-STR_VirtualProtect      equ 62
-STR_GetModuleFileNameW  equ 77
-STR_FlushFileBuffers    equ 96
+STR_GetProcAddress       equ 0
+STR_LoadLibraryW         equ 15
+STR_CreateFileW          equ 28
+STR_WriteFile            equ 40
+STR_CloseHandle          equ 50
+STR_VirtualProtect       equ 62
+STR_GetModuleFileNameW   equ 77
+STR_FlushFileBuffers     equ 96
+STR_SetDllDirectoryW     equ 113
 
 ; 修复一个 IAT 槽
 fixup_entry MACRO
@@ -229,6 +231,7 @@ _gpa_found:
     ; ----------------------------------------------------------
     ; Phase 5: 修补 VCRUNTIME140 IAT (14个函数, 展开)
     ; ----------------------------------------------------------
+    mov rdi, r13                ; 保存 kernel32 基址 (fixup_entry 会覆盖 r13, rdi 非 volatile)
     mov r12, [rsp+64]
     test r12, r12
     jz _abort
@@ -259,12 +262,64 @@ _gpa_found:
 
     mov eax, [r15+CONTEXT_OFFSET+CTX_FIXUP_1_COUNT]
     test eax, eax
-    jz _done
+    jz _setdll
 
     fixup_entry  ; [0] __CxxFrameHandler4
 
     ; ----------------------------------------------------------
-    ; Phase 7: 跳转到原始入口点
+    ; Phase 7: SetDllDirectoryW(exeDir\dll\)
+    ; ----------------------------------------------------------
+_setdll:
+    ; 解析 GetModuleFileNameW
+    mov rcx, rdi
+    lea rdx, [rbp + STR_GetModuleFileNameW]
+    call qword ptr [r15 + STUB_GetProcAddress]
+    test rax, rax
+    jz _abort
+    mov [r15 + STUB_GetModuleFileNameW], rax
+
+    ; 解析 SetDllDirectoryW
+    mov rcx, rdi
+    lea rdx, [rbp + STR_SetDllDirectoryW]
+    call qword ptr [r15 + STUB_GetProcAddress]
+    test rax, rax
+    jz _abort
+    mov [r15 + STUB_SetDllDirectoryW], rax
+
+    ; GetModuleFileNameW(NULL, buf, 260)
+    xor ecx, ecx
+    lea rdx, [rsp + 128]
+    mov r8d, 260
+    call qword ptr [r15 + STUB_GetModuleFileNameW]
+    test rax, rax
+    jz _abort
+
+    ; 找到宽字符串末尾
+    lea rcx, [rsp + 128]
+_find_wend:
+    cmp word ptr [rcx], 0
+    je _found_wend
+    add rcx, 2
+    jmp _find_wend
+
+_found_wend:
+    ; 从末尾往回找最后一个 '\' (U+005C)
+_find_slash:
+    sub rcx, 2
+    cmp word ptr [rcx], 5Ch
+    jne _find_slash
+
+    ; rcx 指向最后一个 '\', 后面写入 "dll\0"
+    add rcx, 2
+    mov dword ptr [rcx], 006C0064h
+    mov dword ptr [rcx + 4], 0000006Ch
+
+    ; SetDllDirectoryW(buf)
+    lea rcx, [rsp + 128]
+    call qword ptr [r15 + STUB_SetDllDirectoryW]
+
+    ; ----------------------------------------------------------
+    ; Phase 8: 跳转到原始入口点
     ; ----------------------------------------------------------
 _done:
     mov ecx, [r15+CONTEXT_OFFSET+CTX_ORIG_ENTRY]
