@@ -150,17 +150,25 @@ jobs:
       - name: Setup Liberica NIK JDK 25
         shell: pwsh
         run: |
-          $nikVer = "25.0.3+12"
-          $cacheDir = Join-Path $env:RUNNER_TOOL_CACHE "liberica-nik" $nikVer
-          $javaHome = Join-Path $cacheDir "graalvm-jdk-${nikVer}"
-          if (-not (Test-Path $javaHome)) {
-            Write-Host "Downloading Liberica NIK $nikVer..."
-            $url = "https://download.bell-sw.com/graalvm/${nikVer}/bellsoft-graalvm-jdk${nikVer}-windows-amd64.zip"
+          $tag = "25.0.3+1-25.0.3+12"
+          $cacheDir = Join-Path $env:RUNNER_TOOL_CACHE "liberica-nik" $tag
+          $javaHome = $null
+          if (Test-Path $cacheDir) {
+            $dirs = Get-ChildItem -Path $cacheDir -Directory | Where-Object { $_.Name -like "*liberica*" }
+            if ($dirs) { $javaHome = $dirs[0].FullName }
+          }
+          if (-not $javaHome) {
+            Write-Host "Downloading Liberica NIK..."
+            $url = "https://github.com/bell-sw/LibericaNIK/releases/download/${tag}/bellsoft-liberica-vm-openjdk25.0.3%2B12-25.0.3%2B1-windows-amd64.zip"
             New-Item -ItemType Directory -Path $cacheDir -Force | Out-Null
             Invoke-WebRequest -Uri $url -OutFile "$cacheDir\nik.zip"
             Expand-Archive -Path "$cacheDir\nik.zip" -DestinationPath $cacheDir -Force
             Remove-Item "$cacheDir\nik.zip"
+            $dirs = Get-ChildItem -Path $cacheDir -Directory | Where-Object { $_.Name -like "*liberica*" }
+            if (-not $dirs) { Write-Error "Failed to find extracted JDK directory"; exit 1 }
+            $javaHome = $dirs[0].FullName
           }
+          Write-Host "JAVA_HOME=$javaHome"
           "JAVA_HOME=$javaHome" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "GRAALVM_HOME=$javaHome" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           echo "$javaHome\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
