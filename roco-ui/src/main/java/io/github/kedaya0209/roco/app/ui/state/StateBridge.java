@@ -35,7 +35,8 @@ public final class StateBridge {
 
         // === 玩家状态 ===
         AppEvents.subscribe(PlayerStateEvent.class, event -> Platform.runLater(() ->
-                ViewportState.getInstance().updatePlayerPosition(event.x(), event.y(), event.angle())));
+                ViewportState.getInstance().updatePlayerPosition(
+                        event.x(), event.y(), event.smoothedX(), event.smoothedY(), event.angle())));
 
         // === 相机模式 ===
         AppEvents.subscribe(FollowModeEvent.class, event -> Platform.runLater(() ->

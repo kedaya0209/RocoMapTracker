@@ -2,6 +2,11 @@ package io.github.kedaya0209.roco.app.socket;
 
 import net.jcip.annotations.ThreadSafe;
 
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.charset.StandardCharsets;
+import java.util.Set;
+
 /**
  * 系统事件 serviceId 常量 — 保留负数段，和业务消息走相同的路由机制
  * 任何客户端都可以订阅这些事件用于监控
@@ -38,10 +43,10 @@ public final class SystemEvents {
     /**
      * 序列化 CLIENT_CONNECTED 事件 body
      */
-    public static byte[] encodeConnected(String clientId, java.util.Set<Integer> provides, java.util.Set<Integer> subscribes) {
-        byte[] nameBytes = clientId.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+    public static byte[] encodeConnected(String clientId, Set<Integer> provides, java.util.Set<Integer> subscribes) {
+        byte[] nameBytes = clientId.getBytes(StandardCharsets.UTF_8);
         int size = 2 + nameBytes.length + 2 + provides.size() * 4 + 2 + subscribes.size() * 4;
-        java.nio.ByteBuffer buf = java.nio.ByteBuffer.allocate(size).order(java.nio.ByteOrder.BIG_ENDIAN);
+        ByteBuffer buf = ByteBuffer.allocate(size).order(ByteOrder.BIG_ENDIAN);
         buf.putShort((short) nameBytes.length);
         buf.put(nameBytes);
         buf.putShort((short) provides.size());
@@ -55,8 +60,8 @@ public final class SystemEvents {
      * 序列化 CLIENT_DISCONNECTED 事件 body
      */
     public static byte[] encodeDisconnected(String clientId, int reason) {
-        byte[] nameBytes = clientId.getBytes(java.nio.charset.StandardCharsets.UTF_8);
-        java.nio.ByteBuffer buf = java.nio.ByteBuffer.allocate(2 + nameBytes.length + 4).order(java.nio.ByteOrder.BIG_ENDIAN);
+        byte[] nameBytes = clientId.getBytes(StandardCharsets.UTF_8);
+        ByteBuffer buf = ByteBuffer.allocate(2 + nameBytes.length + 4).order(java.nio.ByteOrder.BIG_ENDIAN);
         buf.putShort((short) nameBytes.length);
         buf.put(nameBytes);
         buf.putInt(reason);

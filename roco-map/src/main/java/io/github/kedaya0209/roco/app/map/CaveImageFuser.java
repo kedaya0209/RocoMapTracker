@@ -14,6 +14,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.BitSet;
 import java.util.List;
 
@@ -299,7 +300,7 @@ public class CaveImageFuser {
             int[] src = intLine.getScanline();
             System.arraycopy(src, 0, rgba, 0, w * 4);
         } else {
-            java.util.Arrays.fill(rgba, 0);
+            Arrays.fill(rgba, 0);
         }
         return rgba;
     }

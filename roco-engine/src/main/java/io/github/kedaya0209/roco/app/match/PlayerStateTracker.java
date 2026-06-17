@@ -76,8 +76,7 @@ public class PlayerStateTracker {
         }
 
         MapContext.getInstance().updatePlayerState(smoothedX, smoothedY, finalAngle);
-        // 事件传原始坐标（ViewportState 接收后自行 EMA + 置灰判定用原始值）
-        AppEvents.publish(PlayerStateEvent.class, new PlayerStateEvent(x, y, finalAngle));
+        AppEvents.publish(PlayerStateEvent.class, new PlayerStateEvent(x, y, smoothedX, smoothedY, finalAngle));
     }
 
     /**
