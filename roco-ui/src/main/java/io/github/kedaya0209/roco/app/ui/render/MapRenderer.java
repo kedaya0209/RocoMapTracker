@@ -159,7 +159,7 @@ public class MapRenderer {
                 vp.syncFromMapContext();
                 log.info("首帧 view={}x{} scale={} ox={} oy={}",
                         (int) parent.getWidth(), (int) parent.getHeight(),
-                        String.format("%.4f", scale));
+                        String.format("%.4f", scale), ox, oy);
             }
         }
 
@@ -227,8 +227,8 @@ public class MapRenderer {
         playerRenderer.snapshotOy = localOy;
         playerRenderer.snapshotPivotX = parent.getWidth() / 2;
         playerRenderer.snapshotPivotY = parent.getHeight() / 2;
-        playerRenderer.snapshotPlayerX = mm.getPlayerX();
-        playerRenderer.snapshotPlayerY = mm.getPlayerY();
+        playerRenderer.snapshotPlayerX = vp.getSmoothedPlayerX();
+        playerRenderer.snapshotPlayerY = vp.getSmoothedPlayerY();
         for (RenderLayer layer : renderLayers) {
             layer.onFrame();
         }

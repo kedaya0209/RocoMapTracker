@@ -15,6 +15,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.Arrays;
 
 /**
  * 洞穴图像对比度增强工具 — 对洞穴源 PNG 应用 CLAHE。
@@ -342,7 +343,7 @@ public class CaveImageEnhancer {
             int[] src = intLine.getScanline();
             System.arraycopy(src, 0, rgba, 0, w * 4);
         } else {
-            java.util.Arrays.fill(rgba, 0);
+            Arrays.fill(rgba, 0);
         }
         return rgba;
     }

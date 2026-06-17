@@ -3,7 +3,6 @@ package io.github.kedaya0209.roco.app.ui.render;
 import net.jcip.annotations.NotThreadSafe;
 import io.github.kedaya0209.roco.app.config.RenderConfig;
 import io.github.kedaya0209.roco.app.config.ViewConfig;
-import io.github.kedaya0209.roco.app.context.MapContext;
 import io.github.kedaya0209.roco.app.ui.state.ViewportState;
 import javafx.scene.Group;
 import javafx.scene.Node;
@@ -42,6 +41,11 @@ public class PlayerRenderer implements RenderLayer {
     double snapshotScale, snapshotOx, snapshotOy;
     double snapshotPivotX, snapshotPivotY;
     double snapshotPlayerX, snapshotPlayerY;
+
+    /** 渲染侧插值位置：每帧向快照位置 lerp，消除匹配更新间的离散跳跃感 */
+    private double renderX = Double.NaN, renderY = Double.NaN;
+    /** 渲染侧插值因子：0.5 在 60fps 下 3 帧收敛 87%，5 帧收敛 97%，无感知延迟 */
+    private static final double LERP_FACTOR = 0.5;
 
     public PlayerRenderer() {
         playerGroup = new Group();
@@ -143,8 +147,7 @@ public class PlayerRenderer implements RenderLayer {
             playerRotate.setAngle(0);
         }
 
-        boolean initialized = ViewportState.getInstance().isPlayerInitialized();
-        MapContext mm = MapContext.getInstance();
+        boolean initialized = vp.isPlayerInitialized();
         if (initialized && playerView.getImage() != null) {
             playerView.setVisible(true);
             if (lastPlayerSize != RenderConfig.PLAYER_VIEW_SIZE) {
@@ -158,14 +161,30 @@ public class PlayerRenderer implements RenderLayer {
                 rebuildRipples();
             }
             double half = playerView.getFitWidth() / 2.0;
-            // 使用 MapRenderer 的快照值，与 CameraContext 在同一帧内基于相同坐标计算视口偏移
-            double px = snapshotPlayerX;
-            double py = snapshotPlayerY;
+            // 渲染侧位置插值：每帧向快照（EMA 平滑后的匹配坐标）lerp，
+            // 消除匹配更新间的离散跳跃，使箭头移动位移量均匀一致
+            if (Double.isNaN(renderX)) {
+                renderX = snapshotPlayerX;
+                renderY = snapshotPlayerY;
+            } else {
+                double dx = snapshotPlayerX - renderX;
+                double dy = snapshotPlayerY - renderY;
+                // 快照跳跃超过 50px 时视为位置重置（如洞穴切换），直接吸附
+                if (dx * dx + dy * dy > 2500) {
+                    renderX = snapshotPlayerX;
+                    renderY = snapshotPlayerY;
+                } else {
+                    renderX += dx * LERP_FACTOR;
+                    renderY += dy * LERP_FACTOR;
+                }
+            }
+            double px = renderX;
+            double py = renderY;
             playerView.setLayoutX(px - half);
             playerView.setLayoutY(py - half);
             // 导航模式下 group 层 Rotate(-navAngle) 已提供逆旋转，
             // setRotate 只需设置玩家真实朝向，无需再减 navAngle
-            double playerAngle = mm.isHasAngle() ? mm.getPlayerAngle() : 0;
+            double playerAngle = vp.isHasAngle() ? vp.getPlayerAngle() : 0;
             playerView.setRotate(playerAngle);
 
             // 光环和波纹中心每帧追踪玩家位置

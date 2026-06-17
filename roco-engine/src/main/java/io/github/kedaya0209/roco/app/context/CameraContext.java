@@ -30,7 +30,7 @@ public class CameraContext {
      * 跟随模式死区阈值（逻辑坐标像素）。
      * 玩家位移小于此值时跳过视口更新，避免小抖动导致地图晃动。
      */
-    private static final double FOLLOW_DEAD_ZONE = 1.0;
+    private static final double FOLLOW_DEAD_ZONE = 0.0;
 
     /** 上次跟随模式更新时的玩家位置（用于死区判断） */
     private volatile double lastFollowX = -1;

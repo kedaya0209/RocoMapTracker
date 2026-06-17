@@ -15,6 +15,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -232,7 +233,7 @@ public final class MapImageLoader {
             }
         } else {
             // 未知行类型，写空白
-            java.util.Arrays.fill(rowGray, 0, w, (byte) 0);
+            Arrays.fill(rowGray, 0, w, (byte) 0);
         }
     }
 
