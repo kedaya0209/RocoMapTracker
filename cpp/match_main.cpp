@@ -193,11 +193,6 @@ int main(int argc, char* argv[]) {
                 closesocket(sock); WSACleanup(); return 1;
             }
             if (!params.cacheFilePath.empty()) {
-                size_t lastSep = params.cacheFilePath.find_last_of("\\/");
-                if (lastSep != std::string::npos) {
-                    std::string dir = params.cacheFilePath.substr(0, lastSep);
-                    CreateDirectoryA(dir.c_str(), nullptr);
-                }
                 overworld->save_cache(params.cacheFilePath);
             }
         }
@@ -219,11 +214,6 @@ int main(int argc, char* argv[]) {
                 closesocket(sock); WSACleanup(); return 1;
             }
             if (!params.caveCacheFilePath.empty()) {
-                size_t lastSep = params.caveCacheFilePath.find_last_of("\\/");
-                if (lastSep != std::string::npos) {
-                    std::string dir = params.caveCacheFilePath.substr(0, lastSep);
-                    CreateDirectoryA(dir.c_str(), nullptr);
-                }
                 matcher_cave->save_cache(params.caveCacheFilePath);
             }
         }

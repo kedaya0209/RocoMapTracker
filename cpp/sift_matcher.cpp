@@ -2,6 +2,15 @@
 #include <algorithm>
 #include "sift_matcher.h"
 
+// UTF-8 → 宽字符转换（Windows ANSI API 无法处理含中文的 UTF-8 路径）
+static std::wstring to_wide(const std::string& utf8) {
+    int wlen = MultiByteToWideChar(CP_UTF8, 0, utf8.c_str(), -1, nullptr, 0);
+    if (wlen <= 0) return L"";
+    std::wstring w(wlen, L'\0');
+    MultiByteToWideChar(CP_UTF8, 0, utf8.c_str(), -1, &w[0], wlen);
+    return w;
+}
+
 // ============================================================================
 // 分块 SIFT 检测 + 去重（用于大子图）
 // ============================================================================
@@ -402,7 +411,8 @@ size_t SiftMatcher::feature_count() const {
 
 bool SiftMatcher::save_cache(const std::string& path) {
     std::string tmpPath = path + ".tmp";
-    FILE* f = fopen(tmpPath.c_str(), "wb");
+    std::wstring wTmpPath = to_wide(tmpPath);
+    FILE* f = _wfopen(wTmpPath.c_str(), L"wb");
     if (!f) {
         LOGERR("Failed to create cache temp file: %s", tmpPath.c_str());
         return false;
@@ -439,14 +449,15 @@ bool SiftMatcher::save_cache(const std::string& path) {
 
     if (fclose(f) != 0) {
         LOGERR("Failed to close cache temp file: %s", tmpPath.c_str());
-        DeleteFileA(tmpPath.c_str());
+        DeleteFileW(wTmpPath.c_str());
         return false;
     }
 
-    DeleteFileA(path.c_str());
-    if (rename(tmpPath.c_str(), path.c_str()) != 0) {
+    std::wstring wPath = to_wide(path);
+    DeleteFileW(wPath.c_str());
+    if (_wrename(wTmpPath.c_str(), wPath.c_str()) != 0) {
         LOGERR("Failed to rename cache file: %s -> %s", tmpPath.c_str(), path.c_str());
-        DeleteFileA(tmpPath.c_str());
+        DeleteFileW(wTmpPath.c_str());
         return false;
     }
 
@@ -455,7 +466,8 @@ bool SiftMatcher::save_cache(const std::string& path) {
 }
 
 bool SiftMatcher::load_cache(const std::string& path) {
-    FILE* f = fopen(path.c_str(), "rb");
+    std::wstring wPath = to_wide(path);
+    FILE* f = _wfopen(wPath.c_str(), L"rb");
     if (!f) {
         LOG("No cache file at: %s", path.c_str());
         return false;
