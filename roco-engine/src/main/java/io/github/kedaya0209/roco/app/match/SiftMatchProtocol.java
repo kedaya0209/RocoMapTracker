@@ -5,6 +5,7 @@ import io.github.kedaya0209.roco.app.config.SiftConfig;
 import io.github.kedaya0209.roco.app.context.ResourceConfigContext;
 import io.github.kedaya0209.roco.app.utils.FilePathUtil;
 
+import java.io.File;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
@@ -66,12 +67,17 @@ public class SiftMatchProtocol {
                                        SubImageSiftOverride[] subImageOverrides,
                                        SubImageSiftOverride matchingSift) {
         String siftMapPath = ResourceConfigContext.getSiftMap();
-        String cacheFilePath = FilePathUtil.getExternalFile(CACHE_PREFIX + siftMapPath + cacheSuffix).getAbsolutePath();
+        File cacheFile = FilePathUtil.getExternalFile(CACHE_PREFIX + siftMapPath + cacheSuffix);
+        // C++ CreateDirectoryA 只能创建单层目录，Java 侧提前确保多级父目录存在
+        cacheFile.getParentFile().mkdirs();
+        String cacheFilePath = cacheFile.getAbsolutePath();
         byte[] cachePathBytes = cacheFilePath.getBytes(StandardCharsets.UTF_8);
 
         byte[] cavePathBytes = null;
         if (caveCacheSuffix != null && !caveCacheSuffix.isEmpty()) {
-            String caveFilePath = FilePathUtil.getExternalFile(CACHE_PREFIX + siftMapPath + caveCacheSuffix).getAbsolutePath();
+            File caveFile = FilePathUtil.getExternalFile(CACHE_PREFIX + siftMapPath + caveCacheSuffix);
+            caveFile.getParentFile().mkdirs();
+            String caveFilePath = caveFile.getAbsolutePath();
             cavePathBytes = caveFilePath.getBytes(StandardCharsets.UTF_8);
         }
 
