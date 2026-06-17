@@ -57,6 +57,9 @@ public class MapRenderer {
     private double lastOx = Double.NaN;
     private double lastOy = Double.NaN;
     private boolean firstFrame = true;
+    // 视口 offset 插值，消除跟随模式下匹配间隔导致的视口离散跳跃
+    private double lerpOx = Double.NaN, lerpOy = Double.NaN;
+    private static final double VIEWPORT_LERP = 0.5;
 
     public MapRenderer(Pane parent) {
         this.parent = parent;
@@ -144,6 +147,29 @@ public class MapRenderer {
         double ox = mm.getOffsetX();
         double oy = mm.getOffsetY();
         double scale = mm.getScale();
+
+        // 跟随模式下对视口 offset 插值，消除匹配间隔导致的视口离散跳跃
+        if (cam.isFollowMode()) {
+            if (Double.isNaN(lerpOx)) {
+                lerpOx = ox;
+                lerpOy = oy;
+            } else {
+                double dox = ox - lerpOx;
+                double doy = oy - lerpOy;
+                if (dox * dox + doy * doy > 2500) {
+                    lerpOx = ox;
+                    lerpOy = oy;
+                } else {
+                    lerpOx += dox * VIEWPORT_LERP;
+                    lerpOy += doy * VIEWPORT_LERP;
+                }
+            }
+            ox = lerpOx;
+            oy = lerpOy;
+        } else {
+            // 手动拖拽时重置插值状态
+            lerpOx = Double.NaN;
+        }
 
         // 转换为子图局部坐标（始终在大陆空间，offsetY=0）
         double localOy = oy;
