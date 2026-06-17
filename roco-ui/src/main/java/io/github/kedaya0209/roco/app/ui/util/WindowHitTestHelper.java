@@ -1,6 +1,7 @@
 package io.github.kedaya0209.roco.app.ui.util;
 
 import javafx.stage.Stage;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import net.jcip.annotations.ThreadSafe;
 
@@ -12,7 +13,6 @@ import java.nio.charset.StandardCharsets;
 
 /**
  * Win32 WM_NCHITTEST 消息拦截 — 实现"标题栏响应、内容区穿透"。
- * <p>
  * 通过 Project Panama FFM API 子类化 JavaFX 窗口的 WndProc，
  * 在幽灵模式下将标题栏下方区域返回 HTTRANSPARENT，鼠标事件穿透到 3D 游戏；
  * 标题栏区域返回 HTCLIENT，按钮点击和窗口拖拽正常。
@@ -30,19 +30,22 @@ public final class WindowHitTestHelper {
     private static final long COORD_MASK = 0xFFFFL;
 
     private static long prevWndProc;
+    @Getter
     private static long currentHwnd;
     private static MemorySegment wndProcStub;
     private static Arena wndProcArena;
+    @Getter
     private static volatile boolean enabled;
+    // ---- 光标屏幕坐标查询 ----
+    private static MethodHandle getCursorPos;
+    // ---- 系统光标全局显隐 ----
+
+    private static MethodHandle showCursor;
 
     /** 预分配的 RECT 结构 (left, top, right, bottom) */
     private static final MemorySegment rect = Arena.global().allocate(16);
 
     private WindowHitTestHelper() {
-    }
-
-    public static boolean isEnabled() {
-        return enabled;
     }
 
     /**
@@ -200,14 +203,6 @@ public final class WindowHitTestHelper {
         return 0;
     }
 
-    public static long getCurrentHwnd() {
-        return currentHwnd;
-    }
-
-    // ---- 系统光标全局显隐 ----
-
-    private static MethodHandle showCursor;
-
     /**
      * 隐藏系统光标（全局）。循环调用 ShowCursor(FALSE) 直到内部计数 < 0（光标实际隐藏）。
      * 解决从标题栏进入时 Windows 自动递增计数导致单次调用无法隐藏的问题。
@@ -244,10 +239,6 @@ public final class WindowHitTestHelper {
             log.warn("恢复系统光标失败", e);
         }
     }
-
-    // ---- 光标屏幕坐标查询 ----
-
-    private static MethodHandle getCursorPos;
 
     /**
      * 获取光标当前屏幕坐标，不依赖 JavaFX 事件系统。
