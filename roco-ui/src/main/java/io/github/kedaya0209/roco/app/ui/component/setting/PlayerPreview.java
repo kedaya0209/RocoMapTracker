@@ -4,6 +4,7 @@ import net.jcip.annotations.NotThreadSafe;
 import io.github.kedaya0209.roco.app.config.RenderConfig;
 import io.github.kedaya0209.roco.app.config.ViewConfig;
 import io.github.kedaya0209.roco.app.context.ResourceConfigContext;
+import io.github.kedaya0209.roco.app.ui.render.PlayerRenderer;
 import io.github.kedaya0209.roco.app.utils.ResourceUtils;
 import javafx.animation.AnimationTimer;
 import javafx.scene.image.Image;
@@ -47,6 +48,10 @@ public class PlayerPreview {
     private double cachedHaloMaxAlpha;
     private double cachedHaloStroke;
     private double cachedPlayerSize;
+    /** 裁剪后图标宽高比 = cropH / cropW，用于 preserveRatio 居中计算 */
+    private double playerAspectRatio = 1.0;
+    /** 上次波纹数量，用于检测变更时重新分布进度 */
+    private int lastRippleCount;
 
     public PlayerPreview(SettingConfigManager configManager) {
         this.configManager = configManager;
@@ -74,7 +79,6 @@ public class PlayerPreview {
             r.setMouseTransparent(true);
             ripples[i] = r;
             root.getChildren().add(r);
-            rippleProgress[i] = (double) i / MAX_RIPPLES;
         }
 
         // --- 光环 ---
@@ -88,10 +92,17 @@ public class PlayerPreview {
         playerView = new ImageView();
         playerView.setMouseTransparent(true);
         playerView.setPreserveRatio(true);
+        playerView.setSmooth(true);
         try {
             Image img = new Image(ResourceUtils.getResourceStream(ResourceConfigContext.getPlayerIcon()));
             if (!img.isError()) {
-                playerView.setImage(img);
+                PlayerRenderer.CropResult result = PlayerRenderer.cropPlayerImage(img);
+                if (result.image() != null) {
+                    playerView.setImage(result.image());
+                } else {
+                    playerView.setImage(img);
+                }
+                playerAspectRatio = result.aspectRatio();
             }
         } catch (Exception e) {
             log.warn("加载玩家图标失败", e);
@@ -118,12 +129,20 @@ public class PlayerPreview {
             }
         };
 
-        // 初始化配置缓存
+        // 初始化配置缓存，随后按实际波纹数量分布进度
         refreshCache();
+        redistributeRippleProgress(cachedRippleCount);
     }
 
-    private static double clamp(double v) {
-        return v < 0 ? 0 : Math.min(v, 1);
+    /**
+     * 按实际波纹数量重新分布进度，与 PlayerRenderer 初始化逻辑一致。
+     */
+    private void redistributeRippleProgress(int count) {
+        if (count <= 0) return;
+        for (int i = 0; i < count; i++) {
+            rippleProgress[i] = (double) i / count;
+        }
+        lastRippleCount = count;
     }
 
     private double readDouble(String key, double fallback) {
@@ -175,12 +194,13 @@ public class PlayerPreview {
         double scale = grayDist > 0 ? Math.min(1.0, maxR / grayDist) : 1.0;
         double displayRadius = grayDist * scale;
 
-        // 玩家图标 — 每帧全量更新（无缓存，保证实时响应）
+        // 玩家图标 — 每帧全量更新，等比例渲染
         double sps = playerSize * scale;
         playerView.setFitWidth(sps);
-        playerView.setFitHeight(sps);
-        playerView.setLayoutX(cx - sps / 2.0);
-        playerView.setLayoutY(cy - sps / 2.0);
+        double halfW = sps / 2.0;
+        double halfH = halfW * playerAspectRatio;
+        playerView.setLayoutX(cx - halfW);
+        playerView.setLayoutY(cy - halfH);
 
         // 底衬 — 半透明暗区，为光环/波纹提供对比
         backdrop.setRadius(displayRadius * 1.6);
@@ -188,24 +208,23 @@ public class PlayerPreview {
         backdrop.setCenterY(cy);
 
         // 光环 — 透明度呼吸 + 描边
-        pickupHalo.setRadius(displayRadius);
+        PlayerRenderer.updateHaloBreath(pickupHalo, frameCount,
+                haloFreq, haloMinAlpha, haloMaxAlpha,
+                displayRadius, haloStroke * scale);
         pickupHalo.setCenterX(cx);
         pickupHalo.setCenterY(cy);
-        pickupHalo.setStrokeWidth(haloStroke * scale);
-        double breath = Math.sin(frameCount * haloFreq) * 0.5 + 0.5;
-        double haloAlpha = haloMinAlpha + (haloMaxAlpha - haloMinAlpha) * breath;
-        pickupHalo.setStroke(Color.rgb(255, 255, 200, clamp(haloAlpha)));
+
+        // 波纹数量变更时重新分布进度，与 PlayerRenderer.rebuildRipples 一致
+        if (rippleCount != lastRippleCount) {
+            redistributeRippleProgress(rippleCount);
+        }
 
         // 波纹 — 错峰扩散，自动显隐
+        PlayerRenderer.updateRippleFrame(ripples, rippleProgress, rippleCount,
+                rippleStep, displayRadius, rippleAlpha, rippleStroke * scale);
         for (int i = 0; i < rippleCount; i++) {
-            rippleProgress[i] += rippleStep;
-            if (rippleProgress[i] > 1.0) rippleProgress[i] -= 1.0;
-            double p = rippleProgress[i];
-            ripples[i].setRadius(p * displayRadius);
             ripples[i].setCenterX(cx);
             ripples[i].setCenterY(cy);
-            ripples[i].setStroke(Color.rgb(255, 255, 200, clamp((1 - p) * rippleAlpha)));
-            ripples[i].setStrokeWidth(rippleStroke * scale);
             ripples[i].setVisible(true);
         }
         for (int i = rippleCount; i < MAX_RIPPLES; i++) {

@@ -25,9 +25,9 @@ public final class RenderConfig {
     /** 瓦片视口外预加载缓冲区倍数 */
     public static double TILE_BUFFER_MULTIPLIER = 1.5;
     /** 玩家图标绘制尺寸（像素） */
-    public static double PLAYER_IMG_SIZE = 72;
+    public static double PLAYER_IMG_SIZE = 18;
     /** 玩家图标显示尺寸（ImageView） */
-    public static double PLAYER_VIEW_SIZE = 36;
+    public static double PLAYER_VIEW_SIZE = 18;
     /** 非活跃路线描边宽度 */
     public static double ROUTE_INACTIVE_WIDTH = 2.0;
     /** 活跃路线描边宽度 */

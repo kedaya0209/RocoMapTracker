@@ -74,9 +74,9 @@ public final class MainUiComposer {
 
         // 玩家图标
         try {
+            // 全分辨率加载，裁剪空白在 PlayerRenderer.setPlayerImage 中处理
             Image playerIcon = new Image(ResourceUtils.getResourceStream(
-                    ResourceConfigContext.getPlayerIcon()),
-                    RenderConfig.PLAYER_IMG_SIZE, RenderConfig.PLAYER_IMG_SIZE, true, true);
+                    ResourceConfigContext.getPlayerIcon()));
             if (!playerIcon.isError()) {
                 renderer.setPlayerImage(playerIcon);
             }
