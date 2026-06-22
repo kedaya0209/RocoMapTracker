@@ -1,12 +1,10 @@
 package io.github.kedaya0209.roco.app.map;
 
+import io.github.kedaya0209.roco.app.map.util.PngImage;
+import io.github.kedaya0209.roco.app.map.util.PngImageData;
 import lombok.extern.slf4j.Slf4j;
 import net.jcip.annotations.NotThreadSafe;
 
-import javax.imageio.ImageIO;
-import java.awt.*;
-import java.awt.image.BufferedImage;
-import java.awt.image.DataBufferInt;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayDeque;
@@ -51,9 +49,9 @@ public class MapAssembler {
                 int x = (i % 4) * TILE_SIZE;
                 int y = (i / 4) * TILE_SIZE;
                 try {
-                    BufferedImage tile = ImageIO.read(new File(mapDir + String.format("%02d.png", i + 1)));
+                    PngImageData tile = PngImage.readPng(new File(mapDir + String.format("%02d.png", i + 1)));
                     copyTileToBuffer(tile, fullColorPixels, x, y);
-                    BufferedImage mask = ImageIO.read(new File(maskDir + String.format("T_BigMap_Mask_%02d.png", i + 1)));
+                    PngImageData mask = PngImage.readPng(new File(maskDir + String.format("T_BigMap_Mask_%02d.png", i + 1)));
                     generateHardFence(mask, fence, x, y);
                 } catch (IOException e) {
                     log.error("加载瓦片 {} 失败", i + 1, e);
@@ -79,9 +77,8 @@ public class MapAssembler {
 
             // --- 任务 B: 生成带迷雾的展示图 ---
             log.info("4. 准备迷雾层纹理...");
-            BufferedImage texture = ImageIO.read(new File(texturePath));
-            BufferedImage fogContent = createDenseStackLayer(texture);
-            int[] fogRawPixels = ((DataBufferInt) fogContent.getRaster().getDataBuffer()).getData();
+            PngImageData texture = PngImage.readPng(new File(texturePath));
+            int[] fogRawPixels = createDenseStackLayer(texture);
 
             log.info("5. 并行合成展示图：处理迷雾过渡...");
             int[] displayPixels = new int[FULL_SIZE * FULL_SIZE];
@@ -121,37 +118,36 @@ public class MapAssembler {
 
     // --- 以下为保留的原始工具方法 ---
 
-    private static BufferedImage createDenseStackLayer(BufferedImage tex) {
-        BufferedImage layer = new BufferedImage(FULL_SIZE, FULL_SIZE, BufferedImage.TYPE_INT_ARGB);
-        Graphics2D g2d = layer.createGraphics();
-        g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-        int tw = tex.getWidth(), th = tex.getHeight();
+    private static int[] createDenseStackLayer(PngImageData tex) {
+        int[] layer = new int[FULL_SIZE * FULL_SIZE];
+        int[] texPixels = tex.pixels();
+        int tw = tex.w(), th = tex.h();
         Random r = new Random();
         for (int i = 0; i < STACK_DENSITY; i++) {
             int x = r.nextInt(FULL_SIZE + 400) - 200;
             int y = r.nextInt(FULL_SIZE + 400) - 200;
             float scale = SCALE_MIN + r.nextFloat() * (SCALE_MAX - SCALE_MIN);
-            float alpha = STACK_ALPHA * (0.4f + r.nextFloat() * 0.6f);
+            int alpha = (int) (255 * STACK_ALPHA * (0.4f + r.nextFloat() * 0.6f));
             int dw = (int) (tw * scale), dh = (int) (th * scale);
-            g2d.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, alpha));
-            g2d.translate(x, y);
-            g2d.drawImage(tex, -dw / 2, -dh / 2, dw, dh, null);
-            g2d.translate(-x, -y);
+            PngImage.blitScaledAlpha(texPixels, tw, th, layer, FULL_SIZE, FULL_SIZE,
+                    x - dw / 2, y - dh / 2, dw, dh, alpha);
         }
-        g2d.dispose();
         return layer;
     }
 
-    private static void copyTileToBuffer(BufferedImage src, int[] dest, int ox, int oy) {
-        src.getRGB(0, 0, src.getWidth(), src.getHeight(), dest, oy * FULL_SIZE + ox, FULL_SIZE);
+    private static void copyTileToBuffer(PngImageData src, int[] dest, int ox, int oy) {
+        int[] srcPixels = src.pixels();
+        int sw = src.w(), sh = src.h();
+        for (int y = 0; y < sh; y++) {
+            System.arraycopy(srcPixels, y * sw, dest, (oy + y) * FULL_SIZE + ox, sw);
+        }
     }
 
-    private static void generateHardFence(BufferedImage mask, byte[] fence, int ox, int oy) {
-        int w = mask.getWidth(), h = mask.getHeight();
-        int[] pix = mask.getRGB(0, 0, w, h, null, 0, w);
+    private static void generateHardFence(PngImageData mask, byte[] fence, int ox, int oy) {
+        int w = mask.w(), h = mask.h();
+        int[] pix = mask.pixels();
         for (int y = 0; y < h; y++) {
             for (int x = 0; x < w; x++) {
-                // 原逻辑：Alpha > 160 判定为陆地，设置围栏
                 if (((pix[y * w + x] >> 24) & 0xFF) > 160) {
                     for (int i = -DILATION_RADIUS; i <= DILATION_RADIUS; i++) {
                         int tx = x + ox + i;
@@ -228,8 +224,6 @@ public class MapAssembler {
     }
 
     private static void saveImage(int[] pix, String path) throws IOException {
-        BufferedImage out = new BufferedImage(FULL_SIZE, FULL_SIZE, BufferedImage.TYPE_INT_ARGB);
-        out.setRGB(0, 0, FULL_SIZE, FULL_SIZE, pix, 0, FULL_SIZE);
-        ImageIO.write(out, "PNG", new File(path));
+        PngImage.writePng(pix, FULL_SIZE, FULL_SIZE, new File(path));
     }
 }

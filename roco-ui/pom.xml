@@ -83,6 +83,7 @@
                         <option>-Dprism.maxvram=134217728</option>
                         <option>--add-reads=javafx.graphics=ALL-UNNAMED</option>
                         <option>--enable-native-access=ALL-UNNAMED</option>
+                        <option>--enable-native-access=javafx.graphics</option>
                     </options>
                 </configuration>
             </plugin>
@@ -217,6 +218,7 @@
                                 <buildArg>-Dsun.jnu.encoding=UTF-8</buildArg>
                                 <buildArg>-H:+AddAllCharsets</buildArg>
                                 <buildArg>--enable-native-access=ALL-UNNAMED</buildArg>
+                                <buildArg>--enable-native-access=javafx.graphics</buildArg>
                                 <buildArg>--no-fallback</buildArg>
                                 <buildArg>-Djava.awt.headless=false</buildArg>
                                 <buildArg>-H:+InstallExitHandlers</buildArg>
@@ -228,7 +230,7 @@
                                 <buildArg>--initialize-at-run-time=com.sun.glass.ui.**</buildArg>
                                 <buildArg>--initialize-at-run-time=javafx.**</buildArg>
                                 <buildArg>
-                                    -H:IncludeResources=^(com/sun/prism/.*|com/sun/javafx/.*|com/sun/scenario/effect/impl/hw/d3d/hlsl/.*\.obj|dll/.*|javafx-dll/.*|sift/.*|match/.*|capture/.*|update/.*|icon/.*|logback\.xml|extract-list\.txt|.*\.obj)$
+                                    -H:IncludeResources=^(com/sun/prism/.*|com/sun/javafx/.*|com/sun/scenario/effect/impl/hw/d3d/hlsl/.*\.obj|sift/.*|match/.*|capture/.*|update/.*|icon/.*|logback\.xml|extract-list\.txt|.*\.obj)$
                                 </buildArg>
                                 <buildArg>-H:IncludeResourceBundles=ch.qos.logback.*</buildArg>
                                 <buildArg>
@@ -337,6 +339,7 @@
                                 <buildArg>-Dsun.jnu.encoding=UTF-8</buildArg>
                                 <buildArg>-H:+AddAllCharsets</buildArg>
                                 <buildArg>--enable-native-access=ALL-UNNAMED</buildArg>
+                                <buildArg>--enable-native-access=javafx.graphics</buildArg>
                                 <buildArg>--no-fallback</buildArg>
                                 <buildArg>-Djava.awt.headless=false</buildArg>
                                 <buildArg>-H:+InstallExitHandlers</buildArg>
@@ -349,7 +352,7 @@
                                 <buildArg>--initialize-at-run-time=com.sun.glass.ui.**</buildArg>
                                 <buildArg>--initialize-at-run-time=javafx.**</buildArg>
                                 <buildArg>
-                                    -H:IncludeResources=^(com/sun/prism/.*|com/sun/javafx/.*|com/sun/scenario/effect/impl/hw/d3d/hlsl/.*\.obj|dll/.*|javafx-dll/.*|sift/.*|match/.*|capture/.*|update/.*|icon/.*|logback\.xml|extract-list\.txt|.*\.obj)$
+                                    -H:IncludeResources=^(com/sun/prism/.*|com/sun/javafx/.*|com/sun/scenario/effect/impl/hw/d3d/hlsl/.*\.obj|sift/.*|match/.*|capture/.*|update/.*|icon/.*|logback\.xml|extract-list\.txt|.*\.obj)$
                                 </buildArg>
                                 <buildArg>-H:IncludeResourceBundles=ch.qos.logback.*</buildArg>
                                 <buildArg>
@@ -416,6 +419,7 @@
                                 <buildArg>-Dsun.jnu.encoding=UTF-8</buildArg>
                                 <buildArg>-H:+AddAllCharsets</buildArg>
                                 <buildArg>--enable-native-access=ALL-UNNAMED</buildArg>
+                                <buildArg>--enable-native-access=javafx.graphics</buildArg>
                                 <buildArg>--no-fallback</buildArg>
                                 <buildArg>-Djava.awt.headless=false</buildArg>
                                 <buildArg>-H:+InstallExitHandlers</buildArg>
@@ -429,7 +433,7 @@
                                 <buildArg>--initialize-at-run-time=com.sun.glass.ui.**</buildArg>
                                 <buildArg>--initialize-at-run-time=javafx.**</buildArg>
                                 <buildArg>
-                                    -H:IncludeResources=^(com/sun/prism/.*|com/sun/javafx/.*|com/sun/scenario/effect/impl/hw/d3d/hlsl/.*\.obj|dll/.*|javafx-dll/.*|sift/.*|match/.*|capture/.*|update/.*|icon/.*|logback\.xml|extract-list\.txt|.*\.obj)$
+                                    -H:IncludeResources=^(com/sun/prism/.*|com/sun/javafx/.*|com/sun/scenario/effect/impl/hw/d3d/hlsl/.*\.obj|sift/.*|match/.*|capture/.*|update/.*|icon/.*|logback\.xml|extract-list\.txt|.*\.obj)$
                                 </buildArg>
                                 <buildArg>-H:IncludeResourceBundles=ch.qos.logback.*</buildArg>
                                 <buildArg>

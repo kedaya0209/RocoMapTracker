@@ -2,9 +2,9 @@
 chcp 65001 >nul 2>&1
 setlocal enabledelayedexpansion
 
-rem build_patched.bat - PE post-processing for single-file distribution
-rem Usage: build_patched.bat <engine-dir>
-rem   engine-dir : dir with RocoMapTracker.engine.exe + classes\javafx-dll\*.dll
+rem build_patched.bat - PE post-processing for single-file distribution (v3)
+rem Usage: build_patched.bat [engine-dir]
+rem   engine-dir : dir with RocoMapTracker.engine.exe and classes/ subdirs
 rem                (default: ..\roco-ui\target)
 rem Output: <engine-dir>\RocoMapTracker.exe
 
@@ -19,16 +19,25 @@ if not exist "%ENGINE_DIR%\RocoMapTracker.engine.exe" (
     popd
     exit /b 1
 )
-if not exist "%ENGINE_DIR%\classes\javafx-dll\vcruntime140.dll" (
-    echo ERROR: vcruntime140.dll not found at "%ENGINE_DIR%\classes\javafx-dll\"
+
+rem Verify DLL source directories exist
+set "JVFXDLL=%ENGINE_DIR%\classes\javafx-dll"
+set "SHDLL=%ENGINE_DIR%\classes\dll"
+if not exist "%JVFXDLL%\glass.dll" (
+    echo ERROR: JavaFX DLLs not found at "%JVFXDLL%"
+    echo        Run 'mvn -Pnative package -pl roco-ui -am' first
+    popd
+    exit /b 1
+)
+if not exist "%SHDLL%\jvm.dll" (
+    echo ERROR: JVM shim DLLs not found at "%SHDLL%"
+    echo        Run 'mvn -Pnative package -pl roco-ui -am' first
     popd
     exit /b 1
 )
 
 copy /Y "%ENGINE_DIR%\RocoMapTracker.engine.exe" "engine.exe" >nul || exit /b 1
-copy /Y "%ENGINE_DIR%\classes\javafx-dll\vcruntime140.dll" "vcruntime140.dll" >nul || exit /b 1
-copy /Y "%ENGINE_DIR%\classes\javafx-dll\vcruntime140_1.dll" "vcruntime140_1.dll" >nul || exit /b 1
-echo Files staged.
+echo Engine staged.
 echo.
 
 rem ---- Detect Visual Studio environment ----
@@ -88,12 +97,45 @@ echo.
 
 rem ---- Run pe_patch to produce final exe ----
 echo [5] Running PE patcher...
-.\pe_patch.exe ^
-    --engine engine.exe ^
-    --output "%ENGINE_DIR%\RocoMapTracker.exe" ^
-    --vcr140 vcruntime140.dll ^
-    --vcr140_1 vcruntime140_1.dll ^
-    --stub loader_stub.obj
+
+rem Build --embed arguments for all DLLs
+set "EMBED_ARGS="
+
+rem VC++ runtime (from javafx-dll/ — pe_patch auto-detects IAT patching)
+set "EMBED_ARGS=!EMBED_ARGS! --embed vcruntime140.dll=%JVFXDLL%\vcruntime140.dll"
+set "EMBED_ARGS=!EMBED_ARGS! --embed vcruntime140_1.dll=%JVFXDLL%\vcruntime140_1.dll"
+set "EMBED_ARGS=!EMBED_ARGS! --embed msvcp140.dll=%JVFXDLL%\msvcp140.dll"
+set "EMBED_ARGS=!EMBED_ARGS! --embed msvcp140_1.dll=%JVFXDLL%\msvcp140_1.dll"
+set "EMBED_ARGS=!EMBED_ARGS! --embed msvcp140_2.dll=%JVFXDLL%\msvcp140_2.dll"
+
+rem JavaFX DLLs (from javafx-dll/) — prism_common first (other prism DLLs depend on it)
+set "EMBED_ARGS=!EMBED_ARGS! --embed prism_common.dll=%JVFXDLL%\prism_common.dll"
+set "EMBED_ARGS=!EMBED_ARGS! --embed prism_d3d.dll=%JVFXDLL%\prism_d3d.dll"
+set "EMBED_ARGS=!EMBED_ARGS! --embed prism_sw.dll=%JVFXDLL%\prism_sw.dll"
+set "EMBED_ARGS=!EMBED_ARGS! --embed glass.dll=%JVFXDLL%\glass.dll"
+set "EMBED_ARGS=!EMBED_ARGS! --embed decora_sse.dll=%JVFXDLL%\decora_sse.dll"
+set "EMBED_ARGS=!EMBED_ARGS! --embed javafx_font.dll=%JVFXDLL%\javafx_font.dll"
+set "EMBED_ARGS=!EMBED_ARGS! --embed javafx_iio.dll=%JVFXDLL%\javafx_iio.dll"
+
+rem JVM shim DLLs (from dll/) — jvm.dll + java.dll first
+set "EMBED_ARGS=!EMBED_ARGS! --embed jvm.dll=%SHDLL%\jvm.dll"
+set "EMBED_ARGS=!EMBED_ARGS! --embed java.dll=%SHDLL%\java.dll"
+set "EMBED_ARGS=!EMBED_ARGS! --embed awt.dll=%SHDLL%\awt.dll"
+set "EMBED_ARGS=!EMBED_ARGS! --embed jawt.dll=%SHDLL%\jawt.dll"
+set "EMBED_ARGS=!EMBED_ARGS! --embed fontmanager.dll=%SHDLL%\fontmanager.dll"
+set "EMBED_ARGS=!EMBED_ARGS! --embed freetype.dll=%SHDLL%\freetype.dll"
+set "EMBED_ARGS=!EMBED_ARGS! --embed javaaccessbridge.dll=%SHDLL%\javaaccessbridge.dll"
+set "EMBED_ARGS=!EMBED_ARGS! --embed javajpeg.dll=%SHDLL%\javajpeg.dll"
+set "EMBED_ARGS=!EMBED_ARGS! --embed lcms.dll=%SHDLL%\lcms.dll"
+set "EMBED_ARGS=!EMBED_ARGS! --embed jniframe.dll=%SHDLL%\jniframe.dll"
+
+echo   DLL sources:
+echo     VC++:   %JVFXDLL%
+echo     JavaFX: %JVFXDLL%
+echo     JVM:    %SHDLL%
+echo.
+
+.\pe_patch.exe --engine engine.exe --output "%ENGINE_DIR%\RocoMapTracker.exe" --stub loader_stub.obj !EMBED_ARGS!
 
 if %ERRORLEVEL% NEQ 0 (
     echo ERROR: PE patching failed
@@ -105,7 +147,7 @@ echo.
 echo [6] PE patching completed successfully.
 
 rem ---- Cleanup staged files ----
-del engine.exe vcruntime140.dll vcruntime140_1.dll pe_patch.exe pe_patch.obj loader_stub.obj 2>nul
+del engine.exe pe_patch.exe pe_patch.obj loader_stub.obj 2>nul
 
 echo.
 echo DONE: "%ENGINE_DIR%\RocoMapTracker.exe" created

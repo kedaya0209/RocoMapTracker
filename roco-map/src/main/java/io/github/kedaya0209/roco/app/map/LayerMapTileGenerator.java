@@ -1,10 +1,9 @@
 package io.github.kedaya0209.roco.app.map;
 
+import io.github.kedaya0209.roco.app.map.util.PngImage;
+import io.github.kedaya0209.roco.app.map.util.PngImageData;
 import lombok.extern.slf4j.Slf4j;
 
-import javax.imageio.ImageIO;
-import java.awt.*;
-import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -68,10 +67,10 @@ public class LayerMapTileGenerator {
             return;
         }
 
-        BufferedImage sourceImage = ImageIO.read(srcFile);
-        if (sourceImage == null) return;
-        int srcW = sourceImage.getWidth();
-        int srcH = sourceImage.getHeight();
+        PngImageData src = PngImage.readPng(srcFile);
+        int srcW = src.w();
+        int srcH = src.h();
+        int[] srcPixels = src.pixels();
 
         List<LevelInfo> levels = new ArrayList<>();
         for (int lv = 0; lv <= maxLevel; lv++) {
@@ -86,20 +85,24 @@ public class LayerMapTileGenerator {
         try (ExecutorService executor = Executors.newFixedThreadPool(threads)) {
             List<Future<?>> futures = new ArrayList<>();
 
+            // 级联缩放：每级从前一级缩放到当前级，避免每次都从原始大图缩放
+            int[] prevPixels = srcPixels;
+            int prevW = srcW;
+            int prevH = srcH;
+
             for (LevelInfo li : levels) {
-                double factor = 1.0 / (1 << li.level);
-                BufferedImage levelImage;
+                int[] levelPixels;
+                int lw, lh;
                 if (li.level == 0) {
-                    levelImage = sourceImage;
+                    lw = srcW;
+                    lh = srcH;
+                    levelPixels = srcPixels;
                 } else {
-                    int lw = (int) Math.ceil(srcW * factor);
-                    int lh = (int) Math.ceil(srcH * factor);
-                    levelImage = new BufferedImage(lw, lh, BufferedImage.TYPE_INT_ARGB);
-                    Graphics2D g = levelImage.createGraphics();
-                    g.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
-                            RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-                    g.drawImage(sourceImage, 0, 0, lw, lh, null);
-                    g.dispose();
+                    lw = prevW / 2;
+                    lh = prevH / 2;
+                    if (lw <= 0 || lh <= 0) break;
+                    levelPixels = new int[lw * lh];
+                    PngImage.blitScaled(prevPixels, prevW, prevH, levelPixels, lw, lh, 0, 0, lw, lh);
                 }
 
                 File levelDir = new File(outputDir, String.valueOf(li.level));
@@ -112,15 +115,14 @@ public class LayerMapTileGenerator {
 
                         int x = col * tileSize;
                         int y = row * tileSize;
-                        int w = Math.min(tileSize, levelImage.getWidth() - x);
-                        int h = Math.min(tileSize, levelImage.getHeight() - y);
+                        int w = Math.min(tileSize, lw - x);
+                        int h = Math.min(tileSize, lh - y);
                         if (w <= 0 || h <= 0) continue;
 
-                        BufferedImage tile = levelImage.getSubimage(x, y, w, h);
-                        final BufferedImage finalTile = tile;
+                        int[] tile = PngImage.extractSubImage(levelPixels, lw, x, y, w, h);
                         futures.add(executor.submit(() -> {
                             try {
-                                ImageIO.write(finalTile, "png", tileFile);
+                                PngImage.writePng(tile, w, h, tileFile);
                             } catch (IOException e) {
                                 log.warn("瓦片保存失败: {}", tileFile, e);
                             }
@@ -128,8 +130,11 @@ public class LayerMapTileGenerator {
                     }
                 }
 
+                // 更新级联状态，供下一级缩放使用
                 if (li.level > 0) {
-                    levelImage.flush();
+                    prevPixels = levelPixels;
+                    prevW = lw;
+                    prevH = lh;
                 }
             }
 

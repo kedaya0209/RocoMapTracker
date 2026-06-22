@@ -1,6 +1,7 @@
 package io.github.kedaya0209.roco.app.config;
 
 import io.github.kedaya0209.roco.app.utils.ResourceUtils;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import net.jcip.annotations.ThreadSafe;
 
@@ -20,18 +21,15 @@ public final class ConfigPersistence {
 
     private static final String CONFIG_FILE_NAME = "app_config.properties";
 
-    /** 配置加载完成后回调（由 UI 层注册，用于同步 AppState 等） */
+    /** 配置加载完成后回调（由 UI 层注册，用于同步 AppState 等）
+     * -- SETTER --
+     *  注册配置加载完成回调。
+     */
+    @Setter
     private static volatile Runnable onConfigLoaded;
 
     private ConfigPersistence() {
         throw new AssertionError("禁止实例化配置类");
-    }
-
-    /**
-     * 注册配置加载完成回调。
-     */
-    public static void setOnConfigLoaded(Runnable callback) {
-        onConfigLoaded = callback;
     }
 
     /**

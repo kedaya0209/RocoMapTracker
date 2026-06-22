@@ -2,8 +2,8 @@ package io.github.kedaya0209.roco.app.map;
 
 import lombok.extern.slf4j.Slf4j;
 
-import javax.imageio.ImageIO;
-import java.awt.image.BufferedImage;
+import io.github.kedaya0209.roco.app.map.util.PngImage;
+import io.github.kedaya0209.roco.app.map.util.PngImageData;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -41,10 +41,13 @@ public class CaveRegionExtractor {
 
         Path mainPath = mapsDir.resolve(CaveUtils.MAIN_MAP);
         log.info("加载大陆图: {}", CaveUtils.MAIN_MAP);
-        BufferedImage mainMap = ImageIO.read(mainPath.toFile());
-        if (mainMap == null) {
-            log.error("大陆图加载失败");
+        PngImageData mainMap;
+        try {
+            mainMap = PngImage.readPng(mainPath.toFile());
+        } catch (IOException e) {
+            log.error("大陆图加载失败", e);
             System.exit(1);
+            return;
         }
 
         for (Path cavePng : cavePngs) {
@@ -54,25 +57,29 @@ public class CaveRegionExtractor {
         log.info("全部提取完成，共 {} 个洞穴", cavePngs.size());
     }
 
-    private static void extract(Path cavePng, BufferedImage mainMap,
+    private static void extract(Path cavePng, PngImageData mainMap,
                                 int extendPx, Path mapsDir) throws IOException {
         String name = cavePng.getFileName().toString();
         log.info("处理: {}", name);
 
-        BufferedImage caveImg = ImageIO.read(cavePng.toFile());
-        if (caveImg == null) {
-            log.warn("  跳过: 读取失败");
+        PngImageData caveImg;
+        try {
+            caveImg = PngImage.readPng(cavePng.toFile());
+        } catch (IOException e) {
+            log.warn("  跳过: 读取失败", e);
             return;
         }
 
-        int w = caveImg.getWidth();
-        int h = caveImg.getHeight();
+        int w = caveImg.w();
+        int h = caveImg.h();
+        int[] cavePixels = caveImg.pixels();
+        int[] mainPixels = mainMap.pixels();
 
         // 1. 洞穴遮罩
         boolean[] caveMask = new boolean[w * h];
         for (int y = 0; y < h; y++) {
             for (int x = 0; x < w; x++) {
-                if (((caveImg.getRGB(x, y) >> 24) & 0xFF) > 0) {
+                if ((cavePixels[y * w + x] >>> 24) > 0) {
                     caveMask[y * w + x] = true;
                 }
             }
@@ -120,7 +127,7 @@ public class CaveRegionExtractor {
         //     用来预览遮罩层效果
         String outName = name.replace(".png", "_大陆区域.png");
         Path outPath = mapsDir.resolve(outName);
-        BufferedImage outImg = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        int[] outPixels = new int[w * h];
 
         int darkDiv = Math.max(1, (int) Math.round(1.0 / 0.3));
         int pixels = 0;
@@ -128,17 +135,17 @@ public class CaveRegionExtractor {
             for (int x = 0; x < w; x++) {
                 int idx = y * w + x;
                 if (dilateMask[idx]) {
-                    int mainRGB = mainMap.getRGB(x, y);
+                    int mainRGB = mainPixels[y * w + x];
                     int r = ((mainRGB >> 16) & 0xFF) / darkDiv;
                     int g = ((mainRGB >> 8) & 0xFF) / darkDiv;
                     int b = (mainRGB & 0xFF) / darkDiv;
-                    outImg.setRGB(x, y, (255 << 24) | (r << 16) | (g << 8) | b);
+                    outPixels[idx] = (255 << 24) | (r << 16) | (g << 8) | b;
                     pixels++;
                 }
             }
         }
 
-        ImageIO.write(outImg, "png", outPath.toFile());
+        PngImage.writePng(outPixels, w, h, outPath.toFile());
         log.info("  输出: {} ({} 像素, 暗化0.3)", outName, pixels);
     }
 }

@@ -4,12 +4,11 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.kedaya0209.roco.app.map.model.LayerMapLayer;
 import io.github.kedaya0209.roco.app.utils.JsonUtils;
+import io.github.kedaya0209.roco.app.map.util.PngImage;
+import io.github.kedaya0209.roco.app.map.util.PngImageData;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 
-import javax.imageio.ImageIO;
-import java.awt.*;
-import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
@@ -80,22 +79,23 @@ public class LayerMapBatchRenderer {
 
         // 3. 构建共享遮罩
         log.info("构建陆地半透明遮罩...");
-        BufferedImage maskOverlay = buildMaskOverlay();
+        PngImageData maskOverlay = buildMaskOverlay();
+        int[] maskPixels = maskOverlay.pixels();
 
         // 4. 逐组渲染
         for (LayerGroup g : groups) {
             log.info("渲染: {} ({} 个图层)", g.name, g.layers.size());
 
             // 透明图
-            BufferedImage transparent = new BufferedImage(MAP_SIZE, MAP_SIZE, BufferedImage.TYPE_INT_ARGB);
-            drawLayers(transparent, g.layers);
-            ImageIO.write(transparent, "PNG", new File(outputDir + g.name + "_透明.png"));
+            int[] transparent = new int[MAP_SIZE * MAP_SIZE];
+            drawLayers(transparent, MAP_SIZE, g.layers);
+            PngImage.writePng(transparent, MAP_SIZE, MAP_SIZE, new File(outputDir + g.name + "_透明.png"));
             log.info("  透明图已保存");
 
             // 遮罩图
-            BufferedImage masked = copyImage(maskOverlay);
-            drawLayers(masked, g.layers);
-            ImageIO.write(masked, "PNG", new File(outputDir + g.name + "_遮罩.png"));
+            int[] masked = copyPixels(maskPixels);
+            drawLayers(masked, MAP_SIZE, g.layers);
+            PngImage.writePng(masked, MAP_SIZE, MAP_SIZE, new File(outputDir + g.name + "_遮罩.png"));
             log.info("  遮罩图已保存");
         }
 
@@ -105,13 +105,13 @@ public class LayerMapBatchRenderer {
         if (!merged.layers.isEmpty()) {
             log.info("渲染合并: 信仰者村落 (用于瓦片生成)");
 
-            BufferedImage transparent = new BufferedImage(MAP_SIZE, MAP_SIZE, BufferedImage.TYPE_INT_ARGB);
-            drawLayers(transparent, merged.layers);
-            ImageIO.write(transparent, "PNG", new File(outputDir + merged.name + "_透明.png"));
+            int[] transparent = new int[MAP_SIZE * MAP_SIZE];
+            drawLayers(transparent, MAP_SIZE, merged.layers);
+            PngImage.writePng(transparent, MAP_SIZE, MAP_SIZE, new File(outputDir + merged.name + "_透明.png"));
 
-            BufferedImage masked = copyImage(maskOverlay);
-            drawLayers(masked, merged.layers);
-            ImageIO.write(masked, "PNG", new File(outputDir + merged.name + "_遮罩.png"));
+            int[] masked = copyPixels(maskPixels);
+            drawLayers(masked, MAP_SIZE, merged.layers);
+            PngImage.writePng(masked, MAP_SIZE, MAP_SIZE, new File(outputDir + merged.name + "_遮罩.png"));
             log.info("  合并图已保存");
         }
 
@@ -142,15 +142,14 @@ public class LayerMapBatchRenderer {
 
     // ===================== 遮罩 =====================
 
-    private BufferedImage buildMaskOverlay() throws IOException {
+    private PngImageData buildMaskOverlay() throws IOException {
         File siftFile = new File(siftPath);
         if (!siftFile.exists()) {
             throw new IOException("SIFT 地图不存在: " + siftPath);
         }
-        BufferedImage sift = ImageIO.read(siftFile);
-        int[] siftPixels = sift.getRGB(0, 0, MAP_SIZE, MAP_SIZE, null, 0, MAP_SIZE);
+        PngImageData sift = PngImage.readPng(siftFile);
+        int[] siftPixels = sift.pixels();
 
-        BufferedImage result = new BufferedImage(MAP_SIZE, MAP_SIZE, BufferedImage.TYPE_INT_ARGB);
         int[] outPixels = new int[MAP_SIZE * MAP_SIZE];
         for (int i = 0; i < siftPixels.length; i++) {
             int a = (siftPixels[i] >> 24) & 0xFF;
@@ -159,27 +158,19 @@ public class LayerMapBatchRenderer {
                 outPixels[i] = (Math.min(overlayA, 255) << 24);
             }
         }
-        result.setRGB(0, 0, MAP_SIZE, MAP_SIZE, outPixels, 0, MAP_SIZE);
-        return result;
+        return new PngImageData(MAP_SIZE, MAP_SIZE, outPixels);
     }
 
     // ===================== 图层绘制 =====================
 
-    private void drawLayers(BufferedImage base, List<LayerMapLayer> layers) throws IOException {
-        Graphics2D g2d = base.createGraphics();
-        g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
-                RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-        g2d.setRenderingHint(RenderingHints.KEY_ALPHA_INTERPOLATION,
-                RenderingHints.VALUE_ALPHA_INTERPOLATION_QUALITY);
-
+    private void drawLayers(int[] basePixels, int dstW, List<LayerMapLayer> layers) throws IOException {
         for (LayerMapLayer layer : layers) {
             File f = new File(layermapDir + layer.getFile());
             if (!f.exists()) {
                 log.warn("  图层缺失: {}", layer.getFile());
                 continue;
             }
-            BufferedImage layerImg = ImageIO.read(f);
-            if (layerImg == null) continue;
+            PngImageData layerImg = PngImage.readPng(f);
 
             double centerPx = (layer.getCameraCenterX() - ORIGIN_X) / SCALE;
             double centerPy = (layer.getCameraCenterY() - ORIGIN_Y) / SCALE;
@@ -189,18 +180,16 @@ public class LayerMapBatchRenderer {
             int dy = (int) Math.round(centerPy - pixelSize / 2);
             int dw = (int) Math.round(pixelSize);
 
-            g2d.drawImage(layerImg, dx, dy, dw, dw, null);
+            PngImage.blitScaled(layerImg.pixels(), layerImg.w(), layerImg.h(),
+                    basePixels, dstW, dstW, dx, dy, dw, dw);
         }
-        g2d.dispose();
     }
 
     // ===================== 图像工具 =====================
 
-    private static BufferedImage copyImage(BufferedImage src) {
-        BufferedImage copy = new BufferedImage(src.getWidth(), src.getHeight(), BufferedImage.TYPE_INT_ARGB);
-        Graphics2D g = copy.createGraphics();
-        g.drawImage(src, 0, 0, null);
-        g.dispose();
+    private static int[] copyPixels(int[] src) {
+        int[] copy = new int[src.length];
+        System.arraycopy(src, 0, copy, 0, src.length);
         return copy;
     }
 
