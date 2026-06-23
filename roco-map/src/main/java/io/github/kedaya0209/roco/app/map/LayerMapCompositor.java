@@ -4,12 +4,11 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.kedaya0209.roco.app.map.model.LayerMapLayer;
 import io.github.kedaya0209.roco.app.utils.JsonUtils;
+import io.github.kedaya0209.roco.app.map.util.PngImage;
+import io.github.kedaya0209.roco.app.map.util.PngImageData;
 import lombok.extern.slf4j.Slf4j;
 import net.jcip.annotations.NotThreadSafe;
 
-import javax.imageio.ImageIO;
-import java.awt.*;
-import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
@@ -65,19 +64,19 @@ public class LayerMapCompositor {
      * 执行合成：加载 mask → 陆地半透明黑色遮罩 → 叠加 LayerMap → 保存
      *
      * @param outputPath 输出 PNG 路径
-     * @return 合成后的 BufferedImage
+     * @return 合成后的 PngImageData
      */
-    public BufferedImage composite(String outputPath) throws IOException {
+    public PngImageData composite(String outputPath) throws IOException {
         long start = System.currentTimeMillis();
 
         log.info("1/3 从 mask 生成黑色遮罩...");
-        BufferedImage result = buildMaskOverlay();
+        PngImageData result = buildMaskOverlay();
 
         log.info("2/3 叠加 LayerMap 洞穴图层...");
         compositeLayerMaps(result);
 
         if (outputPath != null) {
-            ImageIO.write(result, "PNG", new File(outputPath));
+            PngImage.writePng(result.pixels(), result.w(), result.h(), new File(outputPath));
             log.info("3/3 完成！耗时 {}s 输出: {}",
                     (System.currentTimeMillis() - start) / 1000.0, outputPath);
         }
@@ -90,15 +89,14 @@ public class LayerMapCompositor {
      * 利用 SIFT 的 alpha 通道识别陆地，线性映射到遮罩透明度。
      * SIFT 本身已由 MapAssembler 做海岸平滑，此处不做二次模糊。
      */
-    private BufferedImage buildMaskOverlay() throws IOException {
+    private PngImageData buildMaskOverlay() throws IOException {
         File siftFile = new File(siftPath);
         if (!siftFile.exists()) {
             throw new IOException("SIFT 地图不存在: " + siftPath);
         }
-        BufferedImage sift = ImageIO.read(siftFile);
-        int[] siftPixels = sift.getRGB(0, 0, MAP_SIZE, MAP_SIZE, null, 0, MAP_SIZE);
+        PngImageData sift = PngImage.readPng(siftFile);
+        int[] siftPixels = sift.pixels();
 
-        BufferedImage result = new BufferedImage(MAP_SIZE, MAP_SIZE, BufferedImage.TYPE_INT_ARGB);
         int[] outPixels = new int[MAP_SIZE * MAP_SIZE];
         for (int i = 0; i < siftPixels.length; i++) {
             int a = (siftPixels[i] >> 24) & 0xFF;
@@ -108,13 +106,12 @@ public class LayerMapCompositor {
                 outPixels[i] = (Math.min(overlayA, 255) << 24);
             }
         }
-        result.setRGB(0, 0, MAP_SIZE, MAP_SIZE, outPixels, 0, MAP_SIZE);
-        return result;
+        return new PngImageData(MAP_SIZE, MAP_SIZE, outPixels);
     }
 
     // ===================== LayerMap 叠加 =====================
 
-    private void compositeLayerMaps(BufferedImage base) throws IOException {
+    private void compositeLayerMaps(PngImageData base) throws IOException {
         File configFile = new File(configPath);
         if (!configFile.exists()) {
             log.warn("LayerMap 配置不存在，跳过: {}", configPath);
@@ -128,11 +125,8 @@ public class LayerMapCompositor {
         List<LayerMapLayer> layers = MAPPER.convertValue(layersRaw,
                 new TypeReference<List<LayerMapLayer>>() {});
 
-        Graphics2D g2d = base.createGraphics();
-        g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
-                RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-        g2d.setRenderingHint(RenderingHints.KEY_ALPHA_INTERPOLATION,
-                RenderingHints.VALUE_ALPHA_INTERPOLATION_QUALITY);
+        int[] basePixels = base.pixels();
+        int baseW = base.w();
 
         int count = 0;
         for (LayerMapLayer layer : layers) {
@@ -141,8 +135,7 @@ public class LayerMapCompositor {
                 log.warn("  LayerMap 缺失: {}", layer.getFile());
                 continue;
             }
-            BufferedImage layerImg = ImageIO.read(f);
-            if (layerImg == null) continue;
+            PngImageData layerImg = PngImage.readPng(f);
 
             double centerPx = (layer.getCameraCenterX() - ORIGIN_X) / SCALE;
             double centerPy = (layer.getCameraCenterY() - ORIGIN_Y) / SCALE;
@@ -152,11 +145,11 @@ public class LayerMapCompositor {
             int dy = (int) Math.round(centerPy - pixelSize / 2);
             int dw = (int) Math.round(pixelSize);
 
-            g2d.drawImage(layerImg, dx, dy, dw, dw, null);
+            PngImage.blitScaled(layerImg.pixels(), layerImg.w(), layerImg.h(),
+                    basePixels, baseW, baseW, dx, dy, dw, dw);
             log.info("  叠加 [{}] ({},{}) {}x{}", layer.getDisplayName(), dx, dy, dw, dw);
             count++;
         }
-        g2d.dispose();
         log.info("  共叠加 {} 个 LayerMap 图层", count);
     }
 

@@ -6,13 +6,12 @@ import io.github.kedaya0209.roco.app.utils.FilePathUtil;
 import lombok.extern.slf4j.Slf4j;
 import net.jcip.annotations.NotThreadSafe;
 
-import javax.imageio.ImageIO;
-import java.awt.*;
-import java.awt.image.BufferedImage;
-import java.io.ByteArrayInputStream;
+import io.github.kedaya0209.roco.app.map.util.PngImage;
+import io.github.kedaya0209.roco.app.map.util.PngImageData;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
+import java.util.stream.IntStream;
 
 /**
  * 地图瓦片拼接器
@@ -50,34 +49,30 @@ public class MapStitcher {
             int height = (maxY - minY + 1) * th;
             log.info("地图 [{}] 最终生成图片尺寸：{}x{}", tag, width, height);
 
-            BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
-            Graphics2D g2d = image.createGraphics();
+            int[] canvas = new int[width * height];
 
-            g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
-            g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-
-            for (Tile t : tiles) {
-                int dx = (t.x() - minX) * tw;
-                int dy = (t.y() - minY) * th;
-
-                try (ByteArrayInputStream bais = new ByteArrayInputStream(t.data())) {
-                    BufferedImage tileImg = ImageIO.read(bais);
-                    if (tileImg != null) {
-                        g2d.drawImage(tileImg, dx, dy, null);
-                        tileImg.flush();
+            // 分批并行解码瓦片 PNG — 各瓦片写入画布的非重叠区域，无需同步
+            int batchSize = Runtime.getRuntime().availableProcessors() * 2;
+            int fMinX = minX, fMinY = minY, fTw = tw, fTh = th;
+            for (int batchStart = 0; batchStart < tiles.size(); batchStart += batchSize) {
+                int end = Math.min(batchStart + batchSize, tiles.size());
+                IntStream.range(batchStart, end).parallel().forEach(i -> {
+                    Tile t = tiles.get(i);
+                    try {
+                        PngImageData tileData = PngImage.readPng(t.data());
+                        int dx = (t.x() - fMinX) * fTw;
+                        int dy = (t.y() - fMinY) * fTh;
+                        PngImage.blit1to1(tileData.pixels(), tileData.w(), tileData.h(),
+                                canvas, width, dx, dy);
+                    } catch (IOException ignored) {
+                        // 跳过损坏瓦片
                     }
-                }
+                });
             }
-
-            g2d.dispose();
 
             File outFile = FilePathUtil.getRelativeFile(String.format(MapResourceUpdater.OUTPUT_FILE, tag));
             outFile.getParentFile().mkdirs();
-            ImageIO.write(image, "png", outFile);
-            image.flush();
-
-            // 全图 BufferedImage + tile 解码临时内存，写盘后立即回收
-            System.gc();
+            PngImage.writePng(canvas, width, height, outFile);
 
             log.info("✅ 地图 [{}] 拼接完成，文件路径：{}", tag, outFile.getAbsolutePath());
 

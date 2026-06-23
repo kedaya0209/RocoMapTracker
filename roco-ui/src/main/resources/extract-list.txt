@@ -1,12 +1,3 @@
-/dll/awt.dll:/dll/awt.dll:native
-/dll/fontmanager.dll:/dll/fontmanager.dll:native
-/dll/freetype.dll:/dll/freetype.dll:native
-/dll/java.dll:/dll/java.dll:native
-/dll/javaaccessbridge.dll:/dll/javaaccessbridge.dll:native
-/dll/javajpeg.dll:/dll/javajpeg.dll:native
-/dll/jawt.dll:/dll/jawt.dll:native
-/dll/jvm.dll:/dll/jvm.dll:native
-/dll/lcms.dll:/dll/lcms.dll:native
 /capture/RocoMapTracker-capture.exe:/capture/RocoMapTracker-capture.exe
 /match/RocoMapTracker-match.exe:/match/RocoMapTracker-match.exe
 /match/opencv_core4100.dll:/match/opencv_core4100.dll

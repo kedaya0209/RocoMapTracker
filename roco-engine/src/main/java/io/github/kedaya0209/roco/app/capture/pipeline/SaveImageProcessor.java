@@ -4,8 +4,7 @@ import net.jcip.annotations.NotThreadSafe;
 import io.github.kedaya0209.roco.app.capture.frame.ROIData;
 import lombok.extern.slf4j.Slf4j;
 
-import javax.imageio.ImageIO;
-import java.awt.image.BufferedImage;
+import io.github.kedaya0209.roco.app.map.util.PngImage;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -40,7 +39,6 @@ public class SaveImageProcessor implements RoiProcessor {
         if (currentTime - lastSaveTime < 1000) return;
         lastSaveTime = currentTime;
 
-        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
         int[] pixels = new int[width * height];
         for (int i = 0; i < width * height; i++) {
             int b = data[i * 4] & 0xFF;
@@ -49,12 +47,11 @@ public class SaveImageProcessor implements RoiProcessor {
             int a = data[i * 4 + 3] & 0xFF;
             pixels[i] = (a << 24) | (r << 16) | (g << 8) | b;
         }
-        image.setRGB(0, 0, width, height, pixels, 0, width);
 
         try {
             Files.createDirectories(saveDir);
             Path file = saveDir.resolve(String.format("roi_%d_%04d.png", roiIndex, fileIndex++));
-            ImageIO.write(image, "png", file.toFile());
+            PngImage.writePng(pixels, width, height, file.toFile());
             log.debug("ROI 帧已保存: {}", file);
         } catch (IOException e) {
             log.error("保存 ROI 帧失败", e);

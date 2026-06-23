@@ -2,17 +2,12 @@ package io.github.kedaya0209.roco.app;
 
 import io.github.kedaya0209.roco.app.utils.EnvironmentUtil;
 import io.github.kedaya0209.roco.app.utils.FilePathUtil;
-import io.github.kedaya0209.roco.app.utils.ResourceUtils;
 import net.jcip.annotations.NotThreadSafe;
 import io.github.kedaya0209.roco.app.ui.ModernCanvasApp;
 import javafx.application.Application;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.StandardCopyOption;
 
 @Slf4j
 @NotThreadSafe
@@ -29,31 +24,27 @@ public class Main {
     }
 
     /**
-     * 将 JavaFX JNI DLL 从 classpath 提取到 exe 所在目录并预加载。
-     * 启动器在同一目录已经放下了 vcruntime140.dll / vcruntime140_1.dll，
-     * 这里补上 JavaFX 需要的其他 DLL（prism_d3d、glass 等）。
-     * <p>
-     * 提取 JavaFX JNI DLL 到 dll/ 并用 System.loadLibrary 预加载。
-     * 全部加载完成后才设置 javafx.cachedir，避免 JavaFX 过早初始化
-     * 时通过 System.load(绝对路径) 触发 GraalVM Unicode 路径缺陷。
+     * DLL 已由 stub 从 .rmtldr 提取到 dll/，VC++ DLL 已由 stub Phase 11 加载。
+     * 使用 System.loadLibrary(短名) 注册到 GraalVM NativeLibraries —— stub Phase 9
+     * 已通过 AddDllDirectory(dll/) 将 dll/ 加入 Windows DLL 搜索路径，
+     * LoadLibraryW 能正确找到并加载 DLL（含 Unicode 路径处理）。
      */
     private static void preloadNativeLibraries() {
         if (!EnvironmentUtil.isNative()) return;
+
         File exeDir = FilePathUtil.getAppRootDir().toFile();
         File dllDir = new File(exeDir, "dll");
-        dllDir.mkdirs();
 
+        // VC++ DLL 已在 stub Phase 11 加载，此处仅做 Java 侧注册
+        // awt/java 必须在 JDK 内部 System.loadLibrary 前注册
         String[] dlls = {
                 "vcruntime140", "vcruntime140_1",
                 "msvcp140", "msvcp140_1", "msvcp140_2",
-                "prism_d3d", "glass", "javafx_font", "javafx_iio",
-                "prism_common", "prism_sw", "decora_sse"
+                "prism_common", "prism_d3d", "prism_sw",
+                "glass", "decora_sse", "javafx_font", "javafx_iio",
+                "java"
         };
         for (String dll : dlls) {
-            File f = new File(dllDir, dll + ".dll");
-            if (!f.exists()) {
-                extractDllFromClasspath(dll, f);
-            }
             try {
                 System.loadLibrary(dll);
             } catch (UnsatisfiedLinkError e) {
@@ -61,20 +52,7 @@ public class Main {
             }
         }
 
-        // javafx.cachedir 须在所有 DLL 加载完成后设置，否则 JavaFX 的
-        // NativeLibLoader 会调用 System.load(绝对路径) 命中中文路径 bug
         System.setProperty("javafx.cachedir", dllDir.getAbsolutePath());
-        log.info("javafx.cachedir = {}", dllDir.getAbsolutePath());
-    }
-
-    private static void extractDllFromClasspath(String dllName, File destFile) {
-        String resourcePath = "/javafx-dll/" + dllName + ".dll";
-        try (InputStream in = ResourceUtils.getResourceStream(resourcePath)) {
-            destFile.getParentFile().mkdirs();
-            Files.copy(in, destFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
-            log.info("提取 DLL: {} → {}", resourcePath, destFile.getAbsolutePath());
-        } catch (IOException e) {
-            log.error("提取 DLL 失败: {}", resourcePath, e);
-        }
+        log.info("DLL 准备完成: {}", dllDir.getAbsolutePath());
     }
 }
