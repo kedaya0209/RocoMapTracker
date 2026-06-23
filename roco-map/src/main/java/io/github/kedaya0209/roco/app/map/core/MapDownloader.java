@@ -11,7 +11,6 @@ import io.github.kedaya0209.roco.app.utils.PngUtil;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
-import java.io.InputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -19,16 +18,19 @@ import java.io.ObjectOutputStream;
 import java.io.PrintWriter;
 import java.io.BufferedReader;
 import java.io.FileReader;
-import java.net.HttpURLConnection;
-import java.net.URL;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.file.Files;
+import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * 地图瓦片下载器
- * 采用 BFS 自动探测边界 + Java 21 虚拟线程并发 + 进度监控
+ * 四向探测矩形边界 + 批量入队 + Java 21 虚拟线程并发 + 进度监控
  */
 @Slf4j
 @NotThreadSafe
@@ -90,17 +92,20 @@ public class MapDownloader {
                 // 加载历史数据（断点续传支持）
                 loadMeta(tag);
 
-                // 确定 BFS 起点
+                // 四向探测法找到矩形边界，然后填充所有瓦片
+                HttpClient client = HttpClient.newBuilder()
+                        .connectTimeout(Duration.ofMillis(MapResourceUpdater.CONNECT_TIMEOUT))
+                        .build();
                 if (validTiles.isEmpty() && taskQueue.isEmpty()) {
-                    add(0, 0);
-                    progress.addTask();
+                    detectBounds(client, urlTpl, tag);
                 }
 
                 log.info("启动虚拟线程下载池，并发数: {}", MapResourceUpdater.THREAD_COUNT);
                 try (ExecutorService exec = Executors.newVirtualThreadPerTaskExecutor()) {
                     List<CompletableFuture<Void>> futures = new ArrayList<>();
                     for (int j = 0; j < MapResourceUpdater.THREAD_COUNT; j++) {
-                        futures.add(CompletableFuture.runAsync(() -> worker(urlTpl, tag), exec));
+                        HttpClient c = client;
+                        futures.add(CompletableFuture.runAsync(() -> worker(c, urlTpl, tag), exec));
                     }
                     CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
                 }
@@ -147,7 +152,7 @@ public class MapDownloader {
         log.info("用户请求停止下载任务");
     }
 
-    private static void worker(String url, String tag) {
+    private static void worker(HttpClient client, String url, String tag) {
         while (true) {
             if (isStopRequested.get()) {
                 log.warn("检测到停止请求，worker 线程退出");
@@ -165,7 +170,7 @@ public class MapDownloader {
                 continue;
             }
 
-            DownloadResult res = download(x, y, url);
+            DownloadResult res = download(client, x, y, url);
             visited.add(key);
 
             if (res.isSuccess()) {
@@ -176,48 +181,122 @@ public class MapDownloader {
                 if (chunkBuffer.size() >= MapResourceUpdater.CHUNK_SIZE) {
                     saveChunk(tag);
                 }
-
-                // BFS 向四周探测
-                expand(x + 1, y);
-                expand(x - 1, y);
-                expand(x, y + 1);
-                expand(x, y - 1);
             }
 
             progress.finishTask();
-            sleep(MapResourceUpdater.TILE_DELAY_MS);
         }
     }
 
-    private static void expand(int x, int y) {
-        String key = x + "," + y;
-        if (!visited.contains(key)) {
-            add(x, y);
-            progress.addTask();
-        }
-    }
-
-    private static DownloadResult download(int x, int y, String tpl) {
-        HttpURLConnection conn = null;
+    /**
+     * 四向并行探测地图矩形边界，将所有瓦片加入下载队列。
+     * 指数探测 + 二分查找确定边界，再填充全部瓦片坐标到 taskQueue。
+     */
+    private static void detectBounds(HttpClient client, String urlTpl, String tag) {
+        // 四个方向并行探测
+        var exec = Executors.newVirtualThreadPerTaskExecutor();
+        int maxX, minX, maxY, minY;
         try {
-            String u = tpl.replace("{x}", String.valueOf(x)).replace("{y}", String.valueOf(y));
-            conn = (HttpURLConnection) new URL(u).openConnection();
-            conn.setRequestMethod("GET");
-            conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
-            conn.setConnectTimeout(MapResourceUpdater.CONNECT_TIMEOUT);
-            conn.setReadTimeout(MapResourceUpdater.READ);
+            CompletableFuture<Integer> fMaxX = CompletableFuture.supplyAsync(() -> probeAxis(client, urlTpl, 1, 0, exec), exec);
+            CompletableFuture<Integer> fMinX = CompletableFuture.supplyAsync(() -> -probeAxis(client, urlTpl, -1, 0, exec), exec);
+            CompletableFuture<Integer> fMaxY = CompletableFuture.supplyAsync(() -> probeAxis(client, urlTpl, 0, 1, exec), exec);
+            CompletableFuture<Integer> fMinY = CompletableFuture.supplyAsync(() -> -probeAxis(client, urlTpl, 0, -1, exec), exec);
+            CompletableFuture.allOf(fMaxX, fMinX, fMaxY, fMinY).join();
+            maxX = fMaxX.join();
+            minX = fMinX.join();
+            maxY = fMaxY.join();
+            minY = fMinY.join();
+        } finally {
+            exec.shutdown();
+        }
 
-            int code = conn.getResponseCode();
-            if (code == 404) return DownloadResult.notFound();
-            if (code == 200) {
-                try (InputStream in = conn.getInputStream()) {
-                    return DownloadResult.success(in.readAllBytes());
+        log.info("地图 [{}] 边界: X[{},{}] Y[{},{}] 总计 {} 瓦片",
+                tag, minX, maxX, minY, maxY,
+                (maxX - minX + 1L) * (maxY - minY + 1));
+
+        // 将矩形内所有未下载瓦片加入队列
+        for (int y = minY; y <= maxY; y++) {
+            for (int x = minX; x <= maxX; x++) {
+                if (!visited.contains(x + "," + y)) {
+                    taskQueue.offer(new int[]{x, y});
+                    progress.addTask();
                 }
             }
+        }
+    }
+
+    /**
+     * 沿 (dx,dy) 方向指数探测 + 并行三叉搜索边界。
+     * 指数阶段从 1 开始翻倍直到 404；三叉阶段每轮同时探 3 个点，范围缩小 75%。
+     * 返回从原点出发沿该方向的最大有效偏移量（正数）。
+     */
+    private static int probeAxis(HttpClient client, String urlTpl, int dx, int dy, Executor exec) {
+        int lo = 0;  // 最后一个已知有效偏移
+        int hi = 1;  // 第一个可能无效的偏移
+        while (probeOne(client, urlTpl, dx * hi, dy * hi)) {
+            lo = hi;
+            hi *= 2;
+        }
+        // 并行三叉搜索：每轮 3 个点同时探，快速缩小范围
+        while (hi - lo > 1) {
+            int span = hi - lo;
+            if (span <= 4) {
+                // 小范围退化线性扫描
+                for (int i = lo + 1; i < hi; i++) {
+                    if (!probeOne(client, urlTpl, dx * i, dy * i)) break;
+                    lo = i;
+                }
+                break;
+            }
+            int m1 = lo + span / 4;
+            int m2 = lo + span / 2;
+            int m3 = lo + span * 3 / 4;
+            // 3 点并行探测
+            CompletableFuture<Boolean> f1 = CompletableFuture.supplyAsync(
+                    () -> probeOne(client, urlTpl, dx * m1, dy * m1), exec);
+            CompletableFuture<Boolean> f3 = CompletableFuture.supplyAsync(
+                    () -> probeOne(client, urlTpl, dx * m3, dy * m3), exec);
+            boolean r2 = probeOne(client, urlTpl, dx * m2, dy * m2);
+            if (!f1.join()) {
+                hi = m1;
+            } else if (!r2) {
+                lo = m1; hi = m2;
+            } else if (!f3.join()) {
+                lo = m2; hi = m3;
+            } else {
+                lo = m3;
+            }
+        }
+        return lo;
+    }
+
+    /** 探测单个瓦片：下载并记录，返回 true 表示该瓦片存在 */
+    private static boolean probeOne(HttpClient client, String urlTpl, int x, int y) {
+        String key = x + "," + y;
+        if (visited.contains(key)) return true;
+        DownloadResult res = download(client, x, y, urlTpl);
+        if (!res.isSuccess()) return false;
+        visited.add(key);
+        detectSize(res.getData());
+        validTiles.add(new Tile(x, y, res.getData()));
+        return true;
+    }
+    private static DownloadResult download(HttpClient client, int x, int y, String tpl) {
+        try {
+            String u = tpl.replace("{x}", String.valueOf(x)).replace("{y}", String.valueOf(y));
+            HttpRequest req = HttpRequest.newBuilder()
+                    .uri(URI.create(u))
+                    .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+                    .timeout(Duration.ofMillis(MapResourceUpdater.READ))
+                    .GET()
+                    .build();
+            HttpResponse<byte[]> resp = client.send(req, HttpResponse.BodyHandlers.ofByteArray());
+            int code = resp.statusCode();
+            if (code == 404) return DownloadResult.notFound();
+            if (code == 200) return DownloadResult.success(resp.body());
         } catch (IOException e) {
             // 单次失败不重试
-        } finally {
-            if (conn != null) conn.disconnect();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
         return DownloadResult.failed();
     }
@@ -298,10 +377,4 @@ public class MapDownloader {
         tileW = tileH = -1;
     }
 
-    private static void sleep(long ms) {
-        try {
-            Thread.sleep(ms);
-        } catch (InterruptedException ignored) {
-        }
-    }
 }
