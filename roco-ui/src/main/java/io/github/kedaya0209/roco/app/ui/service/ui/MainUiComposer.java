@@ -31,7 +31,6 @@ import javafx.scene.image.Image;
 import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.StackPane;
-import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.SVGPath;
 import javafx.stage.Stage;
@@ -157,11 +156,14 @@ public final class MainUiComposer {
         uiAnimator.setupSidebarToggle(menuBtn, sidebarModal, sidebar);
         sidebar.setAnimator(uiAnimator);
 
-        VBox uiOverlay = new VBox(titleBar);
+        AnchorPane uiOverlay = new AnchorPane(titleBar);
         uiOverlay.setPickOnBounds(false);
-        uiOverlay.setViewOrder(-15); // 永远在侧边栏 ModalPane 之上
-        uiOverlay.setMinHeight(40);
-        uiOverlay.setAlignment(Pos.TOP_CENTER);
+        uiOverlay.setViewOrder(-15); // 值越低渲染越靠后（底层），配合 children 列表顺序（最后=最上层）使用
+        uiOverlay.setMaxHeight(TitleBar.HEIGHT); // 防止 StackPane 纵向拉伸
+        StackPane.setAlignment(uiOverlay, Pos.TOP_LEFT); // 钉在左上角
+        AnchorPane.setTopAnchor(titleBar, 0.0);
+        AnchorPane.setLeftAnchor(titleBar, 0.0);
+        AnchorPane.setRightAnchor(titleBar, 0.0);
 
         AnchorPane resizeLayer = new AnchorPane();
         resizeLayer.setPickOnBounds(false);

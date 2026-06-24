@@ -285,6 +285,7 @@ public class PluginDownloadManager {
         Files.createDirectories(tgtPath.getParent());
 
         // 复制新文件
+        List<Path> failedPaths = new ArrayList<>();
         try (Stream<Path> stream = Files.walk(srcPath)) {
             stream.forEach(source -> {
                 try {
@@ -295,9 +296,15 @@ public class PluginDownloadManager {
                         Files.copy(source, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
                     }
                 } catch (IOException e) {
+                    failedPaths.add(source);
                     log.warn("复制文件失败: {}", source, e);
                 }
             });
+        }
+
+        if (!failedPaths.isEmpty()) {
+            throw new IOException("插件文件替换失败，以下文件无法写入: " + failedPaths
+                    + "。请确保插件进程已关闭后重试。");
         }
 
         log.info("插件目录已替换: {}", targetDir);

@@ -94,10 +94,6 @@ public class ModernCanvasApp extends Application {
     private StackPane rootStack;
     private Stage primaryStage;
 
-    static void main(String[] args) {
-        launch(args);
-    }
-
     public static HostServices hostServices() {
         return appHostServices;
     }
@@ -337,18 +333,6 @@ public class ModernCanvasApp extends Application {
         PluginUpdateManager pm = PluginUpdateManager.getInstance();
         pm.setUiDelegate(new PluginUpdateHandler(rootStack));
         pm.checkAllPlugins(true);
-
-        // 插件启用/禁用与 NativeProcess 联动
-        pm.setOnPluginDisabled(id -> {
-            if ("sniffer".equals(id)) {
-                pcapBridgeManager.stop();
-            }
-        });
-        pm.setOnPluginEnabled(id -> {
-            if ("sniffer".equals(id) && VersionManager.getInstance().getCurrentMode() == VersionMode.ADVANCED) {
-                pcapBridgeManager.init(SocketServer.instance().getPort(), null);
-            }
-        });
 
         // UI 完全就绪后补设任务栏图标（start() 阶段 HWND 可能未就绪）
         initTaskbarIcon();

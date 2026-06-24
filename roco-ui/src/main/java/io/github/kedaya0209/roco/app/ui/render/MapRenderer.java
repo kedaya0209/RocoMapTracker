@@ -34,6 +34,9 @@ import java.util.List;
 @Slf4j
 public class MapRenderer {
 
+    /** 默认地图尺寸（init 中会被实际尺寸替换） */
+    private static final int DEFAULT_MAP_SIZE = 8192;
+
     @Getter
     private final Pane parent;
     private final Group worldGroup;
@@ -47,7 +50,6 @@ public class MapRenderer {
 
     private final IconLayerManager iconLayerManager;
     private final PlayerRenderer playerRenderer;
-    private final RouteRenderer routeRenderer;
     private final HoverRenderer hoverRenderer;
     private final List<RenderLayer> renderLayers;
 
@@ -65,7 +67,7 @@ public class MapRenderer {
         this.parent = parent;
 
         worldGroup = new Group();
-        tileManager = new TileManager(worldGroup, 8192, 8192);
+        tileManager = new TileManager(worldGroup, DEFAULT_MAP_SIZE, DEFAULT_MAP_SIZE);
         worldGroup.setPickOnBounds(false);
         // 变换链：Rotate × Translate × Scale (从右到左作用)
         worldScale = new Scale(1, 1, 0, 0);
@@ -77,7 +79,7 @@ public class MapRenderer {
 
         iconLayerManager = new IconLayerManager(worldGroup);
         playerRenderer = new PlayerRenderer();
-        routeRenderer = new RouteRenderer(parent);
+        RouteRenderer routeRenderer = new RouteRenderer(parent);
         hoverRenderer = new HoverRenderer(parent);
         renderLayers = List.of(playerRenderer, routeRenderer, iconLayerManager, hoverRenderer);
 
@@ -134,74 +136,110 @@ public class MapRenderer {
         MapContext mm = MapContext.getInstance();
         ViewportState vp = ViewportState.getInstance();
 
-        // 局部视口边界约束（确保不滑出活跃子图区域）
         clampToLocalBounds(mm);
+        updateNavMode(vp, cam);
 
-        // 导航模式：每帧更新旋转控制
-        if (vp.isPlayerInitialized()) {
-            navigationController.update(vp.getPlayerAngle(), vp.isNavMode());
-        }
-
-        // 帧同步：navAngle 从 CameraContext → ViewportState
-        vp.setNavAngle(cam.getNavAngle());
         double ox = mm.getOffsetX();
         double oy = mm.getOffsetY();
         double scale = mm.getScale();
 
-        // 跟随模式下对视口 offset 插值，消除匹配间隔导致的视口离散跳跃
-        if (cam.isFollowMode()) {
-            if (Double.isNaN(lerpOx)) {
-                lerpOx = ox;
-                lerpOy = oy;
-            } else {
-                double dox = ox - lerpOx;
-                double doy = oy - lerpOy;
-                if (dox * dox + doy * doy > 2500) {
-                    lerpOx = ox;
-                    lerpOy = oy;
-                } else {
-                    lerpOx += dox * VIEWPORT_LERP;
-                    lerpOy += doy * VIEWPORT_LERP;
-                }
-            }
-            ox = lerpOx;
-            oy = lerpOy;
-        } else {
-            // 手动拖拽时重置插值状态
-            lerpOx = Double.NaN;
-        }
-
-        // 转换为子图局部坐标（始终在大陆空间，offsetY=0）
-        double localOy = oy;
+        double[] interp = interpolateFollowOffset(ox, oy, cam.isFollowMode());
+        ox = interp[0];
+        oy = interp[1];
 
         // 首帧适配
-        if (firstFrame) {
-            if (parent.getWidth() > 0 && parent.getHeight() > 0) {
-                firstFrame = false;
-                autoFitViewport(mm);
-                ox = mm.getOffsetX();
-                oy = mm.getOffsetY();
-                scale = mm.getScale();
-                vp.syncFromMapContext();
-                log.info("首帧 view={}x{} scale={} ox={} oy={}",
-                        (int) parent.getWidth(), (int) parent.getHeight(),
-                        String.format("%.4f", scale), ox, oy);
-            }
+        if (firstFrame && tryAutoFit(mm)) {
+            firstFrame = false;
+            ox = mm.getOffsetX();
+            oy = mm.getOffsetY();
+            scale = mm.getScale();
+            vp.syncFromMapContext();
+            log.info("首帧 view={}x{} scale={} ox={} oy={}",
+                    (int) parent.getWidth(), (int) parent.getHeight(),
+                    String.format("%.4f", scale), ox, oy);
         }
 
         boolean scaleChanged = Math.abs(scale - lastScale) > 1e-9;
         boolean viewportMoved = firstFrame
                 || Math.abs(ox - lastOx) > 1e-9
-                || Math.abs(localOy - lastOy) > 1e-9;
+                || Math.abs(oy - lastOy) > 1e-9;
 
-        // ====== 洞穴叠加同步 ======
+        syncCaveOverlay(mm);
+        applyTransforms(scale, ox, oy, scaleChanged, viewportMoved, vp);
+        syncViewportState(vp, scaleChanged, viewportMoved, scale, ox, oy);
+        updateRenderers(vp, scale, ox, oy);
+        updateTiles(ox, oy, scale, scaleChanged);
+
+        iconLayerManager.getNode().toFront();
+
+        lastScale = scale;
+        lastOx = ox;
+        lastOy = oy;
+    }
+
+    // ==================== 导航更新 ====================
+
+    private void updateNavMode(ViewportState vp, CameraContext cam) {
+        if (vp.isPlayerInitialized()) {
+            navigationController.update(vp.getPlayerAngle(), vp.isNavMode());
+        }
+        vp.setNavAngle(cam.getNavAngle());
+    }
+
+    // ==================== 跟随插值 ====================
+
+    /**
+     * 跟随模式下对视口 offset 插值，消除匹配间隔导致的视口离散跳跃。
+     * 返回 [ox, oy]。
+     */
+    private double[] interpolateFollowOffset(double ox, double oy, boolean followMode) {
+        if (!followMode) {
+            lerpOx = Double.NaN;
+            return new double[]{ox, oy};
+        }
+        double[] result = lerpPoint(lerpOx, lerpOy, ox, oy, VIEWPORT_LERP, 2500);
+        lerpOx = result[0];
+        lerpOy = result[1];
+        return result;
+    }
+
+    // ==================== 工具方法 ====================
+
+    /**
+     * 二维指数平滑。current 为 NaN 或距离超过 thresholdSq 时直接吸附到 target。
+     */
+    static double[] lerpPoint(double currentX, double currentY,
+                               double targetX, double targetY,
+                               double factor, double thresholdSq) {
+        if (Double.isNaN(currentX)) {
+            return new double[]{targetX, targetY};
+        }
+        double dx = targetX - currentX;
+        double dy = targetY - currentY;
+        if (dx * dx + dy * dy > thresholdSq) {
+            return new double[]{targetX, targetY};
+        }
+        return new double[]{currentX + dx * factor, currentY + dy * factor};
+    }
+
+    // ==================== 首帧适配 ====================
+
+    private boolean tryAutoFit(MapContext mm) {
+        if (parent.getWidth() > 0 && parent.getHeight() > 0) {
+            autoFitViewport(mm);
+            return true;
+        }
+        return false;
+    }
+
+    // ==================== 洞穴叠加 ====================
+
+    private void syncCaveOverlay(MapContext mm) {
         int activeLayer = mm.getActiveLayer();
         if (activeLayer >= 0) {
-            // 手动图层覆盖：支持层内全部洞穴或单个洞穴（overrideCaveIndex）
             java.util.List<String> caveDirs = mm.getCaveDirsToRender();
             tileManager.setLayerOverlay(activeLayer, caveDirs);
         } else if (mm.isCaveMode() && mm.getMultiMapMetadata() != null) {
-            // 自动模式 — 跟随匹配结果，显示单个洞穴
             int idx = mm.getCaveIndex();
             String caveDir = "";
             if (idx >= 0) {
@@ -215,18 +253,22 @@ public class MapRenderer {
         } else {
             tileManager.setLayerOverlay(-1, java.util.List.of());
         }
+    }
 
-        // ====== GPU 变换（局部坐标系） ======
+    // ==================== GPU 变换 ====================
+
+    private void applyTransforms(double scale, double ox, double oy,
+                                  boolean scaleChanged, boolean viewportMoved,
+                                  ViewportState vp) {
         if (scaleChanged) {
             worldScale.setX(scale);
             worldScale.setY(scale);
         }
         if (viewportMoved) {
             worldTranslate.setX(ox);
-            worldTranslate.setY(localOy);
+            worldTranslate.setY(oy);
         }
 
-        // ====== 导航模式旋转 ======
         if (vp.isNavMode()) {
             double pivotX = parent.getWidth() / 2;
             double pivotY = parent.getHeight() / 2;
@@ -237,8 +279,13 @@ public class MapRenderer {
         } else if (worldRotate.getAngle() != 0) {
             worldRotate.setAngle(0);
         }
+    }
 
-        // ====== 帧同步 ViewportState（仅在值变化时 set，避免无效 listener 触发） ======
+    // ==================== 帧同步 ====================
+
+    private void syncViewportState(ViewportState vp, boolean scaleChanged,
+                                    boolean viewportMoved, double scale,
+                                    double ox, double oy) {
         if (scaleChanged) {
             vp.setScale(scale);
         }
@@ -246,11 +293,14 @@ public class MapRenderer {
             vp.setOffsetX(ox);
             vp.setOffsetY(oy);
         }
+    }
 
-        // ====== 子渲染器快照（玩家用局部坐标） ======
+    // ==================== 渲染器更新 ====================
+
+    private void updateRenderers(ViewportState vp, double scale, double ox, double oy) {
         playerRenderer.snapshotScale = scale;
         playerRenderer.snapshotOx = ox;
-        playerRenderer.snapshotOy = localOy;
+        playerRenderer.snapshotOy = oy;
         playerRenderer.snapshotPivotX = parent.getWidth() / 2;
         playerRenderer.snapshotPivotY = parent.getHeight() / 2;
         playerRenderer.snapshotPlayerX = vp.getSmoothedPlayerX();
@@ -258,8 +308,11 @@ public class MapRenderer {
         for (RenderLayer layer : renderLayers) {
             layer.onFrame();
         }
+    }
 
-        // ====== 瓦片加载（局部坐标） ======
+    // ==================== 瓦片更新 ====================
+
+    private void updateTiles(double ox, double oy, double scale, boolean scaleChanged) {
         if (scaleChanged) {
             tileManager.onScaleChanged();
         } else {
@@ -272,16 +325,9 @@ public class MapRenderer {
             tileManager.setLastLevel(level);
         }
         if (scaleStable) {
-            tileManager.updateTiles(ox, localOy, scale, level,
+            tileManager.updateTiles(ox, oy, scale, level,
                     parent.getWidth(), parent.getHeight());
         }
-
-        // 确保图标层始终在最上层（覆盖所有瓦片包括洞穴叠加）
-        iconLayerManager.getNode().toFront();
-
-        lastScale = scale;
-        lastOx = ox;
-        lastOy = localOy;
     }
 
     // ==================== 视口适配 ====================
