@@ -178,21 +178,10 @@ public class PlayerRenderer implements RenderLayer {
             }
             // 渲染侧位置插值：每帧向快照（EMA 平滑后的匹配坐标）lerp，
             // 消除匹配更新间的离散跳跃，使箭头移动位移量均匀一致
-            if (Double.isNaN(renderX)) {
-                renderX = snapshotPlayerX;
-                renderY = snapshotPlayerY;
-            } else {
-                double dx = snapshotPlayerX - renderX;
-                double dy = snapshotPlayerY - renderY;
-                // 快照跳跃超过 50px 时视为位置重置（如洞穴切换），直接吸附
-                if (dx * dx + dy * dy > 2500) {
-                    renderX = snapshotPlayerX;
-                    renderY = snapshotPlayerY;
-                } else {
-                    renderX += dx * LERP_FACTOR;
-                    renderY += dy * LERP_FACTOR;
-                }
-            }
+            double[] lerped = MapRenderer.lerpPoint(renderX, renderY,
+                    snapshotPlayerX, snapshotPlayerY, LERP_FACTOR, 2500);
+            renderX = lerped[0];
+            renderY = lerped[1];
             double px = renderX;
             double py = renderY;
             playerView.setLayoutX(px - halfW);

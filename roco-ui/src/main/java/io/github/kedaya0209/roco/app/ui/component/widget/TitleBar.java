@@ -61,7 +61,7 @@ import lombok.extern.slf4j.Slf4j;
 public class TitleBar extends HBox {
 
     /** 标题栏高度（像素），与 WindowHitTestHelper 穿透区域划分一致 */
-    private static final int TITLE_BAR_HEIGHT = 40;
+    public static final int HEIGHT = 40;
 
     private double xOffset = 0;
     private double yOffset = 0;
@@ -104,7 +104,7 @@ public class TitleBar extends HBox {
         super(12);
         this.stageRef = stage;
 
-        setMinHeight(TITLE_BAR_HEIGHT);
+        setMinHeight(HEIGHT);
         setAlignment(Pos.CENTER_LEFT);
         setPadding(new Insets(5, 10, 5, 10));
         setStyle("-fx-background-color: -color-bg-default; -fx-border-color: -color-border-muted; -fx-border-width: 0 0 1 0;");
@@ -168,11 +168,11 @@ public class TitleBar extends HBox {
                 // 鼠标事件过滤器：仅消费内容区事件阻止 UI 交互
                 if (cursorFilter == null) {
                     cursorFilter = e -> {
-                        if (e.getSceneY() > TITLE_BAR_HEIGHT) e.consume();
+                        if (e.getSceneY() > HEIGHT) e.consume();
                     };
                 }
                 scene.addEventFilter(MouseEvent.ANY, cursorFilter);
-                WindowHitTestHelper.enablePartialPassthrough(stage, TITLE_BAR_HEIGHT);
+                WindowHitTestHelper.enablePartialPassthrough(stage, HEIGHT);
 
                 // AnimationTimer 每帧轮询 Win32 GetCursorPos + GetWindowRect，
                 // 纯 Win32 判断光标是否在内容区，当在内容区时调用 ShowCursor(FALSE) 全局隐藏。
@@ -180,7 +180,7 @@ public class TitleBar extends HBox {
                 cursorEnforcer = new AnimationTimer() {
                     @Override
                     public void handle(long now) {
-                        if (WindowHitTestHelper.isCursorOverContentArea(TITLE_BAR_HEIGHT)) {
+                        if (WindowHitTestHelper.isCursorOverContentArea(HEIGHT)) {
                             if (cursorShown) {
                                 WindowHitTestHelper.hideSystemCursor();
                                 cursorShown = false;

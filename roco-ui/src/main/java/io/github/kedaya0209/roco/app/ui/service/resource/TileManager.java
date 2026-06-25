@@ -53,7 +53,6 @@ public class TileManager {
     private int scaleStableFrames = 0;
 
     private String mainlandTileDir;
-    private boolean hasMultiMap = false;
 
     // 洞穴模式状态
     private boolean caveMode = false;
@@ -82,7 +81,6 @@ public class TileManager {
      */
     public void initFromMetadata(CompositeMapMetadata metadata) {
         if (metadata == null || metadata.subImages().isEmpty()) return;
-        this.hasMultiMap = true;
         // 寻找大陆子图（第一个非洞穴子图），否则用子图0
         CompositeMapMetadata.SubImageInfo mainland = metadata.subImages().stream()
                 .filter(s -> !s.isCave())

@@ -112,7 +112,6 @@ public class PluginManagementView {
                 AppEvents.publish(StatusEvent.class,
                         new StatusEvent("检查完成", NotificationType.INFO));
             }));
-            mgr.scanPlugins();
             mgr.checkAllPlugins(true);
         });
 

@@ -5,6 +5,7 @@ import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import net.jcip.annotations.ThreadSafe;
 
+import io.github.kedaya0209.roco.app.process.PluginProcessHandler;
 import io.github.kedaya0209.roco.app.utils.FilePathUtil;
 import java.io.File;
 import java.io.IOException;
@@ -81,10 +82,15 @@ public class PluginUpdateManager {
     @Setter
     private volatile Runnable onCheckComplete;
 
+    /** 插件进程处理程序注册表 — 扫描时自动从 metadata entry 注册 */
+    @Getter
+    private final PluginProcessHandler processHandler;
+
     private PluginUpdateManager() {
         this.scanner = new PluginScanner();
         this.checker = new PluginUpdateChecker();
         this.downloader = new PluginDownloadManager();
+        this.processHandler = new PluginProcessHandler();
         startWatching();
         // 预加载：后台扫描一次插件，用户打开管理页面时缓存已就绪
         Thread.ofPlatform().daemon(true).name("plugin-preload").start(() -> {
@@ -207,6 +213,12 @@ public class PluginUpdateManager {
             pluginCache.clear();
             for (PluginInfo p : plugins) {
                 pluginCache.put(p.id(), p);
+                // 有入口可执行文件的插件自动注册进程启停
+                if (p.entry() != null && !p.entry().isEmpty()
+                        && !processHandler.hasStopHandler(p.id())) {
+                    String entryPath = new File(p.pluginDir(), p.entry()).getAbsolutePath();
+                    processHandler.registerEntry(p.id(), entryPath, p.pluginDir().getAbsolutePath());
+                }
             }
             return plugins;
         } finally {
@@ -376,6 +388,28 @@ public class PluginUpdateManager {
 
         Thread.ofPlatform().daemon(true).name("plugin-download-" + pluginId).start(() -> {
             try {
+                boolean wasRunning = isPluginRunning(pluginId);
+
+                // 如果插件正在运行，先关闭再更新
+                if (wasRunning) {
+                    PluginProcessHandler ph = processHandler;
+                    if (ph != null && ph.hasStopHandler(pluginId)) {
+                        log.info("插件 {} 正在运行，更新前先关闭...", pluginId);
+                        ph.stopPlugin(pluginId);
+                        // 短等待确保进程资源释放
+                        try {
+                            Thread.sleep(500);
+                        } catch (InterruptedException ie) {
+                            Thread.currentThread().interrupt();
+                        }
+                    } else {
+                        log.warn("插件 {} 正在运行，但未配置停止回调，跳过更新", pluginId);
+                        downloading.set(false);
+                        processDownloadQueue();
+                        return;
+                    }
+                }
+
                 downloader.downloadAndInstall(update,
                         progress -> {
                             downloadProgress.put(pluginId, progress);
@@ -399,6 +433,14 @@ public class PluginUpdateManager {
                             scanPlugins();
                             cacheVersion.incrementAndGet();
                             log.info("插件 {} 更新成功: {}", pluginId, update.version());
+                            // 更新前在运行中，更新后自动重启
+                            if (wasRunning) {
+                                PluginProcessHandler ph = processHandler;
+                                if (ph != null) {
+                                    log.info("插件 {} 更新完成，重新启动...", pluginId);
+                                    ph.onPluginEnabled(pluginId);
+                                }
+                            }
                             // 下载涉及大量文件 I/O 和 JSON 解析，Serial GC 惰性收缩，
                             // 显式触发 full GC 回收临时分配的堆内存
                             System.gc();
@@ -545,6 +587,8 @@ public class PluginUpdateManager {
                         opt.get().source(), opt.get().assets(), PluginStatus.NORMAL,
                         opt.get().pluginDir()));
                 if (onPluginEnabled != null) onPluginEnabled.accept(pluginId);
+                PluginProcessHandler ph = processHandler;
+                if (ph != null) ph.onPluginEnabled(pluginId);
             }
             return removed;
         } else {
@@ -556,6 +600,8 @@ public class PluginUpdateManager {
                         opt.get().source(), opt.get().assets(), PluginStatus.DISABLED,
                         opt.get().pluginDir()));
                 if (onPluginDisabled != null) onPluginDisabled.accept(pluginId);
+                PluginProcessHandler ph = processHandler;
+                if (ph != null) ph.onPluginDisabled(pluginId);
                 return true;
             } catch (Exception e) {
                 log.warn("禁用插件 {} 失败", pluginId, e);
