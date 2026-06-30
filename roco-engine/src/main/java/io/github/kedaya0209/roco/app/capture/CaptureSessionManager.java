@@ -1,5 +1,7 @@
 package io.github.kedaya0209.roco.app.capture;
 
+import lombok.Getter;
+import lombok.Setter;
 import net.jcip.annotations.NotThreadSafe;
 import io.github.kedaya0209.roco.app.socket.SocketSession;
 import lombok.extern.slf4j.Slf4j;
@@ -13,6 +15,8 @@ import lombok.extern.slf4j.Slf4j;
 public class CaptureSessionManager {
 
     private volatile SocketSession session;
+    @Setter
+    @Getter
     private volatile boolean handshakeDone;
 
     /**
@@ -46,12 +50,12 @@ public class CaptureSessionManager {
         return session != null && !session.isClosed();
     }
 
-    public boolean isHandshakeDone() {
-        return handshakeDone;
-    }
-
-    public void setHandshakeDone(boolean done) {
-        this.handshakeDone = done;
+    /**
+     * 判断给定的 session 是否为当前活跃的会话。
+     * 用于避免旧 session 的断开回调误触发重启。
+     */
+    public boolean isCurrentSession(SocketSession s) {
+        return session != null && s != null && session.id() == s.id();
     }
 
     /**

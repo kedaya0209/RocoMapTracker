@@ -129,12 +129,17 @@ public class CaptureHandler {
 
     private void onDisconnect(SocketSession session, String reason) {
         log.warn("CaptureHandler 断开连接: {}", reason);
+
+        boolean isCurrent = sessionManager.isCurrentSession(session);
+
         sessionManager.onDisconnect();
         if (stateCallback != null) {
             stateCallback.onStateChange(false, reason);
         }
+
         // 有意停止（黑帧检测/用户手动停止）不触发自动重启，由 watchdog 以 5s 间隔兜底
-        if (!intentionalStop) {
+        // isCurrent 检查防止 switchTarget 时旧 session 异步断开误触发重启
+        if (!intentionalStop && isCurrent) {
             CaptureLaunchParams params = launchParams;
             if (params != null) {
                 restartHelper.restartAsync(server,

@@ -18,7 +18,11 @@ import io.github.kedaya0209.roco.app.ui.command.ViewportCommands.ResetViewportCo
 import io.github.kedaya0209.roco.app.ui.command.ViewportCommands.SetViewportSizeCommand;
 import io.github.kedaya0209.roco.app.ui.command.ViewportCommands.ZoomViewportCommand;
 import io.github.kedaya0209.roco.app.ui.component.overlay.ResourceCounterPanel;
+import io.github.kedaya0209.roco.app.ui.component.sidebar.UiAnimator;
 import io.github.kedaya0209.roco.app.ui.component.widget.FloatToolbox;
+import io.github.kedaya0209.roco.app.ui.component.widget.WindowSwitchPanel;
+import io.github.kedaya0209.roco.app.ui.service.lifecycle.CaptureServiceManager;
+import io.github.kedaya0209.roco.app.platform.WindowFinder;
 import io.github.kedaya0209.roco.app.ui.service.VersionMode;
 import io.github.kedaya0209.roco.app.ui.service.lifecycle.PcapBridgeManager;
 import io.github.kedaya0209.roco.app.ui.service.ui.SnifferInstallService;
@@ -42,14 +46,18 @@ public final class CommandHandlers {
     private static volatile boolean initialized = false;
     private static StackPane rootStack;
     private static PcapBridgeManager pcapBridgeManager;
+    private static CaptureServiceManager captureServiceManager;
+    private static UiAnimator uiAnimator;
 
     private CommandHandlers() {
     }
 
-    public static void init(StackPane rootStack, PcapBridgeManager pm) {
+    public static void init(StackPane rootStack, PcapBridgeManager pm, CaptureServiceManager csm, UiAnimator animator) {
         if (initialized) return;
         CommandHandlers.rootStack = rootStack;
         CommandHandlers.pcapBridgeManager = pm;
+        CommandHandlers.captureServiceManager = csm;
+        CommandHandlers.uiAnimator = animator;
         initialized = true;
 
         registerAppHandlers();
@@ -106,6 +114,20 @@ public final class CommandHandlers {
 
         CommandBus.subscribe(SetLayerCommand.class, cmd -> {
             MapContext.getInstance().setActiveLayer(cmd.layer());
+        });
+
+        CommandBus.subscribe(SwitchWindowCommand.class, cmd -> {
+            if (rootStack == null || captureServiceManager == null) return;
+            // 关闭侧边栏，让切换面板有更大的展示空间
+            if (uiAnimator != null) {
+                uiAnimator.closeSidebar();
+            }
+            long activeHwnd = captureServiceManager.getTargetHwnd();
+            if (activeHwnd <= 0) {
+                activeHwnd = WindowFinder.findWindowByKeyword(CaptureConfig.TARGET_WINDOW_NAME);
+            }
+            WindowSwitchPanel.getInstance().showPanel(rootStack, activeHwnd,
+                    captureServiceManager::switchTarget);
         });
     }
 

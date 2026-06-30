@@ -90,6 +90,22 @@ public class CaptureServiceManager {
     }
 
     /**
+     * 切换截图目标到指定窗口。
+     *
+     * @param newHwnd 目标窗口 HWND
+     * @return 切换是否成功
+     */
+    public boolean switchTarget(long newHwnd) {
+        if (captureService == null) return false;
+        return captureService.switchTarget(newHwnd);
+    }
+
+    /** 获取当前截图目标 HWND（共享上下文） */
+    public long getTargetHwnd() {
+        return captureService != null ? captureService.getTargetHwnd() : 0;
+    }
+
+    /**
      * 停止截图服务
      */
     public void stop() {
