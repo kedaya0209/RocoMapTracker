@@ -41,6 +41,8 @@ public class CaptureService implements FullFrameControl {
     private final CaptureHandler handler = new CaptureHandler(SocketServer.instance(), NativeProcess::create);
     private final CaptureHandler.FrameCallback frameCallback;
     private final CaptureHandler.StateCallback stateCallback;
+    /** 当前截图目标窗口 HWND（共享上下文），为 0 时由 tryConnect 自动查找 */
+    private volatile long targetHwnd = 0;
     private ROIData[] cachedRois;
     /**
      * 全帧模式下，全帧数据在帧数据中的索引位置 (= ROIs 数量)
@@ -145,6 +147,8 @@ public class CaptureService implements FullFrameControl {
 
     /**
      * 查找窗口 → 启动 capture.exe → 由 SocketServer 已注册的 CaptureHandler 接管通信
+     * <p>HWND 优先使用 {@link #targetHwnd}（切换窗口时由 WindowSwitchPanel 更新），
+     * 为 0 时通过 WindowFinder 按窗口标题自动查找。</p>
      */
     public boolean tryConnect() {
         // 兜底：看门狗重连时如果状态机卡在 READY（例如前一次 stop() 未触发断开回调），
@@ -155,7 +159,7 @@ public class CaptureService implements FullFrameControl {
                     new StatusEvent("capture断开", NotificationType.ERROR, StatusEvent.DisplayMode.CAROUSEL));
         }
 
-        long hwnd = WindowFinder.findWindowByKeyword(windowTitle);
+        long hwnd = targetHwnd > 0 ? targetHwnd : WindowFinder.findWindowByKeyword(windowTitle);
         if (hwnd <= 0) {
             StatusStateMachine.getInstance().cascadeTransition(StatusKey.CAPTURE, State.RETRY);
             AppEvents.publish(StatusEvent.class,
@@ -237,6 +241,26 @@ public class CaptureService implements FullFrameControl {
      */
     public int getProcessPid() {
         return handler.getProcessPid();
+    }
+
+    /**
+     * 切换截图目标窗口。
+     * 仅更新共享 HWND 后停止当前 capture.exe，由自动重启逻辑通过 {@link #tryConnect()} 重连。
+     *
+     * @param newHwnd 新窗口 HWND
+     * @return 切换是否成功
+     */
+    public boolean switchTarget(long newHwnd) {
+        if (newHwnd <= 0) return false;
+        log.info("切换截图目标: newHwnd=0x{}", Long.toHexString(newHwnd));
+        this.targetHwnd = newHwnd;
+        handler.stop();
+        return tryConnect();
+    }
+
+    /** 获取当前共享 HWND */
+    public long getTargetHwnd() {
+        return targetHwnd;
     }
 
     public void stop() {

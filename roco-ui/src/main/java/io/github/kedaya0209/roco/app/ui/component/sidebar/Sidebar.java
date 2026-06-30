@@ -8,6 +8,8 @@ import io.github.kedaya0209.roco.app.ui.component.dialog.AboutDialog;
 import io.github.kedaya0209.roco.app.ui.component.setting.SettingsStage;
 import io.github.kedaya0209.roco.app.ui.component.widget.RouteManagerStage;
 import io.github.kedaya0209.roco.app.ui.service.ui.ThemeManager;
+import io.github.kedaya0209.roco.app.ui.command.AppCommands.SwitchWindowCommand;
+import io.github.kedaya0209.roco.app.ui.command.CommandBus;
 import io.github.kedaya0209.roco.app.ui.state.AppState;
 import io.github.kedaya0209.roco.app.ui.state.ViewportState;
 import javafx.application.Platform;
@@ -100,6 +102,9 @@ public class Sidebar extends VBox {
                 null, null, null, false, "/icon/settings.svg", this::openSettings));
         items.add(new SidebarItem(SidebarItem.Type.ACTION, "版本切换",
                 null, null, null, false, "/icon/change.svg", this::onVersionSwitchClick));
+        items.add(new SidebarItem(SidebarItem.Type.ACTION, "切换窗口",
+                null, null, null, false, "/icon/window.svg",
+                () -> CommandBus.dispatch(new SwitchWindowCommand())));
 
         // 分类菜单
         items.add(new SidebarItem(SidebarItem.Type.HEADER, "匹配算法选择",

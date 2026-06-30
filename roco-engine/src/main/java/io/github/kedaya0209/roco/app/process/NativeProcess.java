@@ -36,7 +36,6 @@ public class NativeProcess {
     private static final MethodHandle DELETE_PROC_THREAD_ATTRIBUTE_LIST;
     private static final MethodHandle GET_LAST_ERROR;
     private static final MethodHandle READ_FILE;
-    private static final MethodHandle OPEN_PROCESS;
     private static final MethodHandle SET_PRIORITY_CLASS;
     private static final MethodHandle SET_HANDLE_INFORMATION;
 
@@ -123,11 +122,6 @@ public class NativeProcess {
             GET_LAST_ERROR = LINKER.downcallHandle(
                     KERNEL32.find("GetLastError").orElseThrow(),
                     FunctionDescriptor.of(ValueLayout.JAVA_INT));
-
-            OPEN_PROCESS = LINKER.downcallHandle(
-                    KERNEL32.find("OpenProcess").orElseThrow(),
-                    FunctionDescriptor.of(ValueLayout.JAVA_LONG,
-                            ValueLayout.JAVA_INT, ValueLayout.JAVA_INT, ValueLayout.JAVA_INT));
 
             SET_PRIORITY_CLASS = LINKER.downcallHandle(
                     KERNEL32.find("SetPriorityClass").orElseThrow(),
@@ -424,8 +418,12 @@ public class NativeProcess {
         if (destroyed) return;
         destroyed = true;
         try {
-            TERMINATE_PROCESS.invoke(hProcess, exitCode);
-        } catch (Throwable ignored) {
+            int ret = (int) TERMINATE_PROCESS.invoke(hProcess, exitCode);
+            if (ret == 0) {
+                log.warn("TerminateProcess pid={} 失败, 错误码={}", pid, lastError());
+            }
+        } catch (Throwable e) {
+            log.warn("TerminateProcess pid={} 异常: {}", pid, e.toString());
         }
         closeHandle(hProcess);
         closeHandle(hThread);

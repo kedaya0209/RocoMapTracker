@@ -45,4 +45,9 @@ public final class AppCommands {
     @ThreadSafe
     public record SetLayerCommand(int layer) implements UiCommand {
     }
+
+    /** 显示窗口选择面板（多游戏窗口切换） */
+    @ThreadSafe
+    public record SwitchWindowCommand() implements UiCommand {
+    }
 }

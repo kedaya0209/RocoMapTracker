@@ -80,15 +80,6 @@ public class CaptureProcessManager {
         }
     }
 
-    /**
-     * 强制销毁进程
-     */
-    public void destroyProcess() {
-        if (process != null && process.isAlive()) {
-            process.destroyForcibly();
-        }
-    }
-
     public boolean isAlive() {
         return process != null && process.isAlive();
     }

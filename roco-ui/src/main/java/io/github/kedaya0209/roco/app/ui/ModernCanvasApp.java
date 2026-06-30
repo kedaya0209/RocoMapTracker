@@ -16,6 +16,8 @@ import io.github.kedaya0209.roco.app.hook.event.ProgressEvent;
 import io.github.kedaya0209.roco.app.ui.command.CommandBus;
 import io.github.kedaya0209.roco.app.ui.command.CommandHandlers;
 import io.github.kedaya0209.roco.app.ui.command.SidebarCommands.SwitchVersionCommand;
+import io.github.kedaya0209.roco.app.ui.component.widget.WindowSwitchPanel;
+import io.github.kedaya0209.roco.app.platform.WindowFinder;
 import io.github.kedaya0209.roco.app.ui.hook.UiResponseHook;
 import io.github.kedaya0209.roco.app.ui.state.AppState;
 import io.github.kedaya0209.roco.app.ui.state.StateBridge;
@@ -51,8 +53,10 @@ import java.io.InputStream;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
+import java.util.List;
 import io.github.kedaya0209.roco.app.utils.ResourceExtractor;
 
+import javafx.animation.PauseTransition;
 import javafx.application.Application;
 import javafx.application.HostServices;
 import javafx.application.Platform;
@@ -64,6 +68,7 @@ import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
+import javafx.util.Duration;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -301,7 +306,7 @@ public class ModernCanvasApp extends Application {
      */
     private void buildMainUi() {
         StateBridge.init();
-        CommandHandlers.init(rootStack, pcapBridgeManager);
+        CommandHandlers.init(rootStack, pcapBridgeManager, captureServiceManager, uiAnimator);
         MainUiComposer.UiBuildResult result = MainUiComposer.buildMainUI(primaryStage, rootStack, windowManager, uiAnimator);
 
         siftClientManager.init();
@@ -334,6 +339,9 @@ public class ModernCanvasApp extends Application {
         pm.setUiDelegate(new PluginUpdateHandler(rootStack));
         pm.checkAllPlugins(true);
 
+        // 多窗口检测：启动后自动弹出选择面板
+        autoDetectMultiWindow();
+
         // UI 完全就绪后补设任务栏图标（start() 阶段 HWND 可能未就绪）
         initTaskbarIcon();
 
@@ -344,7 +352,40 @@ public class ModernCanvasApp extends Application {
         log.info("主界面构建完成");
     }
 
+    /**
+     * 启动后检测是否存在多个游戏窗口，是则自动弹出选择面板。
+     * 使用指数退避重试，覆盖窗口在 RocoMapTracker 之后启动的场景。
+     */
+    private void autoDetectMultiWindow() {
+        retryMultiWindowDetect(0);
+    }
 
+    private void retryMultiWindowDetect(int attempt) {
+        // 最多重试 8 次，间隔 ~1.5s（约 12 秒内放弃）
+        if (attempt >= 8) {
+            log.info("多窗口检测: 已重试 {} 次未发现多窗口，停止检测", attempt);
+            return;
+        }
+
+        List<Long> hwnds = WindowFinder.findWindowsByKeyword(CaptureConfig.TARGET_WINDOW_NAME);
+        log.info("多窗口检测 (尝试 {}/8): 找到 {} 个游戏窗口", attempt + 1, hwnds.size());
+
+        if (hwnds.size() > 1) {
+            long activeHwnd = captureServiceManager.getTargetHwnd();
+            if (activeHwnd <= 0) {
+                activeHwnd = WindowFinder.findWindowByKeyword(CaptureConfig.TARGET_WINDOW_NAME);
+            }
+            WindowSwitchPanel.getInstance().showPanel(rootStack, activeHwnd,
+                    captureServiceManager::switchTarget);
+            return;
+        }
+
+        // 延迟重试
+        javafx.animation.PauseTransition pause = new javafx.animation.PauseTransition(
+                javafx.util.Duration.seconds(1.5));
+        pause.setOnFinished(_ -> retryMultiWindowDetect(attempt + 1));
+        pause.play();
+    }
 
     @Override
     public void stop() {
