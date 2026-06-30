@@ -44,13 +44,12 @@ public class WindowSwitchPanel extends StackPane {
     private static final int PANEL_HEIGHT = 540;
     private static final int TILE_WIDTH = 220;
     private static final int TILE_HEIGHT = 200;
+    private static final int PREVIEW_HEIGHT = 140;
     private static final int TILE_GAP = 16;
-    private static final double PREVIEW_RATIO = 0.7;
-    private static final int PREVIEW_HEIGHT = (int) (TILE_HEIGHT * PREVIEW_RATIO);
     private static final int MAX_TILES = 9;
     private static final int PADDING = 24;
     private static final int TILES_PER_ROW = 3;
-    private static final int PREVIEW_FPS = 2;
+    private static final int PREVIEW_FPS = 60;
 
     private static volatile WindowSwitchPanel instance;
 
@@ -63,7 +62,6 @@ public class WindowSwitchPanel extends StackPane {
     private Consumer<Long> onSelected;
     private VBox tileContainer;
     private Label helpLabel;
-    private VBox contentPanel;
     private StackPane rootStack;
     private EventHandler<KeyEvent> keyHandler;
 
@@ -233,7 +231,7 @@ public class WindowSwitchPanel extends StackPane {
             PixelWriter pw = wi.getPixelWriter();
             pw.setPixels(0, 0, TILE_WIDTH, PREVIEW_HEIGHT,
                     PixelFormat.getByteBgraPreInstance(),
-                    scaled, 0, TILE_WIDTH * 4);
+                        scaled, 0, TILE_WIDTH * 4);
             td.previewView.setImage(wi);
         });
     }
@@ -282,7 +280,7 @@ public class WindowSwitchPanel extends StackPane {
     // ===== 内容初始化 =====
 
     private void initContent() {
-        contentPanel = new VBox(0);
+        VBox contentPanel = new VBox(0);
         contentPanel.setBackground(new Background(new BackgroundFill(
                 Color.rgb(25, 25, 35, 0.96), new CornerRadii(16), Insets.EMPTY)));
         contentPanel.setBorder(new Border(new BorderStroke(
@@ -515,11 +513,11 @@ public class WindowSwitchPanel extends StackPane {
     // ===== 辅助方法 =====
 
     private String buildTileStyle(boolean selected) {
-        String base = "-fx-background-radius: 10; -fx-background-color: rgba(255,255,255,0.06); ";
         if (selected) {
-            return base + "-fx-effect: dropshadow(gaussian, #60a5fa, 6, 0.7, 0, 0);";
+            return "-fx-background-radius: 10; -fx-background-color: rgba(255,255,255,0.06); " +
+                    "-fx-border-color: #60a5fa; -fx-border-width: 2; -fx-border-radius: 10;";
         }
-        return base;
+        return "-fx-background-radius: 10; -fx-background-color: rgba(255,255,255,0.06);";
     }
 
     private void updateHelpText() {
