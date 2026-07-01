@@ -227,7 +227,11 @@ public class WindowSwitchPanel extends StackPane {
             TileData td = findTileByHwnd(hwnd);
             if (td == null) return;
 
-            WritableImage wi = new WritableImage(TILE_WIDTH, PREVIEW_HEIGHT);
+            WritableImage wi = td.cachedImage;
+            if (wi == null) {
+                wi = new WritableImage(TILE_WIDTH, PREVIEW_HEIGHT);
+                td.cachedImage = wi;
+            }
             PixelWriter pw = wi.getPixelWriter();
             pw.setPixels(0, 0, TILE_WIDTH, PREVIEW_HEIGHT,
                     PixelFormat.getByteBgraPreInstance(),
@@ -238,7 +242,7 @@ public class WindowSwitchPanel extends StackPane {
 
     private TileData findTileByHwnd(long hwnd) {
         for (TileData td : tiles) {
-            if (td.hwnd() == hwnd) return td;
+            if (td.hwnd == hwnd) return td;
         }
         return null;
     }
@@ -534,5 +538,16 @@ public class WindowSwitchPanel extends StackPane {
 
     // ===== 内部数据结构 =====
 
-    private record TileData(Node node, ImageView previewView, long hwnd) {}
+    private static class TileData {
+        final Node node;
+        final ImageView previewView;
+        final long hwnd;
+        WritableImage cachedImage;
+
+        TileData(Node node, ImageView previewView, long hwnd) {
+            this.node = node;
+            this.previewView = previewView;
+            this.hwnd = hwnd;
+        }
+    }
 }
