@@ -74,11 +74,10 @@ jobs:
           curl.exe -L -o opencv.zip "https://github.com/opencv/opencv/archive/refs/tags/${{ env.OPENCV_VERSION }}.zip"
           powershell -Command "Expand-Archive -Path 'opencv.zip' -DestinationPath '.' -Force"
           mkdir opencv-${{ env.OPENCV_VERSION }}\build
-          pushd opencv-${{ env.OPENCV_VERSION }}\build
-          cmake -G "NMake Makefiles" -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=D:\a\opencv-install -DBUILD_SHARED_LIBS=ON -DBUILD_LIST=core,imgproc,features2d,flann,calib3d -DBUILD_opencv_python2=OFF -DBUILD_opencv_python3=OFF -DBUILD_TESTS=OFF -DBUILD_PERF_TESTS=OFF -DBUILD_EXAMPLES=OFF -DBUILD_DOCS=OFF -DBUILD_opencv_apps=OFF -DWITH_FFMPEG=OFF -DWITH_GTK=OFF -DWITH_V4L=OFF -DWITH_CUDA=OFF -DWITH_OPENCL=OFF -DWITH_QUIRC=OFF -DWITH_IPP=OFF -DBUILD_PNG=OFF -DBUILD_JPEG=OFF -DBUILD_TIFF=OFF -DBUILD_WEBP=OFF -DBUILD_OPENJPEG=OFF -DBUILD_ZLIB=OFF ..
-          nmake /NOLOGO
-          nmake install
-          popd
+          cd opencv-${{ env.OPENCV_VERSION }}\build
+          cmake -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=D:\a\opencv-install -DBUILD_SHARED_LIBS=ON -DBUILD_LIST=core,imgproc,features2d,flann,calib3d -DBUILD_opencv_python2=OFF -DBUILD_opencv_python3=OFF -DBUILD_TESTS=OFF -DBUILD_PERF_TESTS=OFF -DBUILD_EXAMPLES=OFF -DBUILD_DOCS=OFF -DBUILD_opencv_apps=OFF -DWITH_FFMPEG=OFF -DWITH_GTK=OFF -DWITH_V4L=OFF -DWITH_CUDA=OFF -DWITH_OPENCL=OFF -DWITH_QUIRC=OFF -DWITH_IPP=OFF -DBUILD_PNG=OFF -DBUILD_JPEG=OFF -DBUILD_TIFF=OFF -DBUILD_WEBP=OFF -DBUILD_OPENJPEG=OFF -DBUILD_ZLIB=OFF -A x64 ..
+          cmake --build . --config Release --target install -- /nologo /maxcpucount
+          cd ..\..
           dir D:\a\opencv-install\x64\vc17\lib\*.lib
         shell: cmd
 
