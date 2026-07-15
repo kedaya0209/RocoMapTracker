@@ -2,6 +2,7 @@ package io.github.kedaya0209.roco.app.platform;
 
 import io.github.kedaya0209.roco.app.config.PathConfig;
 import io.github.kedaya0209.roco.app.utils.FilePathUtil;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import net.jcip.annotations.NotThreadSafe;
 
@@ -44,10 +45,12 @@ public class PreviewCapture implements AutoCloseable {
     private Socket socket;
     private DataInputStream in;
     private DataOutputStream out;
+    @Getter
     private Thread connectorThread;
     private Thread stdoutThread;
     private Process process;
     private volatile boolean active;
+    private byte[] readBuf = new byte[0];
 
     /**
      * WGC 帧数据。
@@ -338,8 +341,11 @@ public class PreviewCapture implements AutoCloseable {
         int len = in.readInt();
         byte[] body = null;
         if (len > 0) {
-            body = new byte[len];
-            in.readFully(body);
+            if (readBuf.length != len) {
+                readBuf = new byte[len];
+            }
+            in.readFully(readBuf);
+            body = readBuf;
         }
         return new Message(type, body);
     }
