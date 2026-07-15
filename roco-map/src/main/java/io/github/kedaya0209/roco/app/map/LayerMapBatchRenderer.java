@@ -17,7 +17,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * 批量渲染 6 组 LayerMap：每组生成 8192×8192 透明图 + 遮罩图。
+ * 批量渲染 10 组 LayerMap：每组生成 8192×8192 透明图 + 遮罩图。
  * <pre>
  * 分组：
  *   信仰者村落一层 — id=4
@@ -26,6 +26,10 @@ import java.util.stream.Collectors;
  *   月兔暗港      — id=12,16
  *   二叠山丘一层  — id=10
  *   下水管道口    — id=2
+ *   火巨人洞窟   — id=17,18,19
+ *   森巨人洞窟   — id=21,22
+ *   雪巨人洞窟   — id=24
+ *   光王祭坛     — id=26
  * </pre>
  */
 @Slf4j
@@ -57,7 +61,7 @@ public class LayerMapBatchRenderer {
         String base = mapDir.endsWith("\\") || mapDir.endsWith("/") ? mapDir : mapDir + File.separator;
         this.configPath = base + "layermap_config.json";
         this.layermapDir = base + "layermap" + File.separator;
-        this.siftPath = base + "卡洛西亚大陆.png";
+        this.siftPath = base + "WorldMap_SIFT.png";
         this.outputDir = outputDir.endsWith("\\") || outputDir.endsWith("/") ? outputDir : outputDir + File.separator;
     }
 
@@ -67,14 +71,18 @@ public class LayerMapBatchRenderer {
         // 1. 加载所有图层
         List<LayerMapLayer> allLayers = loadAllLayers();
 
-        // 2. 构建 6 个分组（信仰者村落拆为一层/二层）
+        // 2. 构建 10 个分组
         List<LayerGroup> groups = Arrays.asList(
                 group("信仰者村落一层", allLayers, 4),
                 group("信仰者村落二层", allLayers, 5),
                 group("拾荒者港口", allLayers, 7, 8),
                 group("月兔暗港", allLayers, 12, 16),
                 group("二叠山丘一层", allLayers, 10),
-                group("下水管道口", allLayers, 2)
+                group("下水管道口", allLayers, 2),
+                group("火巨人洞窟", allLayers, 17, 18, 19),
+                group("森巨人洞窟", allLayers, 21, 22),
+                group("雪巨人洞窟", allLayers, 24),
+                group("光王祭坛", allLayers, 26)
         );
 
         // 3. 构建共享遮罩
@@ -99,21 +107,10 @@ public class LayerMapBatchRenderer {
             log.info("  遮罩图已保存");
         }
 
-        // 5. 额外生成合并的 信仰者村落（层4+5），仅用于瓦片生成
-        //    单独的一层/二层图保留作为 SIFT 训练源图
-        LayerGroup merged = group("信仰者村落", allLayers, 4, 5);
-        if (!merged.layers.isEmpty()) {
-            log.info("渲染合并: 信仰者村落 (用于瓦片生成)");
-
-            int[] transparent = new int[MAP_SIZE * MAP_SIZE];
-            drawLayers(transparent, MAP_SIZE, merged.layers);
-            PngImage.writePng(transparent, MAP_SIZE, MAP_SIZE, new File(outputDir + merged.name + "_透明.png"));
-
-            int[] masked = copyPixels(maskPixels);
-            drawLayers(masked, MAP_SIZE, merged.layers);
-            PngImage.writePng(masked, MAP_SIZE, MAP_SIZE, new File(outputDir + merged.name + "_遮罩.png"));
-            log.info("  合并图已保存");
-        }
+        // 5. 额外生成合并图（同坐标区域合并），用于瓦片生成
+        renderMerged("信仰者村落", allLayers, maskPixels, outputDir, 4, 5);
+        renderMerged("火巨人洞窟", allLayers, maskPixels, outputDir, 17, 18, 19);
+        renderMerged("森巨人洞窟", allLayers, maskPixels, outputDir, 21, 22);
 
         log.info("全部完成！输出目录: {}", outputDir);
     }
@@ -183,6 +180,24 @@ public class LayerMapBatchRenderer {
             PngImage.blitScaled(layerImg.pixels(), layerImg.w(), layerImg.h(),
                     basePixels, dstW, dstW, dx, dy, dw, dw);
         }
+    }
+
+    // ===================== 合并渲染工具 =====================
+
+    private void renderMerged(String name, List<LayerMapLayer> allLayers,
+                               int[] maskPixels, String outputDir, int... ids) throws IOException {
+        LayerGroup merged = group(name, allLayers, ids);
+        if (merged.layers.isEmpty()) return;
+        log.info("渲染合并: {} (用于瓦片生成)", name);
+
+        int[] transparent = new int[MAP_SIZE * MAP_SIZE];
+        drawLayers(transparent, MAP_SIZE, merged.layers);
+        PngImage.writePng(transparent, MAP_SIZE, MAP_SIZE, new File(outputDir + merged.name + "_透明.png"));
+
+        int[] masked = copyPixels(maskPixels);
+        drawLayers(masked, MAP_SIZE, merged.layers);
+        PngImage.writePng(masked, MAP_SIZE, MAP_SIZE, new File(outputDir + merged.name + "_遮罩.png"));
+        log.info("  合并图已保存");
     }
 
     // ===================== 图像工具 =====================

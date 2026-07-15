@@ -19,7 +19,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * 资源导出器：精准导出“材料”类资源，适配 ResourceConfig 模型
+ * 资源导出器：精准导出"材料"类资源，适配 ResourceConfig 模型
  * 坐标系：图片中心为 (0,0)
  * 功能：自动去重、自动图标复制、脏数据过滤
  */
@@ -27,13 +27,14 @@ import java.util.Set;
 @NotThreadSafe
 public class ResourceExporter {
 
-    private static final String BASE_DIR = "C:\\Users\\tangh\\Desktop\\map";
+    private static final String BASE_DIR = "D:\\Documents\\unpack\\map";
     private static final String RESOURCE_DIR = "D:\\Documents\\unpack\\Output\\Exports\\NRC";
     private static final int CANVAS_SIZE = 8192;
 
     private static final Set<String> TARGET_NPC_NAMES = new HashSet<>();
 
     private final Map<Integer, JsonNode> npcConf = new HashMap<>();
+    private final Map<Integer, String> paramToMaterial = new HashMap<>(); // MEGAMAP_GATHERING: param_id → genre(材料名)
     private final Map<Integer, JsonNode> areaConf = new HashMap<>();
     private final Map<Integer, JsonNode> objConf = new HashMap<>();
     private final Map<Integer, JsonNode> itemConf = new HashMap<>();
@@ -54,7 +55,7 @@ public class ResourceExporter {
     public void export() throws IOException {
         loadData();
 
-        // --- 1. 建立类型白名单 (只保留“材料”) ---
+        // --- 1. 建立类型白名单 (只保留"材料") ---
         Map<Integer, String> typeIntMap = new HashMap<>();
         itemTypeConf.values().forEach(row -> {
             if (row.has("type_name") && "材料".equals(row.get("type_name").asText())) {
@@ -62,32 +63,32 @@ public class ResourceExporter {
             }
         });
 
-        // --- 2. 映射 NPC 名称到 类型和图标，并复制文件 ---
+        // --- 2. 构建 keys.txt 名称 → 类型/图标 映射 ---
         Map<String, String> nameToTypeMap = new HashMap<>();
         Map<String, String> nameToIconMap = new HashMap<>();
         File iconDir = new File(BASE_DIR, "icon");
         if (!iconDir.exists()) iconDir.mkdirs();
 
-        itemConf.values().forEach(row -> {
+        // 2a. 先从 BAG_ITEM_CONF 匹配（获取类型+图标路径）
+        for (var row : itemConf.values()) {
             try {
-                // 忽略字段缺失的脏数据
-                if (!row.has("name") || !row.has("type") || !row.has("big_icon")) return;
+                if (!row.has("name") || !row.has("type") || !row.has("big_icon")) continue;
 
                 String name = row.get("name").asText();
-                if (!TARGET_NPC_NAMES.contains(name)) return;
+                if (!TARGET_NPC_NAMES.contains(name)) continue;
 
                 int typeInt = row.get("type").asInt();
                 String typeName = typeIntMap.get(typeInt);
-                if (typeName == null) return; // 只处理“材料”
+                if (typeName == null) continue;
 
                 nameToTypeMap.put(name, typeName);
 
+                // 复制图标
                 String iconRaw = row.get("big_icon").asText();
-                if (!iconRaw.contains("'")) return;
+                if (!iconRaw.contains("'")) continue;
 
                 String iconPath = iconRaw.replace("Game", "Content");
                 iconPath = iconPath.substring(iconPath.indexOf("'") + 1, iconPath.lastIndexOf(".") + 1) + "png";
-
                 Path source = Paths.get(RESOURCE_DIR, iconPath);
                 String targetName = name + ".png";
                 if (Files.exists(source)) {
@@ -96,52 +97,72 @@ public class ResourceExporter {
                 }
             } catch (IOException ignore) {
             }
-        });
+        }
+
+        // 2b. keys.txt 中 BAG_ITEM_CONF 未匹配到的，统一为"材料"类型，图标用已有文件
+        for (String name : TARGET_NPC_NAMES) {
+            if (!nameToTypeMap.containsKey(name)) {
+                nameToTypeMap.put(name, "材料");
+                Path iconFile = Path.of(iconDir.getAbsolutePath(), name + ".png");
+                if (Files.exists(iconFile)) {
+                    nameToIconMap.put(name, name + ".png");
+                }
+            }
+        }
+
         ArrayNode root = mapper.createArrayNode();
         Set<String> deduplicationSet = new HashSet<>();
 
-        npcConf.values().forEach(row -> {
+        for (var entry : npcConf.entrySet()) {
             try {
-                String matchedName = getMatchedName(row);
-                // 过滤：必须是 keys.txt 里的 NPC，且在 itemConf 中被识别为“材料”
-                if (matchedName != null && nameToTypeMap.containsKey(matchedName)) {
-                    double[] wPos = getPos(row);
-                    String resId = getResId(row);
+                JsonNode row = entry.getValue();
+                int npcId = row.has("npc_id") ? row.get("npc_id").asInt() : -1;
+                if (npcId < 0) continue;
 
-                    if (wPos != null && sceneCenters.containsKey(resId) && sceneSideLengths.containsKey(resId)) {
-                        double[] center = sceneCenters.get(resId);
-                        double side = sceneSideLengths.get(resId);
+                // 通过 MEGAMAP_GATHERING_CONF 的 param_id → genre 映射找到材料名
+                String matchedName = paramToMaterial.get(npcId);
+                if (matchedName == null) continue;
 
-                        double pixelsPerUnit = CANVAS_SIZE / side;
-                        double dx = wPos[0] - center[0];
-                        double dy = wPos[1] - center[1];
+                if (!nameToTypeMap.containsKey(matchedName)) continue;
 
-                        // 转换坐标：中心原点 (0,0)
-                        double px = dx * pixelsPerUnit;
-                        double py = dy * pixelsPerUnit;
+                double[] wPos = getPos(row);
+                String resId = getResId(row);
 
-                        // --- 组合键去重：层级 + 坐标 (保留2位小数) ---
-                        String coordKey = String.format("%s_%.2f_%.2f", resId, px, py);
-                        if (deduplicationSet.contains(coordKey)) {
-                            return;
-                        }
-                        deduplicationSet.add(coordKey);
+                if (wPos == null || !sceneCenters.containsKey(resId) || !sceneSideLengths.containsKey(resId)) continue;
 
-                        // 构建模型节点
-                        ObjectNode node = mapper.createObjectNode();
-                        node.put("type", nameToTypeMap.get(matchedName));
-                        node.put("markType", 1);
-                        node.put("markTypeName", matchedName);
-                        node.put("icon", nameToIconMap.get(matchedName));
-                        node.put("lng", px);
-                        node.put("lat", py);
-                        node.put("layer", resId);
-                        root.add(node);
-                    }
+                double[] center = sceneCenters.get(resId);
+                double side = sceneSideLengths.get(resId);
+
+                double pixelsPerUnit = CANVAS_SIZE / side;
+                double dx = wPos[0] - center[0];
+                double dy = wPos[1] - center[1];
+
+                // 转换坐标：中心原点 (0,0)
+                double px = dx * pixelsPerUnit;
+                double py = dy * pixelsPerUnit;
+
+                // --- 组合键去重：层级 + 坐标 (保留2位小数) ---
+                String coordKey = String.format("%s_%.2f_%.2f", resId, px, py);
+                if (deduplicationSet.contains(coordKey)) continue;
+                deduplicationSet.add(coordKey);
+
+                // 构建模型节点
+                ObjectNode node = mapper.createObjectNode();
+                node.put("type", nameToTypeMap.get(matchedName));
+                node.put("markType", 1);
+                node.put("markTypeName", matchedName);
+                String iconName = nameToIconMap.get(matchedName);
+                if (iconName != null) {
+                    node.put("icon", iconName);
                 }
+                node.put("lng", px);
+                node.put("lat", py);
+                node.put("layer", resId);
+                root.add(node);
             } catch (RuntimeException ignore) {
             }
-        });
+        }
+        log.info("MEGAMAP_GATHERING 映射命中: {}", root.size());
 
         // 4. 落地保存
         File outFile = new File(BASE_DIR, "resource_configs.json");
@@ -149,15 +170,6 @@ public class ResourceExporter {
         log.info("批量导出并去重完成！");
         log.info("生成总点位数: {}", root.size());
         log.info("结果文件: {}", outFile.getAbsolutePath());
-    }
-
-    private String getMatchedName(JsonNode r) {
-        if (!r.has("editor_name") || r.get("editor_name").isEmpty()) return null;
-        String editorName = r.get("editor_name").get(0).asText();
-        for (String target : TARGET_NPC_NAMES) {
-            if (editorName.contains(target)) return target;
-        }
-        return null;
     }
 
     private void loadData() throws IOException {
@@ -177,6 +189,21 @@ public class ResourceExporter {
         fill(objConf, new File(dataDir, "SCENE_OBJECT_CONF.json"));
         fill(itemConf, new File(dataDir, "BAG_ITEM_CONF.json"));
         fill(itemTypeConf, new File(dataDir, "BAG_ITEM_TYPE_CONF.json"));
+        // 加载 MEGAMAP_GATHERING_CONF: param_id → genre(材料名) 映射
+        File gatheringFile = new File(dataDir, "MEGAMAP_GATHERING_CONF.json");
+        if (gatheringFile.exists()) {
+            mapper.readTree(gatheringFile).get("RocoDataRows").fields().forEachRemaining(e -> {
+                JsonNode v = e.getValue();
+                if (v.has("param_id") && v.has("genre")) {
+                    String genre = v.get("genre").asText();
+                    if (TARGET_NPC_NAMES.contains(genre)) {
+                        paramToMaterial.put(v.get("param_id").asInt(), genre);
+                    }
+                }
+            });
+        }
+        log.info("MEGAMAP_GATHERING 材料映射加载: {} 种材料, {} 个 param_id",
+                paramToMaterial.values().stream().distinct().count(), paramToMaterial.size());
     }
 
     private void fill(Map<Integer, JsonNode> map, File f) throws IOException {
