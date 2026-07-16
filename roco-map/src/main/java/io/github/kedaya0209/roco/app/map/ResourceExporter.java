@@ -36,6 +36,7 @@ public class ResourceExporter {
     private final Map<Integer, JsonNode> npcConf = new HashMap<>();
     private final Map<Integer, String> paramToMaterial = new HashMap<>(); // MEGAMAP_GATHERING: param_id → genre(材料名)
     private final Map<Integer, JsonNode> areaConf = new HashMap<>();
+    private Map<Integer, String> i18nNpcNameMap; // npc_id → 本地化显示名 (来自 i18n/NPC_CONF.json)
     private final Map<Integer, JsonNode> objConf = new HashMap<>();
     private final Map<Integer, JsonNode> itemConf = new HashMap<>();
     private final Map<Integer, JsonNode> itemTypeConf = new HashMap<>();
@@ -189,21 +190,76 @@ public class ResourceExporter {
         fill(objConf, new File(dataDir, "SCENE_OBJECT_CONF.json"));
         fill(itemConf, new File(dataDir, "BAG_ITEM_CONF.json"));
         fill(itemTypeConf, new File(dataDir, "BAG_ITEM_TYPE_CONF.json"));
+
+        // 加载 NPC 本地化名称 (i18n) — 用于 MEGAMAP_GATHERING genre 不匹配时回退
+        i18nNpcNameMap = loadI18nNpcNames(dataDir);
+
         // 加载 MEGAMAP_GATHERING_CONF: param_id → genre(材料名) 映射
+        // 如果 genre 不在 keys.txt 中，尝试用 i18n 本地化名回退
         File gatheringFile = new File(dataDir, "MEGAMAP_GATHERING_CONF.json");
         if (gatheringFile.exists()) {
             mapper.readTree(gatheringFile).get("RocoDataRows").fields().forEachRemaining(e -> {
                 JsonNode v = e.getValue();
-                if (v.has("param_id") && v.has("genre")) {
+                if (!v.has("param_id")) return;
+                int paramId = v.get("param_id").asInt();
+
+                String materialName = null;
+                if (v.has("genre")) {
                     String genre = v.get("genre").asText();
                     if (TARGET_NPC_NAMES.contains(genre)) {
-                        paramToMaterial.put(v.get("param_id").asInt(), genre);
+                        materialName = genre;
                     }
+                }
+                // 回退：尝试 i18n 本地化显示名
+                if (materialName == null && i18nNpcNameMap != null) {
+                    materialName = i18nNpcNameMap.get(paramId);
+                }
+                if (materialName != null) {
+                    paramToMaterial.put(paramId, materialName);
                 }
             });
         }
-        log.info("MEGAMAP_GATHERING 材料映射加载: {} 种材料, {} 个 param_id",
+        log.info("MEGAMAP_GATHERING + i18n 映射加载: {} 种材料, {} 个 param_id",
                 paramToMaterial.values().stream().distinct().count(), paramToMaterial.size());
+    }
+
+    /**
+     * 从 i18n/NPC_CONF.json 加载 NPC 本地化显示名。
+     * 读取 NPC_CONF.model_conf → LocalizationStrings → keys.txt 匹配的显示名。
+     */
+    private Map<Integer, String> loadI18nNpcNames(File dataDir) throws IOException {
+        File npcConfFile = new File(dataDir, "NPC_CONF.json");
+        File i18nFile = new File(dataDir, "i18n/NPC_CONF.json");
+        if (!npcConfFile.exists() || !i18nFile.exists()) return null;
+
+        JsonNode i18nRoot = mapper.readTree(i18nFile);
+        JsonNode locStrings = i18nRoot.get("LocalizationStrings");
+        if (locStrings == null || !locStrings.isObject()) return null;
+
+        // 加载本地化字符串: model_conf_key → 显示名
+        Map<Integer, String> locMap = new HashMap<>();
+        locStrings.fields().forEachRemaining(e -> {
+            try { locMap.put(Integer.parseInt(e.getKey()), e.getValue().asText()); }
+            catch (NumberFormatException ignore) {}
+        });
+
+        // 遍历 NPC_CONF: npc_id 的 model_conf 指向本地化名称
+        Map<Integer, String> result = new HashMap<>();
+        JsonNode npcConfRoot = mapper.readTree(npcConfFile).get("RocoDataRows");
+        if (npcConfRoot == null) return null;
+
+        npcConfRoot.fields().forEachRemaining(e -> {
+            JsonNode row = e.getValue();
+            if (!row.has("model_conf")) return;
+            int mc = row.get("model_conf").asInt();
+            String localizedName = locMap.get(mc);
+            if (localizedName != null && TARGET_NPC_NAMES.contains(localizedName)) {
+                try { result.put(Integer.parseInt(e.getKey()), localizedName); }
+                catch (NumberFormatException ignore) {}
+            }
+        });
+        log.info("i18n NPC 本地化名称加载: {} 个 NPC 匹配 keys.txt", result.size());
+        return result;
     }
 
     private void fill(Map<Integer, JsonNode> map, File f) throws IOException {
