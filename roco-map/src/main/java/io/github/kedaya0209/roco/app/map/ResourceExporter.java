@@ -19,9 +19,59 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * 资源导出器：精准导出"材料"类资源，适配 ResourceConfig 模型
- * 坐标系：图片中心为 (0,0)
- * 功能：自动去重、自动图标复制、脏数据过滤
+ * 资源导出器：从游戏解包数据导出可采集的材料资源点，生成 resource_configs.json。
+ *
+ * <h3>数据链路</h3>
+ * <pre>
+ * keys.txt（39 种目标材料名）
+ *   │
+ *   ├── ① MEGAMAP_GATHERING_CONF          genre(材料名) → param_id
+ *   │     遍历 RocoDataRows，genre 在 keys.txt 中的条目 → paramToMaterial[param_id] = genre
+ *   │     命中 ~46 个 param_id
+ *   │
+ *   ├── ② NPC_CONF genre=27 补充          traverse → BAG_ITEM_CONF.name
+ *   │     遍历 NPC_CONF，跳过已在①中的 NPCID
+ *   │     条件：genre=27 ∧ traverse_data_type=2
+ *   │     通过 traverse_data_param[0] 查 BAG_ITEM_CONF.name，匹配 keys.txt 则加入
+ *   │     补充 NPC 65599 → 结晶花（BAG_ITEM_CONF 优先使用 _2_P 补丁数据）
+ *   │
+ *   └── paramToMaterial：47 个 param_id → 39 种材料
+ *             │
+ *             └── ③ NPC_REFRESH_CONTENT_CONF  刷新点 → 坐标
+ *                   遍历 RocoDataRows：
+ *                     ① disable:true → 跳过
+ *                     ② npc_id 查 paramToMaterial → 无匹配跳过
+ *                     ③ refresh_param → AREA_CONF / SCENE_OBJECT_CONF 取 center_xyz / position_xyz
+ *                     ④ WORLD_MAP_BLOCK_CONF → canvas 像素坐标 (8192×8192, 中心原点)
+ *                     ⑤ 组合键(层级+材料名+坐标)去重
+ *                     ⑥ 写入 resource_configs.json
+ * </pre>
+ *
+ * <h3>图标导出</h3>
+ * <pre>
+ * BAG_ITEM_CONF 按 name 匹配 keys.txt，复制 icon/big_icon 到 icon/{name}.png。
+ * 未匹配到的再通过 paramToMaterial → NPC_CONF.traverse_data_param → BAG_ITEM_CONF 回溯，
+ * 仍无图标则查 NPC_OPTION_CONF button_icon 含 BagItem/ 的路径。
+ * </pre>
+ *
+ * <h3>数据源</h3>
+ * <ul>
+ *   <li>BIN_COMPRESSED — 用户自己解包的数据（旧版）</li>
+ *   <li>BIN_COMPRESSED_2P — GitHub Roco-Kingdom-World-Data 的 pakchunk4-WindowsNoEditor_2_P 补丁数据，
+ *       用于 BAG_ITEM_CONF（有更正后的物品名称，如 item 100851 在旧版为占位符，_2_P 为"结晶花"）</li>
+ * </ul>
+ *
+ * <h3>坐标系</h3>
+ * canvas 像素坐标，中心原点 (0,0)，8192×8192。
+ * 转换：px = (gameX - centerX) * 8192 / sideLength
+ *
+ * <h3>脏数据过滤</h3>
+ * <ol>
+ *   <li>disable:true 的刷新点</li>
+ *   <li>AREA_CONF / SCENE_OBJECT_CONF 缺失的条目</li>
+ *   <li>WORLD_MAP_BLOCK_CONF 未覆盖的场景</li>
+ *   <li>坐标完全重复的组合键</li>
+ * </ol>
  */
 @Slf4j
 @NotThreadSafe
@@ -29,6 +79,9 @@ public class ResourceExporter {
 
     private static final String BASE_DIR = "D:\\Documents\\unpack\\map";
     private static final String RESOURCE_DIR = "D:\\Documents\\unpack\\Output\\Exports\\NRC";
+    private static final String BIN_COMPRESSED = "D:\\Documents\\unpack\\Output\\Exports\\NRC\\Content\\ScriptC\\Data\\Bin\\BinDataCompressed";
+    private static final String BIN_COMPRESSED_2P = "D:\\Documents\\code\\Roco-tools\\Roco-Kingdom-World-Data\\pakchunk4-WindowsNoEditor_2_P\\Bin\\BinDataCompressed";
+    private static final String BIN_LOCALIZE = "D:\\Documents\\unpack\\Output\\Exports\\NRC\\Content\\ScriptC\\Data\\Bin\\BinLocalize\\dev_CN";
     private static final int CANVAS_SIZE = 8192;
 
     private static final Set<String> TARGET_NPC_NAMES = new HashSet<>();
@@ -36,12 +89,14 @@ public class ResourceExporter {
     private final Map<Integer, JsonNode> npcConf = new HashMap<>();
     private final Map<Integer, String> paramToMaterial = new HashMap<>(); // MEGAMAP_GATHERING: param_id → genre(材料名)
     private final Map<Integer, JsonNode> areaConf = new HashMap<>();
-    private Map<Integer, String> i18nNpcNameMap; // npc_id → 本地化显示名 (来自 i18n/NPC_CONF.json)
     private final Map<Integer, JsonNode> objConf = new HashMap<>();
     private final Map<Integer, JsonNode> itemConf = new HashMap<>();
     private final Map<Integer, JsonNode> itemTypeConf = new HashMap<>();
     private final Map<String, double[]> sceneCenters = new HashMap<>();
     private final Map<String, Double> sceneSideLengths = new HashMap<>();
+    // NPC_CONF 定义 — 用于 traverse_data_param 回溯到 BAG_ITEM_CONF
+    private final Map<Integer, JsonNode> npcDef = new HashMap<>();
+    private final Map<Integer, JsonNode> npcOptionConf = new HashMap<>(); // NPC_OPTION_CONF button_icon 回溯
 
     private final ObjectMapper mapper = new ObjectMapper();
 
@@ -73,28 +128,35 @@ public class ResourceExporter {
         // 2a. 先从 BAG_ITEM_CONF 匹配（获取类型+图标路径）
         for (var row : itemConf.values()) {
             try {
-                if (!row.has("name") || !row.has("type") || !row.has("big_icon")) continue;
+                if (!row.has("name")) continue;
 
                 String name = row.get("name").asText();
                 if (!TARGET_NPC_NAMES.contains(name)) continue;
 
-                int typeInt = row.get("type").asInt();
-                String typeName = typeIntMap.get(typeInt);
-                if (typeName == null) continue;
-
+                // 匹配类型：优先使用 BAG_ITEM_TYPE_CONF 中的"材料"类型，
+                // 若无 type 字段或非材料类型则默认"材料"
+                String typeName = "材料";
+                if (row.has("type")) {
+                    String mapped = typeIntMap.get(row.get("type").asInt());
+                    if (mapped != null) typeName = mapped;
+                }
                 nameToTypeMap.put(name, typeName);
 
-                // 复制图标
-                String iconRaw = row.get("big_icon").asText();
-                if (!iconRaw.contains("'")) continue;
-
-                String iconPath = iconRaw.replace("Game", "Content");
-                iconPath = iconPath.substring(iconPath.indexOf("'") + 1, iconPath.lastIndexOf(".") + 1) + "png";
-                Path source = Paths.get(RESOURCE_DIR, iconPath);
+                // 复制图标：优先 icon(BagItem/)，回退 big_icon(Item190/)
                 String targetName = name + ".png";
-                if (Files.exists(source)) {
-                    Files.copy(source, Path.of(iconDir.getAbsolutePath(), targetName), StandardCopyOption.REPLACE_EXISTING);
-                    nameToIconMap.put(name, targetName);
+                Path targetFile = Path.of(iconDir.getAbsolutePath(), targetName);
+                for (String field : new String[]{"icon", "big_icon"}) {
+                    if (!row.has(field)) continue;
+                    String iconRaw = row.get(field).asText();
+                    if (!iconRaw.contains("'")) continue;
+                    String iconPath = iconRaw.replace("Game", "Content");
+                    iconPath = iconPath.substring(iconPath.indexOf("'") + 1, iconPath.lastIndexOf(".") + 1) + "png";
+                    Path source = Paths.get(RESOURCE_DIR, iconPath);
+                    if (Files.exists(source)) {
+                        Files.copy(source, targetFile, StandardCopyOption.REPLACE_EXISTING);
+                        nameToIconMap.put(name, targetName);
+                        break;
+                    }
                 }
             } catch (IOException ignore) {
             }
@@ -111,12 +173,54 @@ public class ResourceExporter {
             }
         }
 
+        // 2c. 对 i18n 匹配但无图标的材料，通过 NPC_CONF traverse_data_param 回溯 BAG_ITEM_CONF
+        for (String name : TARGET_NPC_NAMES) {
+            if (nameToIconMap.containsKey(name)) continue;
+            // 找出映射到此材料名的 npc_id
+            Integer npcId = null;
+            for (var e : paramToMaterial.entrySet()) {
+                if (name.equals(e.getValue())) { npcId = e.getKey(); break; }
+            }
+            if (npcId == null) continue;
+            JsonNode npcRow = npcDef.get(npcId);
+            if (npcRow == null) continue;
+            if (npcRow.has("traverse_data_type") && npcRow.get("traverse_data_type").asInt() == 2
+                    && npcRow.has("traverse_data_param") && npcRow.get("traverse_data_param").size() > 0) {
+                // traverse_data_type=2: param 是 BAG_ITEM_CONF id
+                int itemId = npcRow.get("traverse_data_param").get(0).asInt();
+                JsonNode itemRow = itemConf.get(itemId);
+                if (itemRow != null) {
+                    if (tryCopyIcon(itemRow, name, iconDir)) continue;
+                }
+            }
+            // 回退：排查 NPC_OPTION_CONF 中 button_icon 含 BagItem/ 路径的图标
+            if (npcRow.has("option_id")) {
+                for (JsonNode optIdNode : npcRow.get("option_id")) {
+                    JsonNode optRow = npcOptionConf.get(optIdNode.asInt());
+                    if (optRow == null || !optRow.has("button_icon")) continue;
+                    String btnIcon = optRow.get("button_icon").asText();
+                    if (!btnIcon.contains("BagItem/") || !btnIcon.contains("'")) continue;
+                    String iconPath = btnIcon.replace("Game", "Content");
+                    iconPath = iconPath.substring(iconPath.indexOf("'") + 1, iconPath.lastIndexOf(".") + 1) + "png";
+                    Path source = Paths.get(RESOURCE_DIR, iconPath);
+                    if (Files.exists(source)) {
+                        String targetName = name + ".png";
+                        Files.copy(source, Path.of(iconDir.getAbsolutePath(), targetName), StandardCopyOption.REPLACE_EXISTING);
+                        nameToIconMap.put(name, targetName);
+                        break;
+                    }
+                }
+            }
+        }
+
         ArrayNode root = mapper.createArrayNode();
         Set<String> deduplicationSet = new HashSet<>();
 
         for (var entry : npcConf.entrySet()) {
             try {
                 JsonNode row = entry.getValue();
+                // 跳过已禁用的刷新点
+                if (row.has("disable") && row.get("disable").asBoolean()) continue;
                 int npcId = row.has("npc_id") ? row.get("npc_id").asInt() : -1;
                 if (npcId < 0) continue;
 
@@ -142,8 +246,9 @@ public class ResourceExporter {
                 double px = dx * pixelsPerUnit;
                 double py = dy * pixelsPerUnit;
 
-                // --- 组合键去重：层级 + 坐标 (保留2位小数) ---
-                String coordKey = String.format("%s_%.2f_%.2f", resId, px, py);
+                // 组合键去重：层级 + 材料名 + 坐标 (保留2位小数)
+                // 不同材料可能在同一 AREA 刷新，必须包含名称避免误过滤
+                String coordKey = String.format("%s_%s_%.2f_%.2f", resId, matchedName, px, py);
                 if (deduplicationSet.contains(coordKey)) continue;
                 deduplicationSet.add(coordKey);
 
@@ -174,7 +279,10 @@ public class ResourceExporter {
     }
 
     private void loadData() throws IOException {
-        File dataDir = new File(BASE_DIR, "pointdata");
+        File dataDir = new File(BIN_COMPRESSED);
+        File locDir = new File(BIN_LOCALIZE);
+
+        // 场景配置（地图中心、边长）
         JsonNode sceneConf = mapper.readTree(new File(dataDir, "WORLD_MAP_BLOCK_CONF.json")).get("RocoDataRows");
         sceneConf.fields().forEachRemaining(e -> {
             JsonNode r = e.getValue();
@@ -185,81 +293,75 @@ public class ResourceExporter {
                 sceneSideLengths.put(id, r.get("side_length").asDouble());
             }
         });
+
+        // 从最新解包数据加载
         fill(npcConf, new File(dataDir, "NPC_REFRESH_CONTENT_CONF.json"));
         fill(areaConf, new File(dataDir, "AREA_CONF.json"));
         fill(objConf, new File(dataDir, "SCENE_OBJECT_CONF.json"));
-        fill(itemConf, new File(dataDir, "BAG_ITEM_CONF.json"));
+        // BAG_ITEM_CONF 优先使用 _2_P 数据（包 Split 补丁，有更正后的物品名称）
+        // 回退到用户自己的解包数据
+        File bagItemFile = new File(BIN_COMPRESSED_2P, "BAG_ITEM_CONF.json");
+        if (!bagItemFile.exists()) bagItemFile = new File(dataDir, "BAG_ITEM_CONF.json");
+        fill(itemConf, bagItemFile);
         fill(itemTypeConf, new File(dataDir, "BAG_ITEM_TYPE_CONF.json"));
+        fill(npcDef, new File(dataDir, "NPC_CONF.json"));
+        fill(npcOptionConf, new File(dataDir, "NPC_OPTION_CONF.json"));
 
-        // 加载 NPC 本地化名称 (i18n) — 用于 MEGAMAP_GATHERING genre 不匹配时回退
-        i18nNpcNameMap = loadI18nNpcNames(dataDir);
-
-        // 加载 MEGAMAP_GATHERING_CONF: param_id → genre(材料名) 映射
-        // 如果 genre 不在 keys.txt 中，尝试用 i18n 本地化名回退
+        // 构建 param_id → 材料名 映射
+        // 来源1：MEGAMAP_GATHERING_CONF — 采集地图上的采集物，genre 字段即材料名
         File gatheringFile = new File(dataDir, "MEGAMAP_GATHERING_CONF.json");
         if (gatheringFile.exists()) {
             mapper.readTree(gatheringFile).get("RocoDataRows").fields().forEachRemaining(e -> {
                 JsonNode v = e.getValue();
-                if (!v.has("param_id")) return;
+                if (!v.has("genre") || !v.has("param_id")) return;
                 int paramId = v.get("param_id").asInt();
-
-                String materialName = null;
-                if (v.has("genre")) {
-                    String genre = v.get("genre").asText();
-                    if (TARGET_NPC_NAMES.contains(genre)) {
-                        materialName = genre;
-                    }
-                }
-                // 回退：尝试 i18n 本地化显示名
-                if (materialName == null && i18nNpcNameMap != null) {
-                    materialName = i18nNpcNameMap.get(paramId);
-                }
-                if (materialName != null) {
-                    paramToMaterial.put(paramId, materialName);
+                String genre = v.get("genre").asText();
+                if (TARGET_NPC_NAMES.contains(genre)) {
+                    paramToMaterial.put(paramId, genre);
                 }
             });
         }
-        log.info("MEGAMAP_GATHERING + i18n 映射加载: {} 种材料, {} 个 param_id",
+        log.info("MEGAMAP_GATHERING genre 映射: {} 种材料, {} 个 param_id",
                 paramToMaterial.values().stream().distinct().count(), paramToMaterial.size());
-    }
 
-    /**
-     * 从 i18n/NPC_CONF.json 加载 NPC 本地化显示名。
-     * 读取 NPC_CONF.model_conf → LocalizationStrings → keys.txt 匹配的显示名。
-     */
-    private Map<Integer, String> loadI18nNpcNames(File dataDir) throws IOException {
-        File npcConfFile = new File(dataDir, "NPC_CONF.json");
-        File i18nFile = new File(dataDir, "i18n/NPC_CONF.json");
-        if (!npcConfFile.exists() || !i18nFile.exists()) return null;
-
-        JsonNode i18nRoot = mapper.readTree(i18nFile);
-        JsonNode locStrings = i18nRoot.get("LocalizationStrings");
-        if (locStrings == null || !locStrings.isObject()) return null;
-
-        // 加载本地化字符串: model_conf_key → 显示名
-        Map<Integer, String> locMap = new HashMap<>();
-        locStrings.fields().forEachRemaining(e -> {
-            try { locMap.put(Integer.parseInt(e.getKey()), e.getValue().asText()); }
-            catch (NumberFormatException ignore) {}
-        });
-
-        // 遍历 NPC_CONF: npc_id 的 model_conf 指向本地化名称
-        Map<Integer, String> result = new HashMap<>();
-        JsonNode npcConfRoot = mapper.readTree(npcConfFile).get("RocoDataRows");
-        if (npcConfRoot == null) return null;
-
-        npcConfRoot.fields().forEachRemaining(e -> {
+        // 补充1: NPC_CONF genre=27 + traverse_data_type=2 -> BAG_ITEM_CONF.name
+        // 覆盖不在 MEGAMAP_GATHERING 中的材料 NPC（如下层家园种植材料）
+        for (var e : npcDef.entrySet()) {
+            int npcId = e.getKey();
+            if (paramToMaterial.containsKey(npcId)) continue;
             JsonNode row = e.getValue();
-            if (!row.has("model_conf")) return;
-            int mc = row.get("model_conf").asInt();
-            String localizedName = locMap.get(mc);
-            if (localizedName != null && TARGET_NPC_NAMES.contains(localizedName)) {
-                try { result.put(Integer.parseInt(e.getKey()), localizedName); }
-                catch (NumberFormatException ignore) {}
+            if (!row.has("genre") || row.get("genre").asInt() != 27) continue;
+            if (row.has("traverse_data_type") && row.get("traverse_data_type").asInt() == 2
+                    && row.has("traverse_data_param") && row.get("traverse_data_param").size() > 0) {
+                int itemId = row.get("traverse_data_param").get(0).asInt();
+                JsonNode itemRow = itemConf.get(itemId);
+                if (itemRow != null && itemRow.has("name")
+                        && TARGET_NPC_NAMES.contains(itemRow.get("name").asText())) {
+                    paramToMaterial.put(npcId, itemRow.get("name").asText());
+                }
             }
-        });
-        log.info("i18n NPC 本地化名称加载: {} 个 NPC 匹配 keys.txt", result.size());
-        return result;
+        }
+
+        log.info("paramToMaterial 最终: {} 种材料, {} 个 param_id",
+                paramToMaterial.values().stream().distinct().count(), paramToMaterial.size());
+
+    }
+    /** 尝试从 BAG_ITEM_CONF row 复制图标，成功返回 true */
+    private boolean tryCopyIcon(JsonNode itemRow, String materialName, File iconDir) throws IOException {
+        for (String field : new String[]{"icon", "big_icon"}) {
+            if (!itemRow.has(field)) continue;
+            String iconRaw = itemRow.get(field).asText();
+            if (!iconRaw.contains("'")) continue;
+            String iconPath = iconRaw.replace("Game", "Content");
+            iconPath = iconPath.substring(iconPath.indexOf("'") + 1, iconPath.lastIndexOf(".") + 1) + "png";
+            Path source = Paths.get(RESOURCE_DIR, iconPath);
+            if (Files.exists(source)) {
+                String targetName = materialName + ".png";
+                Files.copy(source, Path.of(iconDir.getAbsolutePath(), targetName), StandardCopyOption.REPLACE_EXISTING);
+                return true;
+            }
+        }
+        return false;
     }
 
     private void fill(Map<Integer, JsonNode> map, File f) throws IOException {
