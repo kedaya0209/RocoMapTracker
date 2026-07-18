@@ -46,7 +46,7 @@ public class CaveImageFuser {
     private static final int MIN_COMPONENT_SIZE = 200;
 
     public static void main(String[] args) throws Exception {
-        int extendPx = args.length > 0 ? Integer.parseInt(args[0]) : 30;
+        int extendPx = args.length > 0 ? Integer.parseInt(args[0]) : 80;
         double darkFactor = args.length > 1 ? Double.parseDouble(args[1]) : 0.3;
 
         String baseDir = System.getProperty("cave-fuser.resources",

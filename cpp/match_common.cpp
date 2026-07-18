@@ -388,7 +388,10 @@ void save_png(const cv::Mat& bgr, const char* path) {
 }
 
 // ============================================================================
-// Arrow direction detection
+// Arrow direction detection (灰度阈值 + 中心连通域 + PCA)
+// 新方案替换了 HSV inRange + 轮廓矩的方式，因为游戏更新后箭头颜色变化
+// 导致 HSV 颜色过滤失效。新方案基于 Python binarize.py：
+//   灰度 → 对比度拉伸 → 阈值二值化 → 中心连通域 BFS → 全黑像素 PCA
 // ============================================================================
 double detect_arrow_angle_hsv(const uint8_t* bgra_data, int w, int h,
                               double cx, double cy, int radius,
@@ -397,6 +400,9 @@ double detect_arrow_angle_hsv(const uint8_t* bgra_data, int w, int h,
     if (radius < min_radius) return std::numeric_limits<double>::quiet_NaN();
 
     int crop_size = ext ? ext->arrowCropSize : 64;
+    int crop_cx = crop_size / 2;
+    int crop_cy = crop_size / 2;
+
     int cropX = (int)std::round(cx - crop_size / 2);
     int cropY = (int)std::round(cy - crop_size / 2);
     if (cropX < 0) cropX = 0;
@@ -405,81 +411,107 @@ double detect_arrow_angle_hsv(const uint8_t* bgra_data, int w, int h,
     if (cropY + crop_size > h) cropY = h - crop_size;
     if (cropX < 0 || cropY < 0) return std::numeric_limits<double>::quiet_NaN();
 
+    // Step 1: Extract ROI and convert to grayscale
     cv::Mat full(h, w, CV_8UC4, const_cast<uint8_t*>(bgra_data));
     cv::Mat roi(full, cv::Rect(cropX, cropY, crop_size, crop_size));
+    cv::Mat gray;
+    cv::cvtColor(roi, gray, cv::COLOR_BGRA2GRAY);
 
-    cv::Mat hsv;
-    cv::cvtColor(roi, hsv, cv::COLOR_BGRA2BGR);
-    cv::cvtColor(hsv, hsv, cv::COLOR_BGR2HSV);
-
-    cv::Mat mask;
-    int h_low  = ext ? ext->arrowHueLow : 15;
-    int h_high = ext ? ext->arrowHueHigh : 25;
-    int s_low  = ext ? ext->arrowSatLow : 200;
-    int s_high = ext ? ext->arrowSatHigh : 240;
-    int v_low  = ext ? ext->arrowValLow : 230;
-    int v_high = ext ? ext->arrowValHigh : 255;
-    cv::inRange(hsv, cv::Scalar(h_low, s_low, v_low), cv::Scalar(h_high, s_high, v_high), mask);
-
-    std::vector<std::vector<cv::Point>> contours;
-    cv::findContours(mask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
-    if (contours.empty()) return std::numeric_limits<double>::quiet_NaN();
-
-    int maxIdx = 0;
-    double maxArea = 0;
-    for (size_t i = 0; i < contours.size(); i++) {
-        double area = cv::contourArea(contours[i]);
-        if (area > maxArea) {
-            maxArea = area;
-            maxIdx = (int)i;
-        }
+    // Step 2: Contrast stretch (min-max normalization per image)
+    double min_val, max_val;
+    cv::minMaxLoc(gray, &min_val, &max_val);
+    if (max_val > min_val) {
+        gray.convertTo(gray, CV_8UC1, 255.0 / (max_val - min_val),
+                       -min_val * 255.0 / (max_val - min_val));
     }
+
+    // Step 3: Binarize with fixed threshold (192)
+    //   black=0 (arrow / dark elements), white=255 (bright background)
+    cv::Mat binary;
+    cv::threshold(gray, binary, 192, 255, cv::THRESH_BINARY);
+
+    // Step 4: Check center pixel belongs to arrow, then flood-fill
+    //   Keep only center-connected black region (剔除边缘离散噪点)
+    cv::Mat connected = cv::Mat::zeros(crop_size, crop_size, CV_8UC1);
+    if (binary.at<uint8_t>(crop_cy, crop_cx) == 0) {
+        // Invert so arrow pixels become 255, then flood-fill from center
+        cv::Mat inv;
+        cv::bitwise_not(binary, inv);
+
+        cv::Mat mask = cv::Mat::zeros(crop_size + 2, crop_size + 2, CV_8UC1);
+        cv::floodFill(inv, mask, cv::Point(crop_cx, crop_cy),
+                      0, nullptr, cv::Scalar(), cv::Scalar(),
+                      4 | cv::FLOODFILL_FIXED_RANGE | cv::FLOODFILL_MASK_ONLY);
+
+        // Extract center-connected region (mask border is 1px padding for floodFill)
+        connected = mask(cv::Rect(1, 1, crop_size, crop_size)).clone();
+    }
+
+    // Step 5: Collect all black (arrow) pixel coordinates for PCA
+    std::vector<cv::Point> black_pixels;
+    cv::findNonZero(connected, black_pixels);
+
     int min_area = ext ? ext->arrowMinContourArea : 20;
-    if (maxArea < min_area) return std::numeric_limits<double>::quiet_NaN();
+    if ((int)black_pixels.size() < std::max(min_area, 2))
+        return std::numeric_limits<double>::quiet_NaN();
 
-    // PCA 主轴
-    cv::Moments m = cv::moments(contours[maxIdx]);
-    double mcx = m.m10 / m.m00, mcy = m.m01 / m.m00;
-    double axisRad = 0.5 * std::atan2(2.0 * m.mu11, m.mu20 - m.mu02);
-    if (axisRad < 0) axisRad += CV_PI;
-    double axisDeg = axisRad * 180.0 / CV_PI;
-    double cosA = std::cos(axisRad), sinA = std::sin(axisRad);
+    // Step 6: PCA — compute principal direction of black pixels
+    cv::Mat pts((int)black_pixels.size(), 2, CV_64F);
+    for (size_t i = 0; i < black_pixels.size(); i++) {
+        pts.at<double>((int)i, 0) = black_pixels[i].x;
+        pts.at<double>((int)i, 1) = black_pixels[i].y;
+    }
 
-    const auto& c = contours[maxIdx];
+    cv::PCA pca(pts, cv::Mat(), cv::PCA::DATA_AS_ROW);
+    double evec_x = pca.eigenvectors.at<double>(0, 0);
+    double evec_y = pca.eigenvectors.at<double>(0, 1);
+    double mean_x = pca.mean.at<double>(0, 0);
+    double mean_y = pca.mean.at<double>(0, 1);
+
+    double angle_rad = std::atan2(evec_y, evec_x);
+    if (angle_rad < 0) angle_rad += CV_PI;
+
+    // Step 7: Resolve 180° ambiguity — PCA 两端宽度对比法（同原方案）
+    //   箭尖窄、箭尾宽，将黑色像素投影到主轴方向后，取两端各 3 个百分位
+    //   位置的垂直方向跨度为宽度，较窄的一端为箭尖。
+    double cosA = std::cos(angle_rad), sinA = std::sin(angle_rad);
+    double pdx = -sinA, pdy = cosA;  // 垂直方向单位向量
+
     double tMin = 1e18, tMax = -1e18;
-    for (const auto& pt : c) {
-        double t = (pt.x - mcx) * cosA + (pt.y - mcy) * sinA;
+    for (size_t i = 0; i < black_pixels.size(); i++) {
+        double t = (black_pixels[i].x - mean_x) * cosA + (black_pixels[i].y - mean_y) * sinA;
         if (t < tMin) tMin = t;
         if (t > tMax) tMax = t;
     }
     double tRange = tMax - tMin;
-    if (tRange < 1.0) return axisDeg;
 
-    // PCA 两端测宽度判断箭尖方向
     double pcts[] = {0.05, 0.10, 0.20};
     double ep = std::max(3.0, tRange * 0.06);
-    double pdx = -sinA, pdy = cosA;
     double perpLo[2][3] = {{1e18,1e18,1e18},{1e18,1e18,1e18}};
     double perpHi[2][3] = {{-1e18,-1e18,-1e18},{-1e18,-1e18,-1e18}};
-    for (const auto& pt : c) {
-        double t = (pt.x - mcx) * cosA + (pt.y - mcy) * sinA;
-        double perp = (pt.x - mcx) * pdx + (pt.y - mcy) * pdy;
-        for (int i = 0; i < 3; i++) {
-            double o = tRange * pcts[i];
+
+    for (size_t i = 0; i < black_pixels.size(); i++) {
+        double t = (black_pixels[i].x - mean_x) * cosA + (black_pixels[i].y - mean_y) * sinA;
+        double perp = (black_pixels[i].x - mean_x) * pdx + (black_pixels[i].y - mean_y) * pdy;
+        for (int j = 0; j < 3; j++) {
+            double o = tRange * pcts[j];
             if (std::abs(t - (tMin + o)) <= ep) {
-                if (perp < perpLo[0][i]) perpLo[0][i] = perp;
-                if (perp > perpHi[0][i]) perpHi[0][i] = perp;
+                if (perp < perpLo[0][j]) perpLo[0][j] = perp;
+                if (perp > perpHi[0][j]) perpHi[0][j] = perp;
             }
             if (std::abs(t - (tMax - o)) <= ep) {
-                if (perp < perpLo[1][i]) perpLo[1][i] = perp;
-                if (perp > perpHi[1][i]) perpHi[1][i] = perp;
+                if (perp < perpLo[1][j]) perpLo[1][j] = perp;
+                if (perp > perpHi[1][j]) perpHi[1][j] = perp;
             }
         }
     }
+
     double widths[2][3];
     for (int side = 0; side < 2; side++)
-        for (int i = 0; i < 3; i++)
-            widths[side][i] = (perpHi[side][i] > perpLo[side][i]) ? perpHi[side][i] - perpLo[side][i] : 999.0;
+        for (int j = 0; j < 3; j++)
+            widths[side][j] = (perpHi[side][j] > perpLo[side][j])
+                                  ? perpHi[side][j] - perpLo[side][j] : 999.0;
+
     auto median3 = [](double a[3]) -> double {
         double b[3] = {a[0], a[1], a[2]};
         if (b[0] > b[1]) std::swap(b[0], b[1]);
@@ -488,16 +520,15 @@ double detect_arrow_angle_hsv(const uint8_t* bgra_data, int w, int h,
         return b[1];
     };
     double med[2] = {median3(widths[0]), median3(widths[1])};
-    int tipEnd = (med[0] < med[1]) ? -1 : 1;
+    bool tipAtTMax = (med[0] >= med[1]);  // 较窄端为箭尖
 
-    double angleDeg;
-    if (tipEnd == 1) {
-        angleDeg = axisDeg;
-    } else {
-        angleDeg = std::fmod(axisDeg + 180.0, 360.0);
+    double angle_deg = angle_rad * 180.0 / CV_PI;
+    if (!tipAtTMax) {
+        angle_deg += 180.0;
     }
+    angle_deg = std::fmod(angle_deg, 360.0);
 
-    return angleDeg;
+    return angle_deg;
 }
 
 // ============================================================================
