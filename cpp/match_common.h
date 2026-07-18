@@ -7,7 +7,7 @@
 //   - Mat serialization (compressed zlib-based)
 //   - MiniMapProcessor (HoughCircles)
 //   - Circle mask utility
-//   - Arrow angle detection (HSV inRange + PCA)
+//   - Arrow angle detection (grayscale threshold + flood-fill + PCA)
 //   - Result serialization
 //   - Abstract MatcherBase interface
 //   - CONFIG_DATA parser
