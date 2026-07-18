@@ -79,8 +79,11 @@ public class LayerMapBatchRenderer {
                 group("月兔暗港", allLayers, 12, 16),
                 group("二叠山丘一层", allLayers, 10),
                 group("下水管道口", allLayers, 2),
-                group("火巨人洞窟", allLayers, 17, 18, 19),
-                group("森巨人洞窟", allLayers, 21, 22),
+                group("火巨人洞窟一层", allLayers, 17),
+                group("火巨人洞窟二层", allLayers, 18),
+                group("火巨人洞窟三层", allLayers, 19),
+                group("森巨人洞窟一层", allLayers, 21),
+                group("森巨人洞窟二层", allLayers, 22),
                 group("雪巨人洞窟", allLayers, 24),
                 group("光王祭坛", allLayers, 26)
         );
@@ -109,8 +112,11 @@ public class LayerMapBatchRenderer {
 
         // 5. 额外生成合并图（同坐标区域合并），用于瓦片生成
         renderMerged("信仰者村落", allLayers, maskPixels, outputDir, 4, 5);
-        renderMerged("火巨人洞窟", allLayers, maskPixels, outputDir, 17, 18, 19);
-        renderMerged("森巨人洞窟", allLayers, maskPixels, outputDir, 21, 22);
+        renderMerged("火巨人洞窟一层", allLayers, maskPixels, outputDir, 18, 19, 17);
+        renderMerged("火巨人洞窟二层", allLayers, maskPixels, outputDir, 17, 19, 18);
+        renderMerged("火巨人洞窟三层", allLayers, maskPixels, outputDir, 17, 18, 19);
+        renderMerged("森巨人洞窟一层", allLayers, maskPixels, outputDir,  22, 21);
+        renderMerged("森巨人洞窟二层", allLayers, maskPixels, outputDir, 21, 22);
 
         log.info("全部完成！输出目录: {}", outputDir);
     }
