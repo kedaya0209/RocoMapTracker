@@ -151,4 +151,41 @@ public class ResourcePointContext {
     public List<ResourcePoint> getPointsInRect(double minX, double minY, double maxX, double maxY) {
         return gridIndex.queryRect(minX, minY, maxX, maxY);
     }
+
+    /**
+     * 获取所有不重复的资源类别（如 宝箱、材料、眠枭之星），按名称排序。
+     */
+    public List<String> getResourceTypes() {
+        return rawResourceList.stream()
+                .map(ResourceConfig::getType)
+                .filter(Objects::nonNull)
+                .distinct()
+                .sorted()
+                .toList();
+    }
+
+    /**
+     * 获取指定类别下所有不重复的资源名称（markTypeName），按名称排序。
+     */
+    public List<String> getResourceNamesByType(String type) {
+        return rawResourceList.stream()
+                .filter(c -> type.equals(c.getType()))
+                .map(ResourceConfig::getMarkTypeName)
+                .filter(Objects::nonNull)
+                .distinct()
+                .sorted()
+                .toList();
+    }
+
+    /**
+     * 获取指定资源名称对应的图标文件名（取第一个匹配的 config）。
+     */
+    public String getIconForName(String markTypeName) {
+        return rawResourceList.stream()
+                .filter(c -> markTypeName.equals(c.getMarkTypeName()))
+                .map(ResourceConfig::getIcon)
+                .filter(Objects::nonNull)
+                .findFirst()
+                .orElse(null);
+    }
 }

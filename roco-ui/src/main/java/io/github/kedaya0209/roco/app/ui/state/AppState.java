@@ -6,6 +6,9 @@ import io.github.kedaya0209.roco.app.config.ViewConfig;
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;
 
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.Map;
+
 /**
  * 应用级运行时状态 — JavaFX Property，可观测。
  * <p>
@@ -14,6 +17,7 @@ import javafx.beans.property.SimpleBooleanProperty;
  *   <li>{@link #materialCollection} — 物资采集面板显示</li>
  *   <li>{@link #matchingEnabled} — SIFT 匹配开关</li>
  *   <li>{@link #ghostMode} — 幽灵模式（纯运行时，不持久化）</li>
+ *   <li>{@link #resourceFilters} — 资源筛选状态（动态，默认全部可见）</li>
  * </ul>
  * Property 变更的副作用（Config 写入、EventBus 通知）由 Command 的 handler 统一处理，
  * 不再在 setter 中直接写 Config 字段。
@@ -31,6 +35,8 @@ public class AppState {
             new SimpleBooleanProperty(SiftConfig.SIFT_MATCHING_ENABLED);
     /** 幽灵模式（纯运行时，不持久化） */
     private final SimpleBooleanProperty ghostMode = new SimpleBooleanProperty(false);
+    /** 资源筛选状态：markTypeName → BooleanProperty（默认 true=可见） */
+    private final Map<String, SimpleBooleanProperty> resourceFilters = new ConcurrentHashMap<>();
 
     public static AppState getInstance() {
         return INSTANCE;
@@ -76,6 +82,25 @@ public class AppState {
 
     public void setGhostMode(boolean v) {
         ghostMode.set(v);
+    }
+
+    // ==== resourceFilters ====
+
+    /**
+     * 获取指定资源名称的筛选 Property，不存在时自动创建（默认 true=可见）。
+     */
+    public BooleanProperty getResourceFilter(String name) {
+        return resourceFilters.computeIfAbsent(name, _ -> new SimpleBooleanProperty(true));
+    }
+
+    /**
+     * 切换指定资源名称的可见性。
+     */
+    public void toggleResourceFilter(String name) {
+        SimpleBooleanProperty prop = resourceFilters.get(name);
+        if (prop != null) {
+            prop.set(!prop.get());
+        }
     }
 
     /**

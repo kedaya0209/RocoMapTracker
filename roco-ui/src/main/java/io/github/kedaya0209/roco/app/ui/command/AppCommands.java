@@ -50,4 +50,9 @@ public final class AppCommands {
     @ThreadSafe
     public record SwitchWindowCommand() implements UiCommand {
     }
+
+    /** 切换资源类型筛选（宝箱/材料/眠枭之星） */
+    @ThreadSafe
+    public record ToggleResourceTypeCommand(String typeName) implements UiCommand {
+    }
 }

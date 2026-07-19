@@ -310,6 +310,11 @@ public class Sidebar extends VBox {
                                 });
                     }
                 }
+                // 清理内存缓存
+                IconCache.getInstance().clear();
+                SvgManager.clearCache();
+                ImageLoader.getInstance().clearCache();
+
                 Platform.runLater(() -> {
                     if (rootPane != null) {
                         ToastManager.show(rootPane, "缓存已清除", NotificationType.SUCCESS);

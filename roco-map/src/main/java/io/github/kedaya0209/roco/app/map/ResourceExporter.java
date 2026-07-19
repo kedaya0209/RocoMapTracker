@@ -17,9 +17,11 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
- * 资源导出器：从游戏解包数据导出可采集的材料资源点，生成 resource_configs.json。
+ * 资源导出器：从游戏解包数据导出可采集的材料资源点，生成 internal_resource_point.json。
  *
  * <h3>数据链路</h3>
  * <pre>
@@ -44,7 +46,7 @@ import java.util.Set;
  *                     ③ refresh_param → AREA_CONF / SCENE_OBJECT_CONF 取 center_xyz / position_xyz
  *                     ④ WORLD_MAP_BLOCK_CONF → canvas 像素坐标 (8192×8192, 中心原点)
  *                     ⑤ 组合键(层级+材料名+坐标)去重
- *                     ⑥ 写入 resource_configs.json
+ *                     ⑥ 写入 internal_resource_point.json
  * </pre>
  *
  * <h3>图标导出</h3>
@@ -311,7 +313,7 @@ public class ResourceExporter {
         log.info("MEGAMAP_GATHERING 映射命中: {}", root.size());
 
         // 4. 落地保存
-        File outFile = new File(BASE_DIR, "resource_configs.json");
+        File outFile = new File(BASE_DIR, "internal_resource_point.json");
         mapper.writerWithDefaultPrettyPrinter().writeValue(outFile, root);
         log.info("批量导出并去重完成！");
         log.info("生成总点位数: {}", root.size());
@@ -426,12 +428,15 @@ public class ResourceExporter {
 
             if (name.contains("眠枭之星")) {
                 String color = getOwlStarColor(row);
-                String coloredName = name + "（" + color + "）";
-                paramToMaterial.put(npcId, coloredName);
+                paramToMaterial.put(npcId, "眠枭之星（" + color + "）");
                 owlCount++;
             } else if (name.contains("宝箱")) {
                 if (name.contains("副本")) continue;
-                paramToMaterial.put(npcId, name);
+                String normalized = normalizeChestName(name);
+                if (!name.equals(normalized)) {
+                    log.info("宝箱名称规范化: [{}] → [{}]", name, normalized);
+                }
+                paramToMaterial.put(npcId, normalized);
                 chestCount++;
             }
         }
@@ -458,6 +463,20 @@ public class ResourceExporter {
         if (name.contains("（黄）")) return "黄";
         if (name.contains("（紫）")) return "紫";
         return "蓝";
+    }
+
+    /** 宝箱名称规范化：从原始名称中分别提取"xx系"和"x级"，拼装为"xx系x级宝箱"或"x级宝箱"。 */
+    private static final Pattern CHEST_TYPE_PATTERN = Pattern.compile("(\\S+系)");
+    private static final Pattern CHEST_LEVEL_PATTERN = Pattern.compile("([\\d一二三四五六七八九十]+级)");
+
+    private static String normalizeChestName(String name) {
+        Matcher typeMatcher = CHEST_TYPE_PATTERN.matcher(name);
+        String type = typeMatcher.find() ? typeMatcher.group(1) : "";
+
+        Matcher levelMatcher = CHEST_LEVEL_PATTERN.matcher(name);
+        String level = levelMatcher.find() ? levelMatcher.group(1) : "";
+
+        return type + level + "宝箱";
     }
 
     /**
