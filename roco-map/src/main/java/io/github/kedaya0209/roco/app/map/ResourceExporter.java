@@ -82,6 +82,14 @@ public class ResourceExporter {
     private static final String BIN_COMPRESSED = "D:\\Documents\\unpack\\Output\\Exports\\NRC\\Content\\ScriptC\\Data\\Bin\\BinDataCompressed";
     private static final String BIN_COMPRESSED_2P = "D:\\Documents\\code\\Roco-tools\\Roco-Kingdom-World-Data\\pakchunk4-WindowsNoEditor_2_P\\Bin\\BinDataCompressed";
     private static final String BIN_LOCALIZE = "D:\\Documents\\unpack\\Output\\Exports\\NRC\\Content\\ScriptC\\Data\\Bin\\BinLocalize\\dev_CN";
+    private static final String PATCH_DATA_DIR = "D:\\Documents\\code\\Roco-tools\\Roco-Kingdom-World-Data";
+    private static final String[] PATCH_DIRS = {
+            "pakchunk4-WindowsNoEditor",
+            "pakchunk4-WindowsNoEditor_0_P",
+            "pakchunk4-WindowsNoEditor_1_P",
+            "pakchunk4-WindowsNoEditor_2_P",
+            "pakchunk4-WindowsNoEditor_3_P"
+    };
     private static final int CANVAS_SIZE = 8192;
 
     private static final Set<String> TARGET_NPC_NAMES = new HashSet<>();
@@ -97,6 +105,7 @@ public class ResourceExporter {
     // NPC_CONF 定义 — 用于 traverse_data_param 回溯到 BAG_ITEM_CONF
     private final Map<Integer, JsonNode> npcDef = new HashMap<>();
     private final Map<Integer, JsonNode> npcOptionConf = new HashMap<>(); // NPC_OPTION_CONF button_icon 回溯
+    private final Map<Integer, JsonNode> modelConf = new HashMap<>(); // MODEL_CONF 用于眠枭之星颜色判定
 
     private final ObjectMapper mapper = new ObjectMapper();
 
@@ -213,6 +222,37 @@ public class ResourceExporter {
             }
         }
 
+        // 2d. 为 NPC 名称匹配的目标（眠枭之星、宝箱）添加类型映射并提取图标
+        // 眠枭之星：按颜色分别复制图标文件
+        String chestIconFile = null;
+        Map<String, String> owlColorIcons = new HashMap<>();
+        for (String name : paramToMaterial.values()) {
+            if (nameToTypeMap.containsKey(name)) continue;
+            if (name.contains("眠枭之星")) {
+                nameToTypeMap.put(name, "眠枭之星");
+                String color = extractColorFromName(name);
+                String coloredIconName = "眠枭之星（" + color + "）.png";
+                if (!owlColorIcons.containsKey(color)) {
+                    String result = tryCopyOwlColorIcon(color, coloredIconName, iconDir);
+                    if (result != null) {
+                        owlColorIcons.put(color, result);
+                    }
+                }
+                String iconFile = owlColorIcons.get(color);
+                if (iconFile != null) {
+                    nameToIconMap.put(name, iconFile);
+                }
+            } else if (name.contains("宝箱")) {
+                nameToTypeMap.put(name, "宝箱");
+                if (chestIconFile == null) {
+                    chestIconFile = tryExtractNpcIcon(name, iconDir);
+                }
+                if (chestIconFile != null) {
+                    nameToIconMap.put(name, chestIconFile);
+                }
+            }
+        }
+
         ArrayNode root = mapper.createArrayNode();
         Set<String> deduplicationSet = new HashSet<>();
 
@@ -280,12 +320,10 @@ public class ResourceExporter {
 
     private void loadData() throws IOException {
         File dataDir = new File(BIN_COMPRESSED);
-        File locDir = new File(BIN_LOCALIZE);
 
-        // 场景配置（地图中心、边长）
-        JsonNode sceneConf = mapper.readTree(new File(dataDir, "WORLD_MAP_BLOCK_CONF.json")).get("RocoDataRows");
-        sceneConf.fields().forEachRemaining(e -> {
-            JsonNode r = e.getValue();
+        // 场景配置（地图中心、边长）— 使用合并补丁数据
+        Map<Integer, JsonNode> blockConf = loadMergedData("WORLD_MAP_BLOCK_CONF.json");
+        blockConf.values().forEach(r -> {
             if (r.has("map_center_position_xyz") && r.has("side_length")) {
                 String[] c = r.get("map_center_position_xyz").asText().split(";");
                 String id = r.get("scene_res_id").asText();
@@ -294,18 +332,20 @@ public class ResourceExporter {
             }
         });
 
-        // 从最新解包数据加载
-        fill(npcConf, new File(dataDir, "NPC_REFRESH_CONTENT_CONF.json"));
-        fill(areaConf, new File(dataDir, "AREA_CONF.json"));
-        fill(objConf, new File(dataDir, "SCENE_OBJECT_CONF.json"));
+        // 使用合并补丁数据加载（base → _0_P → _1_P → _2_P → _3_P，后覆盖前）
+        npcConf.putAll(loadMergedData("NPC_REFRESH_CONTENT_CONF.json"));
+        areaConf.putAll(loadMergedData("AREA_CONF.json"));
+        objConf.putAll(loadMergedData("SCENE_OBJECT_CONF.json"));
+        npcDef.putAll(loadMergedData("NPC_CONF.json"));
+
         // BAG_ITEM_CONF 优先使用 _2_P 数据（包 Split 补丁，有更正后的物品名称）
         // 回退到用户自己的解包数据
         File bagItemFile = new File(BIN_COMPRESSED_2P, "BAG_ITEM_CONF.json");
         if (!bagItemFile.exists()) bagItemFile = new File(dataDir, "BAG_ITEM_CONF.json");
         fill(itemConf, bagItemFile);
         fill(itemTypeConf, new File(dataDir, "BAG_ITEM_TYPE_CONF.json"));
-        fill(npcDef, new File(dataDir, "NPC_CONF.json"));
         fill(npcOptionConf, new File(dataDir, "NPC_OPTION_CONF.json"));
+        modelConf.putAll(loadMergedData("MODEL_CONF.json"));
 
         // 构建 param_id → 材料名 映射
         // 来源1：MEGAMAP_GATHERING_CONF — 采集地图上的采集物，genre 字段即材料名
@@ -342,10 +382,182 @@ public class ResourceExporter {
             }
         }
 
+        // 补充2: 按 NPC 名称匹配（眠枭之星、宝箱）
+        loadNpcTargets();
+
         log.info("paramToMaterial 最终: {} 种材料, {} 个 param_id",
                 paramToMaterial.values().stream().distinct().count(), paramToMaterial.size());
 
     }
+
+    /**
+     * 从多级补丁目录合并加载 JSON 数据，后加载的覆盖先加载的同 key 条目。
+     */
+    private Map<Integer, JsonNode> loadMergedData(String fileName) throws IOException {
+        Map<Integer, JsonNode> merged = new HashMap<>();
+        for (String patchDir : PATCH_DIRS) {
+            File f = new File(PATCH_DATA_DIR, patchDir + "\\Bin\\BinDataCompressed\\" + fileName);
+            if (f.exists()) {
+                mapper.readTree(f).get("RocoDataRows").fields().forEachRemaining(e -> {
+                    try {
+                        merged.put(Integer.parseInt(e.getKey()), e.getValue());
+                    } catch (NumberFormatException ignore) {
+                    }
+                });
+            }
+        }
+        return merged;
+    }
+
+    /**
+     * 按 NPC_CONF.name 匹配目标 NPC（眠枭之星、大世界宝箱），加入 paramToMaterial。
+     * 排除"废弃"条目；宝箱类排除"副本"（仅大世界）。
+     */
+    private void loadNpcTargets() {
+        int owlCount = 0;
+        int chestCount = 0;
+        for (var e : npcDef.entrySet()) {
+            int npcId = e.getKey();
+            if (paramToMaterial.containsKey(npcId)) continue;
+            JsonNode row = e.getValue();
+            if (!row.has("name")) continue;
+            String name = row.get("name").asText();
+            if (name.isEmpty() || name.contains("废弃")) continue;
+
+            if (name.contains("眠枭之星")) {
+                String color = getOwlStarColor(row);
+                String coloredName = name + "（" + color + "）";
+                paramToMaterial.put(npcId, coloredName);
+                owlCount++;
+            } else if (name.contains("宝箱")) {
+                if (name.contains("副本")) continue;
+                paramToMaterial.put(npcId, name);
+                chestCount++;
+            }
+        }
+        log.info("NPC 名称匹配: 眠枭之星 {} 个, 宝箱 {} 个", owlCount, chestCount);
+    }
+
+    /**
+     * 根据 NPC 的 model_conf → MODEL_CONF 蓝图路径判定眠枭之星颜色。
+     */
+    private String getOwlStarColor(JsonNode npcRow) {
+        if (!npcRow.has("model_conf")) return "蓝";
+        int mcId = npcRow.get("model_conf").asInt();
+        JsonNode mc = modelConf.get(mcId);
+        if (mc == null || !mc.has("path")) return "蓝";
+        String path = mc.get("path").asText();
+        if (path.contains("Purple") || path.contains("Gulitianguo3")) return "紫";
+        if (path.contains("Yellow") || path.contains("Gulitianguo2")) return "黄";
+        return "蓝";
+    }
+
+    /** 从已带颜色后缀的 NPC 名称中提取颜色字符（蓝/黄/紫）。 */
+    private String extractColorFromName(String name) {
+        if (name.contains("（蓝）")) return "蓝";
+        if (name.contains("（黄）")) return "黄";
+        if (name.contains("（紫）")) return "紫";
+        return "蓝";
+    }
+
+    /**
+     * 将眠枭之星源图标复制为指定颜色的图标文件。
+     * 先尝试找任意一个眠枭之星 NPC 的源图标，再复制到颜色文件名。
+     */
+    private String tryCopyOwlColorIcon(String color, String targetFileName, File iconDir) {
+        // 找一个眠枭之星 NPC 来获取源图标
+        for (var e : paramToMaterial.entrySet()) {
+            String name = e.getValue();
+            if (!name.contains("眠枭之星")) continue;
+            String srcIcon = tryExtractNpcIcon(name, iconDir);
+            if (srcIcon != null) {
+                Path srcPath = Path.of(iconDir.getAbsolutePath(), srcIcon);
+                Path dstPath = Path.of(iconDir.getAbsolutePath(), targetFileName);
+                try {
+                    Files.copy(srcPath, dstPath, StandardCopyOption.REPLACE_EXISTING);
+                    return targetFileName;
+                } catch (IOException ignore) {
+                }
+            }
+            break;
+        }
+        return null;
+    }
+
+    /**
+     * 为 NPC 名称匹配的目标（宝箱、眠枭之星等）提取图标。
+     * 先尝试 NPC_OPTION_CONF 的 button_icon 路径，失败则回退到已知资源路径。
+     *
+     * @return 图标文件名（如 "宝箱.png"），失败返回 null
+     */
+    private String tryExtractNpcIcon(String npcName, File iconDir) {
+        // 1. 找出映射到此 NPC 名称的 npc_id
+        Integer npcId = null;
+        for (var e : paramToMaterial.entrySet()) {
+            if (npcName.equals(e.getValue())) { npcId = e.getKey(); break; }
+        }
+        if (npcId == null) return null;
+
+        JsonNode npcRow = npcDef.get(npcId);
+        if (npcRow == null) return null;
+
+        // 2. 尝试从 NPC_OPTION_CONF.button_icon 复制
+        if (npcRow.has("option_id")) {
+            for (JsonNode optIdNode : npcRow.get("option_id")) {
+                JsonNode optRow = npcOptionConf.get(optIdNode.asInt());
+                if (optRow == null || !optRow.has("button_icon")) continue;
+                String btnIcon = optRow.get("button_icon").asText();
+                if (!btnIcon.contains("'")) continue;
+                String iconPath = btnIcon.replace("Game", "Content");
+                iconPath = iconPath.substring(iconPath.indexOf("'") + 1, iconPath.lastIndexOf(".") + 1) + "png";
+                Path source = Paths.get(RESOURCE_DIR, iconPath);
+                if (Files.exists(source)) {
+                    try {
+                        String targetName = getCategoryName(npcName) + ".png";
+                        Files.copy(source, Path.of(iconDir.getAbsolutePath(), targetName),
+                                StandardCopyOption.REPLACE_EXISTING);
+                        return targetName;
+                    } catch (IOException ignore) {
+                    }
+                }
+            }
+        }
+
+        // 3. 回退：已知资源路径
+        String fallbackPath = getFallbackIconPath(npcName);
+        if (fallbackPath != null) {
+            Path source = Paths.get(RESOURCE_DIR, fallbackPath);
+            if (Files.exists(source)) {
+                try {
+                    String targetName = getCategoryName(npcName) + ".png";
+                    Files.copy(source, Path.of(iconDir.getAbsolutePath(), targetName),
+                            StandardCopyOption.REPLACE_EXISTING);
+                    return targetName;
+                } catch (IOException ignore) {
+                }
+            }
+        }
+        return null;
+    }
+
+    /** 根据 NPC 名称返回类别名（用作图标文件名前缀） */
+    private String getCategoryName(String npcName) {
+        if (npcName.contains("眠枭之星")) return "眠枭之星";
+        if (npcName.contains("宝箱")) return "宝箱";
+        return npcName;
+    }
+
+    /** 已知的图标回退路径（相对于 RESOURCE_DIR） */
+    private String getFallbackIconPath(String npcName) {
+        if (npcName.contains("宝箱")) {
+            return "Content\\NewRoco\\Modules\\System\\Activity\\Raw\\Textures\\img_tongyong_baoxiang.png";
+        }
+        if (npcName.contains("眠枭之星")) {
+            return "Content\\NewRoco\\Modules\\System\\BigMap\\Raw\\Atlas\\WorldMapNpc\\Frames\\starsouls_01.png";
+        }
+        return null;
+    }
+
     /** 尝试从 BAG_ITEM_CONF row 复制图标，成功返回 true */
     private boolean tryCopyIcon(JsonNode itemRow, String materialName, File iconDir) throws IOException {
         for (String field : new String[]{"icon", "big_icon"}) {

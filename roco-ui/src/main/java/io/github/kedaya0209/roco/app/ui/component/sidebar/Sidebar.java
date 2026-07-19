@@ -3,15 +3,24 @@ package io.github.kedaya0209.roco.app.ui.component.sidebar;
 import atlantafx.base.theme.Styles;
 import io.github.kedaya0209.roco.app.config.*;
 import io.github.kedaya0209.roco.app.context.ResourceConfigContext;
+import io.github.kedaya0209.roco.app.hook.AppEvents;
+import io.github.kedaya0209.roco.app.hook.event.NotificationType;
+import io.github.kedaya0209.roco.app.hook.event.StatusEvent;
+import io.github.kedaya0209.roco.app.map.loader.ImageLoader;
 import io.github.kedaya0209.roco.app.match.map.SwitchMapMatcher;
-import io.github.kedaya0209.roco.app.ui.component.dialog.AboutDialog;
-import io.github.kedaya0209.roco.app.ui.component.setting.SettingsStage;
-import io.github.kedaya0209.roco.app.ui.component.widget.RouteManagerStage;
-import io.github.kedaya0209.roco.app.ui.service.ui.ThemeManager;
 import io.github.kedaya0209.roco.app.ui.command.AppCommands.SwitchWindowCommand;
 import io.github.kedaya0209.roco.app.ui.command.CommandBus;
+import io.github.kedaya0209.roco.app.ui.component.dialog.AboutDialog;
+import io.github.kedaya0209.roco.app.ui.component.overlay.ToastManager;
+import io.github.kedaya0209.roco.app.ui.component.setting.SettingsStage;
+import io.github.kedaya0209.roco.app.ui.component.widget.RouteManagerStage;
+import io.github.kedaya0209.roco.app.ui.service.resource.IconCache;
+import io.github.kedaya0209.roco.app.ui.service.resource.SvgManager;
+
+import io.github.kedaya0209.roco.app.ui.service.ui.ThemeManager;
 import io.github.kedaya0209.roco.app.ui.state.AppState;
 import io.github.kedaya0209.roco.app.ui.state.ViewportState;
+import io.github.kedaya0209.roco.app.utils.FilePathUtil;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -30,6 +39,9 @@ import net.jcip.annotations.NotThreadSafe;
 import net.jcip.annotations.ThreadSafe;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Comparator;
 
 @NotThreadSafe
 @Slf4j
@@ -133,6 +145,8 @@ public class Sidebar extends VBox {
                 null, null, null, false, "/icon/route.svg", this::openRouteManager));
         items.add(new SidebarItem(SidebarItem.Type.WIKI, null, null, null, wikiUpdater));
         items.add(new SidebarItem(SidebarItem.Type.WIKI, null, null, null, checkUpdateMgr));
+        items.add(new SidebarItem(SidebarItem.Type.ACTION, "清除缓存",
+                null, null, null, false, "/icon/delete.svg", this::clearCache));
         items.add(new SidebarItem(SidebarItem.Type.ACTION, "插件管理",
                 null, null, null, false, "/icon/plugins.svg",
                 () -> openSettingsCategory("插件管理")));
@@ -278,6 +292,40 @@ public class Sidebar extends VBox {
                 BuildConfig.APP_VERSION,
                 BuildConfig.BUILD_TIMESTAMP,
                 "https://github.com/kedaya0209/RocoMapTracker");
+    }
+
+    private void clearCache() {
+        StackPane rootPane = findRootPane();
+        Thread.ofPlatform().daemon(true).name("clear-cache").start(() -> {
+            try {
+                Path cacheDir = FilePathUtil.getAppRootDir().resolve("cache");
+                if (Files.exists(cacheDir)) {
+                    try (var walk = Files.walk(cacheDir)) {
+                        walk.sorted(Comparator.reverseOrder())
+                                .forEach(p -> {
+                                    try {
+                                        Files.delete(p);
+                                    } catch (IOException ignored) {
+                                    }
+                                });
+                    }
+                }
+                Platform.runLater(() -> {
+                    if (rootPane != null) {
+                        ToastManager.show(rootPane, "缓存已清除", NotificationType.SUCCESS);
+                    }
+                    AppEvents.publish(StatusEvent.class,
+                            new StatusEvent("缓存已清除", NotificationType.SUCCESS, StatusEvent.DisplayMode.CAROUSEL));
+                });
+            } catch (Exception e) {
+                log.error("清除缓存失败", e);
+                Platform.runLater(() -> {
+                    if (rootPane != null) {
+                        ToastManager.show(rootPane, "清除缓存失败", NotificationType.ERROR);
+                    }
+                });
+            }
+        });
     }
 
     // ══════════ 页脚 ══════════
