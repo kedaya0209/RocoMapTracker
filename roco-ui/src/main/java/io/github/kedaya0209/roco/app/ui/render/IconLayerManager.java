@@ -8,6 +8,7 @@ import io.github.kedaya0209.roco.app.context.ResourcePointContext;
 import io.github.kedaya0209.roco.app.map.model.Point;
 import io.github.kedaya0209.roco.app.map.model.ResourcePoint;
 import io.github.kedaya0209.roco.app.ui.service.resource.IconCache;
+import io.github.kedaya0209.roco.app.ui.state.AppState;
 import io.github.kedaya0209.roco.app.ui.state.ViewportState;
 import javafx.geometry.Rectangle2D;
 import javafx.scene.Group;
@@ -32,6 +33,8 @@ public class IconLayerManager implements RenderLayer {
 
     private final Group iconGroup;
     private final Map<ResourcePoint, ImageView> iconViews = new HashMap<>();
+    /** 按 markTypeName 分组的子 Group，用于筛选显隐 */
+    private final Map<String, Group> nameGroups = new HashMap<>();
     private double lastGrayCheckX = Double.NaN;
     private double lastGrayCheckY = Double.NaN;
     /** 上次 counter-rotate 角度，用于脏检测 */
@@ -68,7 +71,8 @@ public class IconLayerManager implements RenderLayer {
     }
 
     /**
-     * 为每个资源点创建 ImageView，放入 iconGroup
+     * 为每个资源点创建 ImageView，按 markTypeName 分组放入 iconGroup。
+     * 筛选时按名称粒度显隐对应的 Group。
      */
     public void buildIconLayer() {
         IconCache cache = IconCache.getInstance();
@@ -77,8 +81,12 @@ public class IconLayerManager implements RenderLayer {
             return;
         }
 
+        nameGroups.clear();
+        iconGroup.getChildren().clear();
+
         Image colorAtlas = cache.getColorAtlas();
         Image grayAtlas = cache.getGrayAtlas();
+        AppState app = AppState.getInstance();
         int built = 0;
 
         for (ResourcePoint rp : ResourcePointContext.getInstance().getAllPoints()) {
@@ -104,10 +112,22 @@ public class IconLayerManager implements RenderLayer {
             iv.setFitHeight(RenderConfig.ICON_SIZE);
 
             iconViews.put(rp, iv);
-            iconGroup.getChildren().add(iv);
+
+            // 按 markTypeName 分组：惰性创建 Group 并绑定筛选状态
+            String name = rp.getConfig().getMarkTypeName();
+            Group nameGroup = nameGroups.computeIfAbsent(name, _ -> {
+                Group g = new Group();
+                g.setPickOnBounds(false);
+                g.setMouseTransparent(true);
+                g.visibleProperty().bind(app.getResourceFilter(name));
+                iconGroup.getChildren().add(g);
+                return g;
+            });
+            nameGroup.getChildren().add(iv);
             built++;
         }
-        log.info("图标 ImageView 层已构建: {} 个点位", built);
+
+        log.info("图标 ImageView 层已构建: {} 个点位, {} 个名称分组", built, nameGroups.size());
     }
 
     /**

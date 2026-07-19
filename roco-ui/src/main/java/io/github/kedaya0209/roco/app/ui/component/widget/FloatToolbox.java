@@ -1,10 +1,14 @@
 package io.github.kedaya0209.roco.app.ui.component.widget;
 
 import io.github.kedaya0209.roco.app.context.MapContext;
+import io.github.kedaya0209.roco.app.context.ResourcePointContext;
+import io.github.kedaya0209.roco.app.map.loader.ImageLoader;
 import io.github.kedaya0209.roco.app.map.model.CompositeMapMetadata;
 import io.github.kedaya0209.roco.app.ui.command.AppCommands.SetFollowModeCommand;
 import io.github.kedaya0209.roco.app.ui.command.AppCommands.SetLayerCommand;
 import io.github.kedaya0209.roco.app.ui.command.AppCommands.ToggleMaterialCollectionCommand;
+import io.github.kedaya0209.roco.app.ui.command.AppCommands.ToggleResourceTypeCommand;
+import io.github.kedaya0209.roco.app.config.PathConfig;
 import io.github.kedaya0209.roco.app.ui.command.CommandBus;
 import io.github.kedaya0209.roco.app.ui.component.overlay.ResourceCounterPanel;
 import io.github.kedaya0209.roco.app.ui.service.VersionMode;
@@ -12,6 +16,7 @@ import io.github.kedaya0209.roco.app.ui.service.resource.SvgManager;
 import io.github.kedaya0209.roco.app.ui.service.ui.VersionManager;
 import io.github.kedaya0209.roco.app.ui.state.AppState;
 import io.github.kedaya0209.roco.app.ui.state.ViewportState;
+import io.github.kedaya0209.roco.app.utils.ResourceUtils;
 import javafx.beans.binding.Bindings;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
@@ -19,9 +24,12 @@ import javafx.geometry.Pos;
 import javafx.scene.Group;
 import javafx.scene.Node;
 import javafx.scene.control.Label;
+import javafx.scene.control.OverrunStyle;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Tooltip;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
+import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.StackPane;
@@ -33,6 +41,7 @@ import javafx.util.Duration;
 import lombok.Getter;
 import net.jcip.annotations.NotThreadSafe;
 
+import java.io.ByteArrayInputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -63,6 +72,15 @@ public class FloatToolbox extends VBox {
     private final Image coverImg;
     private final Image coverActiveImg;
 
+    // 资源筛选
+    private final StackPane filterBtn;
+    private final VBox filterPanel;
+    private boolean filterExpanded = false;
+    private boolean filterPanelBuilt = false;
+    private static final double FILTER_PANEL_WIDTH = 220;
+    private static final double FILTER_PANEL_MAX_HEIGHT = 400;
+    private static final int FILTER_ICON_SIZE = 20;
+
     public FloatToolbox(ResourceCounterPanel resourcePanel, String unifiedBlueColor) {
         super(12);
         instance = this;
@@ -73,14 +91,22 @@ public class FloatToolbox extends VBox {
         setStyle("-fx-background-color: transparent;");
 
         // 加载 PNG 图标
-        this.mainlandImg = new Image(getClass().getResourceAsStream("/icon/mainland.png"));
-        this.mainlandActiveImg = new Image(getClass().getResourceAsStream("/icon/mainland_active.png"));
-        this.coverImg = new Image(getClass().getResourceAsStream("/icon/cover.png"));
-        this.coverActiveImg = new Image(getClass().getResourceAsStream("/icon/cover_active.png"));
+        try {
+            this.mainlandImg = new Image(ResourceUtils.getResourceStream("/icon/mainland.png"));
+            this.mainlandActiveImg = new Image(ResourceUtils.getResourceStream("/icon/mainland_active.png"));
+            this.coverImg = new Image(ResourceUtils.getResourceStream("/icon/cover.png"));
+            this.coverActiveImg = new Image(ResourceUtils.getResourceStream("/icon/cover_active.png"));
 
-        // 左侧列：全部按钮（跟随、大陆、层按钮）
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        // 左侧列：全部按钮（筛选、跟随、大陆、层按钮）
         leftCol = new VBox(12);
         leftCol.setAlignment(Pos.TOP_CENTER);
+
+        // 资源筛选按钮放最上面
+        filterBtn = createFilterButton(unifiedBlueColor);
+        leftCol.getChildren().add(filterBtn);
 
         StackPane followBtn = createFollowButton(unifiedBlueColor);
         mainlandBtn = createMainlandButton();
@@ -120,7 +146,21 @@ public class FloatToolbox extends VBox {
             }
         }
 
-        // 主布局：左侧按钮列 + 右侧洞穴覆盖层（translateX 跟随 leftCol 宽度）
+        // 资源筛选展开面板（右侧覆盖层，首次点击时才填充内容）
+        filterPanel = new VBox(6);
+        filterPanel.setStyle("-fx-background-color: -color-bg-default; -fx-background-radius: 6; " +
+                "-fx-border-color: -color-border-muted; -fx-border-radius: 6;");
+        filterPanel.setManaged(false);
+        filterPanel.setVisible(false);
+        filterPanel.setMinWidth(FILTER_PANEL_WIDTH);
+        filterPanel.setMaxWidth(FILTER_PANEL_WIDTH);
+        Pane filterPaneOverlay = new Pane();
+        filterPaneOverlay.setPickOnBounds(false);
+        filterPaneOverlay.translateXProperty().bind(leftCol.widthProperty().add(16));
+        filterPaneOverlay.setMaxSize(0, 0);
+        filterPaneOverlay.getChildren().add(filterPanel);
+
+        // 主布局：左侧按钮列 + 右侧覆盖层
         StackPane layoutStack = new StackPane();
         layoutStack.setAlignment(Pos.TOP_LEFT);
         HBox leftWrapper = new HBox(leftCol);
@@ -129,6 +169,7 @@ public class FloatToolbox extends VBox {
         // 防止 StackPane 拉伸 cavePane
         cavePane.setMaxSize(0, 0);
         layoutStack.getChildren().add(cavePane);
+        layoutStack.getChildren().add(filterPaneOverlay);
         getChildren().add(layoutStack);
 
         // 资源计数切换（仅在高级版显示）
@@ -418,5 +459,156 @@ public class FloatToolbox extends VBox {
                 }
             }
         }
+    }
+
+    // ==================== 资源筛选 ====================
+
+    /**
+     * 筛选图标按钮：点击展开/收起筛选面板，首次展开时从 ResourcePointContext 动态构建面板内容。
+     */
+    private StackPane createFilterButton(String unifiedBlueColor) {
+        StackPane btn = new StackPane();
+        btn.getStyleClass().add("float-toolbox-btn");
+
+        SVGPath icon = new SVGPath();
+        icon.setContent("M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z");
+        icon.setFill(Color.WHITE);
+        icon.setStroke(Color.BLACK);
+        icon.setStrokeWidth(0.2);
+        icon.setScaleX(1.3);
+        icon.setScaleY(1.3);
+
+        Tooltip tooltip = new Tooltip("资源筛选");
+        tooltip.setShowDelay(Duration.millis(150));
+        Tooltip.install(btn, tooltip);
+        btn.getChildren().add(icon);
+
+        btn.setOnMouseClicked(_ -> {
+            filterExpanded = !filterExpanded;
+            if (filterExpanded) {
+                if (!filterPanelBuilt) {
+                    buildFilterPanel();
+                    filterPanelBuilt = true;
+                }
+                // 展开时显式 resize + layout（managed=false 不会自动布局）
+                filterPanel.applyCss();
+                double h = Math.min(filterPanel.prefHeight(FILTER_PANEL_WIDTH), FILTER_PANEL_MAX_HEIGHT);
+                filterPanel.resize(FILTER_PANEL_WIDTH, h);
+                filterPanel.layout();
+                // 面板定位到与筛选按钮中心对齐（不超出标题栏下方）
+                double btnCenterSceneY = btn.localToScene(
+                        btn.getBoundsInLocal().getCenterX(),
+                        btn.getBoundsInLocal().getCenterY()).getY();
+                double localY = filterPanel.getParent().sceneToLocal(0, btnCenterSceneY).getY();
+                double layoutY = localY - h / 2;
+                double minLayoutY = filterPanel.getParent().sceneToLocal(0, 48).getY();
+                if (layoutY < minLayoutY) {
+                    layoutY = minLayoutY;
+                }
+                filterPanel.setLayoutY(layoutY);
+            }
+            filterPanel.setVisible(filterExpanded);
+            icon.setFill(filterExpanded ? Color.web(unifiedBlueColor) : Color.WHITE);
+        });
+
+        return btn;
+    }
+
+    /**
+     * 从 ResourcePointContext 动态构建筛选面板：按 type 分组，每组下列出图标+名称条目。
+     */
+    private void buildFilterPanel() {
+        filterPanel.getChildren().clear();
+
+        VBox content = new VBox(6);
+        content.setPadding(new Insets(8));
+
+        ResourcePointContext rpc = ResourcePointContext.getInstance();
+        List<String> types = rpc.getResourceTypes();
+        for (String type : types) {
+            List<String> names = rpc.getResourceNamesByType(type);
+            if (names.isEmpty()) continue;
+
+            VBox section = new VBox(3);
+
+            // 可点击的类型标题：点击切换该分类下所有名称
+            HBox headerBox = new HBox(4);
+            headerBox.setAlignment(Pos.CENTER_LEFT);
+            headerBox.setStyle("-fx-cursor: hand;");
+            Label header = new Label(type + " (" + names.size() + ")");
+            header.setStyle("-fx-text-fill: -color-fg-muted; -fx-font-size: 11px; -fx-font-weight: bold;");
+            headerBox.getChildren().add(header);
+
+            FlowPane items = new FlowPane(4, 4);
+            for (String name : names) {
+                items.getChildren().add(createFilterItem(name));
+            }
+
+            // 点击标题切换该分类全部显示/隐藏
+            headerBox.setOnMouseClicked(_ -> {
+                AppState app = AppState.getInstance();
+                boolean allOn = names.stream().allMatch(n -> app.getResourceFilter(n).get());
+                for (String name : names) {
+                    boolean current = app.getResourceFilter(name).get();
+                    if (current == allOn) {
+                        CommandBus.dispatch(new ToggleResourceTypeCommand(name));
+                    }
+                }
+            });
+
+            section.getChildren().addAll(headerBox, items);
+            content.getChildren().add(section);
+        }
+
+        ScrollPane scrollPane = new ScrollPane(content);
+        scrollPane.setFitToWidth(true);
+        scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        scrollPane.setStyle("-fx-background: transparent; -fx-background-color: transparent; -fx-padding: 0;");
+        scrollPane.setMaxHeight(FILTER_PANEL_MAX_HEIGHT);
+        filterPanel.getChildren().add(scrollPane);
+    }
+
+    /**
+     * 创建单个资源名称筛选条目：[图标 20x20] [名称文字]，点击切换显隐。
+     */
+    private HBox createFilterItem(String resourceName) {
+        HBox item = new HBox(4);
+        item.setAlignment(Pos.CENTER_LEFT);
+        item.setPadding(new Insets(2));
+        item.setStyle("-fx-cursor: hand;");
+
+        // 资源图标
+        ImageView iconView = new ImageView();
+        iconView.setFitWidth(FILTER_ICON_SIZE);
+        iconView.setFitHeight(FILTER_ICON_SIZE);
+        iconView.setPreserveRatio(true);
+        String iconFile = ResourcePointContext.getInstance().getIconForName(resourceName);
+        if (iconFile != null) {
+            try {
+                String path = PathConfig.ICON_DIR + iconFile;
+                byte[] bytes = ImageLoader.getInstance().loadIconBytes(path);
+                if (bytes != null) {
+                    iconView.setImage(new Image(new ByteArrayInputStream(bytes)));
+                }
+            } catch (Exception ignored) {
+            }
+        }
+
+        // 名称
+        Label nameLabel = new Label(resourceName);
+        nameLabel.setStyle("-fx-text-fill: -color-fg-default; -fx-font-size: 11px;");
+        nameLabel.setMaxWidth(140);
+        nameLabel.setTextOverrun(OverrunStyle.ELLIPSIS);
+
+        item.getChildren().addAll(iconView, nameLabel);
+
+        // 绑定筛选状态
+        item.opacityProperty().bind(Bindings
+                .when(AppState.getInstance().getResourceFilter(resourceName))
+                .then(1.0).otherwise(0.35));
+
+        item.setOnMouseClicked(_ -> CommandBus.dispatch(new ToggleResourceTypeCommand(resourceName)));
+
+        return item;
     }
 }

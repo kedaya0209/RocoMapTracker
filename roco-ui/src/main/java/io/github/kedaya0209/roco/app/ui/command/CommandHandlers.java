@@ -116,6 +116,9 @@ public final class CommandHandlers {
             MapContext.getInstance().setActiveLayer(cmd.layer());
         });
 
+        CommandBus.subscribe(ToggleResourceTypeCommand.class, cmd ->
+                AppState.getInstance().toggleResourceFilter(cmd.typeName()));
+
         CommandBus.subscribe(SwitchWindowCommand.class, cmd -> {
             if (rootStack == null || captureServiceManager == null) return;
             // 关闭侧边栏，让切换面板有更大的展示空间
