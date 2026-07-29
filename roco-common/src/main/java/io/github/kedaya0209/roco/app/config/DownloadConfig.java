@@ -49,7 +49,7 @@ public final class DownloadConfig {
     /**
      * 地图资源点数据 URL
      */
-    public static String MAP_RESOURCE_POINT_URL = "https://wiki.biligame.com/rocom/Data:Mapnew/point.json";
+    public static String MAP_RESOURCE_POINT_URL = "https://wiki.biligame.com/rocom/";
 
     // --- 下载器参数 ---
     /**

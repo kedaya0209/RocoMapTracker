@@ -101,6 +101,10 @@ public final class MapResourceUpdater {
     private MapResourceUpdater() {
     }
 
+    static void main() {
+        updateAllResources();
+    }
+
     // ========== 公共API方法 ==========
 
     /**
@@ -110,7 +114,10 @@ public final class MapResourceUpdater {
      * @return true 全部成功，false 中途失败（地图下载或配置构建出错）
      */
     public static boolean updateAllResources() {
+        //清理缓存
         LoadInfo.invalidateCategoryCache();
+        //重新解析地图元数据
+        LoadInfo.remoteResolveConfig();
 
         if (!MapDownloader.updateMap()) {
             System.gc();
@@ -124,12 +131,14 @@ public final class MapResourceUpdater {
         }
         MapFileMover.moveMapsToResource();
 
+        //重新解析点位数据
         if (!ResourceConfigBuilder.buildAndSaveConfig()) {
             System.gc();
             return false;
         }
-
+        //下载图标
         IconDownloader.downloadIcons();
+        //移动到资源目录
         MapFileMover.moveAllResources();
 
         // 全量下载完成，清理临时文件

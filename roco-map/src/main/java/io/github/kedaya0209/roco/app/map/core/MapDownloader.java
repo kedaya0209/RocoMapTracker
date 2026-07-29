@@ -68,10 +68,6 @@ public class MapDownloader {
             Files.createDirectories(FilePathUtil.getRelativeFile(MapResourceUpdater.DOWNLOAD_MAP_DIR).toPath());
             Files.createDirectories(FilePathUtil.getRelativeFile(MapResourceUpdater.CHUNK_DIR).toPath());
 
-            if (DownloadConfig.MAP_REMOTE_URLS == null || DownloadConfig.MAP_REMOTE_URLS.length == 0) {
-                LoadInfo.remoteResolveConfig();
-            }
-
             // 2. 遍历地图配置
             CountDownLatch latch = new CountDownLatch(DownloadConfig.MAP_REMOTE_URLS.length);
             for (int i = 0; i < DownloadConfig.MAP_REMOTE_URLS.length; i++) {

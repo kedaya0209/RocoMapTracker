@@ -49,9 +49,8 @@ public class JsMapConfigParser {
             config.setMapBG(getStr(jsContent, "mapBG:\\s*\"([^\"]+)\""));
             config.setDataPrefix(getStr(jsContent, "dataPrefix:\\s*\"([^\"]+)\""));
 
-            // 设置数据列表（使用默认值）
-            // 默认加载point.json文件
-            config.setDataList(List.of("point.json"));
+            // 动态解析 dataList 数组
+            config.setDataList(getDataList(jsContent));
 
             // 解析地图图层信息
             List<MapLayer> layers = new ArrayList<>();
@@ -116,6 +115,19 @@ public class JsMapConfigParser {
 
         // 查找匹配，找到则返回分组1的整数值，否则返回0
         return m.find() ? Integer.parseInt(m.group(1)) : 0;
+    }
+
+    private static List<String> getDataList(String s) {
+        Matcher m = Pattern.compile("dataList:\\s*\\[([^\\]]+)\\]").matcher(s);
+        if (!m.find()) {
+            return List.of("point.json");
+        }
+        List<String> result = new ArrayList<>();
+        Matcher strMatcher = Pattern.compile("\"([^\"]+)\"").matcher(m.group(1));
+        while (strMatcher.find()) {
+            result.add(strMatcher.group(1));
+        }
+        return result.isEmpty() ? List.of("point.json") : result;
     }
 
     private static boolean getBool(String s, String regex) {
