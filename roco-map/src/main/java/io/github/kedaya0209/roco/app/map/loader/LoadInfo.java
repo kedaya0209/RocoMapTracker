@@ -25,6 +25,11 @@ public class LoadInfo {
      */
     private static List<MapCategoryItem> categoryCache = null;
 
+    /**
+     * 需要加载的点位数据文件列表，由 remoteResolveConfig() 从远程配置中解析。
+     */
+    private static List<String> pointDataFiles = List.of("point.json");
+
     public static void invalidateCategoryCache() {
         categoryCache = null;
     }
@@ -41,6 +46,10 @@ public class LoadInfo {
         if (cfg == null) {
             // 配置加载失败，直接返回，不更新任何配置
             return;
+        }
+
+        if (cfg.getDataList() != null && !cfg.getDataList().isEmpty()) {
+            pointDataFiles = cfg.getDataList();
         }
 
         // 更新地图缩放级别配置
@@ -100,9 +109,7 @@ public class LoadInfo {
     }
 
     public static List<MapPointItem> parsePointJson() {
-        // 委托给MapPointLoader执行实际的加载和解析操作
-        // 使用Loader模式分离数据获取和业务逻辑，提高代码的可维护性
-        return MapPointLoader.load();
+        return MapPointLoader.load(pointDataFiles);
     }
 
     public static List<MapCategoryItem> parseCategoryData() {
